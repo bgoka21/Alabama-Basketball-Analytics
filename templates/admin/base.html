@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-white text-black">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alabama Basketball</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 h-screen bg-[#9E1B32] text-white flex flex-col px-4 py-6">
+    <h1 class="text-2xl font-bold mb-8">Alabama Basketball</h1>
+    <nav class="flex flex-col gap-4">
+      <a href="{{ url_for('admin.dashboard') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Dashboard</a>
+      <a href="{{ url_for('admin.files_view_unique') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Files</a>
+      <a href="{{ url_for('admin.game_reports') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Game Reports</a>
+      <a href="{{ url_for('admin.game_stats', game_id=1) }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Stats</a>
+      <a href="{{ url_for('admin.players_list') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Players</a>
+      <a href="{{ url_for('admin.edit_roster', season_id=1) }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Edit Roster</a>
+    </nav>
+  </aside>
+
+  <!-- Main content area -->
+  <main class="flex-1 p-6 overflow-y-auto bg-white text-black">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

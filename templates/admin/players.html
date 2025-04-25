@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1 class="text-2xl font-bold mb-4">Players List</h1>
+  
+  <!-- Season Filter Dropdown -->
+  <form method="GET" action="{{ url_for('admin.players_list') }}" class="mb-4">
+    <label for="season" class="font-semibold mr-2">Select Season:</label>
+    <select name="season_id" id="season" class="p-2 border rounded">
+      {% for season in seasons %}
+        <option value="{{ season.id }}" {% if season.id == selected_season %}selected{% endif %}>
+          {{ season.season_name }}
+        </option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded ml-2">Filter</button>
+  </form>
+  
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white dark:bg-gray-800">
+      <thead class="bg-gray-100 dark:bg-gray-700">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Player Name</th>
+          <th class="px-6 py-3 text-center text-xs font-medium uppercase">Action</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+        {% for player in players %}
+          <tr>
+            <td class="px-6 py-4">{{ player }}</td>
+            <td class="px-6 py-4 text-center">
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">
+                View Player
+              </a>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="2" class="px-6 py-4 text-center">No players found for this season.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Edit Roster Button -->
+  {% if selected_season %}
+    <div class="mt-4 text-right">
+      <a href="{{ url_for('admin.edit_roster', season_id=selected_season) }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        Edit Roster for this Season
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}

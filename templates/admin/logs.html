@@ -1,0 +1,12 @@
+<!-- admin/logs.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Parse Logs for {{ uploaded_file.filename }}</h1>
+<p>Status: {{ uploaded_file.parse_status }}</p>
+<pre style="border:1px solid #ccc; padding:10px; background:#f9f9f9;">
+{{ uploaded_file.parse_log }}
+</pre>
+
+<a href="{{ url_for('admin.dashboard') }}">Back to Dashboard</a>
+{% endblock %}

@@ -1,0 +1,768 @@
+{% extends 'base.html' %}
+{% block content %}
+{# a default “empty” detail so missing categories don’t blow up #}
+{% set empty_group = namespace(
+  total     = namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0),
+  transition=namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0),
+  halfcourt =namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0)
+) %}
+
+<div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+  <h1 class="text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
+  
+<div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+  <!-- Tab Buttons -->
+  <div class="flex space-x-2 mb-4">
+    <button
+      id="btnSeasonTotals"
+      onclick="showTab('seasonTotals')"
+      class="px-4 py-2 border rounded"
+    >
+      Season Totals
+    </button>
+    <button
+      id="btnGameStats"
+      onclick="showTab('gameStats')"
+      class="px-4 py-2 border rounded"
+    >
+      Game‑by‑Game Stats
+    </button>
+    <button
+      id="btnShotType"
+      onclick="showTab('shotType')"
+      class="px-4 py-2 border rounded"
+    >
+      Shot Type
+    </button>
+  </div>
+
+  <!-- 1) Season Totals -->
+  <div id="seasonTotals" class="tab-content block">
+    <!-- Row 1: Advanced Shooting Metrics -->
+    <div class="grid grid-cols-2 gap-4 mb-6 justify-items-center">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+        <div class="text-sm font-medium text-gray-500 uppercase">PTS/SHOT</div>
+        <div class="text-3xl font-bold mt-2">{{ aggregated.points_per_shot }}</div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+        <div class="text-sm font-medium text-gray-500 uppercase">EFG%</div>
+        <div class="text-3xl font-bold mt-2">{{ aggregated.efg_pct }}</div>
+      </div>
+    </div>
+
+    <!-- Row 2: Shooting Breakdown -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+      <!-- ATR -->
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+        <div class="text-sm font-medium text-gray-500 uppercase">ATR</div>
+        <div class="text-3xl font-bold my-2">
+          {% if aggregated.atr_attempts > 0 %}
+            {{ (aggregated.atr_makes/aggregated.atr_attempts*100)|round(1) }}%
+          {% else %}0%{% endif %}
+        </div>
+        <div class="text-xs text-gray-500">{{ aggregated.atr_makes }}/{{ aggregated.atr_attempts }}</div>
+      </div>
+      <!-- 2FG -->
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+        <div class="text-sm font-medium text-gray-500 uppercase">2FG</div>
+        <div class="text-3xl font-bold my-2">
+          {% if aggregated.fg2_attempts > 0 %}
+            {{ (aggregated.fg2_makes/aggregated.fg2_attempts*100)|round(1) }}%
+          {% else %}0%{% endif %}
+        </div>
+        <div class="text-xs text-gray-500">{{ aggregated.fg2_makes }}/{{ aggregated.fg2_attempts }}</div>
+      </div>
+      <!-- 3FG -->
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+        <div class="text-sm font-medium text-gray-500 uppercase">3FG</div>
+        <div class="text-3xl font-bold my-2">
+          {% if aggregated.fg3_attempts > 0 %}
+            {{ (aggregated.fg3_makes/aggregated.fg3_attempts*100)|round(1) }}%
+          {% else %}0%{% endif %}
+        </div>
+        <div class="text-xs text-gray-500">{{ aggregated.fg3_makes }}/{{ aggregated.fg3_attempts }}</div>
+      </div>
+      <!-- FT -->
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+        <div class="text-sm font-medium text-gray-500 uppercase">FT</div>
+        <div class="text-3xl font-bold my-2">
+          {% if aggregated.fta > 0 %}
+            {{ (aggregated.ftm/aggregated.fta*100)|round(1) }}%
+          {% else %}0%{% endif %}
+        </div>
+        <div class="text-xs text-gray-500">{{ aggregated.ftm }}/{{ aggregated.fta }}</div>
+      </div>
+    </div>
+
+    <!-- Row 3: Totals -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      {% for label, value in [
+        ('Points', aggregated.points),
+        ('Assists', aggregated.assists),
+        ('Pot. Assists', aggregated.pot_assists),
+        ('2nd Assists', aggregated.second_assists),
+        ('Turnovers', aggregated.turnovers)
+      ] %}
+        <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+          <div class="text-sm font-medium text-gray-500 uppercase">{{ label }}</div>
+          <div class="text-2xl font-bold mt-2">{{ value }}</div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Row 4: Ratios -->
+    <div class="grid grid-cols-2 gap-4 mb-6 justify-items-center">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+        <div class="text-sm font-medium text-gray-500 uppercase">AST/TO Ratio</div>
+        <div class="text-2xl font-bold mt-2">{{ aggregated.assist_turnover_ratio }}</div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+        <div class="text-sm font-medium text-gray-500 uppercase">Adj AST/TO</div>
+        <div class="text-2xl font-bold mt-2">{{ aggregated.adj_assist_turnover_ratio }}</div>
+      </div>
+    </div>
+
+<!-- Blue Collar Breakdown -->
+<div class="mt-8">
+  <h2 class="text-xl font-semibold mb-4">Blue Collar Breakdown</h2>
+  <div class="overflow-x-auto">
+    <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+      <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Category</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for label, value in [
+          ('Def Reb',      player_blue_breakdown.def_reb),
+          ('Off Reb',      player_blue_breakdown.off_reb),
+          ('Misc',         player_blue_breakdown.misc),
+          ('Deflection',   player_blue_breakdown.deflection),
+          ('Steal',        player_blue_breakdown.steal),
+          ('Block',        player_blue_breakdown.block),
+          ('Floor Dive',   player_blue_breakdown.floor_dive),
+          ('Charge Taken', player_blue_breakdown.charge_taken)
+        ] %}
+        <tr class="odd:bg-white even:bg-gray-100">
+          <td class="px-4 py-2">{{ label }}</td>
+          <td class="px-4 py-2">{{ value }}</td>
+        </tr>
+        {% endfor %}
+
+        {# crimson divider before Season Totals #}
+        <tr class="h-0">
+          <td colspan="2" class="p-0">
+            <div class="h-[2px] bg-[#9E1B32]"></div>
+          </td>
+        </tr>
+
+        <tr class="odd:bg-white even:bg-gray-100 font-bold">
+          <td class="px-4 py-2">Season Totals</td>
+          <td class="px-4 py-2">{{ player_blue_breakdown.total_blue_collar }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div>  <!-- ← NEW: closes `<div id="seasonTotals">` -->
+
+<!-- 2) Game-by-Game Stats -->
+<div id="gameStats" class="tab-content hidden">
+  <h2 class="text-xl font-semibold mb-2">Game-by-Game Breakdown</h2>
+  <div class="overflow-x-auto">
+    <table
+      id="gameStatsTable"
+      class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg"
+    >
+      <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase whitespace-nowrap" data-sort-key="game_date" style="cursor:pointer;">
+            Date<span class="sort-indicator ml-2">⇅</span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Opponent</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="points" style="cursor:pointer;">
+            Pts<span class="sort-indicator ml-2"></span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="assists" style="cursor:pointer;">
+            Ast<span class="sort-indicator ml-2"></span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Pot. Ast</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="turnovers" style="cursor:pointer;">
+            TO's<span class="sort-indicator ml-2"></span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">ATR</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="atr_pct" style="cursor:pointer;">
+            ATR%<span class="sort-indicator ml-2"></span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">2FG</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="fg2_pct" style="cursor:pointer;">
+            2FG%<span class="sort-indicator ml-2"></span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">3FG</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="fg3_pct" style="cursor:pointer;">
+            3FG%<span class="sort-indicator ml-2"></span>
+          </th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">FT</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase" data-sort-key="ft_pct" style="cursor:pointer;">
+            FT%<span class="sort-indicator ml-2"></span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for gid, d in game_breakdown.items() %}
+          {% set dt = game_details.get(gid, {'game_date':'','opponent_name':'','sort_date':'0'}) %}
+          <tr class="odd:bg-white even:bg-gray-100">
+            <td class="px-4 py-2" data-sort="{{ dt.sort_date }}">{{ dt.game_date }}</td>
+            <td class="px-4 py-2">{{ dt.opponent_name }}</td>
+            <td class="px-4 py-2">{{ d.points }}</td>
+            <td class="px-4 py-2">{{ d.assists }}</td>
+            <td class="px-4 py-2">{{ d.pot_assists }}</td>
+            <td class="px-4 py-2">{{ d.turnovers }}</td>
+            <td class="px-4 py-2">{{ d.atr_makes }}/{{ d.atr_attempts }}</td>
+            <td class="px-4 py-2">
+              {% if d.atr_attempts>0 %}{{ (d.atr_makes/d.atr_attempts*100)|round(1) }}%{% else %}0%{% endif %}
+            </td>
+            <td class="px-4 py-2">{{ d.fg2_makes }}/{{ d.fg2_attempts }}</td>
+            <td class="px-4 py-2">
+              {% if d.fg2_attempts>0 %}{{ (d.fg2_makes/d.fg2_attempts*100)|round(1) }}%{% else %}0%{% endif %}
+            </td>
+            <td class="px-4 py-2">{{ d.fg3_makes }}/{{ d.fg3_attempts }}</td>
+            <td class="px-4 py-2">
+              {% if d.fg3_attempts>0 %}{{ (d.fg3_makes/d.fg3_attempts*100)|round(1) }}%{% else %}0%{% endif %}
+            </td>
+            <td class="px-4 py-2">{{ d.ftm }}/{{ d.fta }}</td>
+            <td class="px-4 py-2">
+              {% if d.fta>0 %}{{ (d.ftm/d.fta*100)|round(1) }}%{% else %}0%{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+  <!-- Shot Type Section -->
+  <div id="shotType" class="tab-content hidden">
+  <h2 class="text-xl font-semibold mb-4">Shot Type Overview</h2>
+
+  <!-- Season Aggregates as big cards -->
+  <div class="grid grid-cols-3 gap-4 mb-6">
+    <!-- ATR Season -->
+    <div
+      id="cardATR"
+      onclick="showShotTypeDetail('atr')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.atr.fg_pct|round(1)
+                |grade_atr2fg_pct(shot_type_totals.atr.attempts) }}"
+    >
+      <div class="text-sm font-medium text-gray-500 uppercase">ATR Season</div>
+      <div class="text-2xl font-bold mt-2">
+        {{ shot_type_totals.atr.fg_pct|round(1) }}%
+      </div>
+      <div class="text-xs text-gray-500">
+        {{ shot_type_totals.atr.makes }}/{{ shot_type_totals.atr.attempts }}
+      </div>
+    </div>
+
+    <!-- 2FG Season -->
+    <div
+      id="cardFG2"
+      onclick="showShotTypeDetail('fg2')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.fg2.fg_pct|round(1)
+                |grade_atr2fg_pct(shot_type_totals.fg2.attempts) }}"
+    >
+      <div class="text-sm font-medium text-gray-500 uppercase">2FG Season</div>
+      <div class="text-2xl font-bold mt-2">
+        {{ shot_type_totals.fg2.fg_pct|round(1) }}%
+      </div>
+      <div class="text-xs text-gray-500">
+        {{ shot_type_totals.fg2.makes }}/{{ shot_type_totals.fg2.attempts }}
+      </div>
+    </div>
+
+    <!-- 3FG Season -->
+    <div
+      id="cardFG3"
+      onclick="showShotTypeDetail('fg3')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.fg3.fg_pct|round(1)
+                |grade_3fg_pct(shot_type_totals.fg3.attempts) }}"
+    >
+      <div class="text-sm font-medium text-gray-500 uppercase">3FG Season</div>
+      <div class="text-2xl font-bold mt-2">
+        {{ shot_type_totals.fg3.fg_pct|round(1) }}%
+      </div>
+      <div class="text-xs text-gray-500">
+        {{ shot_type_totals.fg3.makes }}/{{ shot_type_totals.fg3.attempts }}
+      </div>
+    </div>
+  </div>
+
+  <!-- (no more small buttons here—click the big cards above!) -->
+
+
+    {# pull in our three namespaces from the route #}
+    {% set atr_summary = shot_summaries['atr'] %}
+    {% set fg2_summary = shot_summaries['fg2'] %}
+    {% set fg3_summary = shot_summaries['fg3'] %}
+    
+    
+    {# ── ATR Detail Table ── #}
+    {% set atr_groups = [
+      ('Assisted',        ['Assisted','Non‑Assisted']),
+      ('Dribble',      ['Dribble','No Dribble']),
+      ('RA',           ['Restricted Area','Non Restricted Area']),
+      ('Feet',         ['Off 1 Foot','Off 2 Feet']),
+      ('Hands',        ['Left Hand Finish','Right Hand Finish','Hands To Rim','Hands Away From Rim']),
+      ('PA',           ['Play Action','No Play Action']),
+      ('Defenders',    ['Primary Defender','Secondary Defender','Multiple Defenders','Unguarded']),
+      ('Type',         ['Dunk','Catch','Floater','Layup','Pull Up','Step Back']),
+      ('Other',        ['Blocked']),
+      ('Scheme – Drive',  ['Middle Drive','Baseline Drive','Slot Drive','Drive Right','Drive Left']),
+      ('Scheme – Attack', ['Beast / Post','DHO / Get','Iso','PnR Handler','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Pass',   [
+        'Swing','Check Down','Off Screen','1 More','Lift','PnR Pocket','Post Entry','Drift','PnR Lob','Post Pass Out','Kickdown',
+        'PnR Late Roll','Dump Off','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Slash / Cut','Reshape',
+        'Shake','Skip','Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
+      ])
+    ] %}
+    
+    <div id="atr" class="detail-content hidden">
+      <table class="min-w-full divide-y divide-gray-200 mb-6">
+        <thead class="bg-gray-100">
+          <tr>
+            <th rowspan="2" class="px-4 py-2 text-left">Category</th>
+            <th colspan="4" class="px-4 py-2 text-center">Total</th>
+            <th colspan="4" class="px-4 py-2 text-center">Transition</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half‑Court</th>
+          </tr>
+          <tr>
+            {% for _ in range(3) %}
+              <th class="px-2 py-1 text-center">FGA</th>
+              <th class="px-2 py-1 text-center">FG%</th>
+              <th class="px-2 py-1 text-center">PPS</th>
+              <th class="px-2 py-1 text-center">Freq%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for _group_name, cats in atr_groups %}
+            {# crimson divider between groups #}
+            <tr>
+              <td colspan="13" class="p-0">
+                <div class="h-[2px] bg-[#9E1B32]"></div>
+              </td>
+            </tr>
+    
+            {# actual data rows with zebra stripes #}
+            {% for category in cats %}
+              {% set d = atr_summary.cats.get(category, empty_group) %}
+              <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
+                <td class="px-4 py-2">{{ category }}</td>
+    
+                {# Totals #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.makes }}‑{{ d.total.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.total.fg_pct*100)|round(1)|grade_atr2fg_pct(d.total.attempts) }}"
+                >
+                  {{ (d.total.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ (d.total.attempts/shot_type_totals.atr.attempts*100)|round(1) }}%
+                </td>
+    
+                {# Transition #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.makes }}‑{{ d.transition.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.transition.fg_pct*100)|round(1)|grade_atr2fg_pct(d.transition.attempts) }}"
+                >
+                  {{ (d.transition.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ (d.transition.attempts/shot_type_totals.atr.attempts*100)|round(1) }}%
+                </td>
+    
+                {# Half‑Court #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.makes }}‑{{ d.halfcourt.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.halfcourt.fg_pct*100)|round(1)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
+                >
+                  {{ (d.halfcourt.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ (d.halfcourt.attempts/shot_type_totals.atr.attempts*100)|round(1) }}%
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+    
+    
+    
+    
+    {# ── 2FG Detail Table ── #}
+    {% set fg2_groups = [
+      ('Assisted',        ['Assisted','Non‑Assisted']),
+      ('Dribble',      ['Dribble','No Dribble']),
+      ('RA',           ['Restricted Area','Non Restricted Area']),
+      ('Feet',         ['Off 1 Foot','Off 2 Feet']),
+      ('Hands',        ['Left Hand Finish','Right Hand Finish','Hands To Rim','Hands Away From Rim']),
+      ('PA',           ['Play Action','No Play Action']),
+      ('Defenders',    ['Primary Defender','Secondary Defender','Multiple Defenders','Unguarded']),
+      ('Type',         ['Dunk','Catch','Floater','Layup','Pull Up','Step Back']),
+      ('Other',        ['Blocked']),
+      ('Scheme – Drive',  ['Middle Drive','Baseline Drive','Slot Drive','Drive Right','Drive Left']),
+      ('Scheme – Attack', ['Beast / Post','DHO / Get','Iso','PnR Handler','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Pass',   [
+        'Swing','Check Down','Off Screen','1 More','Lift','PnR Pocket','Post Entry','Drift','PnR Lob','Post Pass Out','Kickdown',
+        'PnR Late Roll','Dump Off','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Slash / Cut','Reshape',
+        'Shake','Skip','Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
+      ])
+    ] %}
+    
+    <div id="fg2" class="detail-content hidden">
+      <table class="min-w-full divide-y divide-gray-200 mb-6">
+        <thead class="bg-gray-100">
+          <tr>
+            <th rowspan="2" class="px-4 py-2 text-left">Category</th>
+            <th colspan="4" class="px-4 py-2 text-center">Total</th>
+            <th colspan="4" class="px-4 py-2 text-center">Transition</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half‑Court</th>
+          </tr>
+          <tr>
+            {% for _ in range(3) %}
+              <th class="px-2 py-1 text-center">FGA</th>
+              <th class="px-2 py-1 text-center">FG%</th>
+              <th class="px-2 py-1 text-center">PPS</th>
+              <th class="px-2 py-1 text-center">Freq%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for _group_name, cats in fg2_groups %}
+            {# crimson divider between groups #}
+            <tr>
+              <td colspan="13" class="p-0">
+                <div class="h-[2px] bg-[#9E1B32]"></div>
+              </td>
+            </tr>
+    
+            {# actual data rows with zebra stripes #}
+            {% for category in cats %}
+              {% set d = fg2_summary.cats.get(category, empty_group) %}
+              <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
+                <td class="px-4 py-2">{{ category }}</td>
+    
+                {# Totals #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.makes }}‑{{ d.total.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.total.fg_pct*100)|round(1)|grade_atr2fg_pct(d.total.attempts) }}"
+                >
+                  {{ (d.total.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg2.attempts > 0 %}
+                    {{ (d.total.attempts/shot_type_totals.fg2.attempts*100)|round(1) }}%
+                  {% else %}0%{% endif %}
+                </td>
+    
+                {# Transition #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.makes }}‑{{ d.transition.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.transition.fg_pct*100)|round(1)|grade_atr2fg_pct(d.transition.attempts) }}"
+                >
+                  {{ (d.transition.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg2.attempts > 0 %}
+                    {{ (d.transition.attempts/shot_type_totals.fg2.attempts*100)|round(1) }}%
+                  {% else %}0%{% endif %}
+                </td>
+    
+                {# Half‑Court #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.makes }}‑{{ d.halfcourt.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.halfcourt.fg_pct*100)|round(1)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
+                >
+                  {{ (d.halfcourt.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg2.attempts > 0 %}
+                    {{ (d.halfcourt.attempts/shot_type_totals.fg2.attempts*100)|round(1) }}%
+                  {% else %}0%{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+    
+    
+    
+    {# ── 3FG Detail Table ── #}
+    {% set fg3_groups = [
+      ('Assisted',        ['Assisted','Non‑Assisted']),
+      ('Type',         ['Catch and Shoot','Pull Up','Step Back','Catch and Hold','Slide Dribble']),
+      ('Line',         ['On The Line','Off The Line']),
+      ('Pocket',       ['Shot Pocket','Non-Shot Pocket']),
+      ('Move',         ['Stationary','On Move']),
+      ('Contest',      ['Contest','Uncontested','Late Contest','Blocked']),
+      ('Footwork',     ['WTN Left-Right','WTN Right-Left','Left-Right','Right-Left','Hop']),
+      ('Good/Bad',     ['Good','Bad','Neutral Three']),
+      ('Shrink',       ['Shrink','Non-Shrink']),
+      ('Scheme – Attack',['Beast / Post','DHO / Get','PnR Handler','Iso','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Drive', ['Drive Right','Drive Left','Dip']),
+      ('Scheme – Pass',  [
+        'Swing','Checkdown','Off Screen','1 More','Lift','Drift','Post Entry','Post Pass Out',
+        'Kickdown','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Reshape','Shake','Skip',
+        'Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
+      ])
+    ] %}
+    
+    <div id="fg3" class="detail-content hidden">
+      <table class="min-w-full divide-y divide-gray-200 mb-6">
+        <thead class="bg-gray-100">
+          <tr>
+            <th rowspan="2" class="px-4 py-2 text-left">Category</th>
+            <th colspan="4" class="px-4 py-2 text-center">Total</th>
+            <th colspan="4" class="px-4 py-2 text-center">Transition</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half‑Court</th>
+          </tr>
+          <tr>
+            {% for _ in range(3) %}
+              <th class="px-2 py-1 text-center">FGA</th>
+              <th class="px-2 py-1 text-center">FG%</th>
+              <th class="px-2 py-1 text-center">PPS</th>
+              <th class="px-2 py-1 text-center">Freq%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for _group_name, cats in fg3_groups %}
+            {# crimson divider between groups #}
+            <tr>
+              <td colspan="13" class="p-0">
+                <div class="h-[2px] bg-[#9E1B32]"></div>
+              </td>
+            </tr>
+    
+            {# actual data rows with zebra stripes #}
+            {% for category in cats %}
+              {% set d = fg3_summary.cats.get(category, empty_group) %}
+              <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
+                <td class="px-4 py-2">{{ category }}</td>
+    
+                {# Totals #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.makes }}‑{{ d.total.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.total.fg_pct*100)|round(1)|grade_3fg_pct(d.total.attempts) }}"
+                >
+                  {{ (d.total.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ (d.total.attempts/shot_type_totals.fg3.attempts*100)|round(1) }}%
+                </td>
+    
+                {# Transition #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.makes }}‑{{ d.transition.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.transition.fg_pct*100)|round(1)|grade_3fg_pct(d.transition.attempts) }}"
+                >
+                  {{ (d.transition.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ (d.transition.attempts/shot_type_totals.fg3.attempts*100)|round(1) }}%
+                </td>
+    
+                {# Half‑Court #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.makes }}‑{{ d.halfcourt.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.halfcourt.fg_pct*100)|round(1)|grade_3fg_pct(d.halfcourt.attempts) }}"
+                >
+                  {{ (d.halfcourt.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {{ (d.halfcourt.attempts/shot_type_totals.fg3.attempts*100)|round(1) }}%
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+
+
+  
+  <script>
+// —— Utility ——
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// —— Main tab switcher ——
+function showTab(tabName) {
+  ['seasonTotals','gameStats','shotType'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.toggle('hidden', id !== tabName);
+    el.classList.toggle('block',  id === tabName);
+  });
+  ['btnSeasonTotals','btnGameStats','btnShotType'].forEach(btnId => {
+    document.getElementById(btnId).classList.remove('bg-blue-600','text-white');
+  });
+  document.getElementById('btn' + capitalize(tabName)).classList.add('bg-blue-600','text-white');
+
+  if (tabName === 'shotType') {
+    showShotTypeDetail('atr');  // default into ATR whenever you open ShotType
+  }
+}
+
+
+// —— Shot‑Type sub‑tab switcher ——
+function showShotTypeDetail(detail) {
+  ['atr','fg2','fg3'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.toggle('hidden', id !== detail);
+    el.classList.toggle('block',  id === detail);
+  });
+  const map = { atr:'ATR', fg2:'FG2', fg3:'FG3' };
+  Object.entries(map).forEach(([type,suf]) => {
+    const card = document.getElementById('card' + suf);
+    if (type === detail) {
+      card.classList.replace('bg-white','bg-gray-100');
+      card.classList.replace('dark:bg-gray-800','dark:bg-gray-700');
+      card.classList.replace('shadow-md','shadow-inner');
+    } else {
+      card.classList.replace('bg-gray-100','bg-white');
+      card.classList.replace('dark:bg-gray-700','dark:bg-gray-800');
+      card.classList.replace('shadow-inner','shadow-md');
+    }
+  });
+}
+
+
+// —— DOM‑ready initialization ——
+document.addEventListener('DOMContentLoaded', function() {
+  // 1) Activate the Season Totals tab by default
+  showTab('seasonTotals');
+
+  // 2) Wire up Game‑by‑Game sorting
+  const table = document.getElementById("gameStatsTable");
+  if (table) {
+    const headers = table.querySelectorAll("thead th[data-sort-key]");
+    let sortState = { key: null, order: 'asc' };
+    headers.forEach(header => {
+      const indicator = header.querySelector(".sort-indicator");
+      if (indicator) indicator.textContent = " ⇅";
+      header.addEventListener("click", () => {
+        const sortKey = header.getAttribute("data-sort-key");
+        if (sortState.key === sortKey) {
+          sortState.order = (sortState.order === "asc" ? "desc" : "asc");
+        } else {
+          sortState.key = sortKey;
+          sortState.order = (sortKey === "game_date" ? "desc" : "asc");
+        }
+        // restyle headers
+        headers.forEach(h => h.classList.remove("bg-blue-600","text-white"));
+        headers.forEach(h => {
+          const ind = h.querySelector(".sort-indicator");
+          if (ind) ind.textContent = " ⇅";
+        });
+        header.classList.add("bg-blue-600","text-white");
+        if (indicator) indicator.textContent = (sortState.order === "asc" ? " ▲" : " ▼");
+        // actually sort
+        const sortMapping = {
+          "game_date":0, "points":2, "assists":3,
+          "pot_assists":4, "turnovers":5,
+          "atr_pct":7, "fg2_pct":9, "fg3_pct":11, "ft_pct":13
+        };
+        const colIndex = sortMapping[sortKey];
+        const tbody = table.tBodies[0];
+        Array.from(tbody.rows)
+             .sort((a,b) => {
+               let aVal, bVal;
+               if (sortKey === "game_date") {
+                 aVal = parseInt(a.cells[colIndex].getAttribute("data-sort"))||0;
+                 bVal = parseInt(b.cells[colIndex].getAttribute("data-sort"))||0;
+               } else {
+                 const strip = s=>parseFloat(s.textContent.trim().replace(/%$/,""))||0;
+                 aVal = strip(a.cells[colIndex]);
+                 bVal = strip(b.cells[colIndex]);
+               }
+               return sortState.order==="asc" ? aVal - bVal : bVal - aVal;
+             })
+             .forEach(r=>tbody.appendChild(r));
+      });
+    });
+  }
+});
+</script>
+
+
+
+
+
+{% endblock %}

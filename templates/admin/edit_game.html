@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+  <h1 class="text-2xl font-bold mb-4">Edit Game</h1>
+  <form method="POST">
+    <!-- Game Date -->
+    <div class="mb-4">
+      <label for="game_date" class="block font-semibold mb-1">Game Date</label>
+      <input type="date" id="game_date" name="game_date" value="{{ game.game_date }}" class="w-full p-2 border rounded" required>
+    </div>
+    <!-- Opponent Name -->
+    <div class="mb-4">
+      <label for="opponent_name" class="block font-semibold mb-1">Opponent Name</label>
+      <input type="text" id="opponent_name" name="opponent_name" value="{{ game.opponent_name }}" class="w-full p-2 border rounded" required>
+    </div>
+    <!-- Result -->
+    <div class="mb-4">
+      <label for="result" class="block font-semibold mb-1">Result</label>
+      <input type="text" id="result" name="result" value="{{ game.result }}" class="w-full p-2 border rounded">
+    </div>
+    <!-- Submit Button -->
+    <div>
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        Save Changes
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

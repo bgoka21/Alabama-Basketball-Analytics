@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <h1 class="text-3xl font-bold mb-6 text-center">Uploaded Files</h1>
+
+  <!-- Category Filter -->
+  <form method="GET" class="mb-4 text-center">
+    <label for="category" class="font-semibold mr-2">Filter by Category:</label>
+    <select name="category" id="category" onchange="this.form.submit()" class="border rounded px-3 py-1">
+      <option value="">All</option>
+      <option value="Game" {% if selected_category == 'Game' %}selected{% endif %}>Game</option>
+      <option value="Practice" {% if selected_category == 'Practice' %}selected{% endif %}>Practice</option>
+    </select>
+  </form>
+
+  <!-- Bulk Actions Form -->
+  <form method="POST" action="{{ url_for('admin.bulk_action') }}">
+    <div class="mb-3 flex justify-between items-center">
+      <div>
+        <button name="action" value="download" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Download Selected</button>
+        <button name="action" value="delete" type="submit" onclick="return confirm('Delete selected files?')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded ml-2">Delete Selected</button>
+      </div>
+      <div>
+        <label class="font-medium"><input type="checkbox" id="select-all" class="mr-1">Select All</label>
+      </div>
+    </div>
+
+    <!-- Files Table -->
+    <div class="bg-white shadow rounded-lg overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-[#9E1B32] text-white">
+          <tr>
+            <th class="px-4 py-3"><input type="checkbox" disabled></th>
+            <th class="px-4 py-3 text-left">Filename</th>
+            <th class="px-4 py-3 text-left">Category</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Last Parsed</th>
+            <th class="px-4 py-3 text-left">Uploaded</th>
+            <th class="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 text-gray-800">
+          {% for file in files %}
+          <tr>
+            <td class="px-4 py-3"><input type="checkbox" name="selected_files" value="{{ file.id }}"></td>
+            <td class="px-4 py-3">{{ file.filename }}</td>
+            <td class="px-4 py-3">{{ file.category or 'Uncategorized' }}</td>
+            <td class="px-4 py-3">{{ file.parse_status }}</td>
+            <td class="px-4 py-3">{{ file.last_parsed or '—' }}</td>
+            <td class="px-4 py-3">{{ file.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="px-4 py-3 space-x-2">
+              <a href="{{ url_for('admin.download_file', file_id=file.id) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Download</a>
+              <form method="POST" action="{{ url_for('admin.delete_file', file_id=file.id) }}" class="inline">
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('select-all')?.addEventListener('change', function () {
+    document.querySelectorAll('input[name="selected_files"]').forEach(cb => cb.checked = this.checked);
+  });
+</script>
+{% endblock %}

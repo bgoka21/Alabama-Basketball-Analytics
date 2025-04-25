@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Stats</title>
+</head>
+<body>
+    <h1>🏀 Team Stats</h1>
+
+    <h2>📊 Game-by-Game Team Stats</h2>
+    <table border="1">
+        <tr>
+            <th>Game ID</th>
+            <th>Points</th>
+            <th>Assists</th>
+            <th>Turnovers</th>
+            <th>PPP</th>
+        </tr>
+        {% for game in team_stats %}
+        <tr>
+            <td>{{ game.game_id }}</td>
+            <td>{{ game.total_points }}</td>
+            <td>{{ game.total_assists }}</td>
+            <td>{{ game.total_turnovers }}</td>
+            <td>{{ (game.total_points / game.total_possessions)|round(2) if game.total_possessions > 0 else 'N/A' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>📊 Opponent Stats</h2>
+    <table border="1">
+        <tr>
+            <th>Game ID</th>
+            <th>Points</th>
+            <th>Assists</th>
+            <th>Turnovers</th>
+            <th>PPP</th>
+        </tr>
+        {% for game in opponent_stats %}
+        <tr>
+            <td>{{ game.game_id }}</td>
+            <td>{{ game.total_points }}</td>
+            <td>{{ game.total_assists }}</td>
+            <td>{{ game.total_turnovers }}</td>
+            <td>{{ (game.total_points / game.total_possessions)|round(2) if game.total_possessions > 0 else 'N/A' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1 class="text-2xl font-bold mb-4">Edit Roster</h1>
+
+  <!-- SAVE FORM -->
+  <form method="POST" class="max-w-xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+    <!-- Season Selection -->
+    <div class="mb-4">
+      <label for="season_id" class="block font-semibold mb-1">Select Existing Season:</label>
+      <select name="season_id" id="season_id" class="w-full p-2 border rounded">
+        <option value="">-- Select Season --</option>
+        {% for season in seasons %}
+          <option value="{{ season.id }}" {% if season.id == selected_season %}selected{% endif %}>
+            {{ season.season_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- New Season Input -->
+    <div class="mb-4">
+      <label for="new_season" class="block font-semibold mb-1">Or Create New Season (Enter Year or Season Name):</label>
+      <input
+        type="text"
+        id="new_season"
+        name="new_season"
+        placeholder="e.g. 2025"
+        class="w-full p-2 border rounded"
+      >
+    </div>
+
+    <!-- Players List Textarea -->
+    <div class="mb-4">
+      <label for="players_list" class="block font-semibold mb-1">Enter Player Names (one per line):</label>
+      <textarea
+        id="players_list"
+        name="players_list"
+        rows="10"
+        class="w-full p-2 border rounded"
+      >{{ current_roster }}</textarea>
+    </div>
+
+    <button
+      type="submit"
+      class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+    >
+      Save Roster
+    </button>
+  </form>
+
+  <!-- DELETE FORM (only when a season is selected) -->
+  {% if selected_season %}
+    <form
+      method="POST"
+      action="{{ url_for('admin.delete_roster', season_id=selected_season) }}"
+      onsubmit="return confirm('Really delete the entire roster for this season?');"
+      class="max-w-xl mx-auto mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
+    >
+      <button
+        type="submit"
+        class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+      >
+        Delete Roster
+      </button>
+    </form>
+  {% endif %}
+
+{% endblock %}

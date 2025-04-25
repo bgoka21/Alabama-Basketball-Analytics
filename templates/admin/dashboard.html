@@ -1,0 +1,73 @@
+<!-- admin/dashboard.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">Admin Dashboard</h1>
+
+<!-- Upload Form -->
+<form action="{{ url_for('admin.upload_file') }}" method="post" enctype="multipart/form-data" class="mb-6 space-y-4">
+  <div>
+    <label for="file" class="block font-semibold mb-1">Upload CSV:</label>
+    <input type="file" name="file" multiple id="file" class="border rounded px-4 py-2 w-full" />
+  </div>
+
+  <div>
+    <label for="category" class="block font-semibold mb-1">Category:</label>
+    <select name="category" id="category" class="border rounded px-4 py-2 w-full">
+      <option value="Game">Game</option>
+      <option value="Practice">Practice</option>
+    </select>
+  </div>
+
+  <button type="submit" class="bg-[#9E1B32] text-white px-6 py-2 rounded hover:bg-[#7e1629]">
+    Upload
+  </button>
+</form>
+
+<!-- Display List of Uploaded Files -->
+<div class="overflow-x-auto">
+  <table class="min-w-full border text-sm">
+    <thead class="bg-[#9E1B32] text-white">
+      <tr>
+        <th class="px-4 py-2 text-left">Filename</th>
+        <th class="px-4 py-2 text-left">Status</th>
+        <th class="px-4 py-2 text-left">Last Parsed</th>
+        <th class="px-4 py-2 text-left">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200">
+      {% for f in uploaded_files %}
+      <tr class="bg-white">
+        <td class="px-4 py-2">{{ f.filename }}</td>
+        <td class="px-4 py-2">{{ f.parse_status }}</td>
+        <td class="px-4 py-2">
+          {% if f.last_parsed %}
+            {{ f.last_parsed }}
+          {% else %}
+            Not Parsed
+          {% endif %}
+        </td>
+        <td class="px-4 py-2 space-x-2">
+          <form action="{{ url_for('admin.parse_file', file_id=f.id) }}" method="post" class="inline">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Parse</button>
+          </form>
+          <a href="{{ url_for('admin.view_logs', file_id=f.id) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm">Logs</a>
+          <form action="{{ url_for('admin.delete_file', file_id=f.id) }}" method="post" class="inline">
+            <button type="submit" onclick="return confirm('Delete this file?')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Reset DB Section -->
+<h2 class="text-xl font-bold mt-10 mb-2 text-red-700">Danger Zone</h2>
+<form action="{{ url_for('admin.reset_db') }}" method="post" class="space-y-2">
+  <label class="block font-semibold">Type RESET to confirm:</label>
+  <input type="text" name="confirmation" class="border rounded px-4 py-2 w-full" />
+  <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">Reset Database</button>
+</form>
+{% endblock %}
+
