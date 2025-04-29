@@ -471,9 +471,9 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         ).sum()
     defensive_possessions = defense_count - defense_invalid
 
-    print("📝 Possession Summary:")
-    print(f"   Offensive Possessions: {offensive_possessions} (from {offense_count} Offense rows, {offense_invalid} disregarded)")
-    print(f"   Defensive Possessions: {defensive_possessions} (from {defense_count} Defense rows, {defense_invalid} disregarded)")
+    #print("📝 Possession Summary:")
+    #print(f"   Offensive Possessions: {offensive_possessions} (from {offense_count} Offense rows, {offense_invalid} disregarded)")
+    #print(f"   Defensive Possessions: {defensive_possessions} (from {defense_count} Defense rows, {defense_invalid} disregarded)")
 
     possession_data = []
     for index, row in df.iterrows():
@@ -524,7 +524,7 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
             "is_neutral": is_neutral
         }
         possession_data.append(poss)
-    print("\n📝 Detailed Possession Data:")
+    #print("\n📝 Detailed Possession Data:")
     for poss in possession_data:
         print(poss)
     return possession_data, offensive_possessions, defensive_possessions
@@ -600,9 +600,9 @@ def calculate_derived_metrics(player_stats):
     return player_stats
 
 def parse_csv(file_path, game_id, season_id):
-    print("✅ Starting CSV Processing...")
-    print(f"🔍 Checking file path: {os.path.abspath(file_path)}")
-    print(f"🔍 File exists? {os.path.exists(file_path)}")
+    #print("✅ Starting CSV Processing...")
+    #print(f"🔍 Checking file path: {os.path.abspath(file_path)}")
+    #print(f"🔍 File exists? {os.path.exists(file_path)}")
 
     if not os.path.exists(file_path):
         print("❌ Error: CSV file not found!")
@@ -611,9 +611,9 @@ def parse_csv(file_path, game_id, season_id):
     print(f"📚 Reading CSV: {file_path}")
     df = pd.read_csv(file_path)
 
-    print("🔍 Unique Row Names in CSV:")
-    print(df['Row'].unique())
-    print("📊 CSV Columns:", df.columns.tolist())
+    #print("🔍 Unique Row Names in CSV:")
+    #print(df['Row'].unique())
+    #print("📊 CSV Columns:", df.columns.tolist())
 
     from app import create_app
     app_instance = create_app()
@@ -637,8 +637,8 @@ def parse_csv(file_path, game_id, season_id):
         print("❌ CSV is empty! No data to insert.")
         return
 
-    print(f"✅ CSV Loaded! {len(df)} rows detected.")
-    print("⚙️ parse_csv() function is executing correctly!")
+    #print(f"✅ CSV Loaded! {len(df)} rows detected.")
+    #print("⚙️ parse_csv() function is executing correctly!")
 
     # --- Define Mappings ---
     stat_mapping = {
@@ -1087,7 +1087,7 @@ def parse_csv(file_path, game_id, season_id):
 
     conn.close()
 
-    print("✅ Player Stats Successfully Inserted!")
+    #print("✅ Player Stats Successfully Inserted!")
     calculate_derived_metrics(player_stats_dict)
     
     # --- Calculate Possession Type Breakdowns using the new detailed function ---
@@ -1095,19 +1095,6 @@ def parse_csv(file_path, game_id, season_id):
     offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \
         get_possession_breakdown_detailed(df)
 
-    print("\n🔍 Possession Type Breakdown (Offense):")
-    print(json.dumps(offensive_breakdown, indent=2))
-    print("\n🔍 Possession Type Breakdown (Defense):")
-    print(json.dumps(defensive_breakdown, indent=2))
-
-    print("\n🔍 Possession Splits Breakdown (Offense):")
-    print(json.dumps(periodic_offense, indent=2))
-    print("\n🔍 Possession Splits Breakdown (Defense):")
-    print(json.dumps(periodic_defense, indent=2))
-
-
-    print("\n🔍 Debug Summary: Player Stats with Derived Metrics")
-    print(json.dumps(player_stats_dict, indent=4))
 
     # ● compute lineup efficiencies (2-5 man units, min 10 poss)
     efficiencies = compute_lineup_efficiencies(
@@ -1133,4 +1120,4 @@ def test_parse():
 if __name__ == "__main__":
     test_parse()
 
-print("✅ CSV parsing script modifications completed!")
+#print("✅ CSV parsing script modifications completed!")
