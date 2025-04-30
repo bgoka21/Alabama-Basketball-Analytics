@@ -1,0 +1,46 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+  <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">User Management</h1>
+        <a href="{{ url_for('admin.logout') }}"
+           class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
+          Logout
+        </a>
+      </div>
+
+  <a href="{{ url_for('admin.add_user') }}"
+     class="inline-block mb-4 px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
+    + Add New User
+  </a>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow">
+      <thead>
+        <tr class="bg-gray-100 dark:bg-gray-700 text-left">
+          <th class="px-4 py-2">Username</th>
+          <th class="px-4 py-2">Role</th>
+          <th class="px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr class="border-b dark:border-gray-700">
+          <td class="px-4 py-2">{{ user.username }}</td>
+          <td class="px-4 py-2">{{ 'Admin' if user.is_admin else 'User' }}</td>
+          <td class="px-4 py-2 space-x-2">
+            <a href="{{ url_for('admin.edit_user', user_id=user.id) }}"
+               class="text-blue-600 hover:underline">Edit</a>
+            <form action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                  method="POST"
+                  class="inline-block"
+                  onsubmit="return confirm('Delete {{ user.username }}?');">
+              <button type="submit" class="text-red-600 hover:underline">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

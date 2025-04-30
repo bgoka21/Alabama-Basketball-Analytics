@@ -8,20 +8,79 @@
 </head>
 <body class="min-h-screen flex">
 
-  <!-- Sidebar -->
-  <aside class="w-64 h-screen bg-[#9E1B32] text-white flex flex-col px-4 py-6">
+  <!-- Sidebar: always visible -->
+  <aside class="w-64 bg-[#9E1B32] text-white flex flex-col px-4 py-6">
     <h1 class="text-2xl font-bold mb-8">Alabama Basketball</h1>
-    <nav class="flex flex-col gap-4">
-      <a href="{{ url_for('admin.dashboard') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Dashboard</a>
-      <a href="{{ url_for('admin.files_view_unique') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Files</a>
-      <a href="{{ url_for('admin.game_reports') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Game Reports</a>
-      <a href="{{ url_for('admin.game_stats', game_id=1) }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Stats</a>
-      <a href="{{ url_for('admin.players_list') }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Players</a>
-      <a href="{{ url_for('admin.edit_roster', season_id=1) }}" class="hover:bg-white hover:text-[#9E1B32] px-3 py-2 rounded transition">Edit Roster</a>
+
+    <nav class="flex flex-col gap-4 flex-1">
+      <!-- Home -->
+      <a href="{{ url_for('public.homepage') }}"
+         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                {{ 'bg-white text-[#9E1B32]' if active_page=='home' else '' }}">
+        Home
+      </a>
+
+      {% if current_user.is_authenticated %}
+        <!-- Game Reports -->
+        <a href="{{ url_for('admin.game_reports') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                  {{ 'bg-white text-[#9E1B32]' if active_page=='game_reports' else '' }}">
+          Game Reports
+        </a>
+
+        <!-- Players -->
+        <a href="{{ url_for('admin.players_list') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                  {{ 'bg-white text-[#9E1B32]' if active_page=='players' else '' }}">
+          Players
+        </a>
+
+        {% if current_user.is_admin %}
+          <!-- Dashboard -->
+          <a href="{{ url_for('admin.dashboard') }}"
+             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                    {{ 'bg-white text-[#9E1B32]' if active_page=='dashboard' else '' }}">
+            Dashboard
+          </a>
+
+          <!-- Files -->
+          <a href="{{ url_for('admin.files_view_unique') }}"
+             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                    {{ 'bg-white text-[#9E1B32]' if active_page=='files' else '' }}">
+            Files
+          </a>
+
+          <!-- Edit Roster -->
+          <a href="{{ url_for('admin.edit_roster', season_id=1) }}"
+             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                    {{ 'bg-white text-[#9E1B32]' if active_page=='edit_roster' else '' }}">
+            Edit Roster
+          </a>
+
+          <!-- Users -->
+          <a href="{{ url_for('admin.users_list') }}"
+             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                    {{ 'bg-white text-[#9E1B32]' if active_page=='users' else '' }}">
+            Users
+          </a>
+        {% endif %}
+
+        <!-- Logout -->
+        <a href="{{ url_for('admin.logout') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]">
+          Logout
+        </a>
+      {% else %}
+        <!-- Login (for anonymous users) -->
+        <a href="{{ url_for('admin.login') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]">
+          Login
+        </a>
+      {% endif %}
     </nav>
   </aside>
 
-  <!-- Main content area -->
+  <!-- Main content -->
   <main class="flex-1 p-6 overflow-y-auto bg-white text-black">
     {% block content %}{% endblock %}
   </main>

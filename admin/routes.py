@@ -8,13 +8,13 @@ import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 import json
 from types import SimpleNamespace
 
-
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, send_file, current_app, session, make_response
 )
-from flask_login import login_required, current_user, confirm_login, login_user
-from werkzeug.security import check_password_hash
+from flask_login import login_required, current_user, confirm_login, login_user, logout_user
+from utils.auth       import admin_required
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from models.database import (
@@ -68,21 +68,40 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @admin_bp.before_request
-def admin_before_request():
-    if request.endpoint in ['admin.login', 'static']:
+def admin_bp_before_request():
+    # Always allow the login page & static assets
+    if request.endpoint == 'admin.login' or request.endpoint.startswith('static'):
         return
 
+    # First, everyone must be logged in to see any /admin pages
     if not current_user.is_authenticated:
-        flash("You must be logged in to access admin pages.", "error")
+        flash("Please log in to continue.", "error")
         return redirect(url_for('admin.login'))
 
-    if '_fresh' in session and not session['_fresh']:
-        flash("Please confirm your login to continue.", "error")
+    # Now lock down only the truly admin-only endpoints:
+    admin_only = {
+        'admin.dashboard',
+        'admin.files_view_unique',
+        'admin.upload_file',
+        'admin.parse_file',
+        'admin.delete_file',
+        'admin.users_list',
+        'admin.add_user',
+        'admin.edit_user',
+        'admin.delete_user',
+        'admin.edit_roster',
+        'admin.delete_roster',
+        # … add any other admin-only endpoints here …
+    }
+
+    if request.endpoint in admin_only and not current_user.is_admin:
+        flash("You do not have permission to view that page.", "error")
         return redirect(url_for('admin.login'))
 
-    if not getattr(current_user, 'is_admin', False):
-        flash("You are not authorized to access admin pages.", "error")
-        return redirect(url_for('admin.login'))
+    # Everything else under admin_bp (e.g. game_reports, game_stats, players_list, player_shot_type, etc.)
+    # is now only gated by login_required (via this before_request), not by admin status.
+
+
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -94,7 +113,11 @@ def login():
         if user and check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
             flash("Login successful!", "success")
-            return redirect(url_for('admin.dashboard'))
+            # Send admins to the dashboard, everyone else out to the public home
+            if user.is_admin:
+                return redirect(url_for('admin.dashboard'))
+            else:
+                return redirect(url_for('public.homepage'))
 
         flash("Invalid credentials. Please try again.", "error")
         return redirect(url_for('admin.login'))
@@ -102,14 +125,97 @@ def login():
     return render_template('admin/login.html')
 
 @admin_bp.route('/dashboard', methods=['GET'])
-@login_required
+@admin_required
 def dashboard():
     uploaded_files = UploadedFile.query.order_by(UploadedFile.upload_date.desc()).all()
     return render_template('admin/dashboard.html', uploaded_files=uploaded_files, active_page='dashboard')
 
+@admin_bp.route('/users', methods=['GET'])
+@admin_required
+def users_list():
+    """Show all users for admin to manage."""
+    users = User.query.order_by(User.username).all()
+    return render_template('admin/users.html', users=users, active_page='users')
+
+@admin_bp.route('/users/add', methods=['GET', 'POST'])
+@admin_required
+def add_user():
+    """Admin: create a new user account."""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        is_admin = bool(request.form.get('is_admin'))
+
+        # Basic validation
+        if not username or not password:
+            flash('Username and password are required.', 'error')
+        elif User.query.filter_by(username=username).first():
+            flash('That username is already taken.', 'error')
+        else:
+            # Create & save
+            hashed = generate_password_hash(password)
+            new = User(username=username, password_hash=hashed, is_admin=is_admin)
+            db.session.add(new)
+            db.session.commit()
+            flash(f'User "{username}" created.', 'success')
+            return redirect(url_for('admin.users_list'))
+
+    # GET or failed POST: render form
+    return render_template('admin/add_user.html', active_page='users')
+
+@admin_bp.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_user(user_id):
+    """Admin: edit an existing user."""
+    user = User.query.get_or_404(user_id)
+
+    if request.method == 'POST':
+        new_username = request.form.get('username', '').strip()
+        new_password = request.form.get('password', '')
+        is_admin = bool(request.form.get('is_admin'))
+
+        if not new_username:
+            flash('Username cannot be blank.', 'error')
+        elif new_username != user.username and User.query.filter_by(username=new_username).first():
+            flash('That username is already taken.', 'error')
+        else:
+            user.username = new_username
+            user.is_admin = is_admin
+            if new_password:
+                user.password_hash = generate_password_hash(new_password)
+            db.session.commit()
+            flash(f'User "{user.username}" updated.', 'success')
+            return redirect(url_for('admin.users_list'))
+
+    return render_template('admin/edit_user.html', user=user, active_page='users')
+
+@admin_bp.route('/users/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def delete_user(user_id):
+    """Admin: delete a user."""
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        flash("You can't delete yourself!", 'error')
+    else:
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'User "{user.username}" deleted.', 'success')
+
+    return redirect(url_for('admin.users_list'))
+
+@admin_bp.route('/logout')
+@login_required
+def logout():
+    """Log the current user out."""
+    logout_user()
+    flash("Logged out successfully.", "success")
+    return redirect(url_for('public.homepage'))
+
+
 
 @admin_bp.route('/upload', methods=['POST'])
-@login_required
+@admin_required
 def upload_file():
     if 'file' not in request.files:
         flash('No file part in request', 'error')
@@ -140,7 +246,7 @@ def upload_file():
     return redirect(url_for('admin.dashboard'))
 
 @admin_bp.route('/parse/<int:file_id>', methods=['POST'])
-@login_required
+@admin_required
 def parse_file(file_id):
     uploaded_file = UploadedFile.query.get_or_404(file_id)
     filename      = uploaded_file.filename
@@ -212,13 +318,13 @@ def parse_file(file_id):
 
 
 @admin_bp.route('/logs/<int:file_id>', methods=['GET'])
-@login_required
+@admin_required
 def view_logs(file_id):
     uploaded_file = UploadedFile.query.get_or_404(file_id)
     return render_template('admin/logs.html', uploaded_file=uploaded_file)
 
 @admin_bp.route('/delete/<int:file_id>', methods=['POST'])
-@login_required
+@admin_required
 def delete_file(file_id):
     uploaded_file = UploadedFile .query.get_or_404(file_id)
     filename = uploaded_file.filename
@@ -234,7 +340,7 @@ def delete_file(file_id):
     return redirect(url_for('admin.files_view_unique'))
 
 @admin_bp.route('/bulk-action', methods=['POST'], endpoint='bulk_action')
-@login_required
+@admin_required
 def bulk_action_view():
     selected_ids = request.form.getlist('selected_files')
     action = request.form.get('action')
@@ -266,7 +372,7 @@ def bulk_action_view():
     return redirect(url_for('admin.files_view_unique'))
 
 @admin_bp.route('/download/<int:file_id>', methods=['GET'])
-@login_required
+@admin_required
 def download_file(file_id):
     uploaded_file = UploadedFile.query.get_or_404(file_id)
     file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], uploaded_file.filename)
@@ -278,7 +384,7 @@ def download_file(file_id):
         return redirect(url_for('admin.files_view_unique'))
 
 @admin_bp.route('/reset-db', methods=['POST'])
-@login_required
+@admin_required
 def reset_db():
     if not current_user.is_admin:
         flash("You are not authorized to reset the database.", "error")
@@ -320,12 +426,12 @@ def reset_db():
 @login_required
 def game_reports():
     games = Game.query.order_by(Game.game_date.desc()).all()
-    return render_template('admin/game_reports.html', games=games)
+    return render_template('admin/game_reports.html', games=games, active_page='game_reports')
 
 
 
 @admin_bp.route('/files', methods=['GET'], endpoint='files_view_unique')
-@login_required
+@admin_required
 def files_view():
     category_filter = request.args.get('category')
     if category_filter:
@@ -442,6 +548,7 @@ def game_stats(game_id):
 
     return render_template(
         'admin/game_stats.html',
+        active_page='stats',
         game=game,
         team_stats=team_stats,
         opponent_stats=opponent_stats,
@@ -761,7 +868,7 @@ def player_detail(player_name):
 # ... [remaining routes unchanged below] ...
 
 @admin_bp.route('/roster/edit', methods=['GET', 'POST'])
-@login_required
+@admin_required
 def edit_roster():
     seasons = Season.query.order_by(Season.season_name.desc()).all()
 
@@ -804,7 +911,7 @@ def edit_roster():
 
 
 @admin_bp.route('/roster/<int:season_id>/delete', methods=['POST'])
-@login_required
+@admin_required
 def delete_roster(season_id):
     # remove all roster entries
     Roster.query.filter_by(season_id=season_id).delete()
@@ -841,7 +948,8 @@ def players_list():
     return render_template('admin/players.html',
                            players=players,
                            seasons=seasons,
-                           selected_season=season_id)
+                           selected_season=season_id,
+                           active_page='players')
 
 
 @admin_bp.route('/player/<player_name>/shot-type')

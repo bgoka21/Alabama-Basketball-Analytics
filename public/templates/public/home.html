@@ -1,0 +1,161 @@
+{# templates/public/home.html #}
+{% extends 'admin/base.html' %}
+{% block content %}
+
+  <!-- Hero / Title -->
+  <section class="bg-gradient-to-r from-[#9E1B32] to-red-700 text-white py-12">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+      <h1 class="text-5xl font-extrabold">Welcome To Alabama Basketball</h1>
+      <p class="mt-2 text-lg opacity-75">Season Stats & Leaderboards</p>
+    </div>
+  </section>
+
+  <!-- Summary Cards -->
+  <section class="-mt-8 px-4 mb-8">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    {% for label, value in [
+        ('Season Record',   summary.record),
+        ('Avg. BCP/Game',   summary.avg_bcp),
+        ('Avg. 3FG%',       summary.avg_fg3),
+        ('Avg. Team PPG',   summary.avg_ppg)
+        ] %}
+      <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg p-6 rounded-lg shadow-lg">
+        <div class="text-sm font-semibold uppercase opacity-80">{{ label }}</div>
+        <div class="mt-2 text-3xl font-bold">{{ value }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Filters (no change) -->
+  <section class="px-4 mb-6">
+    <!-- your existing Season / Last 5 / True Data buttons -->
+  </section>
+
+  <!-- Leaderboards (no change) -->
+  <section class="px-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- your existing cards for BCP, Hard Hats, 3FG%, ATR% -->
+  </section>
+
+
+<!-- Filter Row -->
+<div class="flex flex-wrap gap-4 mb-6">
+  <a href="{{ url_for('public.homepage', filter='season',  view=view_opt) }}"
+     class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='season'  else 'bg-gray-200 text-black' }}">
+    Season
+  </a>
+  <a href="{{ url_for('public.homepage', filter='last5',  view=view_opt) }}"
+     class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='last5'  else 'bg-gray-200 text-black' }}">
+    Last 5 Games
+  </a>
+  <a href="{{ url_for('public.homepage', filter='true_data', view=view_opt) }}"
+     class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='true_data' else 'bg-gray-200 text-black' }}">
+    True Data
+  </a>
+</div>
+
+<!-- Leaderboards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+
+  <!-- Blue Collar Points Leaders -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold mb-4">Blue Collar Points Leaders</h2>
+    <table class="w-full text-left">
+      <thead>
+        <tr class="border-b">
+          <th class="pb-2">Player</th>
+          <th class="pb-2">Total BCP</th>
+          <th class="pb-2">BCP / Poss</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for player, total in bcp_leaders %}
+        <tr class="border-t hover:bg-gray-50">
+          <td class="py-2">{{ player }}</td>
+          <td class="py-2">{{ '%.1f'|format(total) }}</td>
+          <td class="py-2">
+            {{ bcp_per_poss_map.get(player, 0) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+
+<!-- Hard Hat Winners -->
+<div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold mb-4">Hard Hat Winners</h2>
+    <table class="w-full text-left">
+      <tbody>
+        {% for name, count in hard_hats %}
+        <tr class="border-t hover:bg-gray-50">
+          <td class="py-2">{{ name }}</td>
+          <td class="py-2 text-right">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+<!-- 3FG% Leaders -->
+<div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold mb-4">3FG% Leaders</h2>
+    <table class="w-full text-left">
+      <thead>
+        <tr class="border-b">
+          <th class="pb-2">Player</th>
+          <th class="pb-2 text-right">M/A</th>
+          <th class="pb-2 text-right">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, m, a, pct in fg3_leaders %}
+        <tr class="border-t hover:bg-gray-50">
+          <td class="py-2">{{ name }}</td>
+          <td class="py-2 text-right">{{ m }}/{{ a }}</td>
+          <td class="py-2 text-right">
+            {% if pct is not none %}
+              {{ "%.1f"|format(pct) }}%
+            {% else %}
+              N/A
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- ATR% Leaders -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold mb-4">ATR% Leaders</h2>
+    <table class="w-full text-left">
+      <thead>
+        <tr class="border-b">
+          <th class="pb-2">Player</th>
+          <th class="pb-2 text-right">M/A</th>
+          <th class="pb-2 text-right">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, m, a, pct in atr_leaders %}
+        <tr class="border-t hover:bg-gray-50">
+          <td class="py-2">{{ name }}</td>
+          <td class="py-2 text-right">{{ m }}/{{ a }}</td>
+          <td class="py-2 text-right">
+            {% if pct is not none %}
+              {{ "%.1f"|format(pct) }}%
+            {% else %}
+              N/A
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+{% endblock %}
