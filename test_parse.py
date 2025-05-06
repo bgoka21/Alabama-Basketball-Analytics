@@ -7,7 +7,7 @@ from itertools import combinations
 from collections import defaultdict
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession
 
-print("🔥 parse_csv() function has started executing!")
+#print("🔥 parse_csv() function has started executing!")
 
 # --- Helper Functions ---
 
@@ -525,8 +525,8 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         }
         possession_data.append(poss)
     #print("\n📝 Detailed Possession Data:")
-    for poss in possession_data:
-        print(poss)
+    #for poss in possession_data:
+        #print(poss)
     return possession_data, offensive_possessions, defensive_possessions
 
 
@@ -608,7 +608,7 @@ def parse_csv(file_path, game_id, season_id):
         print("❌ Error: CSV file not found!")
         return
 
-    print(f"📚 Reading CSV: {file_path}")
+    #print(f"📚 Reading CSV: {file_path}")
     df = pd.read_csv(file_path)
 
     #print("🔍 Unique Row Names in CSV:")
