@@ -464,7 +464,20 @@ def game_stats(game_id):
 
     # ─── Load DB rows you’ll need in the template ──────────────────────────────
     player_stats            = PlayerStats.query.filter_by(game_id=game_id).all()
-    blue_collar_stats       = BlueCollarStats.query.filter_by(game_id=game_id).all()
+
+    # Summed team‐level blue‐collar stats
+    team_blue_breakdown = db.session.query(
+        func.sum(BlueCollarStats.def_reb).label('def_reb'),
+        func.sum(BlueCollarStats.off_reb).label('off_reb'),
+        func.sum(BlueCollarStats.misc).label('misc'),
+        func.sum(BlueCollarStats.deflection).label('deflection'),
+        func.sum(BlueCollarStats.steal).label('steal'),
+        func.sum(BlueCollarStats.block).label('block'),
+        func.sum(BlueCollarStats.floor_dive).label('floor_dive'),
+        func.sum(BlueCollarStats.charge_taken).label('charge_taken'),
+        func.sum(BlueCollarStats.reb_tip).label('reb_tip')
+    ).filter(BlueCollarStats.game_id == game_id).one()
+
     opponent_blue_breakdown = db.session.query(
         func.sum(OpponentBlueCollarStats.def_reb).label('def_reb'),
         func.sum(OpponentBlueCollarStats.off_reb).label('off_reb'),
@@ -476,7 +489,9 @@ def game_stats(game_id):
         func.sum(OpponentBlueCollarStats.charge_taken).label('charge_taken'),
         func.sum(OpponentBlueCollarStats.reb_tip).label('reb_tip')
     ).filter(OpponentBlueCollarStats.game_id == game_id).one()
+
     possessions = Possession.query.filter_by(game_id=game_id).all()
+
 
     # ─── LOAD CSV & TAG PERIOD ────────────────────────────────────────────────
     csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], game.csv_filename)
@@ -619,7 +634,7 @@ def game_stats(game_id):
         team_stats=team_stats,
         opponent_stats=opponent_stats,
         player_stats=player_stats,
-        blue_collar_stats=blue_collar_stats,
+        blue_collar_stats=team_blue_breakdown,
         opponent_blue_coll_stats=opponent_blue_breakdown,
         possessions=possessions,
 
