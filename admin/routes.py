@@ -444,52 +444,27 @@ def files_view():
 @admin_bp.route('/stats/<int:game_id>')
 @login_required
 def game_stats(game_id):
+    # ─── Load Game & Stored TeamStats ─────────────────────────────────────────
     game = Game.query.get_or_404(game_id)
     team_stats = TeamStats.query.filter_by(game_id=game_id, is_opponent=False).first()
     opponent_stats = TeamStats.query.filter_by(game_id=game_id, is_opponent=True).first()
 
-    # fallback Dummy if no record exists
+    # Dummy fallback
     def default_stats():
-        class Dummy:
-            total_atr_attempts    = 0
-            total_fg2_attempts    = 0
-            total_fg3_attempts    = 0
-            total_atr_makes       = 0
-            total_fg2_makes       = 0
-            total_fg3_makes       = 0
-            total_ftm             = 0
-            total_fta             = 0
-            total_possessions     = 0
-            total_assists         = 0
-            total_turnovers       = 0
-            total_second_assists  = 0
-            total_pot_assists     = 0
-            total_blue_collar     = 0
-        return Dummy()
+        class D:
+            total_atr_attempts = total_fg2_attempts = total_fg3_attempts = 0
+            total_atr_makes    = total_fg2_makes    = total_fg3_makes    = 0
+            total_ftm = total_fta = total_possessions = 0
+            total_assists = total_turnovers = 0
+            total_second_assists = total_pot_assists = 0
+            total_blue_collar = 0
+        return D()
+    if not team_stats:     team_stats     = default_stats()
+    if not opponent_stats: opponent_stats = default_stats()
 
-    if not team_stats:
-        team_stats = default_stats()
-    if not opponent_stats:
-        opponent_stats = default_stats()
-
-    player_stats             = PlayerStats.query.filter_by(game_id=game_id).all()
-    blue_collar_stats        = BlueCollarStats.query.filter_by(game_id=game_id).all()
-    opponent_blue_coll_stats = OpponentBlueCollarStats.query.filter_by(game_id=game_id).all()
-    possessions              = Possession.query.filter_by(game_id=game_id).all()
-
-    # blue‐collar aggregates
-    team_blue_breakdown = db.session.query(
-        func.sum(BlueCollarStats.def_reb).label('def_reb'),
-        func.sum(BlueCollarStats.off_reb).label('off_reb'),
-        func.sum(BlueCollarStats.misc).label('misc'),
-        func.sum(BlueCollarStats.deflection).label('deflection'),
-        func.sum(BlueCollarStats.steal).label('steal'),
-        func.sum(BlueCollarStats.block).label('block'),
-        func.sum(BlueCollarStats.floor_dive).label('floor_dive'),
-        func.sum(BlueCollarStats.charge_taken).label('charge_taken'),
-        func.sum(BlueCollarStats.reb_tip).label('reb_tip')
-    ).filter(BlueCollarStats.game_id == game_id).one()
-
+    # ─── Load DB rows you’ll need in the template ──────────────────────────────
+    player_stats            = PlayerStats.query.filter_by(game_id=game_id).all()
+    blue_collar_stats       = BlueCollarStats.query.filter_by(game_id=game_id).all()
     opponent_blue_breakdown = db.session.query(
         func.sum(OpponentBlueCollarStats.def_reb).label('def_reb'),
         func.sum(OpponentBlueCollarStats.off_reb).label('off_reb'),
@@ -501,51 +476,142 @@ def game_stats(game_id):
         func.sum(OpponentBlueCollarStats.charge_taken).label('charge_taken'),
         func.sum(OpponentBlueCollarStats.reb_tip).label('reb_tip')
     ).filter(OpponentBlueCollarStats.game_id == game_id).one()
+    possessions = Possession.query.filter_by(game_id=game_id).all()
 
-    # --- load raw CSV & tag each row with its half/OT split ---
+    # ─── LOAD CSV & TAG PERIOD ────────────────────────────────────────────────
     csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], game.csv_filename)
     df = pd.read_csv(csv_path)
-
-    # create a simple 'Period' column so our split-bucketing in
-    # get_possession_breakdown_detailed() can see 1st/2nd/OT
+    # Grab just “1st Half”, “2nd Half”, or “Overtime”
     df['Period'] = (
         df['GAME SPLITS']
-          .fillna('')              # guard against NaN
-          .str.split(',', n=1)     # if there’s more detail after a comma, drop it
-          .str[0]                  # take only the first piece
-          .str.strip()             # tidy whitespace
+          .fillna('')
+          .str.split(',', n=1).str[0]
+          .str.strip()
     )
 
-
-    # this function now returns (off_by_type, def_by_type, off_by_split, def_by_split)
-    offensive_breakdown, defensive_breakdown, \
-      periodic_offense, periodic_defense = get_possession_breakdown_detailed(df)
-
-    # --- lineup efficiencies unchanged ---
+    # ─── POSSESSION BREAKDOWNS & LINEUPS (UNCHANGED) ──────────────────────────
+    offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \
+        get_possession_breakdown_detailed(df)
     uploaded_file = UploadedFile.query.filter_by(filename=game.csv_filename).first()
-    if uploaded_file and uploaded_file.lineup_efficiencies:
-        lineup_efficiencies = json.loads(uploaded_file.lineup_efficiencies)
-    else:
-        lineup_efficiencies = {}
-
-    best_offense  = {}
+    lineup_efficiencies = (
+        json.loads(uploaded_file.lineup_efficiencies)
+        if uploaded_file and uploaded_file.lineup_efficiencies else {}
+    )
+    best_offense = {}
     worst_offense = {}
-    best_defense  = {}
+    best_defense = {}
     worst_defense = {}
     for size, sides in lineup_efficiencies.items():
-        # offense units
-        off_list = sides.get('offense', {})
-        desc = sorted(off_list.items(), key=lambda kv: kv[1], reverse=True)
-        asc  = sorted(off_list.items(), key=lambda kv: kv[1])
-        best_offense[size]  = desc[:5]
-        worst_offense[size] = asc[:5]
-        # defense units
-        def_list = sides.get('defense', {})
-        asc_def  = sorted(def_list.items(), key=lambda kv: kv[1])
-        desc_def = sorted(def_list.items(), key=lambda kv: kv[1], reverse=True)
-        best_defense[size]  = asc_def[:5]
-        worst_defense[size] = desc_def[:5]
+        # Offense
+        off = sides.get('offense', {})
+        best_offense[size]  = sorted(off.items(), key=lambda x: x[1], reverse=True)[:5]
+        worst_offense[size] = sorted(off.items(), key=lambda x: x[1])[:5]
+        # Defense
+        dfens = sides.get('defense', {})
+        best_defense[size]  = sorted(dfens.items(), key=lambda x: x[1])[:5]
+        worst_defense[size] = sorted(dfens.items(), key=lambda x: x[1], reverse=True)[:5]
 
+    # ─── DEFENSIVE SECONDARY METRICS ──────────────────────────────────────────
+    # We'll treat the opponent’s offense as “Defense rows” in the CSV:
+    defense_rows = df[df['Row'] == "Defense"]
+
+    # Helper: count tokens in the OPP STATS column
+    def count_def_tokens(rows, tokens):
+        return sum(
+            1
+            for _, r in rows.iterrows()
+            for tok in extract_tokens(r.get("OPP STATS", ""))
+            if tok in tokens
+        )
+
+    # 1) OREB % Allowed
+    opp_atr_miss   = opponent_stats.total_atr_attempts - opponent_stats.total_atr_makes
+    opp_fg2_miss   = opponent_stats.total_fg2_attempts - opponent_stats.total_fg2_makes
+    opp_fg3_miss   = opponent_stats.total_fg3_attempts - opponent_stats.total_fg3_makes
+    opp_reb_chance = opp_atr_miss + opp_fg2_miss + opp_fg3_miss
+    opp_oreb_pct = (
+        round(opponent_blue_breakdown.off_reb / opp_reb_chance * 100, 1)
+        if opp_reb_chance > 0 else 0.0
+    )
+
+    # 2) FT Rate Allowed (FTA ÷ possessions)
+    # count opponent free‐throw attempts
+    opp_fta = opponent_stats.total_fta
+    # opponent field‐goal attempts = ATR + 2FG + 3FG attempts
+    opp_fga = (
+        opponent_stats.total_atr_attempts
+        + opponent_stats.total_fg2_attempts
+        + opponent_stats.total_fg3_attempts
+    )
+    opp_ft_rate = (
+        round(opp_fta / opp_fga * 100, 1)
+        if opp_fga > 0 else 0.0
+    )
+
+    # 3) Good Shot % Allowed
+    opp_good = (
+        opponent_stats.total_fta
+      + opponent_stats.total_atr_makes + opp_atr_miss
+      + opponent_stats.total_fg3_makes + opp_fg3_miss
+    )
+    opp_bad = opponent_stats.total_fg2_makes + opp_fg2_miss
+    opp_den = opp_good + opp_bad
+    opp_good_shot_pct = (
+        round(opp_good / opp_den * 100, 2)
+        if opp_den > 0 else 0.0
+    )
+
+    # 4) Assist % Allowed (assists ÷ made FGs)
+    opp_fgm_made   = (
+        opponent_stats.total_atr_makes
+      + opponent_stats.total_fg2_makes
+      + opponent_stats.total_fg3_makes
+    )
+    opp_assist_pct = (
+        round(opponent_stats.total_assists / opp_fgm_made * 100, 1)
+        if opp_fgm_made > 0 else 0.0
+    )
+
+    # 5) Turnover % Allowed (TOs ÷ possessions)
+    opp_turnover_pct = (
+        round(opponent_stats.total_turnovers / opponent_stats.total_possessions * 100, 1)
+        if opponent_stats.total_possessions > 0 else 0.0
+    )
+
+    # 6) PPP Allowed (points allowed ÷ possessions)
+    opp_ppp = (
+        round(opponent_stats.total_points / opponent_stats.total_possessions, 2)
+        if opponent_stats.total_possessions > 0 else 0.0
+    )
+
+    # 7) TCR Allowed (transition conversions ÷ transition opportunities)
+    # Denominator: made+missed FG + steals (from OPP STATS), minus neutrals
+    made   = count_def_tokens(defense_rows, ("ATR+", "2FG+", "3FG+"))
+    missed = count_def_tokens(defense_rows, ("ATR-", "2FG-", "3FG-"))
+    steals = count_def_tokens(defense_rows, ("Steal",))
+    neutrals = defense_rows[defense_rows['TEAM'].fillna('').str.contains("Neutral")]
+    made_neu   = count_def_tokens(neutrals, ("ATR+", "2FG+", "3FG+"))
+    missed_neu = count_def_tokens(neutrals, ("ATR-", "2FG-", "3FG-"))
+    steals_neu = count_def_tokens(neutrals, ("Steal",))
+    trans_opps = (made + missed + steals) - (made_neu + missed_neu + steals_neu)
+
+    # Numerator: any OPP stat in transition that’s a conversion
+    trans_rows = defense_rows[
+        defense_rows['POSSESSION TYPE'].fillna('').str.contains("Transition")
+    ]
+    conv = count_def_tokens(trans_rows, (
+        "ATR+", "ATR-",
+        "2FG+", "2FG-",
+        "3FG+", "3FG-",
+        "FT+",   # free throws made
+        "Fouled"
+    ))
+    opp_tcr_pct = (
+        round(conv / trans_opps * 100, 1)
+        if trans_opps > 0 else 0.0
+    )
+
+    # ─── RENDER ───────────────────────────────────────────────────────────────
     return render_template(
         'admin/game_stats.html',
         active_page='stats',
@@ -553,24 +619,34 @@ def game_stats(game_id):
         team_stats=team_stats,
         opponent_stats=opponent_stats,
         player_stats=player_stats,
-        blue_collar_stats=team_blue_breakdown,
+        blue_collar_stats=blue_collar_stats,
         opponent_blue_coll_stats=opponent_blue_breakdown,
         possessions=possessions,
 
-        # overall possession‐type buckets
+        # breakdowns
         offensive_breakdown=offensive_breakdown,
         defensive_breakdown=defensive_breakdown,
-
-        # per‐period (Game Splits) buckets
         periodic_offense=periodic_offense,
         periodic_defense=periodic_defense,
 
+        # lineup efficiencies
         lineup_efficiencies=lineup_efficiencies,
         best_offense=best_offense,
         worst_offense=worst_offense,
         best_defense=best_defense,
-        worst_defense=worst_defense
+        worst_defense=worst_defense,
+
+        # defensive secondary metrics
+        opp_oreb_pct=opp_oreb_pct,
+        opp_ft_rate=opp_ft_rate,
+        opp_good_shot_pct=opp_good_shot_pct,
+        opp_assist_pct=opp_assist_pct,
+        opp_turnover_pct=opp_turnover_pct,
+        opp_ppp=opp_ppp,
+        opp_tcr_pct=opp_tcr_pct,
     )
+
+
 
 
 

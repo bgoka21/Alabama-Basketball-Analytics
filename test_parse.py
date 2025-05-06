@@ -687,7 +687,8 @@ def parse_csv(file_path, game_id, season_id):
         "total_fg3_attempts": 0,
         "total_ftm": 0,
         "total_fta": 0,
-        "total_blue_collar": 0
+        "total_blue_collar": 0,
+        "foul_by": 0
     }
     opponent_totals = {
         "atr_makes": 0,
@@ -800,6 +801,7 @@ def parse_csv(file_path, game_id, season_id):
             team_totals["total_fg3_attempts"]  += safe_value(stats.get("fg3_attempts", 0))
             team_totals["total_ftm"]           += safe_value(stats.get("ftm", 0))
             team_totals["total_fta"]           += safe_value(stats.get("fta", 0))
+            team_totals["foul_by"]             += safe_value(stats.get("foul_by", 0))
 
         # 8) commit once after looping
         db.session.commit()
@@ -811,104 +813,128 @@ def parse_csv(file_path, game_id, season_id):
         opponent_totals["total_possessions"] = int(defensive_possessions)
 
 
-
         # --- Derived metrics for TeamStats ---------------------------------------
-    # 1) Count actual Off. Rebounds (fill NaN before counting)
+        # helper to count any label tokens in a set of rows
+        def count_tokens(rows, tokens):
+            return sum(
+                1
+                for _, r in rows.iterrows()
+                for col in df.columns if col.startswith("#")
+                for tok in extract_tokens(r.get(col, ""))
+                if tok in tokens
+            )
+
+        # 1) Count actual Off. Rebounds
         oreb_count = int(
-          df.loc[df['Row']=="Offense", 'TEAM']
+            df.loc[df['Row'] == "Offense", 'TEAM']
             .fillna('')
             .str.count("Off Reb")
             .sum()
         )
         team_totals["total_off_reb"] = oreb_count
 
-        # 2) Recompute a “clean” possession count per Sportscode (fill NaN before contains)
+        # 2) Sportscode possessions (exclude Neutral & Off Reb)
         run = int(df['Row'].eq("Offense").sum())
         neu = int(
-          df.loc[df['Row']=="Offense", 'TEAM']
+            df.loc[df['Row'] == "Offense", 'TEAM']
             .fillna('')
             .str.contains("Neutral")
             .sum()
         )
         poss = run - neu - oreb_count
         team_totals["poss_for_derived"] = poss
-    
-        # 3) Derived metrics — overwrite the old block
-        #    (use poss_for_derived instead of total_possessions)
 
-            # — Assist % (needed to avoid KeyError) —
+        # 3) Assist %
         fgm_total = (
             team_totals["total_atr_makes"]
-          + team_totals["total_fg2_makes"]
-          + team_totals["total_fg3_makes"]
+        + team_totals["total_fg2_makes"]
+        + team_totals["total_fg3_makes"]
         )
-        if fgm_total > 0:
-            team_totals["assist_pct"] = round(
-                team_totals["total_assists"] / fgm_total * 100, 1
-            )
-        else:
-            team_totals["assist_pct"] = 0.0
-    
-        # — OREB % (Sportscode excludes FT misses from rebound chances)
-        atr_miss     = team_totals["total_atr_attempts"] - team_totals["total_atr_makes"]
-        fg2_miss     = team_totals["total_fg2_attempts"] - team_totals["total_fg2_makes"]
-        fg3_miss     = team_totals["total_fg3_attempts"] - team_totals["total_fg3_makes"]
-        opp_reb_chance = atr_miss + fg2_miss + fg3_miss
-        if opp_reb_chance > 0:
-            team_totals["oreb_pct"] = round(oreb_count / opp_reb_chance * 100, 0)
-        else:
-            team_totals["oreb_pct"] = 0.0
-    
-        # — FT Rate
-        # — FT Rate (Sportscode uses fouls drawn per possession)
-        foul_drawn = team_totals.get("foul_by", 0)
-        if poss > 0:
-            team_totals["ft_rate"] = round(foul_drawn / poss * 100, 1)
-        else:
-            team_totals["ft_rate"] = 0.0
+        team_totals["assist_pct"] = (
+            round(team_totals["total_assists"] / fgm_total * 100, 1)
+            if fgm_total > 0 else 0.0
+        )
 
-        # preserve free throw attempts for Good Shot % calculation
+        # 4) OREB %
+        atr_miss = team_totals["total_atr_attempts"] - team_totals["total_atr_makes"]
+        fg2_miss = team_totals["total_fg2_attempts"] - team_totals["total_fg2_makes"]
+        fg3_miss = team_totals["total_fg3_attempts"] - team_totals["total_fg3_makes"]
+        reb_chance = atr_miss + fg2_miss + fg3_miss
+        team_totals["oreb_pct"] = (
+            round(oreb_count / reb_chance * 100, 0)
+            if reb_chance > 0 else 0.0
+        )
+
+        # 5) FT Rate (NBA formula: FTA ⁄ FGA)
+        offense_rows = df[df['Row'] == "Offense"]
+        # Count free‐throw attempts (made + missed)
+        fta = count_tokens(offense_rows, ("FT+", "FT-"))
+        # Total field‐goal attempts = ATR + 2FG + 3FG attempts
+        fga = (
+            team_totals["total_atr_attempts"]
+          + team_totals["total_fg2_attempts"]
+          + team_totals["total_fg3_attempts"]
+        )
+        team_totals["ft_rate"] = (
+            round(fta / fga * 100, 1)
+            if fga > 0 else 0.0
+        )
+
+
+        # 6) Turnover %
+        turns = team_totals["total_turnovers"]
+        team_totals["turnover_pct"] = (
+            round(turns / poss * 100, 1)
+            if poss > 0 else 0.0
+        )
+
+        # 7) Good Shot %
         ftr = team_totals["total_fta"]
-    
-        # — TO %
-        to = team_totals["total_turnovers"]
-        if poss > 0:
-            team_totals["turnover_pct"] = round(to / poss * 100, 1)
-        else:
-            team_totals["turnover_pct"] = 0.0
-    
-        # — Good Shot %
-        good = ftr \
-             + team_totals["total_atr_makes"] + atr_miss \
-             + team_totals["total_fg3_makes"] + fg3_miss
-        bad  = team_totals["total_fg2_makes"] + fg2_miss
-        denom = good + bad
-        if denom > 0:
-            team_totals["good_shot_pct"] = round(good / denom * 100, 2)
-        else:
-            team_totals["good_shot_pct"] = 0.0
-    
-        # — TCR (only count made shots & FT+ as “conversions”)
-        trans_df = df[
-            (df['Row'] == "Offense") &
-            df['POSSESSION TYPE'].fillna('').str.contains("Transition")
+        good = (
+            ftr
+        + team_totals["total_atr_makes"] + atr_miss
+        + team_totals["total_fg3_makes"] + fg3_miss
+        )
+        bad = team_totals["total_fg2_makes"] + fg2_miss
+        den = good + bad
+        team_totals["good_shot_pct"] = (
+            round(good / den * 100, 2)
+            if den > 0 else 0.0
+        )
+
+        # 8) TCR per Sportscode definition
+        # Denominator: made + missed FG + steals, minus neutrals
+        made      = count_tokens(offense_rows, ("ATR+", "2FG+", "3FG+"))
+        missed    = count_tokens(offense_rows, ("ATR-", "2FG-", "3FG-"))
+        steals    = count_tokens(offense_rows, ("Steal",))
+        neutrals  = offense_rows[offense_rows['TEAM'].fillna('').str.contains("Neutral")]
+        madeneu   = count_tokens(neutrals, ("ATR+", "2FG+", "3FG+"))
+        missneu   = count_tokens(neutrals, ("ATR-", "2FG-", "3FG-"))
+        stealneu  = count_tokens(neutrals, ("Steal",))
+        trans_opps = (made + missed + steals) - (madeneu + missneu + stealneu)
+
+        #    Numerator: ATR± + 2FG± + 3FG± + Fouled (in Transition rows)
+        trans_rows = offense_rows[
+            offense_rows['POSSESSION TYPE'].fillna('').str.contains("Transition")
         ]
-        trans_opp = len(trans_df)
-        conv = 0
-        for _, r in trans_df.iterrows():
-            for col in df.columns:
-                if not col.startswith("#"):
-                    continue
-                for tok in extract_tokens(r.get(col, "")):
-                    if tok in ("ATR+", "2FG+", "3FG+", "FT+"):
-                        conv += 1
-        if trans_opp > 0:
-            team_totals["tcr_pct"] = round(conv / trans_opp * 100, 1)
-        else:
-            team_totals["tcr_pct"] = 0.0
+        conversions = count_tokens(trans_rows, (
+            "ATR+", "ATR-",
+            "2FG+", "2FG-",
+            "3FG+", "3FG-",
+            "Fouled"
+        ))
+        team_totals["tcr_pct"] = (
+            round(conversions / trans_opps * 100, 1)
+            if trans_opps > 0 else 0.0
+        )
         # -------------------------------------------------------------------------
 
 
+        # Recount FT from CSV to fix missing free throws
+        offense_rows = df[df['Row'] == "Offense"]
+        team_totals["total_ftm"] = count_tokens(offense_rows, ("FT+",))
+        team_totals["total_fta"] = count_tokens(offense_rows, ("FT+","FT-"))
+    
         # Insert Team Stats for your team
         team_entry = TeamStats(
             game_id=game_id,
@@ -1083,6 +1109,20 @@ def parse_csv(file_path, game_id, season_id):
                 points_scored=poss.get("points_scored", 0)
             )
             db.session.add(new_poss)
+            db.session.flush()
+            # Insert PlayerPossession entries
+            player_ids = []
+            for jersey in poss.get("players_on_floor", []):
+                player = PlayerStats.query.filter_by(game_id=game_id, player_name=jersey).first()
+                if player:
+                    player_ids.append(player.id)
+
+            for pid in player_ids:
+                db.session.add(PlayerPossession(
+                    possession_id=new_poss.id,
+                    player_id=pid
+                ))
+
         db.session.commit()
 
     conn.close()

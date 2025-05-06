@@ -221,107 +221,73 @@ def homepage():
         .subquery()
     )
 
-    # 2) Build a possession‐counts subquery per player:
+
+
+    # 2) Build a simpler possession‐counts subquery per player:
     pps_sub = (
         db.session.query(
             PlayerPossession.player_id.label('player_id'),
-
-            # Offense counts
-            func.coalesce(func.sum(
-                case(
-                    (Possession.possession_side == 'Offense', 1),
-                    else_=0
-                )
-            ), 0).label('runO'),
-            func.coalesce(func.sum(
-                case(
-                    (and_(
-                        Possession.possession_side == 'Offense',
-                        Possession.possession_type == 'Neutral'
-                    ), 1),
-                    else_=0
-                )
-            ), 0).label('neuO'),
-            func.coalesce(func.sum(
-                case(
-                    (and_(
-                        Possession.possession_side == 'Offense',
-                        Possession.possession_type == 'Off Reb'
-                    ), 1),
-                    else_=0
-                )
-            ), 0).label('orebO'),
-
-            # Defense counts
-            func.coalesce(func.sum(
-                case(
-                    (Possession.possession_side == 'Defense', 1),
-                    else_=0
-                )
-            ), 0).label('runD'),
-            func.coalesce(func.sum(
-                case(
-                    (and_(
-                        Possession.possession_side == 'Defense',
-                        Possession.possession_type == 'Neutral'
-                    ), 1),
-                    else_=0
-                )
-            ), 0).label('neuD'),
-            func.coalesce(func.sum(
-                case(
-                    (and_(
-                        Possession.possession_side == 'Defense',
-                        Possession.possession_type == 'Off Reb'
-                    ), 1),
-                    else_=0
-                )
-            ), 0).label('orebD'),
+            func.count(PlayerPossession.id).label('poss_count')
         )
-        .join(Possession, Possession.id == PlayerPossession.possession_id)
+        .join(Possession, PlayerPossession.possession_id == Possession.id)
         .filter(Possession.game_id.in_(game_ids))
         .group_by(PlayerPossession.player_id)
         .subquery()
     )
 
-    # 3) Join them and compute BCP‐per‐possession:
+    # NEW: turn pps_sub into a dict of player_name → poss_count
+    player_poss = (
+      db.session.query(PlayerStats.player_name, pps_sub.c.poss_count)
+      .join(pps_sub, pps_sub.c.player_id == PlayerStats.id)
+      .all()
+    )
+    poss_counts = { name: count for name, count in player_poss }
+
+    # 3) Join with bcp_sub and compute Possessions‐per‐BCP:
     bcp_per_poss_leaders = (
         db.session.query(
             PlayerStats.player_name,
             (
-                bcp_sub.c.bcp
-                / func.nullif(
-                    ( (pps_sub.c.runO - pps_sub.c.neuO - pps_sub.c.orebO)
-                    +  (pps_sub.c.runD - pps_sub.c.neuD - pps_sub.c.orebD)
-                    ), 0
-                )
-            ).label('bcp_per_poss')
+                pps_sub.c.poss_count
+                / func.nullif(bcp_sub.c.bcp, 0)
+            ).label('poss_per_bcp')
         )
         .join(bcp_sub, bcp_sub.c.player_id == PlayerStats.id)
         .join(pps_sub, pps_sub.c.player_id == PlayerStats.id)
-        .order_by(desc('bcp_per_poss'))
+        .order_by('poss_per_bcp')
         .limit(10)
         .all()
     )
 
-    # 4) Map for template
-    bcp_per_poss_map = {
-        row.player_name: round(row.bcp_per_poss, 2)
+    # 4) Map for the template (round to 1 decimal, no zeros when bcp == 0):
+    poss_per_bcp_map = {
+        row.player_name: round(row.poss_per_bcp, 1) if row.poss_per_bcp is not None else '—'
         for row in bcp_per_poss_leaders
     }
 
 
+    sort_by = request.args.get('sort', 'bcp')  # 'bcp' or 'efficiency'
 
+    if sort_by == 'efficiency':
+        def eff_key(item):
+            name = item[0]
+            val  = poss_per_bcp_map.get(name)
+            # if it's not a number (e.g. '—'), treat as infinite so it sorts last
+            return val if isinstance(val, (int, float)) else float('inf')
+        bcp_leaders.sort(key=eff_key)
+    else:
+        # sort by total BCP descending
+        bcp_leaders.sort(key=lambda x: x[1], reverse=True)
 
 
     # ── Summary cards data ────────────────────────────
-    # 1) Season record
-    games  = Game.query.filter(Game.season_id == get_current_season_id()).all()
+    # 1) Record over the *selected* games
+    games  = Game.query.filter(Game.id.in_(game_ids)).all()
     wins   = sum(1 for g in games if g.result.lower() == 'win')
     losses = sum(1 for g in games if g.result.lower() == 'loss')
     record = f"{wins}–{losses}"
 
-    # 2) Avg. BCP per game
+    # 2) Avg. BCP per game over those same games
     total_bcp = sum(row.total_bcp for row in bcp_leaders)
     avg_bcp   = round(total_bcp / len(games), 1) if games else 0
 
@@ -364,7 +330,8 @@ def homepage():
         hard_hats=hard_hats,
         fg3_leaders=fg3_leaders,
         atr_leaders=atr_leaders,
-        bcp_per_poss_map=bcp_per_poss_map,
+        poss_per_bcp_map=poss_per_bcp_map,
+        poss_count_map=poss_counts,
         filter_opt=filter_opt,
         view_opt=view_opt,
         active_page='home',

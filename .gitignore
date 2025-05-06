@@ -6,3 +6,4 @@ uploads/
 .DS_Store
 data/.DS_Store
 templates/.DS_Store
+instance/database.db

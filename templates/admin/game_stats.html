@@ -12,126 +12,58 @@
 
   <!-- OFFENSE TAB -->
   <div id="offenseContent">
-    <!-- Bucket 1: Alabama Shooting -->
-    <div class="space-y-8">
-      <div>
-        <h2 class="text-xl font-bold mb-3">Alabama</h2>
-        {% set total_shots = team_stats.total_atr_attempts + team_stats.total_fg2_attempts + team_stats.total_fg3_attempts %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <!-- ATR -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">ATR</div>
-            <div class="text-2xl font-extrabold">
-              {% if team_stats.total_atr_attempts > 0 %}
-                {{ (team_stats.total_atr_makes / team_stats.total_atr_attempts * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-md my-1">
-              {% if total_shots > 0 %}
-                {{ (team_stats.total_atr_attempts / total_shots * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ team_stats.total_atr_makes }}-{{ team_stats.total_atr_attempts }}
-            </div>
-          </div>
-          <!-- 2FG -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">2FG</div>
-            <div class="text-2xl font-extrabold">
-              {% if team_stats.total_fg2_attempts > 0 %}
-                {{ (team_stats.total_fg2_makes / team_stats.total_fg2_attempts * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-md my-1">
-              {% if total_shots > 0 %}
-                {{ (team_stats.total_fg2_attempts / total_shots * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ team_stats.total_fg2_makes }}-{{ team_stats.total_fg2_attempts }}
-            </div>
-          </div>
-          <!-- 3FG -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">3FG</div>
-            <div class="text-2xl font-extrabold">
-              {% if team_stats.total_fg3_attempts > 0 %}
-                {{ (team_stats.total_fg3_makes / team_stats.total_fg3_attempts * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-md my-1">
-              {% if total_shots > 0 %}
-                {{ (team_stats.total_fg3_attempts / total_shots * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ team_stats.total_fg3_makes }}-{{ team_stats.total_fg3_attempts }}
-            </div>
-          </div>
-          <!-- FT -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">FT</div>
-            <div class="text-2xl font-extrabold">
-              {% if team_stats.total_fta > 0 %}
-                {{ (team_stats.total_ftm / team_stats.total_fta * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ team_stats.total_ftm }}-{{ team_stats.total_fta }}
-            </div>
-          </div>
-        </div>
-      </div>
+<!-- Offense Cards Redesigned -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+  <!-- Shooting Splits -->
+  {% set total_shots = team_stats.total_atr_attempts + team_stats.total_fg2_attempts + team_stats.total_fg3_attempts %}
+    {% for label, makes, attempts, extra in [
+          ('ATR', team_stats.total_atr_makes, team_stats.total_atr_attempts, total_shots),
+          ('2FG', team_stats.total_fg2_makes, team_stats.total_fg2_attempts, total_shots),
+          ('3FG', team_stats.total_fg3_makes, team_stats.total_fg3_attempts, total_shots),
+          ('FT',  team_stats.total_ftm,      team_stats.total_fta,      None)
+      ] %}
+  <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+    <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+    <div class="text-3xl font-extrabold mt-1">
+      {% if attempts > 0 %}{{ (makes/attempts*100)|round(1) }}%{% else %}0.0%{% endif %}
     </div>
+    {% if extra is not none %}
+    <div class="text-sm text-gray-400 mt-1">
+      {% if extra > 0 %}{{ (attempts/extra*100)|round(1) }}%{% else %}0.0%{% endif %}
+    </div>
+    {% endif %}
+    <div class="text-xs text-gray-600 mt-2">{{ makes }}–{{ attempts }}</div>
+  </div>
+  {% endfor %}
 
-          <!-- === Key Efficiency Cards === -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4 mb-6">
-            <!-- Assist % -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">Assist %</div>
-              <div class="text-2xl font-bold">{{ team_stats.assist_pct }}%</div>
-            </div>
-            <!-- TO % -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">TO %</div>
-              <div class="text-2xl font-bold">{{ team_stats.turnover_pct }}%</div>
-            </div>
-            <!-- TCR -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">TCR</div>
-              <div class="text-2xl font-bold">{{ team_stats.tcr_pct }}%</div>
-            </div>
-            <!-- PPP -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">PPP</div>
-              <div class="text-2xl font-bold">
-                {% if team_stats.total_possessions|int > 0 %}
-                  {{ (team_stats.total_points|int / team_stats.total_possessions|int)|round(2) }}
-                {% else %}0.00{% endif %}
-              </div>
-              <div class="text-xs mt-1">{{ team_stats.total_possessions }} poss</div>
-            </div>
-          </div>
-    
-          <!-- === Secondary Metrics Row === -->
-          <div class="grid grid-cols-3 gap-4 mb-6">
-            <!-- OREB % -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">OREB %</div>
-              <div class="text-2xl font-bold">{{ team_stats.oreb_pct }}%</div>
-            </div>
-            <!-- FT Rate -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">FT Rate</div>
-              <div class="text-2xl font-bold">{{ team_stats.ft_rate }}%</div>
-            </div>
-            <!-- Good Shot % -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow text-center">
-              <div class="text-sm font-medium uppercase">Good Shot %</div>
-              <div class="text-2xl font-bold">{{ team_stats.good_shot_pct }}%</div>
-            </div>
-          </div>
+  <!-- Efficiency & Secondary Metrics -->
+  {% for label, value in [
+      ('Assist %',     team_stats.assist_pct),
+      ('TO %',         team_stats.turnover_pct),
+      ('TCR',          team_stats.tcr_pct),
+      ('FT Rate',      team_stats.ft_rate),
+      ('OREB %',       team_stats.oreb_pct),
+      ('Good Shot %',  team_stats.good_shot_pct)
+  ] %}
+  <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+    <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+    <div class="text-3xl font-extrabold mt-1">{{ value }}%</div>
+  </div>
+  {% endfor %}
+
+  <!-- PPP -->
+  <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+    <div class="text-xs font-semibold uppercase text-gray-500">PPP</div>
+    <div class="text-3xl font-extrabold mt-1">
+      {% if team_stats.total_possessions|int>0 %}
+        {{ (team_stats.total_points|int/team_stats.total_possessions|int)|round(2) }}
+      {% else %}0.00{% endif %}
+    </div>
+    <div class="text-xs text-gray-600 mt-2">{{ team_stats.total_possessions }} poss</div>
+  </div>
+</div>
+
+
     
 
       <!-- Playmaking & Efficiency (Alabama Only) -->
@@ -326,77 +258,56 @@
 
   <!-- DEFENSE TAB -->
   <div id="defenseContent" class="hidden">
-    <!-- Bucket 1: Opponent Shooting -->
-    <div class="space-y-8">
-      <div>
-        <h2 class="text-xl font-bold mb-3">{{ game.opponent_name }}</h2>
-        {% set opp_total_shots = opponent_stats.total_atr_attempts + opponent_stats.total_fg2_attempts + opponent_stats.total_fg3_attempts %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <!-- ATR -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">ATR</div>
-            <div class="text-2xl font-extrabold">
-              {% if opponent_stats.total_atr_attempts > 0 %}
-                {{ (opponent_stats.total_atr_makes / opponent_stats.total_atr_attempts * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-md my-1">
-              {% if opp_total_shots > 0 %}
-                {{ (opponent_stats.total_atr_attempts / opp_total_shots * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ opponent_stats.total_atr_makes }}-{{ opponent_stats.total_atr_attempts }}
-            </div>
-          </div>
-          <!-- 2FG -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">2FG</div>
-            <div class="text-2xl font-extrabold">
-              {% if opponent_stats.total_fg2_attempts > 0 %}
-                {{ (opponent_stats.total_fg2_makes / opponent_stats.total_fg2_attempts * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-md my-1">
-              {% if opp_total_shots > 0 %}
-                {{ (opponent_stats.total_fg2_attempts / opp_total_shots * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ opponent_stats.total_fg2_makes }}-{{ opponent_stats.total_fg2_attempts }}
-            </div>
-          </div>
-          <!-- 3FG -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">3FG</div>
-            <div class="text-2xl font-extrabold">
-              {% if opponent_stats.total_fg3_attempts > 0 %}
-                {{ (opponent_stats.total_fg3_makes / opponent_stats.total_fg3_attempts * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-md my-1">
-              {% if opp_total_shots > 0 %}
-                {{ (opponent_stats.total_fg3_attempts / opp_total_shots * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ opponent_stats.total_fg3_makes }}-{{ opponent_stats.total_fg3_attempts }}
-            </div>
-          </div>
-          <!-- FT -->
-          <div class="bg-white dark:bg-gray-800 text-center p-4 shadow-md rounded">
-            <div class="font-bold underline mb-2">FT</div>
-            <div class="text-2xl font-extrabold">
-              {% if opponent_stats.total_fta > 0 %}
-                {{ (opponent_stats.total_ftm / opponent_stats.total_fta * 100) | round(1) }}%
-              {% else %}0.0%{% endif %}
-            </div>
-            <div class="text-sm">
-              {{ opponent_stats.total_ftm }}-{{ opponent_stats.total_fta }}
-            </div>
-          </div>
-        </div>
+<!-- Defense Cards Redesigned (matching Offense order) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+  <!-- Opponent Shooting Splits -->
+  {% set opp_total_shots = opponent_stats.total_atr_attempts
+                         + opponent_stats.total_fg2_attempts
+                         + opponent_stats.total_fg3_attempts %}
+  {% for label, makes, attempts, extra in [
+        ('ATR', opponent_stats.total_atr_makes, opponent_stats.total_atr_attempts, opp_total_shots),
+        ('2FG', opponent_stats.total_fg2_makes, opponent_stats.total_fg2_attempts, opp_total_shots),
+        ('3FG', opponent_stats.total_fg3_makes, opponent_stats.total_fg3_attempts, opp_total_shots),
+        ('FT',  opponent_stats.total_ftm,      opponent_stats.total_fta,      None)
+  ] %}
+    <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+      <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+      <div class="text-3xl font-extrabold mt-1">
+        {% if attempts > 0 %}{{ (makes/attempts*100)|round(1) }}%{% else %}0.0%{% endif %}
       </div>
+      {% if extra is not none %}
+        <div class="text-sm text-gray-400 mt-1">
+          {% if extra > 0 %}{{ (attempts/extra*100)|round(1) }}%{% else %}0.0%{% endif %}
+        </div>
+      {% endif %}
+      <div class="text-xs text-gray-600 mt-2">{{ makes }}–{{ attempts }}</div>
+    </div>
+  {% endfor %}
+
+  <!-- Mirror Offense order: Assist, TO, TCR, FT Rate, then OREB, Good Shot -->
+  {% for label, value in [
+        ('Assist %',    opp_assist_pct),
+        ('TO %',        opp_turnover_pct),
+        ('TCR',         opp_tcr_pct),
+        ('FT Rate',     opp_ft_rate),
+        ('OREB %',      opp_oreb_pct),
+        ('Good Shot %', opp_good_shot_pct)
+  ] %}
+    <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+      <div class="text-xs font-semibold uppercase text-gray-500">{{ label }} Allowed</div>
+      <div class="text-3xl font-extrabold mt-1">{{ value }}%</div>
+    </div>
+  {% endfor %}
+
+  <!-- PPP Allowed last -->
+  <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+    <div class="text-xs font-semibold uppercase text-gray-500">PPP Allowed</div>
+    <div class="text-3xl font-extrabold mt-1">{{ opp_ppp }}</div>
+    <div class="text-xs text-gray-600 mt-2">{{ opponent_stats.total_possessions }} poss</div>
+  </div>
+</div>
+
+      
 
       <!-- Playmaking & Efficiency (Opponent Only) -->
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">

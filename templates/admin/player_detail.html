@@ -338,7 +338,7 @@
             <th rowspan="2" class="px-4 py-2 text-left">Category</th>
             <th colspan="4" class="px-4 py-2 text-center">Total</th>
             <th colspan="4" class="px-4 py-2 text-center">Transition</th>
-            <th colspan="4" class="px-4 py-2 text-center">Half‑Court</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half-Court</th>
           </tr>
           <tr>
             {% for _ in range(3) %}
@@ -366,7 +366,7 @@
     
                 {# Totals #}
                 <td class="px-2 py-1 text-center">
-                  {{ d.total.makes }}‑{{ d.total.attempts }}
+                  {{ d.total.makes }}-{{ d.total.attempts }}
                 </td>
                 <td
                   class="px-2 py-1 text-center"
@@ -378,12 +378,16 @@
                   {{ d.total.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
-                  {{ (d.total.attempts/shot_type_totals.atr.attempts*100)|round(1) }}%
+                  {% if shot_type_totals.atr.attempts > 0 %}
+                    {{ (d.total.attempts / shot_type_totals.atr.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
                 </td>
     
                 {# Transition #}
                 <td class="px-2 py-1 text-center">
-                  {{ d.transition.makes }}‑{{ d.transition.attempts }}
+                  {{ d.transition.makes }}-{{ d.transition.attempts }}
                 </td>
                 <td
                   class="px-2 py-1 text-center"
@@ -395,12 +399,16 @@
                   {{ d.transition.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
-                  {{ (d.transition.attempts/shot_type_totals.atr.attempts*100)|round(1) }}%
+                  {% if shot_type_totals.atr.attempts > 0 %}
+                    {{ (d.transition.attempts / shot_type_totals.atr.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
                 </td>
     
-                {# Half‑Court #}
+                {# Half-Court #}
                 <td class="px-2 py-1 text-center">
-                  {{ d.halfcourt.makes }}‑{{ d.halfcourt.attempts }}
+                  {{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}
                 </td>
                 <td
                   class="px-2 py-1 text-center"
@@ -412,7 +420,11 @@
                   {{ d.halfcourt.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
-                  {{ (d.halfcourt.attempts/shot_type_totals.atr.attempts*100)|round(1) }}%
+                  {% if shot_type_totals.atr.attempts > 0 %}
+                    {{ (d.halfcourt.attempts / shot_type_totals.atr.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}
@@ -420,10 +432,7 @@
         </tbody>
       </table>
     </div>
-    
-    
-    
-    
+
     
     {# ── 2FG Detail Table ── #}
     {% set fg2_groups = [
@@ -546,18 +555,18 @@
     
     {# ── 3FG Detail Table ── #}
     {% set fg3_groups = [
-      ('Assisted',        ['Assisted','Non‑Assisted']),
-      ('Type',         ['Catch and Shoot','Pull Up','Step Back','Catch and Hold','Slide Dribble']),
-      ('Line',         ['On The Line','Off The Line']),
-      ('Pocket',       ['Shot Pocket','Non-Shot Pocket']),
-      ('Move',         ['Stationary','On Move']),
-      ('Contest',      ['Contest','Uncontested','Late Contest','Blocked']),
-      ('Footwork',     ['WTN Left-Right','WTN Right-Left','Left-Right','Right-Left','Hop']),
-      ('Good/Bad',     ['Good','Bad','Neutral Three']),
-      ('Shrink',       ['Shrink','Non-Shrink']),
-      ('Scheme – Attack',['Beast / Post','DHO / Get','PnR Handler','Iso','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
-      ('Scheme – Drive', ['Drive Right','Drive Left','Dip']),
-      ('Scheme – Pass',  [
+      ('Assisted',        ['Assisted','Non-Assisted']),
+      ('Type',            ['Catch and Shoot','Pull Up','Step Back','Catch and Hold','Slide Dribble']),
+      ('Line',            ['On The Line','Off The Line']),
+      ('Pocket',          ['Shot Pocket','Non-Shot Pocket']),
+      ('Move',            ['Stationary','On Move']),
+      ('Contest',         ['Contest','Uncontested','Late Contest','Blocked']),
+      ('Footwork',        ['WTN Left-Right','WTN Right-Left','Left-Right','Right-Left','Hop']),
+      ('Good/Bad',        ['Good','Bad','Neutral Three']),
+      ('Shrink',          ['Shrink','Non-Shrink']),
+      ('Scheme – Attack', ['Beast / Post','DHO / Get','PnR Handler','Iso','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Drive',  ['Drive Right','Drive Left','Dip']),
+      ('Scheme – Pass',   [
         'Swing','Checkdown','Off Screen','1 More','Lift','Drift','Post Entry','Post Pass Out',
         'Kickdown','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Reshape','Shake','Skip',
         'Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
@@ -571,7 +580,7 @@
             <th rowspan="2" class="px-4 py-2 text-left">Category</th>
             <th colspan="4" class="px-4 py-2 text-center">Total</th>
             <th colspan="4" class="px-4 py-2 text-center">Transition</th>
-            <th colspan="4" class="px-4 py-2 text-center">Half‑Court</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half-Court</th>
           </tr>
           <tr>
             {% for _ in range(3) %}
@@ -584,68 +593,59 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
           {% for _group_name, cats in fg3_groups %}
-            {# crimson divider between groups #}
             <tr>
               <td colspan="13" class="p-0">
                 <div class="h-[2px] bg-[#9E1B32]"></div>
               </td>
             </tr>
-    
-            {# actual data rows with zebra stripes #}
             {% for category in cats %}
               {% set d = fg3_summary.cats.get(category, empty_group) %}
               <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
                 <td class="px-4 py-2">{{ category }}</td>
     
                 {# Totals #}
-                <td class="px-2 py-1 text-center">
-                  {{ d.total.makes }}‑{{ d.total.attempts }}
-                </td>
+                <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
                 <td
                   class="px-2 py-1 text-center"
                   style="{{ (d.total.fg_pct*100)|round(1)|grade_3fg_pct(d.total.attempts) }}"
-                >
-                  {{ (d.total.fg_pct*100)|round(1) }}%
-                </td>
+                >{{ (d.total.fg_pct*100)|round(1) }}%</td>
+                <td class="px-2 py-1 text-center">{{ d.total.pps|round(2) }}</td>
                 <td class="px-2 py-1 text-center">
-                  {{ d.total.pps|round(2) }}
-                </td>
-                <td class="px-2 py-1 text-center">
-                  {{ (d.total.attempts/shot_type_totals.fg3.attempts*100)|round(1) }}%
+                  {% if shot_type_totals.fg3.attempts > 0 %}
+                    {{ (d.total.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
                 </td>
     
                 {# Transition #}
-                <td class="px-2 py-1 text-center">
-                  {{ d.transition.makes }}‑{{ d.transition.attempts }}
-                </td>
+                <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
                 <td
                   class="px-2 py-1 text-center"
                   style="{{ (d.transition.fg_pct*100)|round(1)|grade_3fg_pct(d.transition.attempts) }}"
-                >
-                  {{ (d.transition.fg_pct*100)|round(1) }}%
-                </td>
+                >{{ (d.transition.fg_pct*100)|round(1) }}%</td>
+                <td class="px-2 py-1 text-center">{{ d.transition.pps|round(2) }}</td>
                 <td class="px-2 py-1 text-center">
-                  {{ d.transition.pps|round(2) }}
-                </td>
-                <td class="px-2 py-1 text-center">
-                  {{ (d.transition.attempts/shot_type_totals.fg3.attempts*100)|round(1) }}%
+                  {% if shot_type_totals.fg3.attempts > 0 %}
+                    {{ (d.transition.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
                 </td>
     
-                {# Half‑Court #}
-                <td class="px-2 py-1 text-center">
-                  {{ d.halfcourt.makes }}‑{{ d.halfcourt.attempts }}
-                </td>
+                {# Half-Court #}
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
                 <td
                   class="px-2 py-1 text-center"
                   style="{{ (d.halfcourt.fg_pct*100)|round(1)|grade_3fg_pct(d.halfcourt.attempts) }}"
-                >
-                  {{ (d.halfcourt.fg_pct*100)|round(1) }}%
-                </td>
+                >{{ (d.halfcourt.fg_pct*100)|round(1) }}%</td>
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.pps|round(2) }}</td>
                 <td class="px-2 py-1 text-center">
-                  {{ d.halfcourt.pps|round(2) }}
-                </td>
-                <td class="px-2 py-1 text-center">
-                  {{ (d.halfcourt.attempts/shot_type_totals.fg3.attempts*100)|round(1) }}%
+                  {% if shot_type_totals.fg3.attempts > 0 %}
+                    {{ (d.halfcourt.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}
@@ -653,10 +653,7 @@
         </tbody>
       </table>
     </div>
-    
 
-
-  
   <script>
 // —— Utility ——
 function capitalize(str) {
