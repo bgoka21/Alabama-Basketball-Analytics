@@ -78,20 +78,28 @@ def homepage():
     min_atr = None if filter_opt == 'true_data' else 10
 
 
-    # ─── 4A) Blue Collar Points Leaders ──────────────
+    # 4A) Blue Collar Points Leaders (now summing the same total_blue_collar you use on player pages)
+    bcp_sub = (
+        db.session.query(
+            BlueCollarStats.player_id.label('player_id'),
+            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0)
+                .label('total_bcp')
+        )
+        .filter(BlueCollarStats.game_id.in_(game_ids))
+        .group_by(BlueCollarStats.player_id)
+        .subquery()
+    )
+
     bcp_leaders = (
         db.session.query(
             PlayerStats.player_name,
-            func.sum(BlueCollarStats.total_blue_collar).label('total_bcp')
+            bcp_sub.c.total_bcp
         )
-        .join(BlueCollarStats, BlueCollarStats.player_id == PlayerStats.id)
-        .filter(BlueCollarStats.game_id.in_(game_ids))
-        .group_by(PlayerStats.player_name)
-        .order_by(desc('total_bcp'))
+        .join(bcp_sub, bcp_sub.c.player_id == PlayerStats.id)
+        .order_by(desc(bcp_sub.c.total_bcp))
         .limit(10)
         .all()
     )
-
 
     #  ───────────────────────────────────────────
     #  Determine winning games among our selection
@@ -198,30 +206,11 @@ def homepage():
     atr_leaders = qa.order_by(desc('atr_pct')).limit(10).all()
 
 
-     # ─── 4E) Blue Collar Points + Possessions Per BCP ────────────
+    # 4E) Possessions per BCP
 
-    # a) Sum each player’s BCP
-    bcp_sub = (
-        db.session.query(
-            BlueCollarStats.player_id.label('player_id'),
-            (
-                func.coalesce(func.sum(BlueCollarStats.def_reb),    0) +
-                func.coalesce(func.sum(BlueCollarStats.off_reb),    0) +
-                func.coalesce(func.sum(BlueCollarStats.misc),       0) +
-                func.coalesce(func.sum(BlueCollarStats.deflection), 0) +
-                func.coalesce(func.sum(BlueCollarStats.steal),      0) +
-                func.coalesce(func.sum(BlueCollarStats.block),      0) +
-                func.coalesce(func.sum(BlueCollarStats.floor_dive), 0) +
-                func.coalesce(func.sum(BlueCollarStats.charge_taken),0)+
-                func.coalesce(func.sum(BlueCollarStats.reb_tip),    0)
-            ).label('total_bcp')
-        )
-        .filter(BlueCollarStats.game_id.in_(game_ids))
-        .group_by(BlueCollarStats.player_id)
-        .subquery()
-    )
+    # a) bcp_sub is already defined above.
 
-    # b) Count each player’s total possessions
+    # b) count each player’s possessions
     pps_sub = (
         db.session.query(
             PlayerPossession.player_id.label('player_id'),
@@ -233,7 +222,7 @@ def homepage():
         .subquery()
     )
 
-    # c) Join and compute Poss/BCP
+    # c) join them and compute rate
     players_q = (
         db.session.query(
             PlayerStats.player_name,
@@ -249,22 +238,26 @@ def homepage():
         .filter(PlayerStats.game_id.in_(game_ids))
     )
 
-    # d) Sort by query param
+    # d) apply your ≥100-possessions filter when sorting by efficiency
     if sort_by == 'efficiency':
-        players_q = players_q.order_by('poss_per_bcp')
+        players_q = (
+            players_q
+            .filter(pps_sub.c.possessions >= 100)
+            .order_by('poss_per_bcp')
+        )
     else:
-        players_q = players_q.order_by(desc('total_bcp'))
+        players_q = players_q.order_by(desc(bcp_sub.c.total_bcp))
 
-    # e) Grab top 10
+    # e) top 10
     top10 = players_q.limit(10).all()
 
-    # f) Build a simple list of 4-tuples for the template
+    # f) to template tuples
     bcp_leaders = [
         (
-            r.player_name,
-            float(r.total_bcp),
-            int(r.possessions),
-            None if r.poss_per_bcp is None else round(r.poss_per_bcp, 2)
+        r.player_name,
+        float(r.total_bcp),
+        int(r.possessions),
+        None if r.poss_per_bcp is None else round(r.poss_per_bcp, 2)
         )
         for r in top10
     ]
