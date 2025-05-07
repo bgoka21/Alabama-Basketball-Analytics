@@ -148,20 +148,22 @@ def homepage():
 
     # 3) Count how many times each player hit that max in a winning game
     hard_hats = (
-        db.session.query(
-            PlayerStats.player_name,
-            func.count().label('hard_hat_count')
-        )
-        .join(player_bcp, player_bcp.c.player_id == PlayerStats.id)
-        .join(max_bcp_sub, and_(
-            player_bcp.c.game_id == max_bcp_sub.c.game_id,
-            player_bcp.c.bcp     == max_bcp_sub.c.max_bcp
-        ))
-        .group_by(PlayerStats.player_name)
-        .order_by(desc('hard_hat_count'))
-        .limit(10)
-        .all()
-    )
+         db.session.query(
+             PlayerStats.player_name,
+             func.count().label('hard_hat_count')
+         )
+         .join(player_bcp, player_bcp.c.player_id == PlayerStats.id)
+         .join(max_bcp_sub, and_(
+             player_bcp.c.game_id == max_bcp_sub.c.game_id,
+             player_bcp.c.bcp     == max_bcp_sub.c.max_bcp
+         ))
+        # only count games where someone actually scored >0 BCP
+        .filter(max_bcp_sub.c.max_bcp > 0)
+         .group_by(PlayerStats.player_name)
+         .order_by(desc('hard_hat_count'))
+         .limit(10)
+         .all()
+     )
 
     # ─── 4C) 3FG% Leaders ──────────────────────────────
     q3 = (
