@@ -78,24 +78,24 @@ def homepage():
     min_atr = None if filter_opt == 'true_data' else 10
 
 
-    # 4A) Blue Collar Points Leaders (now summing the same total_blue_collar you use on player pages)
+    # ─── 4A) Blue Collar Points Leaders ──────────────
     bcp_sub = (
         db.session.query(
-            BlueCollarStats.player_id.label('player_id'),
+            PlayerStats.player_name.label('player_name'),
             func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0)
                 .label('total_bcp')
         )
+        .join(BlueCollarStats, BlueCollarStats.player_id == PlayerStats.id)
         .filter(BlueCollarStats.game_id.in_(game_ids))
-        .group_by(BlueCollarStats.player_id)
+        .group_by(PlayerStats.player_name)
         .subquery()
     )
 
     bcp_leaders = (
         db.session.query(
-            PlayerStats.player_name,
+            bcp_sub.c.player_name,
             bcp_sub.c.total_bcp
         )
-        .join(bcp_sub, bcp_sub.c.player_id == PlayerStats.id)
         .order_by(desc(bcp_sub.c.total_bcp))
         .limit(10)
         .all()
@@ -210,22 +210,23 @@ def homepage():
 
     # a) bcp_sub is already defined above.
 
-    # b) count each player’s possessions
+    # b) Count each player’s total possessions **across all games** by name
     pps_sub = (
         db.session.query(
-            PlayerPossession.player_id.label('player_id'),
+            PlayerStats.player_name.label('player_name'),
             func.count(PlayerPossession.id).label('possessions')
         )
-        .join(Possession, PlayerPossession.possession_id == Possession.id)
+        .join(PlayerStats, PlayerPossession.player_id == PlayerStats.id)
+        .join(Possession,   PlayerPossession.possession_id == Possession.id)
         .filter(Possession.game_id.in_(game_ids))
-        .group_by(PlayerPossession.player_id)
+        .group_by(PlayerStats.player_name)
         .subquery()
     )
 
-    # c) join them and compute rate
+    # c) Join them and compute Poss/BCP
     players_q = (
         db.session.query(
-            PlayerStats.player_name,
+            bcp_sub.c.player_name,
             bcp_sub.c.total_bcp,
             func.coalesce(pps_sub.c.possessions, 0).label('possessions'),
             (
@@ -233,12 +234,20 @@ def homepage():
                 / func.nullif(bcp_sub.c.total_bcp, 0)
             ).label('poss_per_bcp')
         )
-        .join(bcp_sub,   bcp_sub.c.player_id   == PlayerStats.id)
-        .outerjoin(pps_sub, pps_sub.c.player_id == PlayerStats.id)
-        .filter(PlayerStats.game_id.in_(game_ids))
+        # start from the BCP subquery
+        .select_from(bcp_sub)
+        # then bring in possessions by name
+        .outerjoin(
+            pps_sub,
+            pps_sub.c.player_name == bcp_sub.c.player_name
+        )
+        .filter(
+            # only include players who actually appear in our games
+            bcp_sub.c.player_name != None
+        )
     )
 
-    # d) apply your ≥100-possessions filter when sorting by efficiency
+    # d) If sorting by efficiency, only include players with ≥100 possessions
     if sort_by == 'efficiency':
         players_q = (
             players_q
@@ -248,16 +257,14 @@ def homepage():
     else:
         players_q = players_q.order_by(desc(bcp_sub.c.total_bcp))
 
-    # e) top 10
+    # e) Grab top 10 and shape for template
     top10 = players_q.limit(10).all()
-
-    # f) to template tuples
     bcp_leaders = [
         (
-        r.player_name,
-        float(r.total_bcp),
-        int(r.possessions),
-        None if r.poss_per_bcp is None else round(r.poss_per_bcp, 2)
+            r.player_name,
+            float(r.total_bcp),
+            int(r.possessions),
+            None if r.poss_per_bcp is None else round(r.poss_per_bcp, 2)
         )
         for r in top10
     ]
