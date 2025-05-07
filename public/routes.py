@@ -62,6 +62,9 @@ def homepage():
     # 1) Read filter options from query string
     filter_opt = request.args.get('filter', 'season')   # 'season', 'last5', 'true_data'
     view_opt   = request.args.get('view',   'season')   # reserved for future use
+    # Read sort choice from query string (default to total BCP)
+    sort_by = request.args.get('sort', 'bcp')  # 'bcp' or 'efficiency'
+
 
     # 2) Pick games to include
     if filter_opt == 'last5':
@@ -195,15 +198,12 @@ def homepage():
     atr_leaders = qa.order_by(desc('atr_pct')).limit(10).all()
 
 
-    # ────────────────────────────────────────────────────
-    # 4C) Blue Collar Points Per Possession ─────────────
-    # ────────────────────────────────────────────────────
+     # ─── 4E) Blue Collar Points + Possessions Per BCP ────────────
 
-    # 1) Build a subquery that, for each player & game, sums all nine BCP events:
+    # a) Sum each player’s BCP
     bcp_sub = (
         db.session.query(
             BlueCollarStats.player_id.label('player_id'),
-            BlueCollarStats.game_id.label('game_id'),
             (
                 func.coalesce(func.sum(BlueCollarStats.def_reb),    0) +
                 func.coalesce(func.sum(BlueCollarStats.off_reb),    0) +
@@ -212,22 +212,20 @@ def homepage():
                 func.coalesce(func.sum(BlueCollarStats.steal),      0) +
                 func.coalesce(func.sum(BlueCollarStats.block),      0) +
                 func.coalesce(func.sum(BlueCollarStats.floor_dive), 0) +
-                func.coalesce(func.sum(BlueCollarStats.charge_taken), 0) +
+                func.coalesce(func.sum(BlueCollarStats.charge_taken),0)+
                 func.coalesce(func.sum(BlueCollarStats.reb_tip),    0)
-            ).label('bcp')
+            ).label('total_bcp')
         )
         .filter(BlueCollarStats.game_id.in_(game_ids))
-        .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
+        .group_by(BlueCollarStats.player_id)
         .subquery()
     )
 
-
-
-    # 2) Build a simpler possession‐counts subquery per player:
+    # b) Count each player’s total possessions
     pps_sub = (
         db.session.query(
             PlayerPossession.player_id.label('player_id'),
-            func.count(PlayerPossession.id).label('poss_count')
+            func.count(PlayerPossession.id).label('possessions')
         )
         .join(Possession, PlayerPossession.possession_id == Possession.id)
         .filter(Possession.game_id.in_(game_ids))
@@ -235,61 +233,57 @@ def homepage():
         .subquery()
     )
 
-    # NEW: turn pps_sub into a dict of player_name → poss_count
-    player_poss = (
-      db.session.query(PlayerStats.player_name, pps_sub.c.poss_count)
-      .join(pps_sub, pps_sub.c.player_id == PlayerStats.id)
-      .all()
-    )
-    poss_counts = { name: count for name, count in player_poss }
-
-    # 3) Join with bcp_sub and compute Possessions‐per‐BCP:
-    bcp_per_poss_leaders = (
+    # c) Join and compute Poss/BCP
+    players_q = (
         db.session.query(
             PlayerStats.player_name,
+            bcp_sub.c.total_bcp,
+            func.coalesce(pps_sub.c.possessions, 0).label('possessions'),
             (
-                pps_sub.c.poss_count
-                / func.nullif(bcp_sub.c.bcp, 0)
+                func.coalesce(pps_sub.c.possessions, 0)
+                / func.nullif(bcp_sub.c.total_bcp, 0)
             ).label('poss_per_bcp')
         )
-        .join(bcp_sub, bcp_sub.c.player_id == PlayerStats.id)
-        .join(pps_sub, pps_sub.c.player_id == PlayerStats.id)
-        .order_by('poss_per_bcp')
-        .limit(10)
-        .all()
+        .join(bcp_sub,   bcp_sub.c.player_id   == PlayerStats.id)
+        .outerjoin(pps_sub, pps_sub.c.player_id == PlayerStats.id)
+        .filter(PlayerStats.game_id.in_(game_ids))
     )
 
-    # 4) Map for the template (round to 1 decimal, no zeros when bcp == 0):
-    poss_per_bcp_map = {
-        row.player_name: round(row.poss_per_bcp, 1) if row.poss_per_bcp is not None else '—'
-        for row in bcp_per_poss_leaders
-    }
-
-
-    sort_by = request.args.get('sort', 'bcp')  # 'bcp' or 'efficiency'
-
+    # d) Sort by query param
     if sort_by == 'efficiency':
-        def eff_key(item):
-            name = item[0]
-            val  = poss_per_bcp_map.get(name)
-            # if it's not a number (e.g. '—'), treat as infinite so it sorts last
-            return val if isinstance(val, (int, float)) else float('inf')
-        bcp_leaders.sort(key=eff_key)
+        players_q = players_q.order_by('poss_per_bcp')
     else:
-        # sort by total BCP descending
-        bcp_leaders.sort(key=lambda x: x[1], reverse=True)
+        players_q = players_q.order_by(desc('total_bcp'))
+
+    # e) Grab top 10
+    top10 = players_q.limit(10).all()
+
+    # f) Build a simple list of 4-tuples for the template
+    bcp_leaders = [
+        (
+            r.player_name,
+            float(r.total_bcp),
+            int(r.possessions),
+            None if r.poss_per_bcp is None else round(r.poss_per_bcp, 2)
+        )
+        for r in top10
+    ]
 
 
-    # ── Summary cards data ────────────────────────────
-    # 1) Record over the *selected* games
+
+       # ── Summary cards data ────────────────────────────
     games  = Game.query.filter(Game.id.in_(game_ids)).all()
     wins   = sum(1 for g in games if g.result.lower() == 'win')
     losses = sum(1 for g in games if g.result.lower() == 'loss')
     record = f"{wins}–{losses}"
 
-    # 2) Avg. BCP per game over those same games
-    total_bcp = sum(row.total_bcp for row in bcp_leaders)
-    avg_bcp   = round(total_bcp / len(games), 1) if games else 0
+    # 2) Avg. BCP per game over those same games (USE weighted total_blue_collar)
+    team_records = TeamStats.query\
+        .filter(TeamStats.is_opponent==False,
+                TeamStats.game_id.in_(game_ids))\
+        .all()
+    team_total_bcp = sum(r.total_blue_collar for r in team_records)
+    avg_bcp        = round(team_total_bcp / len(team_records), 1) if team_records else 0
 
     # 3) Avg. 3FG% this season (skip any None values)
     pct3s      = [row.fg3_pct for row in fg3_leaders]
@@ -321,17 +315,12 @@ def homepage():
         'avg_ppg': avg_ppg
     }
 
-
-
-    # ─── 5) Render homepage ───────────────────────────
     return render_template(
         'home.html',
         bcp_leaders=bcp_leaders,
         hard_hats=hard_hats,
         fg3_leaders=fg3_leaders,
         atr_leaders=atr_leaders,
-        poss_per_bcp_map=poss_per_bcp_map,
-        poss_count_map=poss_counts,
         filter_opt=filter_opt,
         view_opt=view_opt,
         active_page='home',

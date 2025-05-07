@@ -57,51 +57,51 @@
 <!-- 2x2 Grid Layout: 4 Equal Leaderboard Boxes -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-  <!-- Blue Collar Points Leaders -->
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Blue Collar Points Leaders</h2>
-    <table class="min-w-full whitespace-no-wrap">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-            Player
-          </th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-            <a href="{{ url_for('public.homepage', sort='bcp', filter=filter_opt) }}"
-               class="{{ 'text-white bg-[#9E1B32]' if request.args.get('sort','bcp')=='bcp' else 'text-gray-700 hover:underline' }} inline-block px-2 py-1 rounded">
-              Total BCP
-            </a>
-          </th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-            Possessions
-          </th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-            <a href="{{ url_for('public.homepage', sort='efficiency', filter=filter_opt) }}"
-               class="{{ 'text-white bg-[#9E1B32]' if request.args.get('sort')=='efficiency' else 'text-gray-700 hover:underline' }} inline-block px-2 py-1 rounded">
-              Poss / BCP
-            </a>
-          </th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, total in bcp_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm text-gray-800">{{ player }}</td>
-          <td class="px-6 py-4 text-sm text-gray-800">{{ '%.1f'|format(total) }}</td>
-          <td class="px-6 py-4 text-sm text-gray-800">{{ poss_count_map.get(player, 0) }}</td>
-          <td class="px-6 py-4 text-sm text-gray-800">
-            {% set eff = poss_per_bcp_map.get(player) %}
-            {% if eff is number %}
-              {{ '%.1f'|format(eff) }}
-            {% else %}
-              {{ eff }}
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<!-- Blue Collar Points Leaders -->
+<div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+  <h2 class="text-xl font-semibold mb-4">Blue Collar Points Leaders</h2>
+  <table class="min-w-full whitespace-no-wrap">
+    <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+      <tr>
+        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
+          Player
+        </th>
+        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
+          <a href="{{ url_for('public.homepage', sort='bcp', filter=filter_opt) }}"
+             class="{{ 'text-white bg-[#9E1B32]' if request.args.get('sort','bcp')=='bcp' else 'text-gray-700 hover:underline' }} inline-block px-2 py-1 rounded">
+            Total BCP
+          </a>
+        </th>
+        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
+          Possessions
+        </th>
+        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
+          <a href="{{ url_for('public.homepage', sort='efficiency', filter=filter_opt) }}"
+             class="{{ 'text-white bg-[#9E1B32]' if request.args.get('sort')=='efficiency' else 'text-gray-700 hover:underline' }} inline-block px-2 py-1 rounded">
+            Poss / BCP
+          </a>
+        </th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200">
+      {% for player, total_bcp, possessions, poss_per_bcp in bcp_leaders %}
+      <tr class="bg-white hover:bg-gray-50">
+        <td class="px-6 py-4 text-sm text-gray-800">{{ player }}</td>
+        <td class="px-6 py-4 text-sm text-gray-800">{{ '%.1f'|format(total_bcp) }}</td>
+        <td class="px-6 py-4 text-sm text-gray-800">{{ possessions }}</td>
+        <td class="px-6 py-4 text-sm text-gray-800">
+          {% if poss_per_bcp is not none %}
+            {{ '%.2f'|format(poss_per_bcp) }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
   
 
   <!-- Hard Hat Winners -->
