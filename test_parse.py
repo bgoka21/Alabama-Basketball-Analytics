@@ -5,7 +5,7 @@ import numpy as np
 import sqlite3
 from itertools import combinations
 from collections import defaultdict
-from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession
+from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster
 
 #print("🔥 parse_csv() function has started executing!")
 
@@ -32,50 +32,46 @@ def extract_tokens(cell_value):
     return [token.strip().replace("–", "-") for token in cell_value.split(",") if token.strip()]
 
 def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_collar_values):
+    """
+    Build a dict of zeros for every base stat plus ​every subcategory under ATR, 2FG, and 3FG.
+    Also includes an empty shot_type_details list for storing per-shot JSON objects.
+    """
     base_stats = {
-        "game_id": game_id,
-        "season_id": season_id,
-        "player_name": player_name,
-        "points": 0,
-        "assists": 0,
-        "pot_assists": 0,      # ← initialize potential assists
-        "second_assists": 0,   # ← initialize 2nd assists
-        "turnovers": 0,
-        "atr_makes": 0,
-        "atr_attempts": 0,
-        "fg2_makes": 0,
-        "fg2_attempts": 0,
-        "fg3_makes": 0,
-        "fg3_attempts": 0,
-        "ftm": 0,
-        "fta": 0,
-        "foul_by": 0,
-        "contest_front": 0,
-        "contest_side": 0,
-        "contest_behind": 0,
-        "contest_late": 0,
-        "contest_early": 0,
-        "contest_no": 0,
-        "bump_positive": 0,
-        "bump_missed": 0,
-        "blowby_total": 0,
-        "blowby_triple_threat": 0,
-        "blowby_closeout": 0,
-        "blowby_isolation": 0,
-        "atr_fouled": 0,
-        "fg2_fouled": 0,
-        "fg3_fouled": 0,
+        "game_id":          game_id,
+        "season_id":        season_id,
+        "player_name":      player_name,
+        "points":          0,
+        "assists":         0,
+        "pot_assists":     0,
+        "second_assists":  0,
+        "turnovers":       0,
+        "atr_makes":       0,
+        "atr_attempts":    0,
+        "fg2_makes":       0,
+        "fg2_attempts":    0,
+        "fg3_makes":       0,
+        "fg3_attempts":    0,
+        "ftm":             0,
+        "fta":             0,
+        "foul_by":         0,
+        "atr_fouled":      0,
+        "fg2_fouled":      0,
+        "fg3_fouled":      0,
         "shot_type_details": [],
         "blue_collar_accum": {key: 0 for key in blue_collar_values.keys()}
     }
+    # Copy in any other mapped stats (e.g. "blocks", "steals") you already had:
     base_stats.update({key: 0 for key in stat_mapping.values()})
 
+    # ─── Build out subcategory keys for ATR, 2FG, and 3FG ───────────────────
     def slug(s):
-        return (s.lower()
-                  .replace("(", "").replace(")", "")
-                  .replace("/", "_")
-                  .replace("-", "_")
-                  .replace(" ", "_"))
+        return (
+            s.lower()
+             .replace("(", "").replace(")", "")
+             .replace("/", "_")
+             .replace("-", "_")
+             .replace(" ", "_")
+        )
 
     detail_columns = {
         # ATR & 2FG shared columns
@@ -96,7 +92,8 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
             "Reshape", "Shake", "Skip", "Pull Behind", "Outlet", "Press Break", "Cross Court",
             "Under OB", "Kick Ahead", "Dagger", "Side / Press OB"
         ],
-        # 3FG-specific columns
+
+        # 3FG‐specific columns
         "3FG (Contest)":        ["Contest", "Uncontested", "Late Contest", "Blocked"],
         "3FG (Footwork)":       ["WTN Left-Right", "WTN Right-Left", "Left-Right", "Right-Left", "Hop"],
         "3FG (Good/Bad)":       ["Good", "Bad", "Neutral Three"],
@@ -115,6 +112,7 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
         ]
     }
 
+    # Now zero-out every possible "<shot>_<col>_<label>" key for shot in ("atr","fg2","fg3")
     for shot in ("atr", "fg2", "fg3"):
         for col_name, labels in detail_columns.items():
             for lab in labels:
@@ -124,120 +122,166 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
     return base_stats
 
 
+
 def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values):
     """
-    Parses one “Offense” row, updates player_stats_dict, and records detailed shot info
-    including Assisted vs Non‑Assisted flags.
+    Parses one “Offense” row (game), updates player_stats_dict, and records detailed shot info
+    including Assisted vs Non-Assisted flags, plus every subcategory under ATR, 2FG, and 3FG.
     """
-    shooter_col = None
-    shooter_type = None
-    shot_result = None
+    shooter_col   = None
+    shooter_type  = None
+    shot_result   = None
     assisted_flag = False
 
-    # 1) Loop through each “#” column to find shot tokens & other stats
+    # 1) First pass: identify shooter_col & shooter_type (exact match on ATR/2FG/3FG tokens)
     for col in df_columns:
         if not col.startswith("#"):
             continue
 
         tokens = extract_tokens(row.get(col, ""))
+        if not tokens:
+            continue
+
+        # Initialize this player if we haven't seen him/her yet
+        if col not in player_stats_dict:
+            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+
+        # Check for ATR
+        if "ATR+" in tokens or "ATR-" in tokens:
+            shooter_col   = col
+            shooter_type  = "ATR"
+            was_made      = ("ATR+" in tokens)
+            shot_result   = "made" if was_made else "missed"
+
+            # Increment counters once
+            if was_made:
+                player_stats_dict[col]["atr_makes"] += 1
+                player_stats_dict[col]["points"]   += 2
+            player_stats_dict[col]["atr_attempts"] += 1
+
+            break  # stop scanning other columns for shooter
+
+        # Otherwise, check for 2FG
+        elif "2FG+" in tokens or "2FG-" in tokens:
+            shooter_col   = col
+            shooter_type  = "2FG"
+            was_made      = ("2FG+" in tokens)
+            shot_result   = "made" if was_made else "missed"
+
+            if was_made:
+                player_stats_dict[col]["fg2_makes"] += 1
+                player_stats_dict[col]["points"]   += 2
+            player_stats_dict[col]["fg2_attempts"] += 1
+
+            break
+
+        # Otherwise, check for 3FG
+        elif "3FG+" in tokens or "3FG-" in tokens:
+            shooter_col   = col
+            shooter_type  = "3FG"
+            was_made      = ("3FG+" in tokens)
+            shot_result   = "made" if was_made else "missed"
+
+            if was_made:
+                player_stats_dict[col]["fg3_makes"] += 1
+                player_stats_dict[col]["points"]   += 3
+            player_stats_dict[col]["fg3_attempts"] += 1
+
+            break
+
+    # 2) Scan entire row for EXACT "Assist" or "Pot. Assist" once a shooter is known
+    if shooter_col and shooter_type:
+        for other_col in df_columns:
+            other_tokens = extract_tokens(row.get(other_col, ""))
+            if "Assist" in other_tokens:
+                assisted_flag = True
+                player_stats_dict[shooter_col]["assists"] += 1
+                break
+            elif "Pot. Assist" in other_tokens:
+                assisted_flag = True
+                player_stats_dict[shooter_col]["pot_assists"] += 1
+                break
+
+    # 3) Free Throws (FT+ / FT-) always counted, even if no shooter_col
+    for col in df_columns:
+        if not col.startswith("#"):
+            continue
+        tokens = extract_tokens(row.get(col, ""))
+        if "FT+" in tokens:
+            if col not in player_stats_dict:
+                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            player_stats_dict[col]["ftm"] += 1
+            player_stats_dict[col]["fta"] += 1
+            player_stats_dict[col]["points"] += 1
+        elif "FT-" in tokens:
+            if col not in player_stats_dict:
+                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            player_stats_dict[col]["fta"] += 1
+
+    # 4) Miscellaneous mapped stats (Turnover, 2nd Assist, Fouled), excluding "Assist"/"Pot. Assist"
+    for col in df_columns:
+        if not col.startswith("#"):
+            continue
+        tokens = extract_tokens(row.get(col, ""))
         if col not in player_stats_dict:
             player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
 
         for token in tokens:
-            # --- treat both real and potential assists as "assisted" shots ---
-            if token in ("Assist", "Pot. Assist"):
-                assisted_flag = True
-                # increment the right counter
-                if token == "Assist":
-                    player_stats_dict[col]["assists"] += 1
-                else:
-                    player_stats_dict[col]["pot_assists"] += 1
-                continue
+            if token in stat_mapping and token not in ("Assist", "Pot. Assist"):
+                mapped_key = stat_mapping[token]
+                player_stats_dict[col][mapped_key] = player_stats_dict[col].get(mapped_key, 0) + 1
 
-
-            # -- Shots & free throws --
-            elif token == "ATR+":
-                player_stats_dict[col]["atr_makes"]    += 1
-                player_stats_dict[col]["atr_attempts"] += 1
-                player_stats_dict[col]["points"]       += 2
-                shooter_col, shooter_type, shot_result = col, "ATR", "made"
-
-            elif token == "ATR-":
-                player_stats_dict[col]["atr_attempts"] += 1
-                shooter_col, shooter_type, shot_result = col, "ATR", "missed"
-
-            elif token == "2FG+":
-                player_stats_dict[col]["fg2_makes"]    += 1
-                player_stats_dict[col]["fg2_attempts"] += 1
-                player_stats_dict[col]["points"]       += 2
-                shooter_col, shooter_type, shot_result = col, "2FG", "made"
-
-            elif token == "2FG-":
-                player_stats_dict[col]["fg2_attempts"] += 1
-                shooter_col, shooter_type, shot_result = col, "2FG", "missed"
-
-            elif token == "3FG+":
-                player_stats_dict[col]["fg3_makes"]    += 1
-                player_stats_dict[col]["fg3_attempts"] += 1
-                player_stats_dict[col]["points"]       += 3
-                shooter_col, shooter_type, shot_result = col, "3FG", "made"
-
-            elif token == "3FG-":
-                player_stats_dict[col]["fg3_attempts"] += 1
-                shooter_col, shooter_type, shot_result = col, "3FG", "missed"
-
-            elif token == "FT+":
-                player_stats_dict[col]["ftm"]    += 1
-                player_stats_dict[col]["fta"]    += 1
-                player_stats_dict[col]["points"] += 1
-
-            elif token == "FT-":
-                player_stats_dict[col]["fta"] += 1
-
-            # -- other mapped stats (e.g., Turnover, Pot. Assist, 2nd Assist, Fouled) --
-            elif token in stat_mapping and token != "Assist":
-                mapped = stat_mapping[token]
-                player_stats_dict[col][mapped] = player_stats_dict[col].get(mapped, 0) + 1
-
-    # 2) Build shot_detail record only if we saw a shot
+    # 5) Build and append one shot_detail object if we found shooter_type
     if shooter_col and shooter_type:
+        # Safely coerce possession type
+        poss_val = row.get("POSSESSION TYPE", "")
+        possession_str = "" if pd.isna(poss_val) else str(poss_val).strip()
+
         shot_detail = {
-            "shot_class":    shooter_type,
-            "result":        shot_result,
-            "context":       'transition' if row.get('Is Transition') else 'halfcourt',
-            # new Assisted / Non‑Assisted flags:
-            "Assisted":      "Assisted" if assisted_flag else "",
-            "Non‑Assisted":  "Non‑Assisted" if (not assisted_flag) else ""
+            "shot_class":      shooter_type,
+            "result":          shot_result,
+            "possession_type": possession_str,
+            "Assisted":        "Assisted"     if assisted_flag else "",
+            "Non-Assisted":    "" if assisted_flag else "Non-Assisted"
         }
-        key_prefix = shooter_type.lower()   # "atr", "fg2", or "fg3"
+        key_prefix = shooter_type.lower()  # → "atr" or "2fg" or "3fg"
 
-        # 3) Shared detail pulls for ATR & 2FG
+        # ─── Shared ATR & 2FG subcategories (pull from "2FG (…)” columns) ────────────
         if shooter_type in ("ATR", "2FG"):
-            for suffix in ["Type","Defenders","Dribble","Feet","Hands","Other","PA","RA"]:
+            for suffix in ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]:
                 col_name = f"2FG ({suffix})"
-                shot_detail[f"{key_prefix}_{suffix.lower().replace(' ','_')}"] = safe_str(row.get(col_name, ""))
+                shot_detail[f"{key_prefix}_{suffix.lower().replace(' ', '_')}"] = safe_str(row.get(col_name, ""))
 
-            for token in extract_tokens(row.get("2FG Scheme (Attack)", "")):
-                shot_detail[f"{key_prefix}_scheme_attack"] = token
-            for token in extract_tokens(row.get("2FG Scheme (Pass)", "")):
-                shot_detail[f"{key_prefix}_scheme_pass"] = token
+            # 2FG Scheme (Attack) & (Pass)
+            for token2 in extract_tokens(row.get("2FG Scheme (Attack)", "")):
+                shot_detail[f"{key_prefix}_scheme_attack"] = token2
 
-        # 4) 3FG‑only detail pulls
-        else:
-            for suffix in ["Contest","Footwork","Good/Bad","Line","Move","Pocket","Shrink","Type"]:
+            for token2 in extract_tokens(row.get("2FG Scheme (Drive)", "")):
+                shot_detail[f"{key_prefix}_scheme_drive"] = token2
+                
+            for token2 in extract_tokens(row.get("2FG Scheme (Pass)", "")):
+                shot_detail[f"{key_prefix}_scheme_pass"] = token2
+
+        # ─── 3FG-only subcategories (pull from "3FG (…)” columns) ───────────────
+        else:  # shooter_type == "3FG"
+            for suffix in ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]:
                 col_name = f"3FG ({suffix})"
-                shot_detail[f"{key_prefix}_{suffix.lower().replace('/','_').replace(' ','_')}"] = \
-                    safe_str(row.get(col_name, ""))
+                json_key = f"{key_prefix}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
+                shot_detail[json_key] = safe_str(row.get(col_name, ""))
 
-            for token in extract_tokens(row.get("3FG Scheme (Attack)", "")):
-                shot_detail[f"{key_prefix}_scheme_attack"] = token
-            for token in extract_tokens(row.get("3FG Scheme (Drive)", "")):
-                shot_detail[f"{key_prefix}_scheme_drive"] = token
-            for token in extract_tokens(row.get("3FG Scheme (Pass)", "")):
-                shot_detail[f"{key_prefix}_scheme_pass"] = token
+            # 3FG Scheme (Attack), (Drive), (Pass)
+            for token3 in extract_tokens(row.get("3FG Scheme (Attack)", "")):
+                shot_detail[f"{key_prefix}_scheme_attack"] = token3
+            for token3 in extract_tokens(row.get("3FG Scheme (Drive)", "")):
+                shot_detail[f"{key_prefix}_scheme_drive"] = token3
+            for token3 in extract_tokens(row.get("3FG Scheme (Pass)", "")):
+                shot_detail[f"{key_prefix}_scheme_pass"] = token3
 
-        # 5) Append the detail to that player’s list
+        # 6) Append this single shot_detail to the shooter’s shot_type_details list
         player_stats_dict[shooter_col]["shot_type_details"].append(shot_detail)
+
+
+
 
 def process_defense_row(row, opponent_totals, stat_mapping):
     tokens = extract_tokens(row.get("OPP STATS", ""))
@@ -574,7 +618,7 @@ def compute_lineup_efficiencies(possession_data, group_sizes=(2,3,4,5), min_poss
 
 def get_player_id(player_name, conn):
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM player_stats WHERE player_name = ?", (player_name,))
+    cursor.execute("SELECT id FROM roster WHERE player_name = ?", (player_name,))
     result = cursor.fetchone()
     return result[0] if result else None
 
@@ -746,46 +790,47 @@ def parse_csv(file_path, game_id, season_id):
         stats["fg3_total_attempts"] = stats.get("fg3_attempts", 0)
         stats["ft_total_attempts"]  = stats.get("fta", 0)
 
-    # --- Insert Player Stats into Database ---
-    with app_instance.app_context():
-        for player_name, stats in player_stats_dict.items():
-            existing = PlayerStats.query.filter_by(
-                game_id=game_id,
-                player_name=player_name
-            ).first()
+        # --- Insert/Overwrite Player Stats into Database ---
+        with app_instance.app_context():
+            valid_cols = {c.name for c in PlayerStats.__table__.columns}
 
-            # prepare your shot‐detail JSON
-            json_details = None
-            if stats.get("shot_type_details"):
-                json_details = json.dumps(stats["shot_type_details"])
+            for player_name, stats in player_stats_dict.items():
+                # Remove any existing rows for this player & game to avoid duplicates
+                PlayerStats.query \
+                    .filter_by(player_name=player_name, game_id=game_id) \
+                    .delete()
 
-            if existing:
-                # update existing row
-                for stat, value in stats.items():
-                    if stat in ("game_id", "season_id", "player_name", "shot_type_details"):
-                        continue
-                    setattr(
-                        existing,
-                        stat,
-                        getattr(existing, stat, 0) + safe_value(value)
-                    )
-                if json_details is not None:
-                    existing.shot_type_details = json_details
+                # Prepare shot-detail JSON (if any)
+                json_details = None
+                if stats.get("shot_type_details"):
+                    json_details = json.dumps(stats["shot_type_details"])
 
-            else:
-                # inside your “Insert Player Stats” block, instead of the old dictcomp:
-                valid_cols = {c.name for c in PlayerStats.__table__.columns}
-
+                # Build a fresh dict of only valid columns (excluding array/dict fields)
                 clean_stats = {
                     k: safe_value(v)
                     for k, v in stats.items()
                     if k in valid_cols
                     and not isinstance(v, (dict, list, tuple, np.ndarray, pd.Series))
                 }
+
+                # Ensure game_id, season_id, and player_name are set correctly:
+                clean_stats["game_id"]     = game_id
+                clean_stats["season_id"]   = season_id
+                clean_stats["player_name"] = player_name
+                # A game row should never have a practice_id
+                clean_stats["practice_id"] = None
+
+                # Attach shot_type_details JSON if present
                 if json_details is not None:
                     clean_stats["shot_type_details"] = json_details
 
+                # Insert the new, non-duplicated PlayerStats row
                 db.session.add(PlayerStats(**clean_stats))
+
+            # Commit once after processing all players
+            db.session.commit()
+
+
 
             # 7) accumulate to your team_totals
             team_totals["total_points"]        += safe_value(stats.get("points", 0))

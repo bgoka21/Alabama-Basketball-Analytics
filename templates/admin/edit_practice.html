@@ -1,0 +1,92 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+  <div class="px-6 py-4">
+    <h1 class="text-2xl font-bold mb-4">
+      Practice Stats: {{ practice.date.strftime('%b %d, %Y') }} &ndash; {{ practice.category }}
+    </h1>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Player Stats</h2>
+    <div class="overflow-x-auto mb-8">
+      <table class="min-w-full bg-white rounded shadow">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="px-4 py-2">Player</th>
+            <th class="px-4 py-2">PTS</th>
+            <th class="px-4 py-2">AST</th>
+            <th class="px-4 py-2">2nd AST</th>
+            <th class="px-4 py-2">POT. AST</th>
+            <th class="px-4 py-2">TO’s</th>
+            <th class="px-4 py-2">ATR</th>
+            <th class="px-4 py-2">ATR%</th>
+            <th class="px-4 py-2">2FG</th>
+            <th class="px-4 py-2">2FG%</th>
+            <th class="px-4 py-2">3FG</th>
+            <th class="px-4 py-2">3FG%</th>
+            <th class="px-4 py-2">FT</th>
+            <th class="px-4 py-2">FT%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ps in player_stats %}
+          <tr class="border-t">
+            <td class="px-4 py-2">{{ ps.player_name }}</td>
+            <td class="px-4 py-2">{{ ps.points }}</td>
+            <td class="px-4 py-2">{{ ps.assists }}</td>
+            <td class="px-4 py-2">{{ ps.second_assists }}</td>
+            <td class="px-4 py-2">{{ ps.pot_assists }}</td>
+            <td class="px-4 py-2">{{ ps.turnovers }}</td>
+
+            <!-- ATR count and percentage -->
+            <td class="px-4 py-2">{{ ps.atr_makes }}/{{ ps.atr_attempts }}</td>
+            <td class="px-4 py-2">
+              {% if ps.atr_attempts %}
+                {{ (ps.atr_makes / ps.atr_attempts * 100) | round(1) }}%
+              {% else %}
+                – 
+              {% endif %}
+            </td>
+
+            <!-- 2FG count and percentage -->
+            <td class="px-4 py-2">{{ ps.fg2_makes }}/{{ ps.fg2_attempts }}</td>
+            <td class="px-4 py-2">
+              {% if ps.fg2_attempts %}
+                {{ (ps.fg2_makes / ps.fg2_attempts * 100) | round(1) }}%
+              {% else %}
+                – 
+              {% endif %}
+            </td>
+
+            <!-- 3FG count and percentage -->
+            <td class="px-4 py-2">{{ ps.fg3_makes }}/{{ ps.fg3_attempts }}</td>
+            <td class="px-4 py-2">
+              {% if ps.fg3_attempts %}
+                {{ (ps.fg3_makes / ps.fg3_attempts * 100) | round(1) }}%
+              {% else %}
+                – 
+              {% endif %}
+            </td>
+
+            <!-- FT count and percentage -->
+            <td class="px-4 py-2">{{ ps.ftm }}/{{ ps.fta }}</td>
+            <td class="px-4 py-2">
+              {% if ps.fta %}
+                {{ (ps.ftm / ps.fta * 100) | round(1) }}%
+              {% else %}
+                – 
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Future: Blue Collar section can go here -->
+
+    <a href="{{ url_for('admin.dashboard', season_id=practice.season_id) }}"
+       class="inline-block mt-4 px-4 py-2 bg-[#9E1B32] text-white rounded">
+      Back to Dashboard
+    </a>
+  </div>
+{% endblock %}

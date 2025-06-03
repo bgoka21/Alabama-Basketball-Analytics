@@ -1,11 +1,10 @@
-import os
+import os, json
+from datetime import datetime, date
 import io
 import re
-import datetime
 import traceback
 import zipfile
 import pandas as pd  # Added pandas import for CSV parsing and NaN handling
-import json
 from types import SimpleNamespace
 
 from flask import (
@@ -27,14 +26,17 @@ from models.database import (
     Possession,
     PlayerPossession,
     Season,
-    Roster
+    Roster,
+    Practice,
+    SkillEntry
 )
 
 from models.uploaded_file import UploadedFile
 from models.user import User
-
 from sqlalchemy import func
 from test_parse import get_possession_breakdown_detailed
+from test_parse import parse_csv           # your existing game parser
+from parse_practice_csv import parse_practice_csv  # <— make sure this is here
 
 # --- Helper Functions at the top ---
 
@@ -127,8 +129,31 @@ def login():
 @admin_bp.route('/dashboard', methods=['GET'])
 @admin_required
 def dashboard():
-    uploaded_files = UploadedFile.query.order_by(UploadedFile.upload_date.desc()).all()
-    return render_template('admin/dashboard.html', uploaded_files=uploaded_files, active_page='dashboard')
+    # 1a) get season_id from query, or default to most recent
+    sid = request.args.get('season_id', type=int)
+    if not sid:
+        latest = Season.query.order_by(Season.start_date.desc()).first()
+        sid = latest.id if latest else None
+
+    # 1b) load only files for that season
+    uploaded_files = (
+        UploadedFile.query
+        .filter_by(season_id=sid)
+        .order_by(UploadedFile.upload_date.desc())
+        .all()
+    )
+
+    # 1c) fetch seasons for dropdown
+    all_seasons = Season.query.order_by(Season.start_date.desc()).all()
+
+    return render_template(
+        'admin/dashboard.html',
+        uploaded_files   = uploaded_files,
+        all_seasons      = all_seasons,
+        selected_season  = sid,
+        active_page      = 'dashboard'
+    )
+
 
 @admin_bp.route('/users', methods=['GET'])
 @admin_required
@@ -213,7 +238,6 @@ def logout():
     return redirect(url_for('public.homepage'))
 
 
-
 @admin_bp.route('/upload', methods=['POST'])
 @admin_required
 def upload_file():
@@ -226,24 +250,35 @@ def upload_file():
         flash('No selected files', 'error')
         return redirect(url_for('admin.dashboard'))
 
+    category     = request.form.get('category')
+    season_id    = request.form.get('season_id', type=int)
+    file_date_str = request.form.get('file_date')   # <-- new
+
+    # parse the incoming YYYY-MM-DD string into a date object
+    try:
+         file_date = datetime.strptime(file_date_str, '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        flash('Please select a valid date for this file.', 'error')
+        return redirect(url_for('admin.dashboard', season_id=season_id))
+
     for file in files:
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
+            filename    = secure_filename(file.filename)
             upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             file.save(upload_path)
 
-            category = request.form.get('category')
-
             new_upload = UploadedFile(
-                filename=filename,
-                parse_status='Not Parsed',
-                category=category
+                filename     = filename,
+                parse_status = 'Not Parsed',
+                category     = category,
+                season_id    = season_id,
+                file_date    = file_date    # <-- newly stored
             )
             db.session.add(new_upload)
-    db.session.commit()
 
+    db.session.commit()
     flash("Files uploaded successfully!", "success")
-    return redirect(url_for('admin.dashboard'))
+    return redirect(url_for('admin.dashboard', season_id=season_id))
 
 @admin_bp.route('/parse/<int:file_id>', methods=['POST'])
 @admin_required
@@ -252,62 +287,97 @@ def parse_file(file_id):
     filename      = uploaded_file.filename
     upload_path   = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
 
-    # 1) file must exist
+    # 1) Ensure file exists
     if not os.path.exists(upload_path):
         flash(f"File '{filename}' not found on server.", "error")
         return redirect(url_for('admin.files_view_unique'))
 
     try:
-        current_app.logger.debug(
-            f"Starting parse for file '{filename}' at '{upload_path}'"
+        current_app.logger.debug(f"Starting parse for file '{filename}' at '{upload_path}'")
+
+        # always pick up season from the upload record (or default to latest)
+        season_id = (
+            uploaded_file.season_id
+            or Season.query.order_by(Season.start_date.desc()).first().id
         )
-        from test_parse import parse_csv
 
-        # 2) run your parser (now returns lineup_efficiencies too)
-        results = parse_csv(upload_path, 1, 1)
-        current_app.logger.debug("Parsing completed successfully.")
+        # PRACTICE branch
+        if uploaded_file.category in ['Summer Workouts', 'Fall Workouts', 'Official Practices']:
+            # use the file_date column (or fallback to today)
+            file_date = uploaded_file.file_date or date.today()
 
-        # 2a) make lineup_efficiencies JSON-friendly
-        raw_lineups = results.get('lineup_efficiencies', {})
-        json_lineups = {}
-        for size, sides in raw_lineups.items():
-            # e.g. size = 2,3,4,5
-            json_lineups[size] = {}
-            for side, combos in sides.items():
-                # side = 'offense' or 'defense'
-                json_lineups[size][side] = {
-                    ",".join(combo): ppp
-                    for combo, ppp in combos.items()
-                }
-
-        # 3) update status, timestamp, and store all three JSON payloads
-        uploaded_file.parse_status        = 'Parsed Successfully'
-        uploaded_file.last_parsed         = datetime.datetime.utcnow()
-        uploaded_file.offensive_breakdown = json.dumps(
-            results.get('offensive_breakdown', {}))
-        uploaded_file.defensive_breakdown = json.dumps(
-            results.get('defensive_breakdown', {}))
-        uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
-
-        db.session.commit()
-
-        # 4) redirect into the game editor
-        game = Game.query.filter_by(csv_filename=filename).first()
-        if not game:
-            flash(
-                f"Parsed OK but couldn’t find Game record for '{filename}'",
-                "warning"
+            # 2a) create a Practice row
+            practice = Practice(
+                season_id=season_id,
+                date     =file_date,
+                category =uploaded_file.category
             )
-            return redirect(url_for('admin.dashboard'))
+            db.session.add(practice)
+            db.session.flush()   # so practice.id is available
 
-        flash(
-            f"File '{filename}' parsed successfully! You can now edit the game.",
-            "success"
-        )
-        return redirect(url_for('admin.edit_game', game_id=game.id))
+            # 2b) parse into your practice-tables
+            parse_practice_csv(
+                upload_path,
+                season_id = season_id,
+                category  = uploaded_file.category,
+                file_date = file_date,
+            )
+
+            # 3) mark the upload as parsed
+            uploaded_file.parse_status = 'Parsed Successfully'
+            uploaded_file.last_parsed  = datetime.utcnow()
+            db.session.commit()
+
+            flash("Practice parsed successfully! You can now edit it.", "success")
+            return redirect(
+                url_for('admin.edit_practice',
+                        practice_id=practice.id,
+                        season_id=season_id)
+            )
+
+        # GAME branch
+        else:
+            # 2c) run your existing game parser
+            results = parse_csv(upload_path, None, season_id)
+
+            # 2d) JSON-ify the lineup efficiencies
+            raw_lineups = results.get('lineup_efficiencies', {})
+            json_lineups = {
+                size: {
+                    side: { ",".join(combo): ppp
+                            for combo, ppp in sides.items() }
+                    for side, sides in raw_lineups[size].items()
+                }
+                for size in raw_lineups
+            }
+
+            # 3) update UploadedFile with breakdowns + status
+            uploaded_file.parse_status        = 'Parsed Successfully'
+            uploaded_file.last_parsed         = datetime.utcnow()
+            uploaded_file.offensive_breakdown = json.dumps(
+                results.get('offensive_breakdown', {}) )
+            uploaded_file.defensive_breakdown = json.dumps(
+                results.get('defensive_breakdown', {}) )
+            uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
+            db.session.commit()
+
+            # 4) redirect into your game editor
+            game = Game.query.filter_by(csv_filename=filename).first()
+            if not game:
+                flash(
+                    f"Parsed OK but couldn’t find Game record for '{filename}'",
+                    "warning"
+                )
+                return redirect(url_for('admin.dashboard'))
+
+            flash(
+                f"File '{filename}' parsed successfully! You can now edit the game.",
+                "success"
+            )
+            return redirect(url_for('admin.edit_game', game_id=game.id))
 
     except Exception as e:
-        # 5) on any error, record it and flip the status
+        # on error, record it and flip status
         current_app.logger.exception("Error parsing CSV")
         uploaded_file.parse_status = 'Error'
         uploaded_file.parse_error  = str(e)
@@ -315,6 +385,7 @@ def parse_file(file_id):
 
         flash(f"Parsing failed for '{filename}': {e}", "error")
         return redirect(url_for('admin.files_view_unique'))
+
 
 
 @admin_bp.route('/logs/<int:file_id>', methods=['GET'])
@@ -425,8 +496,18 @@ def reset_db():
 @admin_bp.route('/game-reports')
 @login_required
 def game_reports():
-    games = Game.query.order_by(Game.game_date.desc()).all()
-    return render_template('admin/game_reports.html', games=games, active_page='game_reports')
+    # filter to the currently selected season
+    sid   = request.args.get('season_id', type=int)
+    if not sid:
+        # fallback to most recent season
+        sid = Season.query.order_by(Season.start_date.desc()).first().id
+    games = Game.query \
+                 .filter_by(season_id=sid) \
+                 .order_by(Game.game_date.desc()) \
+                 .all()
+    return render_template('admin/game_reports.html',
+                           games=games,
+                            active_page='game_reports')
 
 
 
@@ -439,6 +520,191 @@ def files_view():
     else:
         files = UploadedFile.query.order_by(UploadedFile.upload_date.desc()).all()
     return render_template('files.html', files=files, selected_category=category_filter)
+
+
+@admin_bp.route('/season/<int:season_id>/stats')
+@login_required
+def season_stats(season_id):
+    # ─── Load Season & TeamStats ────────────────────────────────────────────
+    season = Season.query.get_or_404(season_id)
+    # aggregate team stats across all games in this season
+    team_agg = db.session.query(
+        func.sum(TeamStats.total_points),
+        func.sum(TeamStats.total_atr_makes),    func.sum(TeamStats.total_atr_attempts),
+        func.sum(TeamStats.total_fg2_makes),    func.sum(TeamStats.total_fg2_attempts),
+        func.sum(TeamStats.total_fg3_makes),    func.sum(TeamStats.total_fg3_attempts),
+        func.sum(TeamStats.total_ftm),          func.sum(TeamStats.total_fta),
+        func.sum(TeamStats.total_assists),      func.sum(TeamStats.total_turnovers),
+        func.sum(TeamStats.total_second_assists), func.sum(TeamStats.total_pot_assists),
+        func.sum(TeamStats.total_blue_collar),  func.sum(TeamStats.total_possessions)
+    ).filter(
+        TeamStats.season_id == season_id,
+        TeamStats.is_opponent == False
+    ).one()
+
+    opp_agg = db.session.query(
+        func.sum(TeamStats.total_points),
+        func.sum(TeamStats.total_atr_makes),    func.sum(TeamStats.total_atr_attempts),
+        func.sum(TeamStats.total_fg2_makes),    func.sum(TeamStats.total_fg2_attempts),
+        func.sum(TeamStats.total_fg3_makes),    func.sum(TeamStats.total_fg3_attempts),
+        func.sum(TeamStats.total_ftm),          func.sum(TeamStats.total_fta),
+        func.sum(TeamStats.total_assists),      func.sum(TeamStats.total_turnovers),
+        func.sum(TeamStats.total_second_assists), func.sum(TeamStats.total_pot_assists),
+        func.sum(TeamStats.total_blue_collar),  func.sum(TeamStats.total_possessions)
+    ).filter(
+        TeamStats.season_id == season_id,
+        TeamStats.is_opponent == True
+    ).one()
+
+    # Unpack for readability
+    (tp,  atrm, atra, fg2m, fg2a, fg3m, fg3a, ftm, fta,
+     ast, tov, sec_ast, pot_ast, bc, poss) = team_agg
+    (otp, o_atrm, o_atra, o_fg2m, o_fg2a, o_fg3m, o_fg3a, o_ftm, o_fta,
+     o_ast, o_tov, o_sec_ast, o_pot_ast, o_bc, o_poss) = opp_agg
+
+    # ─── Compute percentages ────────────────────────────────────────────────
+    def pct(made, att, precision=1):
+        return round(made/att*100, precision) if att and att>0 else 0.0
+
+    team_stats = SimpleNamespace(
+      total_points       = tp or 0,
+      total_atr_makes    = atrm or 0,     total_atr_attempts = atra or 0,
+      total_fg2_makes    = fg2m or 0,     total_fg2_attempts = fg2a or 0,
+      total_fg3_makes    = fg3m or 0,     total_fg3_attempts = fg3a or 0,
+      total_ftm          = ftm or 0,      total_fta           = fta or 0,
+      total_assists      = ast or 0,      total_turnovers     = tov or 0,
+      total_second_assists = sec_ast or 0, total_pot_assists   = pot_ast or 0,
+      total_blue_collar  = bc or 0,       total_possessions   = poss or 0,
+      assist_pct    = pct(ast or 0, atrm+fg2m+fg3m),
+      turnover_pct  = pct(tov or 0, poss or 1),
+      tcr_pct       = 0.0,  # requires detailed breakdown per possession type
+      oreb_pct      = 0.0,  # requires rebound-chance calc
+      ft_rate       = pct(fta or 0, atra+fg2a+fg3a),
+      good_shot_pct = pct((ftm or 0)+(atrm or 0)+(fg3m or 0), (fta or 0)+(atra or 0)+(fg3a or 0)+(fg2m or 0))
+    )
+
+    opponent_stats = SimpleNamespace(
+      total_points       = otp or 0,
+      total_atr_makes    = o_atrm or 0,    total_atr_attempts = o_atra or 0,
+      total_fg2_makes    = o_fg2m or 0,    total_fg2_attempts = o_fg2a or 0,
+      total_fg3_makes    = o_fg3m or 0,    total_fg3_attempts = o_fg3a or 0,
+      total_ftm          = o_ftm or 0,     total_fta           = o_fta or 0,
+      total_assists      = o_ast or 0,     total_turnovers     = o_tov or 0,
+      total_second_assists = o_sec_ast or 0, total_pot_assists  = o_pot_ast or 0,
+      total_blue_collar  = o_bc or 0,      total_possessions   = o_poss or 0,
+      assist_pct    = pct(o_ast or 0, o_atrm+o_fg2m+o_fg3m),
+      turnover_pct  = pct(o_tov or 0, o_poss or 1),
+      tcr_pct       = 0.0,
+      oreb_pct      = 0.0,
+      ft_rate       = pct(o_fta or 0, o_atra+o_fg2a+o_fg3a),
+      good_shot_pct = pct((o_ftm or 0)+(o_atrm or 0)+(o_fg3m or 0),
+                          (o_fta or 0)+(o_atra or 0)+(o_fg3a or 0)+(o_fg2m or 0))
+    )
+
+    # ─── Blue Collar Totals ────────────────────────────────────────────────
+    blue_breakdown = db.session.query(
+        func.sum(BlueCollarStats.def_reb).label('def_reb'),
+        func.sum(BlueCollarStats.off_reb).label('off_reb'),
+        func.sum(BlueCollarStats.misc).label('misc'),
+        func.sum(BlueCollarStats.deflection).label('deflection'),
+        func.sum(BlueCollarStats.steal).label('steal'),
+        func.sum(BlueCollarStats.block).label('block'),
+        func.sum(BlueCollarStats.floor_dive).label('floor_dive'),
+        func.sum(BlueCollarStats.charge_taken).label('charge_taken'),
+        func.sum(BlueCollarStats.reb_tip).label('reb_tip')
+    ).filter(
+        BlueCollarStats.season_id == season_id
+    ).one()
+
+    opp_blue_breakdown = db.session.query(
+        func.sum(OpponentBlueCollarStats.def_reb).label('def_reb'),
+        func.sum(OpponentBlueCollarStats.off_reb).label('off_reb'),
+        func.sum(OpponentBlueCollarStats.misc).label('misc'),
+        func.sum(OpponentBlueCollarStats.deflection).label('deflection'),
+        func.sum(OpponentBlueCollarStats.steal).label('steal'),
+        func.sum(OpponentBlueCollarStats.block).label('block'),
+        func.sum(OpponentBlueCollarStats.floor_dive).label('floor_dive'),
+        func.sum(OpponentBlueCollarStats.charge_taken).label('charge_taken'),
+        func.sum(OpponentBlueCollarStats.reb_tip).label('reb_tip')
+    ).filter(
+        OpponentBlueCollarStats.season_id == season_id
+    ).one()
+
+    # ─── Load & Concatenate All CSVs in Season for Possession Breakdown ─────
+    dfs = []
+    for game in season.games:
+        path = os.path.join(current_app.config['UPLOAD_FOLDER'], game.csv_filename)
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            # preserve the original “GAME SPLITS” column
+            df['GAME_SPLITS'] = df.get('GAME SPLITS')
+            # split on the first comma only, then strip whitespace
+            df['Period'] = (
+                df['GAME_SPLITS']
+                .fillna('')
+                .str.split(',', n=1)
+                .str[0]
+                .str.strip()
+            )
+            dfs.append(df)
+    if dfs:
+        full_df = pd.concat(dfs, ignore_index=True)
+        off_break, def_break, per_off, per_def = get_possession_breakdown_detailed(full_df)
+    else:
+        off_break = def_break = {}
+        per_off = {h: SimpleNamespace(points=0, count=0) for h in ['1st Half','2nd Half','Overtime']}
+        per_def = per_off
+
+        # collect all game-level lineup JSON
+    season_lineups = {}
+    for game in season.games:
+        uf = UploadedFile.query.filter_by(filename=game.csv_filename).first()
+        if not uf or not uf.lineup_efficiencies:
+            continue
+        per_game = json.loads(uf.lineup_efficiencies)
+        for size, sides in per_game.items():
+            size = int(size)
+            sl = season_lineups.setdefault(size, {'offense': {}, 'defense': {}})
+            for side in ('offense','defense'):
+                for combo, ppp in sides.get(side, {}).items():
+                    sl[side].setdefault(combo, []).append(ppp)
+
+    # average them and pick best/worst 5
+    best_offense_season = {}
+    worst_offense_season = {}
+    best_defense_season = {}
+    worst_defense_season = {}
+
+    for size, sides in season_lineups.items():
+        # offense
+        avg_off = {c: sum(v)/len(v) for c,v in sides['offense'].items()}
+        best_offense_season[size]  = sorted(avg_off.items(), key=lambda x: x[1], reverse=True)[:5]
+        worst_offense_season[size] = sorted(avg_off.items(), key=lambda x: x[1])[:5]
+        # defense
+        avg_def = {c: sum(v)/len(v) for c,v in sides['defense'].items()}
+        best_defense_season[size]  = sorted(avg_def.items(), key=lambda x: x[1])[:5]
+        worst_defense_season[size] = sorted(avg_def.items(), key=lambda x: x[1], reverse=True)[:5]
+
+
+    # ─── RENDER TEMPLATE ────────────────────────────────────────────────────
+    return render_template(
+        'admin/season_stats.html',
+        active_page='stats',
+        season=season,
+        team_stats=team_stats,
+        opponent_stats=opponent_stats,
+        blue_collar_stats=blue_breakdown,
+        opponent_blue_coll_stats=opp_blue_breakdown,
+        offensive_breakdown=off_break,
+        defensive_breakdown=def_break,
+        periodic_offense=per_off,
+        periodic_defense=per_def,
+        best_offense=best_offense_season,
+        worst_offense=worst_offense_season,
+        best_defense=best_defense_season,
+        worst_defense=worst_defense_season,
+    )
+
 
 
 @admin_bp.route('/stats/<int:game_id>')
@@ -664,6 +930,36 @@ def game_stats(game_id):
 
 
 
+@admin_bp.route('/practice/<int:practice_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_practice(practice_id):
+    practice    = Practice.query.get_or_404(practice_id)
+    player_stats = PlayerStats.query.filter_by(practice_id=practice_id).all()
+    blue_stats   = BlueCollarStats.query.filter_by(practice_id=practice_id).all()
+    return render_template(
+        'admin/edit_practice.html',
+        practice     = practice,
+        player_stats = player_stats,
+        blue_stats   = blue_stats,
+        active_page  = 'practices'
+    )
+
+
+@admin_bp.route('/practice-reports')
+@login_required
+def practice_reports():
+    # filter to currently selected season (like games)
+    sid = request.args.get('season_id', type=int)
+    if not sid:
+        sid = Season.query.order_by(Season.start_date.desc()).first().id
+    practices = Practice.query \
+                 .filter_by(season_id=sid) \
+                 .order_by(Practice.date.desc()) \
+                 .all()
+    return render_template('admin/practice_reports.html',
+                           practices=practices,
+                           active_page='practice_reports')
+
 
 @admin_bp.route('/game/<int:game_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -690,64 +986,76 @@ def edit_game(game_id):
     return render_template('admin/edit_game.html', game=game)
 
 
-# admin/routes.py  (only the player_detail view shown)
-@admin_bp.route('/player/<player_name>')
-@login_required
-def player_detail(player_name):
-    # 1) Fetch per‑game rows
-    stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
-    if not stats_records:
-        flash("No stats found for this player.", "error")
-        return redirect(url_for('admin.players_list'))
 
-    # 2) Season aggregates
-    aggregated_dict = {
-        "points":         sum(s.points or 0    for s in stats_records),
-        "assists":        sum(s.assists or 0   for s in stats_records),
-        "turnovers":      sum(s.turnovers or 0 for s in stats_records),
-        "atr_attempts":   sum(s.atr_attempts or 0 for s in stats_records),
-        "atr_makes":      sum(s.atr_makes    or 0 for s in stats_records),
-        "fg2_attempts":   sum(s.fg2_attempts or 0 for s in stats_records),
-        "fg2_makes":      sum(s.fg2_makes    or 0 for s in stats_records),
-        "fg3_attempts":   sum(s.fg3_attempts or 0 for s in stats_records),
-        "fg3_makes":      sum(s.fg3_makes    or 0 for s in stats_records),
-        "fta":            sum(s.fta          or 0 for s in stats_records),
-        "ftm":            sum(s.ftm          or 0 for s in stats_records),
-        "second_assists": sum(s.second_assists or 0 for s in stats_records),
-        "pot_assists":    sum(s.pot_assists    or 0 for s in stats_records),
+# ─── Helper: aggregate stats for a list of PlayerStats records ─────────────────
+def aggregate_stats(stats_list):
+    """
+    Given a list of PlayerStats records, compute totals, eFG%, points-per-shot,
+    and assist/turnover ratios.
+    """
+    # 1) basic sums
+    agg = {
+        "points":          sum(s.points        or 0 for s in stats_list),
+        "assists":         sum(s.assists       or 0 for s in stats_list),
+        "turnovers":       sum(s.turnovers     or 0 for s in stats_list),
+        "atr_attempts":    sum(s.atr_attempts or 0 for s in stats_list),
+        "atr_makes":       sum(s.atr_makes    or 0 for s in stats_list),
+        "fg2_attempts":    sum(s.fg2_attempts or 0 for s in stats_list),
+        "fg2_makes":       sum(s.fg2_makes    or 0 for s in stats_list),
+        "fg3_attempts":    sum(s.fg3_attempts or 0 for s in stats_list),
+        "fg3_makes":       sum(s.fg3_makes    or 0 for s in stats_list),
+        "fta":             sum(s.fta          or 0 for s in stats_list),
+        "ftm":             sum(s.ftm          or 0 for s in stats_list),
+        "second_assists":  sum(s.second_assists or 0 for s in stats_list),
+        "pot_assists":     sum(s.pot_assists  or 0 for s in stats_list),
     }
-    total_shots = (
-        aggregated_dict["atr_attempts"]
-      + aggregated_dict["fg2_attempts"]
-      + aggregated_dict["fg3_attempts"]
-    )
+    # 2) effective FG% and points/shot
+    total_shots = agg["atr_attempts"] + agg["fg2_attempts"] + agg["fg3_attempts"]
     if total_shots:
-        efg = (
-            aggregated_dict["atr_makes"]
-          + aggregated_dict["fg2_makes"]
-          + 1.5 * aggregated_dict["fg3_makes"]
-        ) / total_shots
-        aggregated_dict["efg_pct"]         = f"{efg * 100:.1f}%"
-        aggregated_dict["points_per_shot"] = f"{efg * 2:.2f}"
+        efg = (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots
+        agg["efg_pct"]         = round(efg * 100, 1)
+        agg["points_per_shot"] = round(efg * 2, 2)
     else:
-        aggregated_dict["efg_pct"]         = "N/A"
-        aggregated_dict["points_per_shot"] = "N/A"
+        agg["efg_pct"] = 0.0
+        agg["points_per_shot"] = 0.0
+    # 3) assist/turnover ratios
+    if agg["turnovers"]:
+        agg["assist_turnover_ratio"]     = round(agg["assists"]     / agg["turnovers"], 2)
+        total_ast = agg["assists"] + agg["second_assists"] + agg["pot_assists"]
+        agg["adj_assist_turnover_ratio"] = round(total_ast            / agg["turnovers"], 2)
+    else:
+        agg["assist_turnover_ratio"]     = 0.0
+        agg["adj_assist_turnover_ratio"] = 0.0
 
-    if aggregated_dict["turnovers"]:
-        aggregated_dict["assist_turnover_ratio"]     = f"{aggregated_dict['assists'] / aggregated_dict['turnovers']:.2f}"
-        total_ast = (
-            aggregated_dict["assists"]
-          + aggregated_dict["second_assists"]
-          + aggregated_dict["pot_assists"]
+    return SimpleNamespace(**agg)
+
+
+# ─── Helper: sum blue-collar stats for given PlayerStats records ──────────────
+from sqlalchemy import or_
+
+def get_blue_breakdown(stats_list, roster_id):
+    """
+    Given a list of PlayerStats for one player, sum their BlueCollarStats.
+    If any stats_list rows have game_ids, we filter by those; otherwise by practice_ids.
+    """
+    if not stats_list:
+        return SimpleNamespace(
+            def_reb=0, off_reb=0, misc=0, deflection=0,
+            steal=0, block=0, floor_dive=0,
+            charge_taken=0, reb_tip=0, total_blue_collar=0
         )
-        aggregated_dict["adj_assist_turnover_ratio"] = f"{total_ast / aggregated_dict['turnovers']:.2f}"
+
+    # collect ids
+    game_ids     = [r.game_id     for r in stats_list if r.game_id]
+    practice_ids = [r.practice_id for r in stats_list if r.practice_id]
+
+    # pick filter: prefer games if present
+    if game_ids:
+        fk_cond = BlueCollarStats.game_id.in_(game_ids)
     else:
-        aggregated_dict["assist_turnover_ratio"]     = "N/A"
-        aggregated_dict["adj_assist_turnover_ratio"] = "N/A"
+        fk_cond = BlueCollarStats.practice_id.in_(practice_ids)
 
-    aggregated = SimpleNamespace(**aggregated_dict)
-
-    # 3) Blue‑collar totals
+    # now query
     bc = db.session.query(
         func.coalesce(func.sum(BlueCollarStats.def_reb),      0).label('def_reb'),
         func.coalesce(func.sum(BlueCollarStats.off_reb),      0).label('off_reb'),
@@ -759,258 +1067,921 @@ def player_detail(player_name):
         func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
         func.coalesce(func.sum(BlueCollarStats.reb_tip),      0).label('reb_tip'),
         func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
-    ).join(PlayerStats, BlueCollarStats.player_id == PlayerStats.id) \
-     .filter(PlayerStats.player_name == player_name).one()
+    ).filter(
+        BlueCollarStats.player_id == roster_id,
+        fk_cond
+    ).one()
 
-    player_blue_breakdown = SimpleNamespace(
-        def_reb      = bc.def_reb,
-        off_reb      = bc.off_reb,
-        misc         = bc.misc,
-        deflection   = bc.deflection,
-        steal        = bc.steal,
-        block        = bc.block,
-        floor_dive   = bc.floor_dive,
-        charge_taken = bc.charge_taken,
-        reb_tip      = bc.reb_tip,
-        total_blue_collar = bc.total_blue_collar
+    return SimpleNamespace(
+        def_reb=bc.def_reb,
+        off_reb=bc.off_reb,
+        misc=bc.misc,
+        deflection=bc.deflection,
+        steal=bc.steal,
+        block=bc.block,
+        floor_dive=bc.floor_dive,
+        charge_taken=bc.charge_taken,
+        reb_tip=bc.reb_tip,
+        total_blue_collar=bc.total_blue_collar
     )
 
-    # 4) Shot‑Type season totals
-    shot_type_totals = SimpleNamespace(
-        atr= SimpleNamespace(
-            makes    = aggregated.atr_makes,
-            attempts = aggregated.atr_attempts,
-            fg_pct   = (aggregated.atr_makes/aggregated.atr_attempts*100)
-                       if aggregated.atr_attempts else 0
-        ),
-        fg2= SimpleNamespace(
-            makes    = aggregated.fg2_makes,
-            attempts = aggregated.fg2_attempts,
-            fg_pct   = (aggregated.fg2_makes/aggregated.fg2_attempts*100)
-                       if aggregated.fg2_attempts else 0
-        ),
-        fg3= SimpleNamespace(
-            makes    = aggregated.fg3_makes,
-            attempts = aggregated.fg3_attempts,
-            fg_pct   = (aggregated.fg3_makes/aggregated.fg3_attempts*100)
-                       if aggregated.fg3_attempts else 0
+
+
+
+@admin_bp.route('/admin/player/<player_name>', methods=['GET', 'POST'])
+@login_required
+def player_detail(player_name):
+    # ─── Define shot_map & label_map for both POST and GET ──────────
+    shot_map = {
+        'atr':     ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
+        'floater': ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
+        '3fg':     ['Catch & Shoot - Stationary', 'Catch & Shoot - On The Move', 'Off Dribble'],
+        'ft':      ['Free Throw']                   # ← newly added
+    }
+    label_map = {
+        'atr':     "ATR's",
+        'floater': "Floaters",
+        '3fg':     "3FG's",
+        'ft':      "Free Throws"                    # ← newly added
+    }
+
+
+    player = Roster.query.filter_by(player_name=player_name).first_or_404()
+
+    # ─── Handle Skill‐Development form submission ───────────────────────
+    if request.method == 'POST':
+        # 1) Try the “Skill Name / Value” form first
+        shot_date   = date.fromisoformat(request.form.get('date'))
+        skill_name  = request.form.get('skill_name', '').strip()
+        value_str   = request.form.get('value', '').strip()
+
+        if skill_name and value_str.isdigit():
+            # Insert a generic SkillEntry (e.g. “Free Throws” or anything else)
+            db.session.add(
+                SkillEntry(
+                    player_id   = player.id,
+                    date        = shot_date,
+                    skill_name  = skill_name,
+                    value       = int(value_str),
+                    shot_class  = None,
+                    subcategory = None,
+                    makes       = 0,
+                    attempts    = 0
+                )
+            )
+            db.session.commit()
+            return redirect(
+                url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
+            )
+
+        # 2) Otherwise, fall back to the drill‐by‐drill loop (including 'ft')
+        shot_date = date.fromisoformat(request.form.get('date'))
+        human     = {k: label_map[k] for k in shot_map}
+
+        for cls, subs in shot_map.items():
+            for sub in subs:
+                key      = sub.replace(' ', '_')
+                makes    = int(request.form.get(f"{cls}_{key}_makes", '0') or '0')
+                attempts = int(request.form.get(f"{cls}_{key}_attempts", '0') or '0')
+
+                if makes or attempts:
+                    entry = SkillEntry(
+                        player_id   = player.id,
+                        date        = shot_date,
+                        skill_name  = human[cls],
+                        value       = attempts,
+                        shot_class  = cls,
+                        subcategory = sub,
+                        makes       = makes,
+                        attempts    = attempts
+                    )
+                    db.session.add(entry)
+
+        db.session.commit()
+        return redirect(
+            url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
         )
+
+    # ─── Read optional date‐range filters ────────────────────────────────
+    start_date = request.args.get('start_date')
+    end_date   = request.args.get('end_date')
+
+    # ─── Load & filter SkillEntry rows ─────────────────────────────────
+    q = SkillEntry.query.filter_by(player_id=player.id)
+    if start_date:
+        q = q.filter(SkillEntry.date >= date.fromisoformat(start_date))
+    if end_date:
+        q = q.filter(SkillEntry.date <= date.fromisoformat(end_date))
+    entries_list = q.order_by(SkillEntry.date.desc()).all()
+
+    # ─── Group by date & compute totals ─────────────────────────────────
+    # We’ll pass `entries_list` straight to Jinja and do groupby('date') there.
+    grouped = {}
+    for e in entries_list:
+        grouped.setdefault(e.date, []).append(e)
+
+    # Build a nested dict for drill‐by‐drill totals:
+    totals = {
+        cls: { sub: {'makes': 0, 'attempts': 0} for sub in subs }
+        for cls, subs in shot_map.items()
+    }
+    for e in entries_list:
+        # Only accumulate if it’s a drill entry (has shot_class + subcategory)
+        if e.shot_class in totals and e.subcategory in totals[e.shot_class]:
+            totals[e.shot_class][e.subcategory]['makes']    += e.makes
+            totals[e.shot_class][e.subcategory]['attempts'] += e.attempts
+
+    # Build a separate “generic_totals” for any entry where shot_class is None
+    generic_totals = {}
+    for e in entries_list:
+        if not e.shot_class and e.skill_name:
+            generic_totals[e.skill_name] = generic_totals.get(e.skill_name, 0) + e.value
+
+    # Extract exactly the “NBA 100” entries to show them in their own table:
+    nba100_entries = [e for e in entries_list if e.skill_name == "NBA 100"]
+
+
+    # ─── Fetch ALL stats for this player ────────────────────────────────
+    all_stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
+    if not all_stats_records:
+        flash("No stats found for this player.", "error")
+        return redirect(url_for('admin.players_list'))
+
+    # ─── Split into Game vs Practice records ────────────────────────────
+    game_stats_records     = [r for r in all_stats_records if r.game_id]
+    practice_stats_records = [r for r in all_stats_records if r.practice_id]
+
+   # ─── Read blanket‐tab mode (‘game’ or ‘practice’), but if no games exist, switch to practice ──
+    requested_mode = request.args.get('mode', None)
+    if requested_mode in ("game", "practice"):
+        mode = requested_mode
+    else:
+        # If the player has no game entries but does have practice entries,
+        # force “practice” mode. Otherwise default to “game.”
+        if game_stats_records:
+            mode = "game"
+        elif practice_stats_records:
+            mode = "practice"
+        else:
+            mode = "game"
+
+    # ─── Compute BOTH aggregations for Season Totals ───────────────────
+    aggregated_game     = aggregate_stats(game_stats_records)
+    aggregated_practice = aggregate_stats(practice_stats_records)
+
+    # ─── Compute blue‐collar via raw SQL (instead of get_blue_breakdown) ───
+    zero_blue = SimpleNamespace(
+        def_reb=0, off_reb=0, misc=0, deflection=0,
+        steal=0, block=0, floor_dive=0,
+        charge_taken=0, reb_tip=0, total_blue_collar=0
     )
 
-    # 5) Gather every shot‐detail record
-    all_details = []
-    for rec in stats_records:
-        raw = rec.shot_type_details
-        if raw:
-            details = json.loads(raw) if isinstance(raw, str) else raw
-            all_details.extend(details)
+    if game_stats_records:
+        game_ids = [s.game_id for s in game_stats_records if s.game_id]
+        bc_game = (
+            db.session.query(
+                func.coalesce(func.sum(BlueCollarStats.def_reb),      0).label('def_reb'),
+                func.coalesce(func.sum(BlueCollarStats.off_reb),      0).label('off_reb'),
+                func.coalesce(func.sum(BlueCollarStats.misc),         0).label('misc'),
+                func.coalesce(func.sum(BlueCollarStats.deflection),   0).label('deflection'),
+                func.coalesce(func.sum(BlueCollarStats.steal),        0).label('steal'),
+                func.coalesce(func.sum(BlueCollarStats.block),        0).label('block'),
+                func.coalesce(func.sum(BlueCollarStats.floor_dive),   0).label('floor_dive'),
+                func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
+                func.coalesce(func.sum(BlueCollarStats.reb_tip),      0).label('reb_tip'),
+                func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
+            )
+            .filter(BlueCollarStats.player_id == player.id)
+            .filter(BlueCollarStats.game_id.in_(game_ids))
+            .one()
+        )
+        player_blue_breakdown_game = SimpleNamespace(
+            def_reb           = bc_game.def_reb,
+            off_reb           = bc_game.off_reb,
+            misc              = bc_game.misc,
+            deflection        = bc_game.deflection,
+            steal             = bc_game.steal,
+            block             = bc_game.block,
+            floor_dive        = bc_game.floor_dive,
+            charge_taken      = bc_game.charge_taken,
+            reb_tip           = bc_game.reb_tip,
+            total_blue_collar = bc_game.total_blue_collar
+        )
+    else:
+        player_blue_breakdown_game = zero_blue
 
-    # 6) Build detail_counts with total / transition / halfcourt
-    detail_counts = {'atr': {}, 'fg2': {}, 'fg3': {}}
-    cls_map      = {'atr':'atr','2fg':'fg2','3fg':'fg3'}
+    if practice_stats_records:
+        practice_ids = [s.practice_id for s in practice_stats_records if s.practice_id]
+        bc_practice = (
+            db.session.query(
+                func.coalesce(func.sum(BlueCollarStats.def_reb),      0).label('def_reb'),
+                func.coalesce(func.sum(BlueCollarStats.off_reb),      0).label('off_reb'),
+                func.coalesce(func.sum(BlueCollarStats.misc),         0).label('misc'),
+                func.coalesce(func.sum(BlueCollarStats.deflection),   0).label('deflection'),
+                func.coalesce(func.sum(BlueCollarStats.steal),        0).label('steal'),
+                func.coalesce(func.sum(BlueCollarStats.block),        0).label('block'),
+                func.coalesce(func.sum(BlueCollarStats.floor_dive),   0).label('floor_dive'),
+                func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
+                func.coalesce(func.sum(BlueCollarStats.reb_tip),      0).label('reb_tip'),
+                func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
+            )
+            .filter(BlueCollarStats.player_id == player.id)
+            .filter(BlueCollarStats.practice_id.in_(practice_ids))
+            .one()
+        )
+        player_blue_breakdown_practice = SimpleNamespace(
+            def_reb           = bc_practice.def_reb,
+            off_reb           = bc_practice.off_reb,
+            misc              = bc_practice.misc,
+            deflection        = bc_practice.deflection,
+            steal             = bc_practice.steal,
+            block             = bc_practice.block,
+            floor_dive        = bc_practice.floor_dive,
+            charge_taken      = bc_practice.charge_taken,
+            reb_tip           = bc_practice.reb_tip,
+            total_blue_collar = bc_practice.total_blue_collar
+        )
+    else:
+        player_blue_breakdown_practice = zero_blue
 
-    for shot in all_details:
-        cls_key = shot.get('shot_class','').lower()
-        cls = cls_map.get(cls_key)
-        if not cls:
+    # ─── Now pick which “blue” to pass to the template ────────────
+    if mode == 'game':
+        agg  = aggregated_game
+        blue = player_blue_breakdown_game
+    else:
+        agg  = aggregated_practice
+        blue = player_blue_breakdown_practice
+
+
+        # ─── Override agg’s shooting fields with raw JSON counts ─────────────────
+    # Count ATR/2FG/3FG from each PlayerStats.shot_type_details exactly once/shot
+    makes_atr = 0
+    att_atr   = 0
+    makes_fg2 = 0
+    att_fg2   = 0
+    makes_fg3 = 0
+    att_fg3   = 0
+
+    # Iterate through each PlayerStats record in the chosen mode
+    stats_for_totals = game_stats_records if mode == 'game' else practice_stats_records
+
+    for s in stats_for_totals:
+        if not s.shot_type_details:
             continue
 
-        made    = (shot.get('result') == 'made')
-        context = shot.get('context', 'total')   # must be 'total', 'transition' or 'halfcourt'
+        js = (
+            json.loads(s.shot_type_details)
+            if isinstance(s.shot_type_details, str)
+            else s.shot_type_details
+        )
+        for shot in js:
+            sc = shot.get('shot_class', '').strip().lower()
+            made = (shot.get('result') == 'made')
+            if sc == 'atr':
+                att_atr += 1
+                makes_atr += 1 if made else 0
+            elif sc == '2fg':
+                att_fg2 += 1
+                makes_fg2 += 1 if made else 0
+            elif sc == '3fg':
+                att_fg3 += 1
+                makes_fg3 += 1 if made else 0
 
-        for key, val in shot.items():
-            if key in ('shot_class','result','context') or not val:
-                continue
+    # Now overwrite the agg values for those fields
+    agg.atr_makes    = makes_atr
+    agg.atr_attempts = att_atr
+    agg.fg2_makes    = makes_fg2
+    agg.fg2_attempts = att_fg2
+    agg.fg3_makes    = makes_fg3
+    agg.fg3_attempts = att_fg3
+    # (Note: agg.ftm and agg.fta remain as parsed from PlayerStats.ftm/fta)
 
-            if isinstance(val, (list, tuple)):
-                labels = val
-            else:
-                labels = [
-                    label.strip()
-                    for label in re.split(r'[,/]', str(val))
-                    if label.strip()
-                ]
 
-            for lbl in labels:
-                ent = detail_counts[cls].setdefault(
-                  lbl,
-                  {
-                    'total':      {'attempts':0,'makes':0},
-                    'transition': {'attempts':0,'makes':0},
-                    'halfcourt':  {'attempts':0,'makes':0},
-                  }
-                )
-                # increment overall + context
-                ent['total']['attempts']      += 1
-                ent[context]['attempts']      += 1
+        # ─── Recompute season‐long points from JSON + free throws ─────────────────
+    total_pts = 0
+    for s in stats_for_totals:
+        if not s.shot_type_details:
+            # just add free throws if no JSON present
+            total_pts += (s.ftm or 0)
+            continue
+
+        js = (
+            json.loads(s.shot_type_details)
+            if isinstance(s.shot_type_details, str)
+            else s.shot_type_details
+        )
+        # count makes per shot class
+        made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
+        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
+        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
+        # free throws
+        ft_made   = s.ftm or 0
+
+        # 2 pts for ATR/2FG, 3 pts for 3FG, 1 pt for each FT made
+        total_pts += (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
+
+    # overwrite agg.points
+    agg.points = total_pts
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    # ─── End override ─────────────────────────────────────────────────────────
+
+
+    # ─── Prepare Shot-Type Season Totals & Summaries ───────────────────
+    stats_for_shot = game_stats_records if mode == 'game' else practice_stats_records
+
+
+# … earlier in player_detail …
+
+    # ─── Gather every shot‐detail JSON blob ─────────────────────
+    all_details = []
+    for rec in stats_for_shot:
+        if rec.shot_type_details:
+            js = (json.loads(rec.shot_type_details)
+                if isinstance(rec.shot_type_details, str)
+                else rec.shot_type_details)
+            all_details.extend(js)
+
+    # ─── Compute raw season totals directly from all_details ─────────────────
+    makes_atr  = sum(1 for shot in all_details if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
+    att_atr    = sum(1 for shot in all_details if shot.get('shot_class','').lower() == 'atr')
+    makes_fg2  = sum(1 for shot in all_details if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
+    att_fg2    = sum(1 for shot in all_details if shot.get('shot_class','').lower() == '2fg')
+    makes_fg3  = sum(1 for shot in all_details if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
+    att_fg3    = sum(1 for shot in all_details if shot.get('shot_class','').lower() == '3fg')
+
+    fg_pct_atr  = (makes_atr / att_atr * 100) if att_atr else 0
+    fg_pct_fg2  = (makes_fg2 / att_fg2 * 100) if att_fg2 else 0
+    fg_pct_fg3  = (makes_fg3 / att_fg3 * 100) if att_fg3 else 0
+
+    raw_season_totals = SimpleNamespace(
+        atr  = SimpleNamespace(makes=makes_atr,  attempts=att_atr,  fg_pct=fg_pct_atr),
+        fg2  = SimpleNamespace(makes=makes_fg2,  attempts=att_fg2,  fg_pct=fg_pct_fg2),
+        fg3  = SimpleNamespace(makes=makes_fg3,  attempts=att_fg3,  fg_pct=fg_pct_fg3)
+    )
+
+    # ─── Initialize counters ───────────────────────────────────────────────────
+    detail_counts = {'atr': {}, 'fg2': {}, 'fg3': {}}
+    cls_map       = {'atr':'atr','2fg':'fg2','3fg':'fg3'}
+
+    # … continue with your detail_counts + shot_summaries logic …
+
+
+    # ─── Populate detail_counts: one attempt per shot per distinct label ───────
+    for shot in all_details:
+        sc = shot.get('shot_class', '').lower()       # e.g. "2fg", "3fg", or "atr"
+        shot_cls = cls_map.get(sc)                    # e.g. "fg2", "fg3", or "atr"
+
+        if not shot_cls:
+            continue
+
+        made = (shot.get('result') == 'made')
+        raw  = shot.get('possession_type', '').strip().lower()
+        if 'trans' in raw:
+            ctx = 'transition'
+        elif 'half' in raw:
+            ctx = 'halfcourt'
+        else:
+            ctx = 'total'
+
+        # 1) Collect all labels for this shot
+        labels_for_this_shot = []
+
+        # a) Assisted vs Non-Assisted
+        if shot.get('Assisted'):
+            labels_for_this_shot.append('Assisted')
+        else:
+            labels_for_this_shot.append('Non-Assisted')
+
+        # b) All HUDL suffix fields for this shot
+        if sc in ('atr', '2fg'):
+            # The parser stored all ATR & 2FG subfields under "2FG (...)" columns,
+            # with prefix "2fg_" in JSON. So we look up keys under "2fg_*"
+            suffix_keys = ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]
+            for suffix in suffix_keys:
+                old_key = f"{sc}_{suffix.lower().replace(' ', '_')}"
+                val = shot.get(old_key, "")
+                if val:
+                    sublabels = [lbl.strip() for lbl in re.split(r'[,/]', str(val)) if lbl.strip()]
+                    labels_for_this_shot.extend(sublabels)
+        else:  # sc == '3fg'
+            suffix_keys = ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]
+            for suffix in suffix_keys:
+                old_key = f"{sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
+                val = shot.get(old_key, "")
+                if val:
+                    sublabels = [lbl.strip() for lbl in re.split(r'[,/]', str(val)) if lbl.strip()]
+                    labels_for_this_shot.extend(sublabels)
+
+        # ─── Now pull in every “_scheme_attack” / “_scheme_drive” / “_scheme_pass” tag ───────────
+        #   e.g. "2fg_scheme_attack", "2fg_scheme_drive", "2fg_scheme_pass" or
+        #   "3fg_scheme_attack", "3fg_scheme_drive", "3fg_scheme_pass"
+
+        for scheme in ("scheme_attack", "scheme_drive", "scheme_pass"):
+            old_key = f"{sc}_{scheme}"
+            val = shot.get(old_key, "")
+            if val:
+                sublabels = [lbl.strip() for lbl in re.split(r'[,/]', str(val)) if lbl.strip()]
+                labels_for_this_shot.extend(sublabels)
+
+
+        # 2) Use a set() so each distinct label is counted once
+        unique_labels = set(labels_for_this_shot)
+
+        # 3) Increment each label exactly once
+        for lbl in unique_labels:
+            ent = detail_counts[shot_cls].setdefault(lbl, {
+                'total':     {'attempts': 0, 'makes': 0},
+                'transition':{'attempts': 0, 'makes': 0},
+                'halfcourt': {'attempts': 0, 'makes': 0},
+            })
+            # Grand total: +1 attempt for this shot under that label
+            ent['total']['attempts'] += 1
+            if made:
+                ent['total']['makes'] += 1
+
+            # Context‐specific (e.g. transition or halfcourt)
+            if ctx in ('transition','halfcourt'):
+                ent[ctx]['attempts'] += 1
                 if made:
-                    ent['total']['makes']     += 1
-                    ent[context]['makes']     += 1
+                    ent[ctx]['makes'] += 1
 
-    # 7) Compute fg_pct, freq, pps for each context
-    for cls, bucket in detail_counts.items():
-        for lbl, data in bucket.items():
-            # avoid div/0
-            base = data['total']['attempts'] or 1
-            pts  = 2 if cls in ('atr','fg2') else 3
-
+    # ─── Compute fg_pct, pps & freq_pct ────────────────────────────────────────
+    for shot_type, bucket in detail_counts.items():
+        for data in bucket.values():
+            total_att = data['total']['attempts'] or 1
+            pts = 2 if shot_type in ('atr','fg2') else 3
             for ctx in ('total','transition','halfcourt'):
                 a = data[ctx]['attempts']
                 m = data[ctx]['makes']
-                data[ctx]['fg_pct'] = (m / a) if a else 0
-                data[ctx]['pps']    = (pts * m / a) if a else 0
-                data[ctx]['freq']   = (a / base)
+                data[ctx]['fg_pct']   = m / total_att
+                data[ctx]['pps']      = (pts * m / a) if a else 0
+                data[ctx]['freq_pct'] = a / total_att
 
-    # 8) Wrap into shot_summaries
-    # 8) Ensure default categories exist, then wrap into shot_summaries
+    # ─── Build shot_summaries ────────────────────────────────────────────────
     shot_summaries = {}
     for shot_type, bucket in detail_counts.items():
-        # always have these two keys so template lookup never fails
-        for default_label in ['Assisted', 'Non‑Assisted']:
-            bucket.setdefault(default_label, {
-                'total':      {'attempts': 0, 'makes': 0, 'fg_pct': 0, 'pps': 0, 'freq': 0},
-                'transition': {'attempts': 0, 'makes': 0, 'fg_pct': 0, 'pps': 0, 'freq': 0},
-                'halfcourt':  {'attempts': 0, 'makes': 0, 'fg_pct': 0, 'pps': 0, 'freq': 0},
+        # (1) Ensure Assisted/Non-Assisted keys exist
+        for lbl in ('Assisted','Non-Assisted'):
+            bucket.setdefault(lbl, {
+                'total':     {'attempts': 0,'makes': 0,'fg_pct':0,'pps':0,'freq_pct':0},
+                'transition':{'attempts': 0,'makes': 0,'fg_pct':0,'pps':0,'freq_pct':0},
+                'halfcourt': {'attempts': 0,'makes': 0,'fg_pct':0,'pps':0,'freq_pct':0},
             })
-            # build per‐category namespaces
-            cats = {}
-            for lbl, data in bucket.items():
-                cats[lbl] = SimpleNamespace(
-                    total      = SimpleNamespace(**data['total']),
-                    transition = SimpleNamespace(**data['transition']),
-                    halfcourt  = SimpleNamespace(**data['halfcourt']),
-                )
 
-            # season summary totals for this shot type
-            ta = sum(d['total']['attempts'] for d in bucket.values()) or 1
-            tm = sum(d['total']['makes']    for d in bucket.values())
-            tp = sum(d['total']['pps'] * d['total']['attempts'] for d in bucket.values())
-
-            shot_summaries[shot_type] = SimpleNamespace(
-                total = SimpleNamespace(
-                    attempts = ta,
-                    makes    = tm,
-                    fg_pct   = tm / ta,
-                    pps      = tp / ta
-                ),
-                cats = cats
+        # (2) Build a namespace for each label/category
+        cats = {
+            lbl: SimpleNamespace(
+                total      = SimpleNamespace(**data['total']),
+                transition = SimpleNamespace(**data['transition']),
+                halfcourt  = SimpleNamespace(**data['halfcourt'])
             )
-
-    
-    # 8.a) season‑wide transition + halfcourt aggregates on each summary
-    for key, summary in shot_summaries.items():
-        # sum up all category‐level transition & halfcourt makes/attempts
-        t_att = sum(cat.transition.attempts for cat in summary.cats.values())
-        t_mks = sum(cat.transition.makes    for cat in summary.cats.values())
-        h_att = sum(cat.halfcourt.attempts  for cat in summary.cats.values())
-        h_mks = sum(cat.halfcourt.makes     for cat in summary.cats.values())
-
-        summary.transition = SimpleNamespace(
-            attempts = t_att,
-            makes    = t_mks,
-            fg_pct   = (t_mks / t_att * 100) if t_att else 0
-        )
-        summary.halfcourt = SimpleNamespace(
-            attempts = h_att,
-            makes    = h_mks,
-            fg_pct   = (h_mks / h_att * 100) if h_att else 0
-        )
-
-
-
-    # 9) Game‑by‑Game breakdown (unchanged)
-    fields = [
-      "points","assists","turnovers",
-      "atr_makes","atr_attempts",
-      "fg2_makes","fg2_attempts",
-      "fg3_makes","fg3_attempts",
-      "ftm","fta","pot_assists","second_assists"
-    ]
-    game_breakdown, game_details = {}, {}
-    for s in stats_records:
-        gid = s.game_id
-        if gid not in game_breakdown:
-            game_breakdown[gid] = {f:0 for f in fields}
-        for f in fields:
-            game_breakdown[gid][f] += getattr(s, f, 0) or 0
-
-    for gid, data in game_breakdown.items():
-        g = Game.query.get(gid)
-        game_details[gid] = {
-            'opponent_name': g.opponent_name if g else 'Unknown',
-            'game_date':     g.game_date.strftime("%b %d") if g and g.game_date else '',
-            'sort_date':     g.game_date.strftime("%Y%m%d") if g and g.game_date else '0'
+            for lbl, data in bucket.items()
         }
 
-    # 10) Render template
-    # … after you build shot_summaries …
+        # (3) Sum up totals and compute fg_pct, pps for this shot_type
+        ta = sum(d['total']['attempts'] for d in bucket.values()) or 1
+        tm = sum(d['total']['makes']    for d in bucket.values())
+        pts = 2 if shot_type in ('atr','fg2') else 3
+        tp = sum(d['total']['makes'] * pts for d in bucket.values())
+
+        shot_summaries[shot_type] = SimpleNamespace(
+            total      = SimpleNamespace(attempts=ta, makes=tm, fg_pct=(tm/ta*100), pps=(tp/ta)),
+            cats       = cats,
+            transition = SimpleNamespace(
+                attempts=sum(d['transition']['attempts'] for d in bucket.values()),
+                makes   =sum(d['transition']['makes']    for d in bucket.values()),
+                fg_pct  =(sum(d['transition']['makes']    for d in bucket.values()) /
+                        (sum(d['transition']['attempts'] for d in bucket.values()) or 1)),
+                pps     =(pts * sum(d['transition']['makes'] for d in bucket.values()) /
+                        (sum(d['transition']['attempts'] for d in bucket.values()) or 1))
+            ),
+            halfcourt  = SimpleNamespace(
+                attempts=sum(d['halfcourt']['attempts'] for d in bucket.values()),
+                makes   =sum(d['halfcourt']['makes']    for d in bucket.values()),
+                fg_pct  =(sum(d['halfcourt']['makes']    for d in bucket.values()) /
+                        (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1)),
+                pps     =(pts * sum(d['halfcourt']['makes'] for d in bucket.values()) /
+                        (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1))
+            )
+        )
+    # ←─── this “for shot_type…” loop ends here
+
+
+
+    # ─── Game‐by‐game breakdown for sub‐tab (recompute points) ──────────────
+    game_breakdown = {}
+    game_details   = {}
+
+    for s in game_stats_records:
+        gid = s.game_id
+
+        js = []
+        if s.shot_type_details:
+            js = (
+                json.loads(s.shot_type_details)
+                if isinstance(s.shot_type_details, str)
+                else s.shot_type_details
+            )
+
+        # count makes for each class
+        made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
+        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
+        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
+
+        # free throws made
+        ft_made   = s.ftm or 0
+
+        # TOTAL POINTS for this game:
+        pts_for_game = (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
+
+        # count attempts from JSON
+        att_atr   = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr')
+        att_fg2   = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg')
+        att_fg3   = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg')
+
+        # build the row
+        game_breakdown[gid] = {
+            "points":         pts_for_game,
+            "assists":        s.assists or 0,
+            "turnovers":      s.turnovers or 0,
+            "pot_assists":    s.pot_assists or 0,
+            "second_assists": s.second_assists or 0,
+
+            "atr_makes":      made_atr,
+            "atr_attempts":   att_atr,
+
+            "fg2_makes":      made_fg2,
+            "fg2_attempts":   att_fg2,
+
+            "fg3_makes":      made_fg3,
+            "fg3_attempts":   att_fg3,
+
+            "ftm":            ft_made,
+            "fta":            s.fta or 0
+        }
+
+        # date/opponent details remain unchanged
+        g = s.game
+        game_details[gid] = {
+            "opponent_name": g.opponent_name if g else "Unknown",
+            "game_date":     g.game_date.strftime("%b %d") if g and g.game_date else "",
+            "sort_date":     g.game_date.strftime("%Y%m%d") if g and g.game_date else "0"
+        }
+
+    # ─── Practice‐by‐practice breakdown (recompute points) ─────────────────
+    practice_breakdown = {}
+    practice_details   = {}
+
+    for s in practice_stats_records:
+        pid = s.practice_id
+
+        js = []
+        if s.shot_type_details:
+            js = (
+                json.loads(s.shot_type_details)
+                if isinstance(s.shot_type_details, str)
+                else s.shot_type_details
+            )
+
+        made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
+        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
+        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
+        ft_made   = s.ftm or 0
+
+        pts_for_practice = (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
+
+        att_atr   = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr')
+        att_fg2   = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg')
+        att_fg3   = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg')
+
+        practice_breakdown[pid] = {
+            "points":         pts_for_practice,
+            "assists":        s.assists or 0,
+            "turnovers":      s.turnovers or 0,
+            "pot_assists":    s.pot_assists or 0,
+            "second_assists": s.second_assists or 0,
+
+            "atr_makes":      made_atr,
+            "atr_attempts":   att_atr,
+
+            "fg2_makes":      made_fg2,
+            "fg2_attempts":   att_fg2,
+
+            "fg3_makes":      made_fg3,
+            "fg3_attempts":   att_fg3,
+
+            "ftm":            ft_made,
+            "fta":            s.fta or 0
+        }
+
+        pr = s.practice
+        practice_details[pid] = {
+            "game_date":     pr.date.strftime("%b %d") if pr and pr.date else "",
+            "opponent_name": pr.category if pr else "",
+            "sort_date":     pr.date.strftime("%Y%m%d") if pr and pr.date else "0"
+        }
+
+
+
+        # ─── TEMPORARY DEBUG: print out every ATR shot detail for Game 1 (rec.id=9) ───
+    for rec in stats_for_shot:
+        if rec.shot_type_details:
+            js = json.loads(rec.shot_type_details) if isinstance(rec.shot_type_details, str) else rec.shot_type_details
+            # Only dump the first ATR shot so we don’t flood the console
+            for shot in js:
+                if shot.get('shot_class') == 'ATR':
+                    print(">>> ATR shot_detail dict:", shot)
+                    break
+            # And show how many ATR‐class entries exist in this rec:
+            num_atr = sum(1 for shot in js if shot.get('shot_class') == 'ATR')
+            print(f"Game {rec.game_id} (rec.id={rec.id}) has {num_atr} ATR entries")
+
+
+
+
+    # ─── Finally, render template with BOTH modes & all context ─────────
     return render_template(
         'admin/player_detail.html',
-        player_name           = player_name,
-        stats_records         = stats_records,
-        aggregated            = aggregated,
-        game_breakdown        = game_breakdown,
-        game_details          = game_details,
-        player_blue_breakdown = player_blue_breakdown,
-        shot_type_totals      = shot_type_totals,
-        shot_summaries        = shot_summaries,
+        player_name                        = player_name,
+        mode                               = mode,
+        agg                                = agg,
+        blue                               = blue,
+        aggregated_game                    = aggregated_game,
+        aggregated_practice                = aggregated_practice,
+        player_blue_breakdown_game         = player_blue_breakdown_game,
+        player_blue_breakdown_practice     = player_blue_breakdown_practice,
+        game_stats_records                 = game_stats_records,
+        practice_stats_records             = practice_stats_records,
+        stats_records                      = game_stats_records if mode=='game' else practice_stats_records,
+
+        # ─── Pass the flat list of all SkillEntry rows (so template can group by date) ───
+        entries                            = entries_list,
+        # ─── “Drill‐by‐drill” totals for shot_map (so template can show totals row) ───
+        shot_totals                        = totals,
+        # ── Pass the separate NBA 100 list to the template ────────────────
+        nba100_entries                     = nba100_entries,
+
+        shot_map                           = shot_map,
+        label_map                          = label_map,
+        generic_totals                     = generic_totals,   # e.g. {"Free Throws":123}
+
+        # ── all your existing context for stats, shot summaries, etc. ─────────
+        start_date                         = start_date or '',
+        end_date                           = end_date   or '',
+        shot_type_totals                   = raw_season_totals,
+        shot_summaries                     = shot_summaries,
+        game_breakdown                     = game_breakdown,
+        game_details                       = game_details,
+        practice_breakdown                 = practice_breakdown,
+        practice_details                   = practice_details,
+        player                             = player
     )
+
+
+
+
 
 # ... [remaining routes unchanged below] ...
 
-@admin_bp.route('/roster/edit', methods=['GET', 'POST'])
-@admin_required
-def edit_roster():
-    seasons = Season.query.order_by(Season.season_name.desc()).all()
+
+#─ Delete all entries for a given date ───────────────────────────
+@admin_bp.route(
+    '/admin/player/<player_name>/skill-entry/<entry_date>/delete',
+    methods=['POST']
+)
+@login_required
+def delete_skill_entry(player_name, entry_date):
+    # parse the incoming date
+    target_date = date.fromisoformat(entry_date)
+    # delete every SkillEntry for that player on that date
+    SkillEntry.query.filter_by(player_id=Roster.query.filter_by(player_name=player_name).first_or_404().id,
+                                date=target_date
+                               ).delete(synchronize_session=False)
+    db.session.commit()
+    flash('All skill‐development entries deleted for that date.', 'success')
+    return redirect(
+        url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
+    )
+
+
+# ─── Edit all entries for a given date ─────────────────────────────
+@admin_bp.route(
+    '/admin/player/<player_name>/skill-entry/<entry_date>/edit',
+    methods=['GET', 'POST']
+)
+@login_required
+def edit_skill_entry(player_name, entry_date):
+    # Rebuild the shot_map & label_map exactly as in the template
+    shot_map = {
+        'atr':     ["Right Hand", "Left Hand", "Off 1 Foot", "Off 2 Feet"],
+        'floater': ["Right Hand", "Left Hand", "Off 1 Foot", "Off 2 Feet"],
+        '3fg':     ["Catch & Shoot", "Off Dribble"],
+        'ft':      ["Free Throw"]    # ← added Free Throws category
+    }
+    label_map = {
+        'atr':     "ATR's",
+        'floater': "FLOATER's",
+        '3fg':     "3FG's",
+        'ft':      "Free Throws"     # ← display label for the new category
+    }
+
+    # Parse the date and load the roster & any existing entries
+    target_date = date.fromisoformat(entry_date)
+    roster = Roster.query.filter_by(player_name=player_name).first_or_404()
+    entries = SkillEntry.query.filter_by(
+        player_id=roster.id,
+        date=target_date
+    ).all()
+
+    # If there are no entries at all for that date, flash & redirect
+    if not entries:
+        flash('No entries found for that date.', 'error')
+        return redirect(
+            url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
+        )
 
     if request.method == 'POST':
-        season_id = request.form.get('season_id', type=int)
-        new_season_name = request.form.get('new_season', '').strip()
+        # Loop through every (shot_class, subcategory) in shot_map,
+        # creating or updating a SkillEntry accordingly.
+        for cls, subs in shot_map.items():
+            for sub in subs:
+                field_key = sub.replace(' ', '_')
+                makes    = int(request.form.get(f"{cls}_{field_key}_makes", '0') or '0')
+                attempts = int(request.form.get(f"{cls}_{field_key}_attempts", '0') or '0')
 
-        if new_season_name:
-            season = Season(season_name=new_season_name)
-            db.session.add(season)
-            db.session.commit()
-            season_id = season.id
-        else:
-            season = Season.query.get(season_id)
-            if not season:
-                flash("Invalid season selected.", "error")
-                return redirect(url_for('admin.edit_roster'))
-        
-        players_text = request.form.get('players_list', '')
-        players = [line.strip() for line in players_text.split('\n') if line.strip()]
+                existing = SkillEntry.query.filter_by(
+                    player_id   = roster.id,
+                    date        = target_date,
+                    shot_class  = cls,
+                    subcategory = sub
+                ).first()
 
-        Roster.query.filter_by(season_id=season_id).delete()
-        for player in players:
-            roster_entry = Roster(season_id=season_id, player_name=player)
-            db.session.add(roster_entry)
+                if existing:
+                    existing.makes    = makes
+                    existing.attempts = attempts
+                else:
+                    new_entry = SkillEntry(
+                        player_id   = roster.id,
+                        date        = target_date,
+                        shot_class  = cls,
+                        subcategory = sub,
+                        makes       = makes,
+                        attempts    = attempts
+                    )
+                    db.session.add(new_entry)
+
         db.session.commit()
-        flash("Roster updated successfully!", "success")
-        return redirect(url_for('admin.players_list', season_id=season_id))
+        flash('Skill‐development entries updated.', 'success')
+        return redirect(
+            url_for('admin.player_detail', player_name=player_name) + '#skillDev'
+        )
 
-    season_id = request.args.get('season_id', type=int)
-    current_roster_text = ""
-    if season_id:
-        roster_entries = Roster.query.filter_by(season_id=season_id).all()
-        current_roster_text = "\n".join([entry.player_name for entry in roster_entries])
-        
-    return render_template('admin/edit_roster.html', 
-                           seasons=seasons, 
-                           selected_season=season_id, 
-                           current_roster=current_roster_text)
+    # GET: render the edit form, passing everything the template needs
+    return render_template(
+        'admin/edit_skill_entry.html',
+        player_name=player_name,
+        entries=entries,
+        entry_date=entry_date,
+        shot_map=shot_map,
+        label_map=label_map
+    )
 
 
-@admin_bp.route('/roster/<int:season_id>/delete', methods=['POST'])
-@admin_required
-def delete_roster(season_id):
-    # remove all roster entries
-    Roster.query.filter_by(season_id=season_id).delete()
-    # then remove the season altogether
-    Season.query.filter_by(id=season_id).delete()
+@admin_bp.route(
+    '/admin/player/<player_name>/nba100',
+    methods=['POST']
+)
+@login_required
+def add_nba100_entry(player_name):
+    """
+    Handle the NBA 100 form:
+      - Reads date and makes (0–100) from request.form
+      - Creates a SkillEntry(skill_name="NBA 100", value=makes)
+      - Redirects back to the Skill Development tab
+    """
+    from datetime import date
+
+    # 1) Look up the player
+    roster = Roster.query.filter_by(player_name=player_name).first_or_404()
+
+    # 2) Get form data
+    form_date = request.form.get('date')
+    makes_str = request.form.get('makes', '0')
+
+    # 3) Validate the date
+    try:
+        target_date = date.fromisoformat(form_date)
+    except (TypeError, ValueError):
+        flash('Invalid date for NBA 100 entry.', 'error')
+        return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
+
+    # 4) Validate “makes” is int between 0 and 100
+    try:
+        makes = int(makes_str)
+        if makes < 0 or makes > 100:
+            raise ValueError()
+    except ValueError:
+        flash('“Makes” must be an integer between 0 and 100.', 'error')
+        return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
+
+    # 5) Insert a new SkillEntry with skill_name="NBA 100"
+    new_entry = SkillEntry(
+        player_id   = roster.id,
+        date        = target_date,
+        skill_name  = "NBA 100",
+        value       = makes,
+        shot_class  = None,
+        subcategory = None,
+        makes       = 0,
+        attempts    = 0
+    )
+    db.session.add(new_entry)
     db.session.commit()
-    flash("Season and its roster have been deleted.", "success")
-    return redirect(url_for('admin.edit_roster'))
+
+    flash(f'NBA 100 entry saved: {makes}/100 on {target_date.isoformat()}.', 'success')
+    return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
+
+
+
+@admin_bp.route('/admin/roster', methods=['GET', 'POST'])
+@login_required
+def roster():
+    # 1) Load seasons
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    if not seasons:
+        flash("Please create at least one season first.", "warning")
+        return redirect(url_for('admin.create_season'))
+
+    # 2) Which season is selected?
+    selected_id = request.args.get('season_id', type=int) or seasons[0].id
+
+    # 3) Handle new roster entry
+    if request.method == 'POST':
+        name = request.form['player_name'].strip()
+        if name:
+            db.session.add(Roster(season_id=selected_id, player_name=name))
+            db.session.commit()
+            flash(f"Added {name} to {Season.query.get(selected_id).season_name}.", "success")
+        return redirect(url_for('admin.roster', season_id=selected_id))
+
+    # 4) Fetch only this season’s roster
+    roster_entries = Roster.query \
+                          .filter_by(season_id=selected_id) \
+                          .order_by(Roster.player_name) \
+                          .all()
+
+    return render_template(
+        'admin/roster.html',
+        seasons=seasons,
+        selected_season=selected_id,
+        roster_entries=roster_entries
+    )
+
+
+@admin_bp.route('/admin/season/create', methods=['GET', 'POST'])
+@admin_required
+def create_season():
+    if request.method == 'POST':
+        name = request.form.get('season_name', '').strip()
+        if not name:
+            flash("Season name can't be blank.", "error")
+            return redirect(url_for('admin.create_season'))
+
+        new_season = Season(season_name=name)
+        db.session.add(new_season)
+        db.session.commit()
+
+        flash(f"Season '{name}' created!", "success")
+        return redirect(url_for('admin.roster', season_id=new_season.id))
+
+    return render_template("admin/create_season.html")
+
+
+
+
+@admin_bp.route('/admin/roster/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_roster(id):
+    entry = Roster.query.get_or_404(id)
+    season_id = entry.season_id
+    db.session.delete(entry)
+    db.session.commit()
+    flash(f"Removed {entry.player_name} from roster.", "success")
+    return redirect(url_for('admin.roster', season_id=season_id))
+
+@admin_bp.context_processor
+def inject_seasons():
+    # grab all seasons, most‐recent first
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    # read ?season_id= or fall back to the first in the list
+    selected = request.args.get('season_id', type=int) or (seasons[0].id if seasons else None)
+    return {
+        'all_seasons':    seasons,
+        'selected_season': selected
+    }
+
+
 
 
 
@@ -1056,10 +2027,12 @@ def player_shot_type(player_name):
         return redirect(url_for('admin.players_list'))
 
     # Collect every shot_type_details entry across every game
+    # Build shot_details using only the “game” or “practice” subset (stats_for_shot)
     shot_details = []
-    for s in stats_records:
+    for s in stats_for_shot:
         if s.shot_type_details:
-            shot_details.extend(s.shot_type_details)
+            shot_details.extend(json.loads(s.shot_type_details))
+
 
     # Now you can group or filter shot_details however you like:
     atr_details  = [d for d in shot_details if d.get('shot_class') == 'ATR']
@@ -1073,3 +2046,6 @@ def player_shot_type(player_name):
         fg2_details=fg2_details,
         fg3_details=fg3_details,
     )
+
+
+

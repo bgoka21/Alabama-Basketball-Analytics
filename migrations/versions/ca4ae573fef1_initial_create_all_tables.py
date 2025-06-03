@@ -1,8 +1,8 @@
-"""Initial migration
+"""Initial create all tables
 
-Revision ID: bfac7702b9be
+Revision ID: ca4ae573fef1
 Revises: 
-Create Date: 2025-03-19 19:56:19.408600
+Create Date: 2025-05-27 21:58:44.508967
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'bfac7702b9be'
+revision = 'ca4ae573fef1'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -25,15 +25,6 @@ def upgrade():
     sa.Column('end_date', sa.Date(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('season_name')
-    )
-    op.create_table('uploaded_files',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('filename', sa.String(length=255), nullable=False),
-    sa.Column('upload_date', sa.DateTime(), nullable=True),
-    sa.Column('parse_status', sa.String(length=50), nullable=True),
-    sa.Column('parse_log', sa.Text(), nullable=True),
-    sa.Column('last_parsed', sa.DateTime(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -54,9 +45,99 @@ def upgrade():
     sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('practice',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('season_id', sa.Integer(), nullable=False),
+    sa.Column('date', sa.Date(), nullable=False),
+    sa.Column('category', sa.String(length=20), nullable=False),
+    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('roster',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('season_id', sa.Integer(), nullable=False),
+    sa.Column('player_name', sa.String(length=100), nullable=False),
+    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('season_id', 'player_name', name='_season_player_uc')
+    )
+    op.create_table('uploaded_files',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('season_id', sa.Integer(), nullable=False),
+    sa.Column('filename', sa.String(length=255), nullable=False),
+    sa.Column('upload_date', sa.DateTime(), nullable=True),
+    sa.Column('file_date', sa.Date(), nullable=False),
+    sa.Column('parse_status', sa.String(length=50), nullable=True),
+    sa.Column('parse_log', sa.Text(), nullable=True),
+    sa.Column('parse_error', sa.Text(), nullable=True),
+    sa.Column('last_parsed', sa.DateTime(), nullable=True),
+    sa.Column('offensive_breakdown', sa.Text(), nullable=True),
+    sa.Column('defensive_breakdown', sa.Text(), nullable=True),
+    sa.Column('lineup_efficiencies', sa.Text(), nullable=True),
+    sa.Column('category', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('blue_collar_stats',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('game_id', sa.Integer(), nullable=True),
+    sa.Column('practice_id', sa.Integer(), nullable=True),
+    sa.Column('season_id', sa.Integer(), nullable=False),
+    sa.Column('player_id', sa.Integer(), nullable=True),
+    sa.Column('def_reb', sa.Integer(), nullable=True),
+    sa.Column('off_reb', sa.Integer(), nullable=True),
+    sa.Column('misc', sa.Integer(), nullable=True),
+    sa.Column('deflection', sa.Integer(), nullable=True),
+    sa.Column('steal', sa.Integer(), nullable=True),
+    sa.Column('block', sa.Integer(), nullable=True),
+    sa.Column('floor_dive', sa.Integer(), nullable=True),
+    sa.Column('charge_taken', sa.Integer(), nullable=True),
+    sa.Column('reb_tip', sa.Integer(), nullable=True),
+    sa.Column('total_blue_collar', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
+    sa.ForeignKeyConstraint(['player_id'], ['roster.id'], ),
+    sa.ForeignKeyConstraint(['practice_id'], ['practice.id'], ),
+    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('blue_collar_stats', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_blue_collar_stats_game_id'), ['game_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_blue_collar_stats_player_id'), ['player_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_blue_collar_stats_practice_id'), ['practice_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_blue_collar_stats_season_id'), ['season_id'], unique=False)
+
+    op.create_table('opponent_blue_collar_stats',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('game_id', sa.Integer(), nullable=True),
+    sa.Column('practice_id', sa.Integer(), nullable=True),
+    sa.Column('season_id', sa.Integer(), nullable=False),
+    sa.Column('player_id', sa.Integer(), nullable=True),
+    sa.Column('def_reb', sa.Integer(), nullable=True),
+    sa.Column('off_reb', sa.Integer(), nullable=True),
+    sa.Column('misc', sa.Integer(), nullable=True),
+    sa.Column('deflection', sa.Integer(), nullable=True),
+    sa.Column('steal', sa.Integer(), nullable=True),
+    sa.Column('block', sa.Integer(), nullable=True),
+    sa.Column('floor_dive', sa.Integer(), nullable=True),
+    sa.Column('charge_taken', sa.Integer(), nullable=True),
+    sa.Column('reb_tip', sa.Integer(), nullable=True),
+    sa.Column('total_blue_collar', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
+    sa.ForeignKeyConstraint(['player_id'], ['roster.id'], ),
+    sa.ForeignKeyConstraint(['practice_id'], ['practice.id'], ),
+    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('opponent_blue_collar_stats', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_game_id'), ['game_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_player_id'), ['player_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_practice_id'), ['practice_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_season_id'), ['season_id'], unique=False)
+
     op.create_table('player_stats',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('game_id', sa.Integer(), nullable=False),
+    sa.Column('game_id', sa.Integer(), nullable=True),
+    sa.Column('practice_id', sa.Integer(), nullable=True),
     sa.Column('season_id', sa.Integer(), nullable=False),
     sa.Column('player_name', sa.String(length=100), nullable=False),
     sa.Column('jersey_number', sa.Integer(), nullable=True),
@@ -89,38 +170,60 @@ def upgrade():
     sa.Column('atr_fouled', sa.Integer(), nullable=True),
     sa.Column('fg2_fouled', sa.Integer(), nullable=True),
     sa.Column('fg3_fouled', sa.Integer(), nullable=True),
+    sa.Column('shot_type_details', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
+    sa.ForeignKeyConstraint(['practice_id'], ['practice.id'], ),
     sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('player_stats', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_player_stats_game_id'), ['game_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_player_stats_player_name'), ['player_name'], unique=False)
+        batch_op.create_index(batch_op.f('ix_player_stats_practice_id'), ['practice_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_player_stats_season_id'), ['season_id'], unique=False)
 
     op.create_table('possession',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('game_id', sa.Integer(), nullable=False),
+    sa.Column('practice_id', sa.Integer(), nullable=True),
     sa.Column('season_id', sa.Integer(), nullable=False),
     sa.Column('time_segment', sa.String(length=20), nullable=True),
-    sa.Column('possession_side', sa.Boolean(), nullable=True),
+    sa.Column('possession_side', sa.String(length=20), nullable=True),
     sa.Column('player_combinations', sa.String(length=255), nullable=True),
     sa.Column('possession_start', sa.String(length=50), nullable=True),
     sa.Column('possession_type', sa.String(length=50), nullable=True),
     sa.Column('paint_touches', sa.String(length=10), nullable=True),
     sa.Column('shot_clock', sa.String(length=10), nullable=True),
     sa.Column('shot_clock_pt', sa.String(length=10), nullable=True),
+    sa.Column('points_scored', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
+    sa.ForeignKeyConstraint(['practice_id'], ['practice.id'], ),
     sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('possession', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_possession_game_id'), ['game_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_possession_practice_id'), ['practice_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_possession_season_id'), ['season_id'], unique=False)
 
+    op.create_table('skill_entries',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('player_id', sa.Integer(), nullable=False),
+    sa.Column('date', sa.Date(), nullable=False),
+    sa.Column('skill_name', sa.String(length=64), nullable=False),
+    sa.Column('value', sa.Integer(), nullable=False),
+    sa.Column('shot_class', sa.String(length=20), nullable=False),
+    sa.Column('subcategory', sa.String(length=50), nullable=False),
+    sa.Column('makes', sa.Integer(), nullable=False),
+    sa.Column('attempts', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['player_id'], ['roster.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('team_stats',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('game_id', sa.Integer(), nullable=False),
+    sa.Column('practice_id', sa.Integer(), nullable=True),
+    sa.Column('player_id', sa.Integer(), nullable=True),
     sa.Column('season_id', sa.Integer(), nullable=False),
     sa.Column('total_points', sa.Integer(), nullable=True),
     sa.Column('total_assists', sa.Integer(), nullable=True),
@@ -137,73 +240,34 @@ def upgrade():
     sa.Column('total_ftm', sa.Integer(), nullable=True),
     sa.Column('total_blue_collar', sa.Integer(), nullable=True),
     sa.Column('total_possessions', sa.Integer(), nullable=True),
+    sa.Column('assist_pct', sa.Float(), nullable=False),
+    sa.Column('turnover_pct', sa.Float(), nullable=False),
+    sa.Column('tcr_pct', sa.Float(), nullable=False),
+    sa.Column('oreb_pct', sa.Float(), nullable=False),
+    sa.Column('ft_rate', sa.Float(), nullable=False),
+    sa.Column('good_shot_pct', sa.Float(), nullable=False),
     sa.Column('is_opponent', sa.Boolean(), nullable=True),
     sa.Column('total_atr_fouled', sa.Integer(), nullable=True),
     sa.Column('total_fg2_fouled', sa.Integer(), nullable=True),
     sa.Column('total_fg3_fouled', sa.Integer(), nullable=True),
+    sa.Column('wins', sa.Integer(), nullable=False),
+    sa.Column('losses', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
+    sa.ForeignKeyConstraint(['player_id'], ['roster.id'], ),
+    sa.ForeignKeyConstraint(['practice_id'], ['practice.id'], ),
     sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('team_stats', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_team_stats_game_id'), ['game_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_team_stats_practice_id'), ['practice_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_team_stats_season_id'), ['season_id'], unique=False)
-
-    op.create_table('blue_collar_stats',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('game_id', sa.Integer(), nullable=False),
-    sa.Column('season_id', sa.Integer(), nullable=False),
-    sa.Column('player_id', sa.Integer(), nullable=True),
-    sa.Column('def_reb', sa.Integer(), nullable=True),
-    sa.Column('off_reb', sa.Integer(), nullable=True),
-    sa.Column('misc', sa.Integer(), nullable=True),
-    sa.Column('deflection', sa.Integer(), nullable=True),
-    sa.Column('steal', sa.Integer(), nullable=True),
-    sa.Column('block', sa.Integer(), nullable=True),
-    sa.Column('floor_dive', sa.Integer(), nullable=True),
-    sa.Column('charge_taken', sa.Integer(), nullable=True),
-    sa.Column('reb_tip', sa.Integer(), nullable=True),
-    sa.Column('total_blue_collar', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
-    sa.ForeignKeyConstraint(['player_id'], ['player_stats.id'], ),
-    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    with op.batch_alter_table('blue_collar_stats', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_blue_collar_stats_game_id'), ['game_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_blue_collar_stats_player_id'), ['player_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_blue_collar_stats_season_id'), ['season_id'], unique=False)
-
-    op.create_table('opponent_blue_collar_stats',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('game_id', sa.Integer(), nullable=False),
-    sa.Column('season_id', sa.Integer(), nullable=False),
-    sa.Column('player_id', sa.Integer(), nullable=True),
-    sa.Column('def_reb', sa.Integer(), nullable=True),
-    sa.Column('off_reb', sa.Integer(), nullable=True),
-    sa.Column('misc', sa.Integer(), nullable=True),
-    sa.Column('deflection', sa.Integer(), nullable=True),
-    sa.Column('steal', sa.Integer(), nullable=True),
-    sa.Column('block', sa.Integer(), nullable=True),
-    sa.Column('floor_dive', sa.Integer(), nullable=True),
-    sa.Column('charge_taken', sa.Integer(), nullable=True),
-    sa.Column('reb_tip', sa.Integer(), nullable=True),
-    sa.Column('total_blue_collar', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['game_id'], ['game.id'], ),
-    sa.ForeignKeyConstraint(['player_id'], ['player_stats.id'], ),
-    sa.ForeignKeyConstraint(['season_id'], ['season.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    with op.batch_alter_table('opponent_blue_collar_stats', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_game_id'), ['game_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_player_id'), ['player_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_opponent_blue_collar_stats_season_id'), ['season_id'], unique=False)
 
     op.create_table('player_possession',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('possession_id', sa.Integer(), nullable=False),
     sa.Column('player_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['player_id'], ['player_stats.id'], ),
+    sa.ForeignKeyConstraint(['player_id'], ['roster.id'], ),
     sa.ForeignKeyConstraint(['possession_id'], ['possession.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -221,36 +285,44 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_player_possession_player_id'))
 
     op.drop_table('player_possession')
+    with op.batch_alter_table('team_stats', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_team_stats_season_id'))
+        batch_op.drop_index(batch_op.f('ix_team_stats_practice_id'))
+        batch_op.drop_index(batch_op.f('ix_team_stats_game_id'))
+
+    op.drop_table('team_stats')
+    op.drop_table('skill_entries')
+    with op.batch_alter_table('possession', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_possession_season_id'))
+        batch_op.drop_index(batch_op.f('ix_possession_practice_id'))
+        batch_op.drop_index(batch_op.f('ix_possession_game_id'))
+
+    op.drop_table('possession')
+    with op.batch_alter_table('player_stats', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_player_stats_season_id'))
+        batch_op.drop_index(batch_op.f('ix_player_stats_practice_id'))
+        batch_op.drop_index(batch_op.f('ix_player_stats_player_name'))
+        batch_op.drop_index(batch_op.f('ix_player_stats_game_id'))
+
+    op.drop_table('player_stats')
     with op.batch_alter_table('opponent_blue_collar_stats', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_opponent_blue_collar_stats_season_id'))
+        batch_op.drop_index(batch_op.f('ix_opponent_blue_collar_stats_practice_id'))
         batch_op.drop_index(batch_op.f('ix_opponent_blue_collar_stats_player_id'))
         batch_op.drop_index(batch_op.f('ix_opponent_blue_collar_stats_game_id'))
 
     op.drop_table('opponent_blue_collar_stats')
     with op.batch_alter_table('blue_collar_stats', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_blue_collar_stats_season_id'))
+        batch_op.drop_index(batch_op.f('ix_blue_collar_stats_practice_id'))
         batch_op.drop_index(batch_op.f('ix_blue_collar_stats_player_id'))
         batch_op.drop_index(batch_op.f('ix_blue_collar_stats_game_id'))
 
     op.drop_table('blue_collar_stats')
-    with op.batch_alter_table('team_stats', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_team_stats_season_id'))
-        batch_op.drop_index(batch_op.f('ix_team_stats_game_id'))
-
-    op.drop_table('team_stats')
-    with op.batch_alter_table('possession', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_possession_season_id'))
-        batch_op.drop_index(batch_op.f('ix_possession_game_id'))
-
-    op.drop_table('possession')
-    with op.batch_alter_table('player_stats', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_player_stats_season_id'))
-        batch_op.drop_index(batch_op.f('ix_player_stats_player_name'))
-        batch_op.drop_index(batch_op.f('ix_player_stats_game_id'))
-
-    op.drop_table('player_stats')
+    op.drop_table('uploaded_files')
+    op.drop_table('roster')
+    op.drop_table('practice')
     op.drop_table('game')
     op.drop_table('users')
-    op.drop_table('uploaded_files')
     op.drop_table('season')
     # ### end Alembic commands ###

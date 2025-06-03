@@ -1,0 +1,54 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<div id="skillEntryEdit" class="px-4 py-6 bg-white rounded shadow mb-6">
+  <h2 class="text-xl font-semibold mb-4">
+    Edit Skill Development for {{ player_name }} on {{ entry_date }}
+  </h2>
+
+  <form method="post" class="space-y-4">
+    <div>
+      <label class="block font-medium">Date</label>
+      <input type="date" name="date" required
+             value="{{ entry_date }}"
+             class="border rounded p-2 w-full" />
+    </div>
+
+    <table class="min-w-full table-auto border-collapse bg-white rounded shadow mb-4">
+      <thead>
+        <tr class="bg-gray-100">
+          <th class="px-2 py-1">Shot Class</th>
+          <th class="px-2 py-1">Sub-Category</th>
+          <th class="px-2 py-1">Makes</th>
+          <th class="px-2 py-1">Attempts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cls, subs in shot_map.items() %}
+          {% for sub in subs %}
+            {% set entry = entries|selectattr('shot_class','equalto', cls)|selectattr('subcategory','equalto', sub)|list|first %}
+            <tr>
+              <td class="px-2 py-1 font-semibold">{{ label_map[cls] }}</td>
+              <td class="px-2 py-1">{{ sub }}</td>
+              <td class="px-2 py-1">
+                <input type="number" min="0" name="{{ cls }}_{{ sub|replace(' ', '_') }}_makes"
+                       value="{{ entry.makes if entry else 0 }}"
+                       class="w-16 border rounded p-1" />
+              </td>
+              <td class="px-2 py-1">
+                <input type="number" min="0" name="{{ cls }}_{{ sub|replace(' ', '_') }}_attempts"
+                       value="{{ entry.attempts if entry else 0 }}"
+                       class="w-16 border rounded p-1" />
+              </td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="flex space-x-4">
+      <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Save Changes</button>
+      <a href="{{ url_for('admin.player_detail', player_name=player_name) }}#skillDev" class="text-gray-600 self-center">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

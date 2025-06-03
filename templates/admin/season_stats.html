@@ -1,0 +1,481 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1 class="text-2xl font-bold mb-4">{{ season.season_name }} Season Totals</h1>
+
+  <!-- Tab Buttons -->
+  <div class="flex space-x-4 mb-6">
+    <button id="offenseBtn" class="px-4 py-2 rounded bg-[#9E1B32] text-white">Offense</button>
+    <button id="defenseBtn" class="px-4 py-2 rounded bg-gray-200 text-gray-700">Defense</button>
+  </div>
+
+  <!-- OFFENSE TAB -->
+  <div id="offenseContent">
+    <!-- Shooting Splits Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+      {% set total_shots = team_stats.total_atr_attempts + team_stats.total_fg2_attempts + team_stats.total_fg3_attempts %}
+      {% for label, makes, attempts, extra in [
+            ('ATR', team_stats.total_atr_makes, team_stats.total_atr_attempts, total_shots),
+            ('2FG', team_stats.total_fg2_makes, team_stats.total_fg2_attempts, total_shots),
+            ('3FG', team_stats.total_fg3_makes, team_stats.total_fg3_attempts, total_shots),
+            ('FT',  team_stats.total_ftm,      team_stats.total_fta,      None)
+        ] %}
+      <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+        <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+        <div class="text-3xl font-extrabold mt-1">
+          {% if attempts > 0 %}{{ (makes/attempts*100)|round(1) }}%{% else %}0.0%{% endif %}
+        </div>
+        {% if extra is not none %}
+        <div class="text-sm text-gray-400 mt-1">
+          {% if extra > 0 %}{{ (attempts/extra*100)|round(1) }}%{% else %}0.0%{% endif %}
+        </div>
+        {% endif %}
+        <div class="text-xs text-gray-600 mt-2">{{ makes }}–{{ attempts }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Efficiency & Secondary Metrics -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+      {% for label, value in [
+          ('Assist %',     team_stats.assist_pct),
+          ('TO %',         team_stats.turnover_pct),
+          ('FT Rate',      team_stats.ft_rate),
+          ('Good Shot %',  team_stats.good_shot_pct)
+      ] %}
+      <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+        <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+        <div class="text-3xl font-extrabold mt-1">{{ value }}%</div>
+      </div>
+      {% endfor %}
+
+      <!-- PPP -->
+      <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+        <div class="text-xs font-semibold uppercase text-gray-500">PPP</div>
+        <div class="text-3xl font-extrabold mt-1">
+          {% if team_stats.total_possessions|int > 0 %}
+            {{ (team_stats.total_points|int / team_stats.total_possessions|int)|round(2) }}
+          {% else %}0.00{% endif %}
+        </div>
+        <div class="text-xs text-gray-600 mt-2">{{ team_stats.total_possessions }} poss</div>
+      </div>
+    </div>
+
+    <!-- Playmaking & Efficiency Table -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+      <h2 class="text-lg font-semibold mb-4">Playmaking &amp; Efficiency</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse">
+          <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase">Stat</th>
+              <th class="px-6 py-3 text-center text-xs font-medium uppercase">Alabama</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for stat, attr in [
+              ('Assists','total_assists'),
+              ('Turnovers','total_turnovers'),
+              ('Second Assists','total_second_assists'),
+              ('Potential Assists','total_pot_assists'),
+              ('Possessions','total_possessions')
+            ] %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-6 py-4">{{ stat }}</td>
+              <td class="px-6 py-4 text-center">{{ team_stats[attr] or 0 }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-6 py-4">Points Per Possession (PPP)</td>
+              <td class="px-6 py-4 text-center">
+                {% if team_stats.total_possessions|int > 0 %}
+                  {{ (team_stats.total_points|int / team_stats.total_possessions|int)|round(2) }}
+                {% else %}0.00{% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Blue Collar Stats -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+      <h2 class="text-lg font-semibold mb-4">Blue Collar Stats</h2>
+      <p class="mb-2"><strong>Total:</strong> {{ team_stats.total_blue_collar or 0 }}</p>
+      <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium uppercase">Category</th>
+              <th class="px-4 py-2 text-center text-xs font-medium uppercase">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for label, value in [
+              ('Def Reb', blue_collar_stats.def_reb),
+              ('Off Reb', blue_collar_stats.off_reb),
+              ('Misc', blue_collar_stats.misc),
+              ('Deflection', blue_collar_stats.deflection),
+              ('Steal', blue_collar_stats.steal),
+              ('Block', blue_collar_stats.block),
+              ('Floor Dive', blue_collar_stats.floor_dive),
+              ('Charge Taken', blue_collar_stats.charge_taken),
+              ('Reb Tip', blue_collar_stats.reb_tip)
+            ] %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-4 py-2">{{ label }}</td>
+              <td class="px-4 py-2 text-center">{{ value or 0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Possession Breakdown -->
+    <div class="mb-10">
+      <h2 class="text-2xl font-semibold mb-4">Possession Breakdown</h2>
+      <h3 class="text-xl font-semibold mb-2">Offense</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full table-auto border-collapse mb-4">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr>
+              <th class="px-4 py-2 text-left">Type</th>
+              <th class="px-4 py-2 text-center">PTS</th>
+              <th class="px-4 py-2 text-center">Poss</th>
+              <th class="px-4 py-2 text-center">PPC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for token, stats in offensive_breakdown.items() %}
+            <tr class="odd:bg-white even:bg-gray-100 {% if token=='OREB Putback' %}border-t-2 border-[#9E1B32]{% endif %}">
+              <td class="px-4 py-2 font-bold">{{ token }}</td>
+              <td class="px-4 py-2 text-center">{{ stats.points }}</td>
+              <td class="px-4 py-2 text-center">{{ stats.count }}</td>
+              <td class="px-4 py-2 text-center font-bold">{{ '%.2f' % (stats.points/stats.count if stats.count else 0) }}</td>
+            </tr>
+            {% endfor %}
+            <tr><td colspan="4"><div class="h-[2px] bg-[#9E1B32]"></div></td></tr>
+            {% for label in ['1st Half','2nd Half','Overtime'] %}
+              {% set s = periodic_offense[label] %}
+              <tr class="font-bold odd:bg-white even:bg-gray-100">
+                <td class="px-4 py-2">{{ label }}</td>
+                <td class="px-4 py-2 text-center">{{ s.points }}</td>
+                <td class="px-4 py-2 text-center">{{ s.count }}</td>
+                <td class="px-4 py-2 text-center">{{ '%.2f' % (s.points/s.count if s.count else 0) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Lineup Efficiency (Offense) -->
+    <div class="mt-8 mb-10">
+      <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
+      <div class="flex space-x-2 mb-6">
+        {% for size in best_offense.keys()|sort %}
+        <button type="button" class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">{{ size }}-Man</button>
+        {% endfor %}
+      </div>
+      {% for size in best_offense.keys()|sort %}
+      <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
+        <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Offense</h3>
+        {% if not best_offense[size] and not worst_offense[size] %}
+        <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+        {% else %}
+        <h4 class="font-semibold mb-2">Best Offense</h4>
+        <table class="w-full table-auto border-collapse mb-4">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP</th></tr>
+          </thead>
+          <tbody>
+            {% for combo, ppp in best_offense[size] %}
+            <tr class="odd:bg-white even:bg-gray-100"><td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td><td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <h4 class="font-semibold mb-2">Worst Offense</h4>
+        <table class="w-full table-auto border-collapse">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP</th></tr>
+          </thead>
+          <tbody>
+            {% for combo, ppp in worst_offense[size] %}
+            <tr class="odd:bg-white even:bg-gray-100"><td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td><td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+
+  <!-- DEFENSE TAB -->
+  <div id="defenseContent" class="hidden">
+    <!-- Opponent Shooting Splits Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+      {% set opp_total_shots = opponent_stats.total_atr_attempts + opponent_stats.total_fg2_attempts + opponent_stats.total_fg3_attempts %}
+      {% for label, makes, attempts, extra in [
+            ('ATR', opponent_stats.total_atr_makes, opponent_stats.total_atr_attempts, opp_total_shots),
+            ('2FG', opponent_stats.total_fg2_makes, opponent_stats.total_fg2_attempts, opp_total_shots),
+            ('3FG', opponent_stats.total_fg3_makes, opponent_stats.total_fg3_attempts, opp_total_shots),
+            ('FT',  opponent_stats.total_ftm,       opponent_stats.total_fta,       None)
+        ] %}
+      <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+        <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+        <div class="text-3xl font-extrabold mt-1">
+          {% if attempts > 0 %}{{ (makes/attempts*100)|round(1) }}%{% else %}0.0%{% endif %}
+        </div>
+        {% if extra is not none %}
+        <div class="text-sm text-gray-400 mt-1">
+          {% if extra > 0 %}{{ (attempts/extra*100)|round(1) }}%{% else %}0.0%{% endif %}
+        </div>
+        {% endif %}
+        <div class="text-xs text-gray-600 mt-2">{{ makes }}–{{ attempts }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Defensive Efficiency Metrics -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+      {% for label, value in [
+          ('Assist % Allowed',    opponent_stats.assist_pct),
+          ('TO % Allowed',        opponent_stats.turnover_pct),
+          ('FT Rate Allowed',     opponent_stats.ft_rate),
+          ('Good Shot % Allowed', opponent_stats.good_shot_pct)
+      ] %}
+      <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+        <div class="text-xs font-semibold uppercase text-gray-500">{{ label }}</div>
+        <div class="text-3xl font-extrabold mt-1">{{ value }}%</div>
+      </div>
+      {% endfor %}
+
+      <!-- PPP Allowed -->
+      <div class="bg-white dark:bg-gray-800 p-5 shadow-lg rounded-lg border-l-4 border-[#9E1B32]">
+        <div class="text-xs font-semibold uppercase text-gray-500">PPP Allowed</div>
+        <div class="text-3xl font-extrabold mt-1">
+          {% if opponent_stats.total_possessions|int > 0 %}
+            {{ (opponent_stats.total_points|int / opponent_stats.total_possessions|int)|round(2) }}
+          {% else %}0.00{% endif %}
+        </div>
+        <div class="text-xs text-gray-600 mt-2">{{ opponent_stats.total_possessions }} poss</div>
+      </div>
+    </div>
+
+    <!-- Playmaking & Efficiency Table -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+      <h2 class="text-lg font-semibold mb-4">Playmaking &amp; Efficiency</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse">
+          <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase">Stat</th>
+              <th class="px-6 py-3 text-center text-xs font-medium uppercase">Opponent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for stat, attr in [
+              ('Assists','total_assists'),
+              ('Turnovers','total_turnovers'),
+              ('Second Assists','total_second_assists'),
+              ('Potential Assists','total_pot_assists'),
+              ('Possessions','total_possessions')
+            ] %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-6 py-4">{{ stat }}</td>
+              <td class="px-6 py-4 text-center">{{ opponent_stats[attr] or 0 }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-6 py-4">Points Per Possession (PPP)</td>
+              <td class="px-6 py-4 text-center">
+                {% if opponent_stats.total_possessions|int > 0 %}
+                  {{ (opponent_stats.total_points|int / opponent_stats.total_possessions|int)|round(2) }}
+                {% else %}0.00{% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Opponent Blue Collar Stats -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+      <h2 class="text-lg font-semibold mb-4">Blue Collar Stats</h2>
+      <p class="mb-2"><strong>Total:</strong> {{ opponent_stats.total_blue_collar or 0 }}</p>
+      <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium uppercase">Category</th>
+              <th class="px-4 py-2 text-center text-xs font-medium uppercase">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for label, value in [
+              ('Def Reb',       opponent_blue_coll_stats.def_reb),
+              ('Off Reb',       opponent_blue_coll_stats.off_reb),
+              ('Misc',          opponent_blue_coll_stats.misc),
+              ('Deflection',    opponent_blue_coll_stats.deflection),
+              ('Steal',         opponent_blue_coll_stats.steal),
+              ('Block',         opponent_blue_coll_stats.block),
+              ('Floor Dive',    opponent_blue_coll_stats.floor_dive),
+              ('Charge Taken',  opponent_blue_coll_stats.charge_taken),
+              ('Reb Tip',       opponent_blue_coll_stats.reb_tip)
+            ] %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-4 py-2">{{ label }}</td>
+              <td class="px-4 py-2 text-center">{{ value or 0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Defense Possession Breakdown -->
+    <div class="mb-10">
+      <h2 class="text-2xl font-semibold mb-4">Possession Breakdown</h2>
+      <h3 class="text-xl font-semibold mb-2">Defense</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full table-auto border-collapse mb-4">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr>
+              <th class="px-4 py-2 text-left">Type</th>
+              <th class="px-4 py-2 text-center">PTS</th>
+              <th class="px-4 py-2 text-center">Poss</th>
+              <th class="px-4 py-2 text-center">PPC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for token, stats in defensive_breakdown.items() %}
+            <tr class="odd:bg-white even:bg-gray-100 {% if token=='OREB Putback' %}border-t-2 border-[#9E1B32]{% endif %}">
+              <td class="px-4 py-2 font-bold">{{ token }}</td>
+              <td class="px-4 py-2 text-center">{{ stats.points }}</td>
+              <td class="px-4 py-2 text-center">{{ stats.count }}</td>
+              <td class="px-4 py-2 text-center">{{ '%.2f' % (stats.points/stats.count if stats.count else 0) }}</td>
+            </tr>
+            {% endfor %}
+            <tr><td colspan="4"><div class="h-[2px] bg-[#9E1B32]"></div></td></tr>
+            {% for label in ['1st Half','2nd Half','Overtime'] %}
+              {% set s = periodic_defense[label] %}
+              <tr class="font-bold odd:bg-white even:bg-gray-100">
+                <td class="px-4 py-2">{{ label }}</td>
+                <td class="px-4 py-2 text-center">{{ s.points }}</td>
+                <td class="px-4 py-2 text-center">{{ s.count }}</td>
+                <td class="px-4 py-2 text-center">{{ '%.2f' % (s.points/s.count if s.count else 0) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Lineup Efficiency (Defense) -->
+    <div class="mt-8 mb-10">
+      <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
+      <div class="flex space-x-2 mb-4">
+        {% for size in best_defense.keys()|sort %}
+        <button type="button" class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+          {{ size }}-Man
+        </button>
+        {% endfor %}
+      </div>
+      {% for size in best_defense.keys()|sort %}
+      <div id="def-lineup-{{ size }}" class="def-lineup-tab hidden">
+        <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Defense</h3>
+        {% if not best_defense[size] and not worst_defense[size] %}
+        <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+        {% else %}
+        <h4 class="font-semibold mb-2">Best Defense</h4>
+        <table class="w-full table-auto border-collapse mb-4">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP Allowed</th></tr>
+          </thead>
+          <tbody>
+            {% for combo, ppp in best_defense[size] %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+              <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <h4 class="font-semibold mb-2">Worst Defense</h4>
+        <table class="w-full table-auto border-collapse">
+          <thead class="bg-white border-b-2 border-[#9E1B32]">
+            <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP Allowed</th></tr>
+          </thead>
+          <tbody>
+            {% for combo, ppp in worst_defense[size] %}
+            <tr class="odd:bg-white even:bg-gray-100">
+              <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+              <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const offBtn = document.getElementById('offenseBtn');
+      const defBtn = document.getElementById('defenseBtn');
+      const offContent = document.getElementById('offenseContent');
+      const defContent = document.getElementById('defenseContent');
+
+      function showOff() {
+        offContent.classList.remove('hidden');
+        defContent.classList.add('hidden');
+        offBtn.classList.replace('bg-gray-200','bg-[#9E1B32]');
+        offBtn.classList.replace('text-gray-700','text-white');
+        defBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
+        defBtn.classList.replace('text-white','text-gray-700');
+      }
+      function showDef() {
+        defContent.classList.remove('hidden');
+        offContent.classList.add('hidden');
+        defBtn.classList.replace('bg-gray-200','bg-[#9E1B32]');
+        defBtn.classList.replace('text-gray-700','text-white');
+        offBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
+        offBtn.classList.replace('text-white','text-gray-700');
+      }
+
+      offBtn.addEventListener('click', showOff);
+      defBtn.addEventListener('click', showDef);
+      showOff();
+
+      // Offense lineup tabs
+      document.querySelectorAll('.off-lineup-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.off-lineup-btn').forEach(b => b.classList.replace('bg-[#9E1B32]','bg-gray-100'));
+          document.querySelectorAll('.off-lineup-tab').forEach(t => t.classList.add('hidden'));
+          btn.classList.replace('bg-gray-100','bg-[#9E1B32]');
+          btn.classList.add('text-white');
+          document.getElementById(`off-lineup-${btn.dataset.size}`).classList.remove('hidden');
+        });
+      });
+      if (document.querySelector('.off-lineup-btn')) document.querySelector('.off-lineup-btn').click();
+
+      // Defense lineup tabs
+      document.querySelectorAll('.def-lineup-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.def-lineup-btn').forEach(b => b.classList.replace('bg-[#9E1B32]','bg-gray-100'));
+          document.querySelectorAll('.def-lineup-tab').forEach(t => t.classList.add('hidden'));
+          btn.classList.replace('bg-gray-100','bg-[#9E1B32]');
+          btn.classList.add('text-white');
+          document.getElementById(`def-lineup-${btn.dataset.size}`).classList.remove('hidden');
+        });
+      });
+      if (document.querySelector('.def-lineup-btn')) document.querySelector('.def-lineup-btn').click();
+    });
+  </script>
+
+{% endblock %}

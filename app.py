@@ -45,70 +45,46 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
+    
 
-    # --- Jinja2 Filters ---
+
+    # --- Jinja2 Filters for coloring percentages ---
+    @app.template_filter()
     def grade_atr2fg_pct(pct, attempts):
+        """
+        Return an inline background-color style based on ATR/2FG percentage.
+        If there are no attempts, returns an empty string.
+        """
         if not attempts:
             return ""
-        try:
-            v = float(pct)
-        except:
-            v = 0.0
-
-        if v == 0:
-            base = (100, 26, 36)
+        # pick a base RGB tuple (0–100 scale) by threshold
+        if pct >= 70:
+            base = (0, 128, 0)    # green
+        elif pct >= 50:
+            base = (255,165, 0)   # orange
         else:
-            bins = [
-                (35,  (100, 26, 36)),
-                (40,  (100, 44, 54)),
-                (45,  (100, 62, 72)),
-                (50,  (100,100, 85)),
-                (55,  (100,100, 70)),
-                (60,  (100,100, 50)),
-                (65,  ( 80,100, 90)),
-                (70,  ( 71,100, 81)),
-                (75,  ( 62,100, 72)),
-                (100, (  0,100,  0)),
-            ]
-            for thresh, rgb in bins:
-                if v <= thresh:
-                    base = rgb
-                    break
-
+            base = (255,  0,  0)  # red
+        # convert each channel 0–100 → 0–255
         r, g, b = (min(round(c * 2.55), 255) for c in base)
         return f"background-color: rgb({r},{g},{b});"
 
+    @app.template_filter()
     def grade_3fg_pct(pct, attempts):
+        """
+        Return an inline background-color style based on 3FG percentage.
+        If there are no attempts, returns an empty string.
+        """
         if not attempts:
             return ""
-        try:
-            v = float(pct)
-        except:
-            v = 0.0
-
-        if v == 0:
-            base = (100,26,36)
+        if pct >= 40:
+            base = (0, 128, 0)
+        elif pct >= 30:
+            base = (255,165, 0)
         else:
-            bins = [
-                (18,  (100, 26, 36)),
-                (21,  (100, 44, 54)),
-                (24,  (100, 62, 72)),
-                (27,  (100,100, 85)),
-                (30,  (100,100, 70)),
-                (33,  (100,100, 50)),
-                (36,  ( 80,100, 90)),
-                (39,  ( 71,100, 81)),
-                (42,  ( 62,100, 72)),
-                (45,  ( 53,100, 63)),
-                (100, (  0,100,  0)),
-            ]
-            for thresh, rgb in bins:
-                if v <= thresh:
-                    base = rgb
-                    break
-
+            base = (255,  0,  0)
         r, g, b = (min(round(c * 2.55), 255) for c in base)
         return f"background-color: rgb({r},{g},{b});"
+
 
     app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
     app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct

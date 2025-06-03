@@ -28,6 +28,13 @@
           Game Reports
         </a>
 
+        <!-- Practice Reports -->
+        <a href="{{ url_for('admin.practice_reports') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                  {{ 'bg-white text-[#9E1B32]' if active_page=='practice_reports' else '' }}">
+          Practice Reports
+        </a>
+
         <!-- Players -->
         <a href="{{ url_for('admin.players_list') }}"
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
@@ -50,11 +57,11 @@
             Files
           </a>
 
-          <!-- Edit Roster -->
-          <a href="{{ url_for('admin.edit_roster', season_id=1) }}"
+          <!-- Roster -->
+          <a href="{{ url_for('admin.roster') }}"
              class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                    {{ 'bg-white text-[#9E1B32]' if active_page=='edit_roster' else '' }}">
-            Edit Roster
+                    {{ 'bg-white text-[#9E1B32]' if active_page=='roster' else '' }}">
+            Roster
           </a>
 
           <!-- Users -->
@@ -80,10 +87,14 @@
     </nav>
   </aside>
 
-  <!-- Main content -->
-  <main class="flex-1 p-6 overflow-y-auto bg-white text-black">
-    {% block content %}{% endblock %}
-  </main>
+<!-- Main content -->
+<main class="flex-1 p-6 overflow-y-auto bg-white text-black">
+  {# ── Page-specific controls (e.g. season dropdown) ── #}
+  {% block page_controls %}{% endblock %}
+
+  {# ── Main page content ── #}
+  {% block content %}{% endblock %}
+</main>
 
 </body>
 </html>

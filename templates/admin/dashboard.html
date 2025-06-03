@@ -1,28 +1,74 @@
-<!-- admin/dashboard.html -->
-{% extends "base.html" %}
+{% extends "admin/base.html" %}
+
+{% block page_controls %}
+<form method="get" class="mb-4 flex items-center gap-2">
+  <label class="font-semibold mr-2">Season:</label>
+  <select name="season_id" onchange="this.form.submit()" class="border p-2 rounded">
+    {% for s in all_seasons %}
+      <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>
+        {{ s.season_name }}
+      </option>
+    {% endfor %}
+  </select>
+</form>
+{% endblock %}
 
 {% block content %}
 <h1 class="text-3xl font-bold mb-6">Admin Dashboard</h1>
 
 <!-- Upload Form -->
 <form action="{{ url_for('admin.upload_file') }}" method="post" enctype="multipart/form-data" class="mb-6 space-y-4">
+
+  <!-- 1) File input -->
   <div>
     <label for="file" class="block font-semibold mb-1">Upload CSV:</label>
-    <input type="file" name="file" multiple id="file" class="border rounded px-4 py-2 w-full" />
+    <input
+      type="file"
+      name="file"
+      multiple
+      id="file"
+      class="border rounded px-4 py-2 w-full"
+    />
   </div>
 
+  <!-- 2) ← Insert your new Date picker here ↓ -->
+  <div>
+    <label for="file_date" class="block font-semibold mb-1">Date:</label>
+    <input
+      type="date"
+      name="file_date"
+      id="file_date"
+      class="border rounded px-4 py-2 w-full"
+      value="{{ request.form.get('file_date', '') }}"
+      required
+    />
+  </div>
+
+
+
+  <!-- 3) Category select -->
   <div>
     <label for="category" class="block font-semibold mb-1">Category:</label>
     <select name="category" id="category" class="border rounded px-4 py-2 w-full">
       <option value="Game">Game</option>
-      <option value="Practice">Practice</option>
+      <option value="Summer Workouts">Summer Workouts</option>
+      <option value="Fall Workouts">Fall Workouts</option>
+      <option value="Official Practices">Official Practices</option>
     </select>
   </div>
 
-  <button type="submit" class="bg-[#9E1B32] text-white px-6 py-2 rounded hover:bg-[#7e1629]">
+  <!-- 4) Hidden season_id -->
+  <input type="hidden" name="season_id" value="{{ selected_season }}" />
+
+  <!-- 5) Submit button -->
+  <button
+    type="submit"
+    class="bg-[#9E1B32] text-white px-6 py-2 rounded hover:bg-[#7e1629]"
+  >
     Upload
   </button>
 </form>
+
 
 <!-- Display List of Uploaded Files -->
 <div class="overflow-x-auto">
@@ -30,6 +76,7 @@
     <thead class="bg-[#9E1B32] text-white">
       <tr>
         <th class="px-4 py-2 text-left">Filename</th>
+        <th class="px-4 py-2 text-left">Category</th>
         <th class="px-4 py-2 text-left">Status</th>
         <th class="px-4 py-2 text-left">Last Parsed</th>
         <th class="px-4 py-2 text-left">Actions</th>
@@ -39,6 +86,7 @@
       {% for f in uploaded_files %}
       <tr class="bg-white">
         <td class="px-4 py-2">{{ f.filename }}</td>
+        <td class="px-4 py-2">{{ f.category }}</td>
         <td class="px-4 py-2">{{ f.parse_status }}</td>
         <td class="px-4 py-2">
           {% if f.last_parsed %}
@@ -48,12 +96,54 @@
           {% endif %}
         </td>
         <td class="px-4 py-2 space-x-2">
-          <form action="{{ url_for('admin.parse_file', file_id=f.id) }}" method="post" class="inline">
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Parse</button>
+          <form
+          action="{{ url_for('admin.parse_file', file_id=f.id) }}"
+          method="post"
+          class="inline"
+        >
+          {% if f.category in ['Summer Workouts','Fall Workouts','Official Practices'] %}
+            <button
+              type="submit"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+            >
+              {% if f.parse_status == 'Parsed Successfully' %}
+                View Practice
+              {% else %}
+                Parse Practice
+              {% endif %}
+            </button>
+          {% else %}
+            <button
+              type="submit"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+            >
+              {% if f.parse_status == 'Parsed Successfully' %}
+                View Game
+              {% else %}
+                Parse Game
+              {% endif %}
+            </button>
+          {% endif %}
           </form>
-          <a href="{{ url_for('admin.view_logs', file_id=f.id) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm">Logs</a>
-          <form action="{{ url_for('admin.delete_file', file_id=f.id) }}" method="post" class="inline">
-            <button type="submit" onclick="return confirm('Delete this file?')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Delete</button>
+          </form>
+          <a
+            href="{{ url_for('admin.view_logs', file_id=f.id) }}"
+            class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm"
+          >
+            Logs
+          </a>
+          <form
+            action="{{ url_for('admin.delete_file', file_id=f.id) }}"
+            method="post"
+            class="inline"
+          >
+            <button
+              type="submit"
+              onclick="return confirm('Delete this file?')"
+              class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+            >
+              Delete
+            </button>
           </form>
         </td>
       </tr>
@@ -67,7 +157,11 @@
 <form action="{{ url_for('admin.reset_db') }}" method="post" class="space-y-2">
   <label class="block font-semibold">Type RESET to confirm:</label>
   <input type="text" name="confirmation" class="border rounded px-4 py-2 w-full" />
-  <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">Reset Database</button>
+  <button
+    type="submit"
+    class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
+  >
+    Reset Database
+  </button>
 </form>
 {% endblock %}
-

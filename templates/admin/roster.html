@@ -53,4 +53,20 @@
   </button>
 </form>
 
+<!-- New Season Form -->
+<form method="post" action="{{ url_for('admin.create_season') }}" class="mb-4 flex items-center gap-2">
+  <input 
+    type="text" 
+    name="season_name" 
+    placeholder="New Season (e.g. 2025-26)" 
+    required 
+    class="border p-2 rounded flex-grow"
+  >
+  <button 
+    type="submit" 
+    class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]"
+  >Add Season</button>
+</form>
+
+
 {% endblock %}

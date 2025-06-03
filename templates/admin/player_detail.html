@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'admin/base.html' %}
 {% block content %}
 {# a default “empty” detail so missing categories don’t blow up #}
 {% set empty_group = namespace(
@@ -7,10 +7,27 @@
   halfcourt =namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0)
 ) %}
 
+{% set agg  = (aggregated_game      if mode=='game' else aggregated_practice) %}
+{% set blue = (player_blue_breakdown_game if mode=='game' else player_blue_breakdown_practice) %}
+
+
 <div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
   <h1 class="text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
   
 <div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+
+  <!-- Game/Practice Buttons -->
+  <div class="flex gap-4 mb-4">
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game') }}"
+       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-100 text-gray-800' }}">
+      Game
+    </a>
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice') }}"
+       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-100 text-gray-800' }}">
+      Practice
+    </a>
+  </div>
+  
   <!-- Tab Buttons -->
   <div class="flex space-x-2 mb-4">
     <button
@@ -34,143 +51,169 @@
     >
       Shot Type
     </button>
+    <button
+    id="btnSkillDevelopment"
+    onclick="showTab('skillDevelopment')"
+    class="px-4 py-2 border rounded"
+  >
+    Skill Development
+  </button>
+
   </div>
 
-  <!-- 1) Season Totals -->
-  <div id="seasonTotals" class="tab-content block">
-    <!-- Row 1: Advanced Shooting Metrics -->
-    <div class="grid grid-cols-2 gap-4 mb-6 justify-items-center">
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
-        <div class="text-sm font-medium text-gray-500 uppercase">PTS/SHOT</div>
-        <div class="text-3xl font-bold mt-2">{{ aggregated.points_per_shot }}</div>
-      </div>
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
-        <div class="text-sm font-medium text-gray-500 uppercase">EFG%</div>
-        <div class="text-3xl font-bold mt-2">{{ aggregated.efg_pct }}</div>
-      </div>
+<!-- 1) Season Totals -->
+<div id="seasonTotals" class="tab-content block">
+  {# pick the right season‐totals & blue‐collar based on mode #}
+  {% if mode == 'game' %}
+    {% set agg  = aggregated_game %}
+    {% set blue = player_blue_breakdown_game %}
+  {% else %}
+    {% set agg  = aggregated_practice %}
+    {% set blue = player_blue_breakdown_practice %}
+  {% endif %}
+
+  <!-- Row 1: Advanced Shooting Metrics -->
+  <div class="grid grid-cols-2 gap-4 mb-6 justify-items-center">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+      <div class="text-sm font-medium text-gray-500 uppercase">PTS/SHOT</div>
+      <div class="text-3xl font-bold mt-2">{{ agg.points_per_shot }}</div>
     </div>
-
-    <!-- Row 2: Shooting Breakdown -->
-    <div class="grid grid-cols-4 gap-4 mb-6">
-      <!-- ATR -->
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
-        <div class="text-sm font-medium text-gray-500 uppercase">ATR</div>
-        <div class="text-3xl font-bold my-2">
-          {% if aggregated.atr_attempts > 0 %}
-            {{ (aggregated.atr_makes/aggregated.atr_attempts*100)|round(1) }}%
-          {% else %}0%{% endif %}
-        </div>
-        <div class="text-xs text-gray-500">{{ aggregated.atr_makes }}/{{ aggregated.atr_attempts }}</div>
-      </div>
-      <!-- 2FG -->
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
-        <div class="text-sm font-medium text-gray-500 uppercase">2FG</div>
-        <div class="text-3xl font-bold my-2">
-          {% if aggregated.fg2_attempts > 0 %}
-            {{ (aggregated.fg2_makes/aggregated.fg2_attempts*100)|round(1) }}%
-          {% else %}0%{% endif %}
-        </div>
-        <div class="text-xs text-gray-500">{{ aggregated.fg2_makes }}/{{ aggregated.fg2_attempts }}</div>
-      </div>
-      <!-- 3FG -->
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
-        <div class="text-sm font-medium text-gray-500 uppercase">3FG</div>
-        <div class="text-3xl font-bold my-2">
-          {% if aggregated.fg3_attempts > 0 %}
-            {{ (aggregated.fg3_makes/aggregated.fg3_attempts*100)|round(1) }}%
-          {% else %}0%{% endif %}
-        </div>
-        <div class="text-xs text-gray-500">{{ aggregated.fg3_makes }}/{{ aggregated.fg3_attempts }}</div>
-      </div>
-      <!-- FT -->
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
-        <div class="text-sm font-medium text-gray-500 uppercase">FT</div>
-        <div class="text-3xl font-bold my-2">
-          {% if aggregated.fta > 0 %}
-            {{ (aggregated.ftm/aggregated.fta*100)|round(1) }}%
-          {% else %}0%{% endif %}
-        </div>
-        <div class="text-xs text-gray-500">{{ aggregated.ftm }}/{{ aggregated.fta }}</div>
-      </div>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+      <div class="text-sm font-medium text-gray-500 uppercase">EFG%</div>
+      <div class="text-3xl font-bold mt-2">{{ agg.efg_pct }}</div>
     </div>
+  </div>
 
-    <!-- Row 3: Totals -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-      {% for label, value in [
-        ('Points', aggregated.points),
-        ('Assists', aggregated.assists),
-        ('Pot. Assists', aggregated.pot_assists),
-        ('2nd Assists', aggregated.second_assists),
-        ('Turnovers', aggregated.turnovers)
-      ] %}
-        <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
-          <div class="text-sm font-medium text-gray-500 uppercase">{{ label }}</div>
-          <div class="text-2xl font-bold mt-2">{{ value }}</div>
-        </div>
-      {% endfor %}
-    </div>
-
-    <!-- Row 4: Ratios -->
-    <div class="grid grid-cols-2 gap-4 mb-6 justify-items-center">
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
-        <div class="text-sm font-medium text-gray-500 uppercase">AST/TO Ratio</div>
-        <div class="text-2xl font-bold mt-2">{{ aggregated.assist_turnover_ratio }}</div>
+   <!-- Row 2: Shooting Breakdown -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <!-- ATR -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+      <div class="text-sm font-medium text-gray-500 uppercase">ATR</div>
+      <div class="text-3xl font-bold my-2">
+        {% if agg.atr_attempts > 0 %}
+          {{ (agg.atr_makes/agg.atr_attempts*100)|round(1) }}%
+        {% else %}0%{% endif %}
       </div>
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
-        <div class="text-sm font-medium text-gray-500 uppercase">Adj AST/TO</div>
-        <div class="text-2xl font-bold mt-2">{{ aggregated.adj_assist_turnover_ratio }}</div>
-      </div>
+      <div class="text-xs text-gray-500">{{ agg.atr_makes }}/{{ agg.atr_attempts }}</div>
     </div>
+    <!-- 2FG -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+      <div class="text-sm font-medium text-gray-500 uppercase">2FG</div>
+      <div class="text-3xl font-bold my-2">
+        {% if agg.fg2_attempts > 0 %}
+          {{ (agg.fg2_makes/agg.fg2_attempts*100)|round(1) }}%
+        {% else %}0%{% endif %}
+      </div>
+      <div class="text-xs text-gray-500">{{ agg.fg2_makes }}/{{ agg.fg2_attempts }}</div>
+    </div>
+    <!-- 3FG -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+      <div class="text-sm font-medium text-gray-500 uppercase">3FG</div>
+      <div class="text-3xl font-bold my-2">
+        {% if agg.fg3_attempts > 0 %}
+          {{ (agg.fg3_makes/agg.fg3_attempts*100)|round(1) }}%
+        {% else %}0%{% endif %}
+      </div>
+      <div class="text-xs text-gray-500">{{ agg.fg3_makes }}/{{ agg.fg3_attempts }}</div>
+    </div>
+    <!-- FT -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+      <div class="text-sm font-medium text-gray-500 uppercase">FT</div>
+      <div class="text-3xl font-bold my-2">
+        {% if agg.fta > 0 %}
+          {{ (agg.ftm/agg.fta*100)|round(1) }}%
+        {% else %}0%{% endif %}
+      </div>
+      <div class="text-xs text-gray-500">{{ agg.ftm }}/{{ agg.fta }}</div>
+    </div>
+  </div>
 
-<!-- Blue Collar Breakdown -->
-<div class="mt-8">
-  <h2 class="text-xl font-semibold mb-4">Blue Collar Breakdown</h2>
-  <div class="overflow-x-auto">
-    <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
-      <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
-        <tr>
-          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Category</th>
-          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for label, value in [
-          ('Def Reb',      player_blue_breakdown.def_reb),
-          ('Off Reb',      player_blue_breakdown.off_reb),
-          ('Misc',         player_blue_breakdown.misc),
-          ('Deflection',   player_blue_breakdown.deflection),
-          ('Steal',        player_blue_breakdown.steal),
-          ('Block',        player_blue_breakdown.block),
-          ('Floor Dive',   player_blue_breakdown.floor_dive),
-          ('Charge Taken', player_blue_breakdown.charge_taken)
-        ] %}
-        <tr class="odd:bg-white even:bg-gray-100">
-          <td class="px-4 py-2">{{ label }}</td>
-          <td class="px-4 py-2">{{ value }}</td>
-        </tr>
-        {% endfor %}
 
-        {# crimson divider before Season Totals #}
-        <tr class="h-0">
-          <td colspan="2" class="p-0">
-            <div class="h-[2px] bg-[#9E1B32]"></div>
-          </td>
-        </tr>
+  <!-- Row 3: Totals -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    {% for label, value in [
+      ('Points', agg.points),
+      ('Assists', agg.assists),
+      ('Pot. Assists', agg.pot_assists),
+      ('2nd Assists', agg.second_assists),
+      ('Turnovers', agg.turnovers)
+    ] %}
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+        <div class="text-sm font-medium text-gray-500 uppercase">{{ label }}</div>
+        <div class="text-2xl font-bold mt-2">{{ value }}</div>
+      </div>
+    {% endfor %}
+  </div>
 
-        <tr class="odd:bg-white even:bg-gray-100 font-bold">
-          <td class="px-4 py-2">Season Totals</td>
-          <td class="px-4 py-2">{{ player_blue_breakdown.total_blue_collar }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- Row 4: Ratios -->
+  <div class="grid grid-cols-2 gap-4 mb-6 justify-items-center">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+      <div class="text-sm font-medium text-gray-500 uppercase">AST/TO Ratio</div>
+      <div class="text-2xl font-bold mt-2">{{ agg.assist_turnover_ratio }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-80">
+      <div class="text-sm font-medium text-gray-500 uppercase">Adj AST/TO</div>
+      <div class="text-2xl font-bold mt-2">{{ agg.adj_assist_turnover_ratio }}</div>
+    </div>
+  </div>
+
+  <!-- Blue Collar Breakdown -->
+  <div class="mt-8">
+    <h2 class="text-xl font-semibold mb-4">Blue Collar Breakdown</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+        <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+          <tr>
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase">Category</th>
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for label, value in [
+            ('Def Reb',      blue.def_reb),
+            ('Off Reb',      blue.off_reb),
+            ('Misc',         blue.misc),
+            ('Deflection',   blue.deflection),
+            ('Steal',        blue.steal),
+            ('Block',        blue.block),
+            ('Floor Dive',   blue.floor_dive),
+            ('Charge Taken', blue.charge_taken)
+          ] %}
+          <tr class="odd:bg-white even:bg-gray-100">
+            <td class="px-4 py-2">{{ label }}</td>
+            <td class="px-4 py-2">{{ value }}</td>
+          </tr>
+          {% endfor %}
+
+          {# Divider before the Season Total row #}
+          <tr class="h-0">
+            <td colspan="2" class="p-0">
+              <div class="h-[2px] bg-[#9E1B32]"></div>
+            </td>
+          </tr>
+          <tr class="odd:bg-white even:bg-gray-100 font-bold">
+            <td class="px-4 py-2">Season Total</td>
+            <td class="px-4 py-2">{{ blue.total_blue_collar }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-</div>  <!-- ← NEW: closes `<div id="seasonTotals">` -->
+</div>  <!-- closes <div id="seasonTotals"> -->
 
-<!-- 2) Game-by-Game Stats -->
+
+
+<!-- 2) Game-by-Game / Practice-by-Practice Stats -->
 <div id="gameStats" class="tab-content hidden">
-  <h2 class="text-xl font-semibold mb-2">Game-by-Game Breakdown</h2>
+  <h2 class="text-xl font-semibold mb-2">
+    {% if mode == 'game' %}
+      Game-by-Game Breakdown
+    {% else %}
+      Practice-by-Practice Breakdown
+    {% endif %}
+  </h2>
   <div class="overflow-x-auto">
     <table
       id="gameStatsTable"
@@ -210,31 +253,49 @@
           </th>
         </tr>
       </thead>
+
+      {# pick the right dicts based on mode #}
+      {% if mode == 'game' %}
+        {% set breakdown = game_breakdown %}
+        {% set details   = game_details %}
+      {% else %}
+        {% set breakdown = practice_breakdown %}
+        {% set details   = practice_details %}
+      {% endif %}
+
       <tbody>
-        {% for gid, d in game_breakdown.items() %}
-          {% set dt = game_details.get(gid, {'game_date':'','opponent_name':'','sort_date':'0'}) %}
+        {% for id, row in breakdown.items() %}
+          {% set dt = details.get(id, {'game_date':'','opponent_name':'','sort_date':'0'}) %}
           <tr class="odd:bg-white even:bg-gray-100">
             <td class="px-4 py-2" data-sort="{{ dt.sort_date }}">{{ dt.game_date }}</td>
             <td class="px-4 py-2">{{ dt.opponent_name }}</td>
-            <td class="px-4 py-2">{{ d.points }}</td>
-            <td class="px-4 py-2">{{ d.assists }}</td>
-            <td class="px-4 py-2">{{ d.pot_assists }}</td>
-            <td class="px-4 py-2">{{ d.turnovers }}</td>
-            <td class="px-4 py-2">{{ d.atr_makes }}/{{ d.atr_attempts }}</td>
+            <td class="px-4 py-2">{{ row.points }}</td>
+            <td class="px-4 py-2">{{ row.assists }}</td>
+            <td class="px-4 py-2">{{ row.pot_assists }}</td>
+            <td class="px-4 py-2">{{ row.turnovers }}</td>
+            <td class="px-4 py-2">{{ row.atr_makes }}/{{ row.atr_attempts }}</td>
             <td class="px-4 py-2">
-              {% if d.atr_attempts>0 %}{{ (d.atr_makes/d.atr_attempts*100)|round(1) }}%{% else %}0%{% endif %}
+              {% if row.atr_attempts > 0 %}
+                {{ (row.atr_makes/row.atr_attempts*100)|round(1) }}%
+              {% else %}0%{% endif %}
             </td>
-            <td class="px-4 py-2">{{ d.fg2_makes }}/{{ d.fg2_attempts }}</td>
+            <td class="px-4 py-2">{{ row.fg2_makes }}/{{ row.fg2_attempts }}</td>
             <td class="px-4 py-2">
-              {% if d.fg2_attempts>0 %}{{ (d.fg2_makes/d.fg2_attempts*100)|round(1) }}%{% else %}0%{% endif %}
+              {% if row.fg2_attempts > 0 %}
+                {{ (row.fg2_makes/row.fg2_attempts*100)|round(1) }}%
+              {% else %}0%{% endif %}
             </td>
-            <td class="px-4 py-2">{{ d.fg3_makes }}/{{ d.fg3_attempts }}</td>
+            <td class="px-4 py-2">{{ row.fg3_makes }}/{{ row.fg3_attempts }}</td>
             <td class="px-4 py-2">
-              {% if d.fg3_attempts>0 %}{{ (d.fg3_makes/d.fg3_attempts*100)|round(1) }}%{% else %}0%{% endif %}
+              {% if row.fg3_attempts > 0 %}
+                {{ (row.fg3_makes/row.fg3_attempts*100)|round(1) }}%
+              {% else %}0%{% endif %}
             </td>
-            <td class="px-4 py-2">{{ d.ftm }}/{{ d.fta }}</td>
+            <td class="px-4 py-2">{{ row.ftm }}/{{ row.fta }}</td>
             <td class="px-4 py-2">
-              {% if d.fta>0 %}{{ (d.ftm/d.fta*100)|round(1) }}%{% else %}0%{% endif %}
+              {% if row.fta > 0 %}
+                {{ (row.ftm/row.fta*100)|round(1) }}%
+              {% else %}0%{% endif %}
             </td>
           </tr>
         {% endfor %}
@@ -242,6 +303,7 @@
     </table>
   </div>
 </div>
+
 
 
   <!-- Shot Type Section -->
@@ -313,7 +375,7 @@
     
     {# ── ATR Detail Table ── #}
     {% set atr_groups = [
-      ('Assisted',        ['Assisted','Non‑Assisted']),
+      ('Assisted',        ['Assisted','Non-Assisted']),
       ('Dribble',      ['Dribble','No Dribble']),
       ('RA',           ['Restricted Area','Non Restricted Area']),
       ('Feet',         ['Off 1 Foot','Off 2 Feet']),
@@ -436,15 +498,15 @@
     
     {# ── 2FG Detail Table ── #}
     {% set fg2_groups = [
-      ('Assisted',        ['Assisted','Non‑Assisted']),
-      ('Dribble',      ['Dribble','No Dribble']),
-      ('RA',           ['Restricted Area','Non Restricted Area']),
-      ('Feet',         ['Off 1 Foot','Off 2 Feet']),
-      ('Hands',        ['Left Hand Finish','Right Hand Finish','Hands To Rim','Hands Away From Rim']),
-      ('PA',           ['Play Action','No Play Action']),
-      ('Defenders',    ['Primary Defender','Secondary Defender','Multiple Defenders','Unguarded']),
-      ('Type',         ['Dunk','Catch','Floater','Layup','Pull Up','Step Back']),
-      ('Other',        ['Blocked']),
+      ('Assisted',        ['Assisted','Non-Assisted']),
+      ('Dribble',         ['Dribble','No Dribble']),
+      ('RA',              ['Restricted Area','Non Restricted Area']),
+      ('Feet',            ['Off 1 Foot','Off 2 Feet']),
+      ('Hands',           ['Left Hand Finish','Right Hand Finish','Hands To Rim','Hands Away From Rim']),
+      ('PA',              ['Play Action','No Play Action']),
+      ('Defenders',       ['Primary Defender','Secondary Defender','Multiple Defenders','Unguarded']),
+      ('Type',            ['Dunk','Catch','Floater','Layup','Pull Up','Step Back']),
+      ('Other',           ['Blocked']),
       ('Scheme – Drive',  ['Middle Drive','Baseline Drive','Slot Drive','Drive Right','Drive Left']),
       ('Scheme – Attack', ['Beast / Post','DHO / Get','Iso','PnR Handler','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
       ('Scheme – Pass',   [
@@ -461,7 +523,7 @@
             <th rowspan="2" class="px-4 py-2 text-left">Category</th>
             <th colspan="4" class="px-4 py-2 text-center">Total</th>
             <th colspan="4" class="px-4 py-2 text-center">Transition</th>
-            <th colspan="4" class="px-4 py-2 text-center">Half‑Court</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half-Court</th>
           </tr>
           <tr>
             {% for _ in range(3) %}
@@ -474,74 +536,50 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
           {% for _group_name, cats in fg2_groups %}
-            {# crimson divider between groups #}
             <tr>
               <td colspan="13" class="p-0">
                 <div class="h-[2px] bg-[#9E1B32]"></div>
               </td>
             </tr>
-    
-            {# actual data rows with zebra stripes #}
             {% for category in cats %}
               {% set d = fg2_summary.cats.get(category, empty_group) %}
               <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
                 <td class="px-4 py-2">{{ category }}</td>
     
                 {# Totals #}
-                <td class="px-2 py-1 text-center">
-                  {{ d.total.makes }}‑{{ d.total.attempts }}
+                <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | round(1) | grade_atr2fg_pct(d.total.attempts) }}"{% endif %}>
+                  {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.total.fg_pct*100)|round(1)|grade_atr2fg_pct(d.total.attempts) }}"
-                >
-                  {{ (d.total.fg_pct*100)|round(1) }}%
-                </td>
-                <td class="px-2 py-1 text-center">
-                  {{ d.total.pps|round(2) }}
-                </td>
+                <td class="px-2 py-1 text-center">{{ d.total.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
-                    {{ (d.total.attempts/shot_type_totals.fg2.attempts*100)|round(1) }}%
-                  {% else %}0%{% endif %}
+                    {{ (d.total.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
                 </td>
     
                 {# Transition #}
-                <td class="px-2 py-1 text-center">
-                  {{ d.transition.makes }}‑{{ d.transition.attempts }}
+                <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | round(1) | grade_atr2fg_pct(d.transition.attempts) }}"{% endif %}>
+                  {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.transition.fg_pct*100)|round(1)|grade_atr2fg_pct(d.transition.attempts) }}"
-                >
-                  {{ (d.transition.fg_pct*100)|round(1) }}%
-                </td>
-                <td class="px-2 py-1 text-center">
-                  {{ d.transition.pps|round(2) }}
-                </td>
+                <td class="px-2 py-1 text-center">{{ d.transition.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
-                    {{ (d.transition.attempts/shot_type_totals.fg2.attempts*100)|round(1) }}%
-                  {% else %}0%{% endif %}
+                    {{ (d.transition.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
                 </td>
     
-                {# Half‑Court #}
-                <td class="px-2 py-1 text-center">
-                  {{ d.halfcourt.makes }}‑{{ d.halfcourt.attempts }}
+                {# Half-Court #}
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) | grade_atr2fg_pct(d.halfcourt.attempts) }}"{% endif %}>
+                  {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.halfcourt.fg_pct*100)|round(1)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
-                >
-                  {{ (d.halfcourt.fg_pct*100)|round(1) }}%
-                </td>
-                <td class="px-2 py-1 text-center">
-                  {{ d.halfcourt.pps|round(2) }}
-                </td>
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
-                    {{ (d.halfcourt.attempts/shot_type_totals.fg2.attempts*100)|round(1) }}%
-                  {% else %}0%{% endif %}
+                    {{ (d.halfcourt.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
                 </td>
               </tr>
             {% endfor %}
@@ -550,8 +588,7 @@
       </table>
     </div>
     
-    
-    
+
     
     {# ── 3FG Detail Table ── #}
     {% set fg3_groups = [
@@ -605,47 +642,38 @@
     
                 {# Totals #}
                 <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
-                <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.total.fg_pct*100)|round(1)|grade_3fg_pct(d.total.attempts) }}"
-                >{{ (d.total.fg_pct*100)|round(1) }}%</td>
-                <td class="px-2 py-1 text-center">{{ d.total.pps|round(2) }}</td>
+                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | round(1) | grade_3fg_pct(d.total.attempts) }}"{% endif %}>
+                  {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center">{{ d.total.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.total.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
-                  {% else %}
-                    0.0%
-                  {% endif %}
+                  {% else %}0.0%{% endif %}
                 </td>
     
                 {# Transition #}
                 <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
-                <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.transition.fg_pct*100)|round(1)|grade_3fg_pct(d.transition.attempts) }}"
-                >{{ (d.transition.fg_pct*100)|round(1) }}%</td>
-                <td class="px-2 py-1 text-center">{{ d.transition.pps|round(2) }}</td>
+                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | round(1) | grade_3fg_pct(d.transition.attempts) }}"{% endif %}>
+                  {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center">{{ d.transition.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.transition.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
-                  {% else %}
-                    0.0%
-                  {% endif %}
+                  {% else %}0.0%{% endif %}
                 </td>
     
                 {# Half-Court #}
                 <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
-                <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.halfcourt.fg_pct*100)|round(1)|grade_3fg_pct(d.halfcourt.attempts) }}"
-                >{{ (d.halfcourt.fg_pct*100)|round(1) }}%</td>
-                <td class="px-2 py-1 text-center">{{ d.halfcourt.pps|round(2) }}</td>
+                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) | grade_3fg_pct(d.halfcourt.attempts) }}"{% endif %}>
+                  {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.halfcourt.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
-                  {% else %}
-                    0.0%
-                  {% endif %}
+                  {% else %}0.0%{% endif %}
                 </td>
               </tr>
             {% endfor %}
@@ -653,6 +681,343 @@
         </tbody>
       </table>
     </div>
+    </div>
+    
+  
+<!-- ──────────────────────────────────────────────────────────────────────────── -->
+<!-- 4) Skill Development                                                           -->
+<!-- ──────────────────────────────────────────────────────────────────────────── -->
+<div
+  id="skillDevelopment"
+  class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8"
+>
+  <!-- ─── Section Title ──────────────────────────────────────────────────────── -->
+  <h2 class="text-3xl font-bold mb-6 border-b pb-2">Skill Development</h2>
+
+  <!-- ─── Drill-by-Drill Entry Form (ATR / Floater / 3FG / FT) ─────────────────── -->
+  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-2xl font-semibold mb-4">Drill-by-Drill Entry</h3>
+    <form method="post" class="w-full">
+      <div class="overflow-x-auto">
+        <table class="w-full table-fixed border border-gray-200 rounded-md">
+          <thead>
+            <!-- Top header: Date + shot-class groups -->
+            <tr class="bg-gray-100">
+              <th
+                rowspan="2"
+                class="px-3 py-2 text-left text-sm font-medium border-r border-gray-200"
+              >
+                Date
+              </th>
+              {% for key, subs in shot_map.items() %}
+                <th
+                  colspan="{{ subs|length }}"
+                  class="px-3 py-2 text-center text-sm font-medium border-r border-gray-200"
+                >
+                  {{ label_map[key] }}
+                </th>
+              {% endfor %}
+            </tr>
+            <!-- Sub-headers: each sub-category -->
+            <tr class="bg-gray-100">
+              {% for subs in shot_map.values() %}
+                {% for sub in subs %}
+                  <th
+                    class="px-2 py-1 text-xs font-medium border-r border-gray-200"
+                  >
+                    {{ sub }}
+                  </th>
+                {% endfor %}
+              {% endfor %}
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr class="bg-white">
+              <!-- Date picker -->
+              <td class="px-3 py-2 border-t border-gray-200">
+                <input
+                  type="date"
+                  name="date"
+                  required
+                  class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+                />
+              </td>
+              <!-- One input cell per sub-category -->
+              {% for key, subs in shot_map.items() %}
+                {% for sub in subs %}
+                  <td class="px-2 py-2 border-t border-gray-200">
+                    <div class="flex space-x-1 justify-center">
+                      <input
+                        type="number"
+                        min="0"
+                        name="{{ key }}_{{ sub|replace(' ', '_') }}_makes"
+                        placeholder="M"
+                        class="w-12 border border-gray-300 rounded-md p-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        name="{{ key }}_{{ sub|replace(' ', '_') }}_attempts"
+                        placeholder="A"
+                        class="w-12 border border-gray-300 rounded-md p-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+                      />
+                    </div>
+                  </td>
+                {% endfor %}
+              {% endfor %}
+            </tr>
+            <tr class="bg-gray-50">
+              <td
+                colspan="{{ 1 + (shot_map.values()|map('length')|sum) }}"
+                class="px-3 py-3 text-right border-t border-gray-200"
+              >
+                <button
+                  type="submit"
+                  class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+                >
+                  Save All
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </div>
+
+  <!-- ─── “NBA 100” Entry Form ──────────────────────────────────────────────────── -->
+  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-2xl font-semibold mb-4">NBA 100 Exercise</h3>
+    <form
+      method="post"
+      action="{{ url_for('admin.add_nba100_entry', player_name=player_name) }}"
+      class="grid grid-cols-1 sm:grid-cols-3 gap-4"
+    >
+      <div>
+        <label class="block text-sm font-medium mb-1">Date</label>
+        <input
+          type="date"
+          name="date"
+          required
+          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1"
+          >Makes (out of 100)</label
+        >
+        <input
+          type="number"
+          name="makes"
+          min="0"
+          max="100"
+          required
+          placeholder="e.g. 87"
+          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div class="flex items-end">
+        <button
+          type="submit"
+          class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        >
+          Save NBA 100
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ─── Date-Range Filter Form ──────────────────────────────────────────────── -->
+  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-2xl font-semibold mb-4">Filter History</h3>
+    <form method="get" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
+      <div class="flex-1">
+        <label class="block text-sm font-medium mb-1">From</label>
+        <input
+          type="date"
+          name="start_date"
+          value="{{ start_date }}"
+          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        />
+      </div>
+      <div class="flex-1">
+        <label class="block text-sm font-medium mb-1">To</label>
+        <input
+          type="date"
+          name="end_date"
+          value="{{ end_date }}"
+          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        />
+      </div>
+      <div class="flex items-end">
+        <button
+          type="submit"
+          class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        >
+          Apply
+        </button>
+      </div>
+      <div class="flex items-end">
+        <a
+          href="{{ url_for('admin.player_detail', player_name=player_name) }}"
+          class="text-gray-600 hover:underline text-sm font-medium"
+          >Clear</a
+        >
+      </div>
+    </form>
+  </div>
+
+  <!-- ─── Drill History Table ─────────────────────────────────────────────────── -->
+  <div class="mb-8">
+    <h3 class="text-2xl font-semibold mb-4">Drill History</h3>
+    <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
+      <table class="w-full table-fixed border border-gray-200 rounded-md">
+        <thead>
+          <tr class="bg-gray-200">
+            <th
+              rowspan="2"
+              class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300"
+            >
+              Date
+            </th>
+            {% for key, subs in shot_map.items() %}
+              <th
+                colspan="{{ subs|length }}"
+                class="px-4 py-2 text-center text-sm font-medium border-r border-gray-300"
+              >
+                {{ label_map[key] }}
+              </th>
+            {% endfor %}
+          </tr>
+          <tr class="bg-gray-200">
+            {% for subs in shot_map.values() %}
+              {% for sub in subs %}
+                <th class="px-3 py-1 text-xs font-medium border-r border-gray-300">
+                  {{ sub }}
+                </th>
+              {% endfor %}
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Totals Row -->
+          <tr class="bg-gray-100 font-semibold">
+            <td class="px-4 py-2 text-sm border-t border-gray-300">Totals</td>
+            {% for key, subs in shot_map.items() %}
+              {% for sub in subs %}
+                {% set t = shot_totals[key][sub] %}
+                <td class="px-3 py-2 text-center text-sm border-t border-gray-300">
+                  {{ t.makes }}/{{ t.attempts }}
+                </td>
+              {% endfor %}
+            {% endfor %}
+          </tr>
+
+          <!-- Per-date Drill Rows -->
+          {% for entry_date, items_grouped in entries|groupby('date') %}
+            <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+              <td class="px-4 py-3 align-top text-sm border-t border-gray-300">
+                {{ entry_date.strftime('%b %d, %Y') }}
+                <div class="mt-1 space-x-2 text-xs">
+                  <a
+                    href="{{ url_for('admin.edit_skill_entry', player_name=player_name, entry_date=entry_date.isoformat()) }}"
+                    class="text-blue-600 hover:underline"
+                    >Edit</a
+                  >
+                  <form
+                    action="{{ url_for('admin.delete_skill_entry', player_name=player_name, entry_date=entry_date.isoformat()) }}"
+                    method="post"
+                    class="inline"
+                  >
+                    <button
+                      type="submit"
+                      class="text-red-600 hover:underline"
+                      onclick="return confirm('Delete this entire entry?');"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              </td>
+              {% for key, subs in shot_map.items() %}
+                {% for sub in subs %}
+                  {% set drill_entry = items_grouped
+                       | selectattr('shot_class','equalto', key)
+                       | selectattr('subcategory','equalto', sub)
+                       | list | first %}
+                  <td class="px-3 py-2 text-center text-sm border-t border-gray-300">
+                    {% if drill_entry %}
+                      {{ drill_entry.makes }}/{{ drill_entry.attempts }}<br />
+                      <span class="text-xs text-gray-600">
+                        ({{ drill_entry.fg_pct }}%)
+                      </span>
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              {% endfor %}
+            </tr>
+          {% else %}
+            <tr>
+              <td
+                colspan="{{ 1 + (shot_map.values()|map('length')|sum) }}"
+                class="px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-300"
+              >
+                No drill history yet.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── NBA 100 History Table ────────────────────────────────────────────────── -->
+  <div class="mb-4">
+    <h3 class="text-2xl font-semibold mb-4">NBA 100 History</h3>
+    <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
+      <table class="w-full table-fixed border border-gray-200 rounded-md">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">
+              Date
+            </th>
+            <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">
+              Makes (out of 100)
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in nba100_entries %}
+            <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+              <td class="px-4 py-2 text-sm border-t border-gray-300">
+                {{ n.date.strftime('%b %d, %Y') }}
+              </td>
+              <td class="px-4 py-2 text-sm border-t border-gray-300">
+                {{ n.value }}/100
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td
+                colspan="2"
+                class="px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-300"
+              >
+                No NBA 100 entries yet.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>  <!-- /.inner container -->
+</div>  <!-- /.main container -->
+
 
   <script>
 // —— Utility ——
@@ -662,15 +1027,15 @@ function capitalize(str) {
 
 // —— Main tab switcher ——
 function showTab(tabName) {
-  ['seasonTotals','gameStats','shotType'].forEach(id => {
+  ['seasonTotals','gameStats','shotType','skillDevelopment'].forEach(id => {
     const el = document.getElementById(id);
     el.classList.toggle('hidden', id !== tabName);
     el.classList.toggle('block',  id === tabName);
   });
-  ['btnSeasonTotals','btnGameStats','btnShotType'].forEach(btnId => {
-    document.getElementById(btnId).classList.remove('bg-blue-600','text-white');
+  ['btnSeasonTotals','btnGameStats','btnShotType','btnSkillDevelopment'].forEach(btnId => {
+    document.getElementById(btnId).classList.remove('bg-[#9E1B32]','text-white');
   });
-  document.getElementById('btn' + capitalize(tabName)).classList.add('bg-blue-600','text-white');
+  document.getElementById('btn' + capitalize(tabName)).classList.add('bg-[#9E1B32]','text-white');
 
   if (tabName === 'shotType') {
     showShotTypeDetail('atr');  // default into ATR whenever you open ShotType
@@ -701,10 +1066,16 @@ function showShotTypeDetail(detail) {
 }
 
 
-// —— DOM‑ready initialization ——
-document.addEventListener('DOMContentLoaded', function() {
-  // 1) Activate the Season Totals tab by default
-  showTab('seasonTotals');
+  // —— DOM-ready initialization ——
+  document.addEventListener('DOMContentLoaded', () => {
+    // pull the hash (without the leading “#”)
+    const hash = window.location.hash.slice(1);
+    // if it matches one of our tab IDs, show it, otherwise default
+    if (['seasonTotals','gameStats','shotType','skillDevelopment'].includes(hash)) {
+      showTab(hash);
+    } else {
+      showTab('seasonTotals');
+    }
 
   // 2) Wire up Game‑by‑Game sorting
   const table = document.getElementById("gameStatsTable");
@@ -723,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function() {
           sortState.order = (sortKey === "game_date" ? "desc" : "asc");
         }
         // restyle headers
-        headers.forEach(h => h.classList.remove("bg-blue-600","text-white"));
+        headers.forEach(h => h.classList.remove("bg-[#9E1B32]","text-white"));
         headers.forEach(h => {
           const ind = h.querySelector(".sort-indicator");
           if (ind) ind.textContent = " ⇅";
