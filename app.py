@@ -57,15 +57,14 @@ def create_app():
         """
         if not attempts:
             return ""
-        # pick a base RGB tuple (0–100 scale) by threshold
+        # pick a base RGB tuple by threshold
         if pct >= 70:
             base = (0, 128, 0)    # green
         elif pct >= 50:
-            base = (255,165, 0)   # orange
+            base = (255, 165, 0)  # orange
         else:
-            base = (255,  0,  0)  # red
-        # convert each channel 0–100 → 0–255
-        r, g, b = (min(round(c * 2.55), 255) for c in base)
+            base = (255, 0, 0)    # red
+        r, g, b = base
         return f"background-color: rgb({r},{g},{b});"
 
     @app.template_filter()
@@ -79,10 +78,10 @@ def create_app():
         if pct >= 40:
             base = (0, 128, 0)
         elif pct >= 30:
-            base = (255,165, 0)
+            base = (255, 165, 0)
         else:
-            base = (255,  0,  0)
-        r, g, b = (min(round(c * 2.55), 255) for c in base)
+            base = (255, 0, 0)
+        r, g, b = base
         return f"background-color: rgb({r},{g},{b});"
 
 
