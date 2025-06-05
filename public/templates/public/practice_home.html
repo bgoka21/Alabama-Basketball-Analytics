@@ -84,5 +84,67 @@
       </tbody>
     </table>
   </div>
+
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">Overall Record</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Record</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Win%</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for player, record, pct in overall_records %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">{{ record }}</td>
+          <td class="px-6 py-4 text-sm">{{ pct }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">Sprint Wins</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Wins</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for player, wins in sprint_wins %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">{{ wins }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">Sprint Losses</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Losses</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for player, losses in sprint_losses %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">{{ losses }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
