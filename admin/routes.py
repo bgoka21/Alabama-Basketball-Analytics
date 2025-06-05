@@ -1110,6 +1110,11 @@ def player_detail(player_name):
 
     # ─── Handle Skill‐Development form submission ───────────────────────
     if request.method == 'POST':
+        if not current_user.is_admin:
+            flash('Only admins may modify skill-development entries.', 'error')
+            return redirect(
+                url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
+            )
         # 1) Try the “Skill Name / Value” form first
         shot_date   = date.fromisoformat(request.form.get('date'))
         skill_name  = request.form.get('skill_name', '').strip()
@@ -1172,7 +1177,9 @@ def player_detail(player_name):
         q = q.filter(SkillEntry.date >= date.fromisoformat(start_date))
     if end_date:
         q = q.filter(SkillEntry.date <= date.fromisoformat(end_date))
-    entries_list = q.order_by(SkillEntry.date.desc()).all()
+    all_entries = q.order_by(SkillEntry.date.desc()).all()
+    nba100_entries = [e for e in all_entries if e.skill_name == "NBA 100"]
+    entries_list  = [e for e in all_entries if e.skill_name != "NBA 100"]
 
     # ─── Group by date & compute totals ─────────────────────────────────
     # We’ll pass `entries_list` straight to Jinja and do groupby('date') there.
@@ -1196,10 +1203,6 @@ def player_detail(player_name):
     for e in entries_list:
         if not e.shot_class and e.skill_name:
             generic_totals[e.skill_name] = generic_totals.get(e.skill_name, 0) + e.value
-
-    # Extract exactly the “NBA 100” entries to show them in their own table:
-    nba100_entries = [e for e in entries_list if e.skill_name == "NBA 100"]
-
 
     # ─── Fetch ALL stats for this player ────────────────────────────────
     all_stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
@@ -1751,6 +1754,7 @@ def player_detail(player_name):
     methods=['POST']
 )
 @login_required
+@admin_required
 def delete_skill_entry(player_name, entry_date):
     # parse the incoming date
     target_date = date.fromisoformat(entry_date)
@@ -1771,6 +1775,7 @@ def delete_skill_entry(player_name, entry_date):
     methods=['GET', 'POST']
 )
 @login_required
+@admin_required
 def edit_skill_entry(player_name, entry_date):
     # Rebuild the shot_map & label_map exactly as in the template
     shot_map = {
@@ -1853,6 +1858,7 @@ def edit_skill_entry(player_name, entry_date):
     methods=['POST']
 )
 @login_required
+@admin_required
 def add_nba100_entry(player_name):
     """
     Handle the NBA 100 form:
