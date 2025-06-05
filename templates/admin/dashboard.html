@@ -165,16 +165,4 @@
   </table>
 </div>
 
-<!-- Reset DB Section -->
-<h2 class="text-xl font-bold mt-10 mb-2 text-red-700">Danger Zone</h2>
-<form action="{{ url_for('admin.reset_db') }}" method="post" class="space-y-2">
-  <label class="block font-semibold">Type RESET to confirm:</label>
-  <input type="text" name="confirmation" class="border rounded px-4 py-2 w-full" />
-  <button
-    type="submit"
-    class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
-  >
-    Reset Database
-  </button>
-</form>
 {% endblock %}

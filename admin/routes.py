@@ -508,42 +508,6 @@ def download_file(file_id):
         flash(f"File '{uploaded_file.filename}' not found.", "error")
         return redirect(url_for('admin.files_view_unique'))
 
-@admin_bp.route('/reset-db', methods=['POST'])
-@admin_required
-def reset_db():
-    if not current_user.is_admin:
-        flash("You are not authorized to reset the database.", "error")
-        return redirect(url_for('admin.dashboard'))
-
-    confirmation = request.form.get('confirmation', '')
-    if confirmation != "RESET":
-        flash("You must type 'RESET' to confirm.", "error")
-        return redirect(url_for('admin.dashboard'))
-
-    try:
-        engine = db.engine
-
-        # never drop users, seasons, or roster tables
-        exclude = {
-            'users',
-            Season.__table__.name,   # e.g. "seasons"
-            Roster.__table__.name    # e.g. "roster"
-        }
-        to_drop = [
-            t for t in db.metadata.sorted_tables
-            if t.name not in exclude
-        ]
-
-        # drop everything except those three
-        db.metadata.drop_all(bind=engine, tables=to_drop)
-        # recreate any missing tables
-        db.create_all()
-
-        flash("Database reset complete (users, seasons & rosters preserved).", "success")
-    except Exception as e:
-        flash(f"Error resetting DB: {e}", "error")
-
-    return redirect(url_for('admin.dashboard'))
 
 
 
