@@ -1,7 +1,7 @@
 # basketball_analytics/public/routes.py
 
-from flask import Blueprint, request, render_template, redirect, url_for
-from flask_login import login_required
+from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
 from collections import defaultdict
 import json
@@ -24,6 +24,19 @@ public_bp = Blueprint(
     __name__,
     template_folder="templates/public",  # points at public/templates/public/
 )
+
+@public_bp.before_request
+def public_bp_before_request():
+    # Always allow the root redirect
+    if request.endpoint == 'public.root' or request.endpoint.startswith('static'):
+        return
+    if not current_user.is_authenticated:
+        return redirect(url_for('admin.login'))
+    if current_user.is_player:
+        allowed = {'public.practice_homepage'}
+        if request.endpoint not in allowed:
+            flash('You do not have permission to view that page.', 'error')
+            return redirect(url_for('public.practice_homepage'))
 
 
 # ───────────────────────────────────────────────

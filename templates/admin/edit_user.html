@@ -22,6 +22,16 @@
              class="mr-2" {% if user.is_admin %}checked{% endif %}>
       <label for="is_admin">Admin privileges</label>
     </div>
+    <div class="flex items-center">
+      <input id="is_player" name="is_player" type="checkbox"
+             class="mr-2" {% if user.is_player %}checked{% endif %}>
+      <label for="is_player">Player account</label>
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Player Name</label>
+      <input name="player_name" type="text" value="{{ user.player_name or '' }}"
+             class="w-full border rounded px-3 py-2">
+    </div>
     <div class="flex items-center space-x-4">
       <button type="submit"
               class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
