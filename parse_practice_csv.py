@@ -79,21 +79,28 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 cell = str(row.get(team_col, "") or "").strip()
                 if not cell:
                     continue
+
+                lower_cell = cell.lower()
+                if "win" in lower_cell:
+                    is_win = True
+                elif "loss" in lower_cell:
+                    is_win = False
+                else:
+                    continue
+
                 tokens = [t.strip() for t in cell.split(",") if t.strip()]
-                if not tokens:
-                    continue
 
-                sign = tokens[0]  # "+" or "-"
-                if sign not in ("+", "-"):
-                    continue
-                is_win = (sign == "+")
+                for token in tokens:
+                    if "#" not in token:
+                        continue
 
-                for player_token in tokens[1:]:
+                    player_token = token[token.index("#") :]
                     clean_name = player_token.split("#")[-1].strip()
-                    clean_name = "#" + clean_name  # restore leading "#"
+                    clean_name = "#" + clean_name
                     roster_id = get_roster_id(clean_name, season_id)
                     if roster_id is None:
                         continue
+
                     if is_win:
                         player_stats_dict[roster_id]["practice_wins"] += 1
                     else:
