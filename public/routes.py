@@ -66,9 +66,9 @@ def root():
 # ───────────────────────────────────────────────
 
 
-@public_bp.route("/home", methods=["GET"])
+@public_bp.route("/game_home", methods=["GET"])
 @login_required
-def homepage():
+def game_homepage():
     # 1) Read filter options from query string
     filter_opt = request.args.get("filter", "season")  # 'season', 'last5', 'true_data'
     view_opt = request.args.get("view", "season")  # reserved for future use
@@ -318,7 +318,7 @@ def homepage():
 
 @public_bp.route("/practice_home", methods=["GET"])
 @login_required
-def practice_homepage():
+def practice_homepage(active_page="practice_home"):
     """Leaderboard-style homepage for practice statistics."""
     season_id = get_current_season_id()
     if not season_id:
@@ -331,7 +331,7 @@ def practice_homepage():
             overall_records=[],
             sprint_wins=[],
             sprint_losses=[],
-            active_page="practice_home",
+            active_page=active_page,
         )
 
     practice_ids = [p.id for p in Practice.query.filter_by(season_id=season_id).all()]
@@ -345,7 +345,7 @@ def practice_homepage():
             overall_records=[],
             sprint_wins=[],
             sprint_losses=[],
-            active_page="practice_home",
+            active_page=active_page,
         )
 
     # ─── Dunks Get You Paid ────────────────────────────────────────────
@@ -504,5 +504,12 @@ def practice_homepage():
         overall_records=overall_records,
         sprint_wins=sprint_wins,
         sprint_losses=sprint_losses,
-        active_page="practice_home",
+        active_page=active_page,
     )
+
+
+@public_bp.route("/home", methods=["GET"])
+@login_required
+def homepage():
+    """Alias for practice_homepage as the main home view."""
+    return practice_homepage(active_page="home")
