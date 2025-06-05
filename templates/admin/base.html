@@ -20,6 +20,13 @@
         Home
       </a>
 
+      <!-- Practice Home -->
+      <a href="{{ url_for('public.practice_homepage') }}"
+         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                {{ 'bg-white text-[#9E1B32]' if active_page=='practice_home' else '' }}">
+        Practice Home
+      </a>
+
       {% if current_user.is_authenticated %}
         <!-- Game Reports -->
         <a href="{{ url_for('admin.game_reports') }}"

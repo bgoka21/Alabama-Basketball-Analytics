@@ -3,7 +3,12 @@
 from flask import Blueprint, request, render_template, redirect, url_for
 from flask_login import login_required
 from sqlalchemy import func, desc, and_, case
-from models.database import db, BlueCollarStats, PlayerStats, Game, Season, TeamStats, PlayerPossession, Possession
+from collections import defaultdict
+import json
+from models.database import (
+    db, BlueCollarStats, PlayerStats, Game, Season, TeamStats,
+    PlayerPossession, Possession, Practice, Roster
+)
 
 
 public_bp = Blueprint(
@@ -327,4 +332,143 @@ def homepage():
         view_opt=view_opt,
         active_page='home',
         summary=summary
+    )
+
+
+@public_bp.route('/practice_home', methods=['GET'])
+@login_required
+def practice_homepage():
+    """Leaderboard-style homepage for practice statistics."""
+    season_id = get_current_season_id()
+    if not season_id:
+        return render_template(
+            'practice_home.html',
+            dunks=[],
+            bcp_leaders=[],
+            atr_leaders=[],
+            fg3_leaders=[],
+            active_page='practice_home'
+        )
+
+    practice_ids = [p.id for p in Practice.query.filter_by(season_id=season_id).all()]
+    if not practice_ids:
+        return render_template(
+            'practice_home.html',
+            dunks=[],
+            bcp_leaders=[],
+            atr_leaders=[],
+            fg3_leaders=[],
+            active_page='practice_home'
+        )
+
+    # ─── Dunks Get You Paid ────────────────────────────────────────────
+    dunk_counts = defaultdict(int)
+    stats = PlayerStats.query.filter(PlayerStats.practice_id.in_(practice_ids)).all()
+    for rec in stats:
+        if not rec.shot_type_details:
+            continue
+        details = (
+            json.loads(rec.shot_type_details)
+            if isinstance(rec.shot_type_details, str)
+            else rec.shot_type_details
+        )
+        for shot in details:
+            if shot.get('result') != 'made':
+                continue
+            if shot.get('atr_type') == 'Dunk' or shot.get('2fg_type') == 'Dunk':
+                dunk_counts[rec.player_name] += 1
+    dunks = sorted(dunk_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    # ─── Blue Collar Point Totals and Wins ─────────────────────────────
+    bcp_totals = {
+        name: float(total)
+        for name, total in (
+            db.session.query(
+                Roster.player_name,
+                func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0)
+            )
+            .join(Roster, BlueCollarStats.player_id == Roster.id)
+            .filter(BlueCollarStats.practice_id.in_(practice_ids))
+            .group_by(Roster.player_name)
+            .all()
+        )
+    }
+
+    win_counts = defaultdict(int)
+    practices = Practice.query.filter(Practice.id.in_(practice_ids)).all()
+    for pr in practices:
+        rows = (
+            db.session.query(
+                Roster.player_name,
+                BlueCollarStats.total_blue_collar
+            )
+            .join(Roster, BlueCollarStats.player_id == Roster.id)
+            .filter(BlueCollarStats.practice_id == pr.id)
+            .all()
+        )
+        if not rows:
+            continue
+        max_bcp = max(r.total_blue_collar for r in rows)
+        if max_bcp <= 0:
+            continue
+        for r in rows:
+            if r.total_blue_collar == max_bcp:
+                win_counts[r.player_name] += 1
+
+    bcp_leaders = [
+        (name, bcp_totals.get(name, 0.0), win_counts.get(name, 0))
+        for name in bcp_totals.keys()
+    ]
+    bcp_leaders.sort(key=lambda x: x[1], reverse=True)
+    bcp_leaders = bcp_leaders[:10]
+
+    # ─── ATR% Leaders ──────────────────────────────────────────────────
+    qa = (
+        PlayerStats.query
+        .with_entities(
+            PlayerStats.player_name,
+            func.sum(PlayerStats.atr_makes).label('atrm'),
+            func.sum(PlayerStats.atr_attempts).label('atra'),
+            (
+                func.sum(PlayerStats.atr_makes)
+                / func.nullif(func.sum(PlayerStats.atr_attempts), 0)
+                * 100
+            ).label('atr_pct')
+        )
+        .filter(PlayerStats.practice_id.in_(practice_ids))
+        .group_by(PlayerStats.player_name)
+        .having(func.sum(PlayerStats.atr_attempts) >= 10)
+        .order_by(desc('atr_pct'))
+        .limit(5)
+    )
+    atr_leaders = qa.all()
+
+    # ─── 3FG% Leaders ──────────────────────────────────────────────────
+    q3 = (
+        PlayerStats.query
+        .with_entities(
+            PlayerStats.player_name,
+            func.sum(PlayerStats.fg3_makes).label('fg3m'),
+            func.sum(PlayerStats.fg3_attempts).label('fg3a'),
+            (
+                func.sum(PlayerStats.fg3_makes)
+                / func.nullif(func.sum(PlayerStats.fg3_attempts), 0)
+                * 100
+            ).label('fg3_pct')
+        )
+        .filter(PlayerStats.practice_id.in_(practice_ids))
+        .group_by(PlayerStats.player_name)
+        .having(func.sum(PlayerStats.fg3_attempts) >= 10)
+        .order_by(desc('fg3_pct'))
+        .limit(5)
+    )
+    fg3_leaders = q3.all()
+
+    return render_template(
+        'practice_home.html',
+        dunks=dunks,
+        bcp_leaders=bcp_leaders,
+        atr_leaders=atr_leaders,
+        fg3_leaders=fg3_leaders,
+        active_page='practice_home'
     )
