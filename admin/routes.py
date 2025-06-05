@@ -1260,9 +1260,9 @@ def player_detail(player_name):
 
     # ─── Fetch ALL stats for this player ────────────────────────────────
     all_stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
+    has_stats = bool(all_stats_records)
     if not all_stats_records:
-        flash("No stats found for this player.", "error")
-        return redirect(url_for('admin.players_list'))
+        flash("No stats found for this player.", "info")
 
     # ─── Split into Game vs Practice records ────────────────────────────
     game_stats_records     = [r for r in all_stats_records if r.game_id]
@@ -1792,7 +1792,8 @@ def player_detail(player_name):
         game_details                       = game_details,
         practice_breakdown                 = practice_breakdown,
         practice_details                   = practice_details,
-        player                             = player
+        player                             = player,
+        has_stats                          = has_stats
     )
 
 

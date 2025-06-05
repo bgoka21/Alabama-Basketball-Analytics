@@ -13,7 +13,10 @@
 
 <div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
   <h1 class="text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
-  
+  {% if not has_stats %}
+    <p class="mb-4 text-yellow-600">No stats found for this player.</p>
+  {% endif %}
+
 <div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
 
   <!-- Game/Practice Buttons -->
