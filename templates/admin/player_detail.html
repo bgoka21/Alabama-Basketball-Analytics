@@ -329,6 +329,7 @@
       </div>
     </div>
 
+  {% endif %}
     <!-- 2FG Season -->
     <div
       id="cardFG2"
@@ -695,6 +696,7 @@
   <h2 class="text-3xl font-bold mb-6 border-b pb-2">Skill Development</h2>
 
   <!-- ─── Drill-by-Drill Entry Form (ATR / Floater / 3FG / FT) ─────────────────── -->
+  {% if current_user.is_admin %}
   <div class="mb-8 bg-white rounded-lg shadow-md p-6">
     <h3 class="text-2xl font-semibold mb-4">Drill-by-Drill Entry</h3>
     <form method="post" class="w-full">
@@ -785,6 +787,8 @@
       </div>
     </form>
   </div>
+  {% endif %}
+  {% if current_user.is_admin %}
 
   <!-- ─── “NBA 100” Entry Form ──────────────────────────────────────────────────── -->
   <div class="mb-8 bg-white rounded-lg shadow-md p-6">
@@ -827,6 +831,7 @@
       </div>
     </form>
   </div>
+  {% endif %}
 
   <!-- ─── Date-Range Filter Form ──────────────────────────────────────────────── -->
   <div class="mb-8 bg-white rounded-lg shadow-md p-6">
@@ -919,26 +924,24 @@
             <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
               <td class="px-4 py-3 align-top text-sm border-t border-gray-300">
                 {{ entry_date.strftime('%b %d, %Y') }}
+                {% if current_user.is_admin %}
                 <div class="mt-1 space-x-2 text-xs">
                   <a
                     href="{{ url_for('admin.edit_skill_entry', player_name=player_name, entry_date=entry_date.isoformat()) }}"
-                    class="text-blue-600 hover:underline"
-                    >Edit</a
-                  >
+                    class="text-blue-600 hover:underline">Edit</a>
                   <form
                     action="{{ url_for('admin.delete_skill_entry', player_name=player_name, entry_date=entry_date.isoformat()) }}"
                     method="post"
-                    class="inline"
-                  >
+                    class="inline">
                     <button
                       type="submit"
                       class="text-red-600 hover:underline"
-                      onclick="return confirm('Delete this entire entry?');"
-                    >
+                      onclick="return confirm('Delete this entire entry?');">
                       Delete
                     </button>
                   </form>
                 </div>
+                {% endif %}
               </td>
               {% for key, subs in shot_map.items() %}
                 {% for sub in subs %}
