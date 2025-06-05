@@ -264,10 +264,17 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         "Floor Dive":   "floor_dive",
                         "Charge Taken": "charge_taken"
                     }
+                    sprint_mapping = {
+                        "Sprint Win":  "sprint_wins",
+                        "Sprint Loss": "sprint_losses",
+                    }
                     for token in tokens:
                         if token in blue_collar_mapping:
                             key = blue_collar_mapping[token]
                             player_blue_dict[roster_id][key] += 1
+                        elif token in sprint_mapping:
+                            key = sprint_mapping[token]
+                            player_stats_dict[roster_id][key] += 1
             continue
         # ────────────────────────────────────────────────────────────────────
 
@@ -319,7 +326,9 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
                 practice_wins     = stats.get("practice_wins", 0),
                 practice_losses   = stats.get("practice_losses", 0),
-                
+                sprint_wins       = stats.get("sprint_wins", 0),
+                sprint_losses     = stats.get("sprint_losses", 0),
+
                 shot_type_details = json.dumps(shots) if shots else None
             )
         )
