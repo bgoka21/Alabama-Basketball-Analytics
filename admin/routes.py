@@ -116,11 +116,11 @@ def login():
         if user and check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
             flash("Login successful!", "success")
-            # Send admins to the dashboard, everyone else out to the public home
+            # Send admins to the dashboard, everyone else to the practice home
             if user.is_admin:
                 return redirect(url_for('admin.dashboard'))
             else:
-                return redirect(url_for('public.homepage'))
+                return redirect(url_for('public.practice_homepage'))
 
         flash("Invalid credentials. Please try again.", "error")
         return redirect(url_for('admin.login'))

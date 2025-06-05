@@ -394,7 +394,7 @@ def practice_homepage():
         )
     }
 
-    win_dates = defaultdict(list)
+    win_counts = defaultdict(int)
     practices = Practice.query.filter(Practice.id.in_(practice_ids)).all()
     for pr in practices:
         rows = (
@@ -411,13 +411,12 @@ def practice_homepage():
         max_bcp = max(r.total_blue_collar for r in rows)
         if max_bcp <= 0:
             continue
-        date_str = pr.date.strftime('%b %d')
         for r in rows:
             if r.total_blue_collar == max_bcp:
-                win_dates[r.player_name].append(date_str)
+                win_counts[r.player_name] += 1
 
     bcp_leaders = [
-        (name, bcp_totals.get(name, 0.0), ', '.join(win_dates.get(name, [])))
+        (name, bcp_totals.get(name, 0.0), win_counts.get(name, 0))
         for name in bcp_totals.keys()
     ]
     bcp_leaders.sort(key=lambda x: x[1], reverse=True)
