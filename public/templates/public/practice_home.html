@@ -32,11 +32,11 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200">
-        {% for player, total, dates in bcp_leaders %}
+        {% for player, total, wins in bcp_leaders %}
         <tr class="bg-white hover:bg-gray-50">
           <td class="px-6 py-4 text-sm">{{ player }}</td>
           <td class="px-6 py-4 text-sm">{{ '%.1f'|format(total) }}</td>
-          <td class="px-6 py-4 text-sm">{{ dates }}</td>
+          <td class="px-6 py-4 text-sm">{{ wins }}</td>
         </tr>
         {% endfor %}
       </tbody>
