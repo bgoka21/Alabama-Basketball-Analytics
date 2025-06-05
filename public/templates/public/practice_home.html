@@ -1,0 +1,88 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">Practice Leaderboards</h1>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">Dunks Get You Paid</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Dunks</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for player, count in dunks %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">Blue Collar Leaders</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">BCP</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Wins</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for player, total, dates in bcp_leaders %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">{{ '%.1f'|format(total) }}</td>
+          <td class="px-6 py-4 text-sm">{{ dates }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">ATR% Leaders</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">FG</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ATR%</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for p in atr_leaders %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ p.player_name }}</td>
+          <td class="px-6 py-4 text-sm">{{ p.atrm }}-{{ p.atra }}</td>
+          <td class="px-6 py-4 text-sm">{{ '%.1f'|format(p.atr_pct) if p.atr_pct is not none else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">3FG% Leaders</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">FG</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">3FG%</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for p in fg3_leaders %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">{{ p.player_name }}</td>
+          <td class="px-6 py-4 text-sm">{{ p.fg3m }}-{{ p.fg3a }}</td>
+          <td class="px-6 py-4 text-sm">{{ '%.1f'|format(p.fg3_pct) if p.fg3_pct is not none else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
