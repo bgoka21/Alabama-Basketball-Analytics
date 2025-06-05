@@ -133,6 +133,19 @@
             Logs
           </a>
           <form
+            action="{{ url_for('admin.delete_data', file_id=f.id) }}"
+            method="post"
+            class="inline"
+          >
+            <button
+              type="submit"
+              onclick="return confirm('Delete parsed data for this file?')"
+              class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm"
+            >
+              Delete Data
+            </button>
+          </form>
+          <form
             action="{{ url_for('admin.delete_file', file_id=f.id) }}"
             method="post"
             class="inline"
