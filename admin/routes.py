@@ -101,6 +101,18 @@ def admin_bp_before_request():
         flash("You do not have permission to view that page.", "error")
         return redirect(url_for('admin.login'))
 
+    # Limit players to their own page and logout
+    if current_user.is_player:
+        allowed = {'admin.player_detail', 'admin.logout'}
+        if request.endpoint not in allowed:
+            flash("You do not have permission to view that page.", "error")
+            return redirect(url_for('public.practice_homepage'))
+        if request.endpoint == 'admin.player_detail':
+            player_name = request.view_args.get('player_name') if request.view_args else None
+            if player_name != current_user.player_name:
+                flash("You do not have permission to view that page.", "error")
+                return redirect(url_for('public.practice_homepage'))
+
     # Everything else under admin_bp (e.g. game_reports, game_stats, players_list, player_shot_type, etc.)
     # is now only gated by login_required (via this before_request), not by admin status.
 
@@ -171,6 +183,8 @@ def add_user():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         is_admin = bool(request.form.get('is_admin'))
+        is_player = bool(request.form.get('is_player'))
+        player_name = request.form.get('player_name', '').strip() or None
 
         # Basic validation
         if not username or not password:
@@ -180,7 +194,13 @@ def add_user():
         else:
             # Create & save
             hashed = generate_password_hash(password)
-            new = User(username=username, password_hash=hashed, is_admin=is_admin)
+            new = User(
+                username=username,
+                password_hash=hashed,
+                is_admin=is_admin,
+                is_player=is_player,
+                player_name=player_name,
+            )
             db.session.add(new)
             db.session.commit()
             flash(f'User "{username}" created.', 'success')
@@ -199,6 +219,8 @@ def edit_user(user_id):
         new_username = request.form.get('username', '').strip()
         new_password = request.form.get('password', '')
         is_admin = bool(request.form.get('is_admin'))
+        is_player = bool(request.form.get('is_player'))
+        player_name = request.form.get('player_name', '').strip() or None
 
         if not new_username:
             flash('Username cannot be blank.', 'error')
@@ -207,6 +229,8 @@ def edit_user(user_id):
         else:
             user.username = new_username
             user.is_admin = is_admin
+            user.is_player = is_player
+            user.player_name = player_name
             if new_password:
                 user.password_hash = generate_password_hash(new_password)
             db.session.commit()

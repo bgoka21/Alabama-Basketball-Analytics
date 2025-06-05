@@ -11,7 +11,7 @@ with app.app_context():
     password_hash = generate_password_hash(password)
 
     if not User.query.filter_by(username=username).first():
-        new_user = User(username=username, password_hash=password_hash, is_admin=True)
+        new_user = User(username=username, password_hash=password_hash, is_admin=True, is_player=False)
         db.session.add(new_user)
         db.session.commit()
         print(f"User '{username}' created successfully.")

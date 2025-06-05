@@ -1,6 +1,11 @@
 {% extends 'admin/base.html' %}
 {% block content %}
 <h1 class="text-3xl font-bold mb-6">Practice Leaderboards</h1>
+{% if current_user.is_player %}
+  <p class="mb-4">
+    <a href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}" class="text-blue-600 underline">My Player Page</a>
+  </p>
+{% endif %}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
     <h2 class="text-xl font-semibold mb-4">Dunks Get You Paid</h2>

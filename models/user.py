@@ -8,3 +8,5 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)  # This field is missing in the DB
     is_admin = db.Column(db.Boolean, default=False)
+    is_player = db.Column(db.Boolean, default=False)
+    player_name = db.Column(db.String(100), nullable=True)
