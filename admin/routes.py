@@ -56,6 +56,13 @@ def extract_tokens(text):
     tokens = text.replace(',', ' ').split()
     return tokens
 
+def get_event_details(rec):
+    """Return JSON-decoded stat or shot details for a PlayerStats record."""
+    data = rec.stat_details or rec.shot_type_details
+    if not data:
+        return []
+    return json.loads(data) if isinstance(data, str) else data
+
 admin_bp = Blueprint('admin', __name__, template_folder='../templates/admin')
 
 try:
@@ -1371,14 +1378,9 @@ def player_detail(player_name):
     stats_for_totals = game_stats_records if mode == 'game' else practice_stats_records
 
     for s in stats_for_totals:
-        if not s.shot_type_details:
+        js = get_event_details(s)
+        if not js:
             continue
-
-        js = (
-            json.loads(s.shot_type_details)
-            if isinstance(s.shot_type_details, str)
-            else s.shot_type_details
-        )
         for shot in js:
             sc = shot.get('shot_class', '').strip().lower()
             made = (shot.get('result') == 'made')
@@ -1405,16 +1407,11 @@ def player_detail(player_name):
         # ─── Recompute season‐long points from JSON + free throws ─────────────────
     total_pts = 0
     for s in stats_for_totals:
-        if not s.shot_type_details:
+        js = get_event_details(s)
+        if not js:
             # just add free throws if no JSON present
             total_pts += (s.ftm or 0)
             continue
-
-        js = (
-            json.loads(s.shot_type_details)
-            if isinstance(s.shot_type_details, str)
-            else s.shot_type_details
-        )
         # count makes per shot class
         made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
         made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
@@ -1441,10 +1438,8 @@ def player_detail(player_name):
     # ─── Gather every shot‐detail JSON blob ─────────────────────
     all_details = []
     for rec in stats_for_shot:
-        if rec.shot_type_details:
-            js = (json.loads(rec.shot_type_details)
-                if isinstance(rec.shot_type_details, str)
-                else rec.shot_type_details)
+        js = get_event_details(rec)
+        if js:
             all_details.extend(js)
 
     # ─── Compute raw season totals directly from all_details ─────────────────
@@ -1621,13 +1616,7 @@ def player_detail(player_name):
     for s in game_stats_records:
         gid = s.game_id
 
-        js = []
-        if s.shot_type_details:
-            js = (
-                json.loads(s.shot_type_details)
-                if isinstance(s.shot_type_details, str)
-                else s.shot_type_details
-            )
+        js = get_event_details(s)
 
         # count makes for each class
         made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
@@ -1681,13 +1670,7 @@ def player_detail(player_name):
     for s in practice_stats_records:
         pid = s.practice_id
 
-        js = []
-        if s.shot_type_details:
-            js = (
-                json.loads(s.shot_type_details)
-                if isinstance(s.shot_type_details, str)
-                else s.shot_type_details
-            )
+        js = get_event_details(s)
 
         made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
         made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
@@ -1731,8 +1714,8 @@ def player_detail(player_name):
 
         # ─── TEMPORARY DEBUG: print out every ATR shot detail for Game 1 (rec.id=9) ───
     for rec in stats_for_shot:
-        if rec.shot_type_details:
-            js = json.loads(rec.shot_type_details) if isinstance(rec.shot_type_details, str) else rec.shot_type_details
+        js = get_event_details(rec)
+        if js:
             # Only dump the first ATR shot so we don’t flood the console
             for shot in js:
                 if shot.get('shot_class') == 'ATR':
@@ -2079,8 +2062,9 @@ def player_shot_type(player_name):
     # Build shot_details using only the “game” or “practice” subset (stats_for_shot)
     shot_details = []
     for s in stats_for_shot:
-        if s.shot_type_details:
-            shot_details.extend(json.loads(s.shot_type_details))
+        js = get_event_details(s)
+        if js:
+            shot_details.extend(js)
 
 
     # Now you can group or filter shot_details however you like:

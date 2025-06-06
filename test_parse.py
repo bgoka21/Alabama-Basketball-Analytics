@@ -71,6 +71,7 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
         "fg2_fouled":      0,
         "fg3_fouled":      0,
         "shot_type_details": [],
+        "stat_details": [],
         "blue_collar_accum": {key: 0 for key in blue_collar_values.keys()}
     }
     # Copy in any other mapped stats (e.g. "blocks", "steals") you already had:
@@ -817,6 +818,9 @@ def parse_csv(file_path, game_id, season_id):
                 json_details = None
                 if stats.get("shot_type_details"):
                     json_details = json.dumps(stats["shot_type_details"])
+                stat_json = None
+                if stats.get("stat_details"):
+                    stat_json = json.dumps(stats["stat_details"])
 
                 # Build a fresh dict of only valid columns (excluding array/dict fields)
                 clean_stats = {
@@ -836,6 +840,8 @@ def parse_csv(file_path, game_id, season_id):
                 # Attach shot_type_details JSON if present
                 if json_details is not None:
                     clean_stats["shot_type_details"] = json_details
+                if stat_json is not None:
+                    clean_stats["stat_details"] = stat_json
 
                 # Insert the new, non-duplicated PlayerStats row
                 db.session.add(PlayerStats(**clean_stats))
