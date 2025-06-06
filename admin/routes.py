@@ -1395,10 +1395,13 @@ def player_detail(player_name):
             else s.shot_type_details
         )
         for shot in js:
-            labels = set(
+            labels = {
                 lbl.strip().upper()
                 for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                 if lbl.strip()
+            }
+            labels.update(
+                lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
             )
             if label_set and not (labels & label_set):
                 continue
@@ -1443,10 +1446,13 @@ def player_detail(player_name):
         made_fg2 = 0
         made_fg3 = 0
         for shot in js:
-            labels = set(
+            labels = {
                 lbl.strip().upper()
                 for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                 if lbl.strip()
+            }
+            labels.update(
+                lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
             )
             if label_set and not (labels & label_set):
                 continue
@@ -1486,10 +1492,13 @@ def player_detail(player_name):
                 else rec.shot_type_details
             )
             for shot in js:
-                labels = set(
+                labels = {
                     lbl.strip().upper()
                     for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                     if lbl.strip()
+                }
+                labels.update(
+                    lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
                 )
                 if label_set and not (labels & label_set):
                     continue
@@ -1744,6 +1753,9 @@ def player_detail(player_name):
                     for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                     if lbl.strip()
                 }
+                labels.update(
+                    lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
+                )
                 if labels & label_set:
                     filtered_js.append(shot)
         else:
