@@ -1817,11 +1817,11 @@ def player_detail(player_name):
             # Only dump the first ATR shot so we don’t flood the console
             for shot in js:
                 if shot.get('shot_class') == 'ATR':
-                    print(">>> ATR shot_detail dict:", shot)
+                    # print(">>> ATR shot_detail dict:", shot)  # removed debug output
                     break
             # And show how many ATR‐class entries exist in this rec:
             num_atr = sum(1 for shot in js if shot.get('shot_class') == 'ATR')
-            print(f"Game {rec.game_id} (rec.id={rec.id}) has {num_atr} ATR entries")
+            # print(f"Game {rec.game_id} (rec.id={rec.id}) has {num_atr} ATR entries")
 
 
 
