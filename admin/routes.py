@@ -1030,27 +1030,57 @@ def edit_game(game_id):
 
 
 # ─── Helper: aggregate stats for a list of PlayerStats records ─────────────────
-def aggregate_stats(stats_list):
-    """
-    Given a list of PlayerStats records, compute totals, eFG%, points-per-shot,
-    and assist/turnover ratios.
-    """
-    # 1) basic sums
-    agg = {
-        "points":          sum(s.points        or 0 for s in stats_list),
-        "assists":         sum(s.assists       or 0 for s in stats_list),
-        "turnovers":       sum(s.turnovers     or 0 for s in stats_list),
-        "atr_attempts":    sum(s.atr_attempts or 0 for s in stats_list),
-        "atr_makes":       sum(s.atr_makes    or 0 for s in stats_list),
-        "fg2_attempts":    sum(s.fg2_attempts or 0 for s in stats_list),
-        "fg2_makes":       sum(s.fg2_makes    or 0 for s in stats_list),
-        "fg3_attempts":    sum(s.fg3_attempts or 0 for s in stats_list),
-        "fg3_makes":       sum(s.fg3_makes    or 0 for s in stats_list),
-        "fta":             sum(s.fta          or 0 for s in stats_list),
-        "ftm":             sum(s.ftm          or 0 for s in stats_list),
-        "second_assists":  sum(s.second_assists or 0 for s in stats_list),
-        "pot_assists":     sum(s.pot_assists  or 0 for s in stats_list),
-    }
+def load_stat_details(record):
+    """Return record.stat_details parsed as a list of dicts."""
+    data = getattr(record, "stat_details", None)
+    if not data:
+        return []
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception:
+            return []
+    return data if isinstance(data, list) else []
+
+
+def aggregate_stats(stats_list, labels=None):
+    """Aggregate totals for a list of PlayerStats records."""
+    label_set = set(labels) if labels else None
+    if label_set:
+        # accumulate using each event's drill_labels
+        totals = {
+            "points":0, "assists":0, "turnovers":0,
+            "atr_attempts":0, "atr_makes":0,
+            "fg2_attempts":0, "fg2_makes":0,
+            "fg3_attempts":0, "fg3_makes":0,
+            "fta":0, "ftm":0,
+            "second_assists":0, "pot_assists":0,
+            "practice_wins":0, "practice_losses":0,
+            "sprint_wins":0, "sprint_losses":0,
+        }
+        for rec in stats_list:
+            for ev in load_stat_details(rec):
+                ev_labels = set(ev.get("drill_labels", []))
+                if not ev_labels or ev_labels & label_set:
+                    for key in totals:
+                        totals[key] += ev.get(key, 0)
+        agg = totals
+    else:
+        agg = {
+            "points":          sum(s.points        or 0 for s in stats_list),
+            "assists":         sum(s.assists       or 0 for s in stats_list),
+            "turnovers":       sum(s.turnovers     or 0 for s in stats_list),
+            "atr_attempts":    sum(s.atr_attempts or 0 for s in stats_list),
+            "atr_makes":       sum(s.atr_makes    or 0 for s in stats_list),
+            "fg2_attempts":    sum(s.fg2_attempts or 0 for s in stats_list),
+            "fg2_makes":       sum(s.fg2_makes    or 0 for s in stats_list),
+            "fg3_attempts":    sum(s.fg3_attempts or 0 for s in stats_list),
+            "fg3_makes":       sum(s.fg3_makes    or 0 for s in stats_list),
+            "fta":             sum(s.fta          or 0 for s in stats_list),
+            "ftm":             sum(s.ftm          or 0 for s in stats_list),
+            "second_assists":  sum(s.second_assists or 0 for s in stats_list),
+            "pot_assists":     sum(s.pot_assists  or 0 for s in stats_list),
+        }
     # 2) effective FG% and points/shot
     total_shots = agg["atr_attempts"] + agg["fg2_attempts"] + agg["fg3_attempts"]
     if total_shots:
@@ -1075,17 +1105,33 @@ def aggregate_stats(stats_list):
 # ─── Helper: sum blue-collar stats for given PlayerStats records ──────────────
 from sqlalchemy import or_
 
-def get_blue_breakdown(stats_list, roster_id):
+def get_blue_breakdown(stats_list, roster_id, labels=None):
     """
     Given a list of PlayerStats for one player, sum their BlueCollarStats.
     If any stats_list rows have game_ids, we filter by those; otherwise by practice_ids.
     """
+    label_set = set(labels) if labels else None
     if not stats_list:
         return SimpleNamespace(
             def_reb=0, off_reb=0, misc=0, deflection=0,
             steal=0, block=0, floor_dive=0,
             charge_taken=0, reb_tip=0, total_blue_collar=0
         )
+
+    if label_set:
+        totals = {
+            'def_reb':0, 'off_reb':0, 'misc':0, 'deflection':0,
+            'steal':0, 'block':0, 'floor_dive':0,
+            'charge_taken':0, 'reb_tip':0, 'total_blue_collar':0
+        }
+        for rec in stats_list:
+            for ev in load_stat_details(rec):
+                ev_labels = set(ev.get('drill_labels', []))
+                if not ev_labels or ev_labels & label_set:
+                    bc = ev.get('blue_collar', {})
+                    for k in totals:
+                        totals[k] += bc.get(k, 0)
+        return SimpleNamespace(**totals)
 
     # collect ids
     game_ids     = [r.game_id     for r in stats_list if r.game_id]
@@ -1274,6 +1320,13 @@ def player_detail(player_name):
     aggregated_game     = aggregate_stats(game_stats_records)
     aggregated_practice = aggregate_stats(practice_stats_records)
 
+    # Optional label filter for drill/event labels
+    label_filter_str = request.args.get('labels')
+    label_filter = [lbl.strip() for lbl in label_filter_str.split(',')] if label_filter_str else None
+
+    filtered_game     = aggregate_stats(game_stats_records, label_filter) if label_filter else aggregated_game
+    filtered_practice = aggregate_stats(practice_stats_records, label_filter) if label_filter else aggregated_practice
+
     # ─── Compute blue‐collar via raw SQL (instead of get_blue_breakdown) ───
     zero_blue = SimpleNamespace(
         def_reb=0, off_reb=0, misc=0, deflection=0,
@@ -1349,13 +1402,20 @@ def player_detail(player_name):
     else:
         player_blue_breakdown_practice = zero_blue
 
+    filtered_blue_game = get_blue_breakdown(game_stats_records, player.id, label_filter) if label_filter else player_blue_breakdown_game
+    filtered_blue_practice = get_blue_breakdown(practice_stats_records, player.id, label_filter) if label_filter else player_blue_breakdown_practice
+
     # ─── Now pick which “blue” to pass to the template ────────────
     if mode == 'game':
         agg  = aggregated_game
         blue = player_blue_breakdown_game
+        filt_agg  = filtered_game
+        filt_blue = filtered_blue_game
     else:
         agg  = aggregated_practice
         blue = player_blue_breakdown_practice
+        filt_agg  = filtered_practice
+        filt_blue = filtered_blue_practice
 
 
         # ─── Override agg’s shooting fields with raw JSON counts ─────────────────
@@ -1752,10 +1812,17 @@ def player_detail(player_name):
         mode                               = mode,
         agg                                = agg,
         blue                               = blue,
+        filt_agg                           = filt_agg,
+        filt_blue                          = filt_blue,
         aggregated_game                    = aggregated_game,
         aggregated_practice                = aggregated_practice,
         player_blue_breakdown_game         = player_blue_breakdown_game,
         player_blue_breakdown_practice     = player_blue_breakdown_practice,
+        filtered_game                      = filtered_game,
+        filtered_practice                  = filtered_practice,
+        filtered_blue_game                 = filtered_blue_game,
+        filtered_blue_practice             = filtered_blue_practice,
+        label_filter                       = label_filter or [],
         game_stats_records                 = game_stats_records,
         practice_stats_records             = practice_stats_records,
         stats_records                      = game_stats_records if mode=='game' else practice_stats_records,
