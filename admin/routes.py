@@ -1471,6 +1471,17 @@ def player_detail(player_name):
 
     # overwrite agg.points
     agg.points = total_pts
+
+    # After overwriting shooting/point totals, recompute eFG% and PPS
+    total_shots = agg.atr_attempts + agg.fg2_attempts + agg.fg3_attempts
+    if total_shots:
+        efg = (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots
+        agg.efg_pct         = round(efg * 100, 1)
+        agg.points_per_shot = round(agg.points / total_shots, 2)
+    else:
+        agg.efg_pct         = 0.0
+        agg.points_per_shot = 0.0
+
     # ─────────────────────────────────────────────────────────────────────────────
 
     # ─── End override ─────────────────────────────────────────────────────────
