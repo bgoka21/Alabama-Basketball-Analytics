@@ -75,8 +75,24 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         player_stats_dict[roster_id]["fta"] += 1
                         player_stats_dict[roster_id]["ftm"] += 1
                         player_stats_dict[roster_id]["points"] += 1
+                        shot_obj = {
+                            "event":       "shot_attempt",
+                            "shot_class":   "ft",
+                            "result":       "made",
+                            "drill_labels": labels,
+                        }
+                        player_shot_list[roster_id].append(shot_obj)
+                        player_detail_list[roster_id].append(dict(shot_obj))
                     elif token == "FT-":
                         player_stats_dict[roster_id]["fta"] += 1
+                        shot_obj = {
+                            "event":       "shot_attempt",
+                            "shot_class":   "ft",
+                            "result":       "miss",
+                            "drill_labels": labels,
+                        }
+                        player_shot_list[roster_id].append(shot_obj)
+                        player_detail_list[roster_id].append(dict(shot_obj))
             continue
         # ───────────────────────────────────────────────────────────────────
 
@@ -249,9 +265,25 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         player_stats_dict[roster_id]["fta"] += 1
                         player_stats_dict[roster_id]["ftm"] += 1
                         player_stats_dict[roster_id]["points"] += 1
+                        ft_obj = {
+                            "event":       "shot_attempt",
+                            "shot_class":   "ft",
+                            "result":       "made",
+                            "drill_labels": labels,
+                        }
+                        player_shot_list[roster_id].append(ft_obj)
+                        player_detail_list[roster_id].append(dict(ft_obj))
                         continue
                     elif token == "FT-":
                         player_stats_dict[roster_id]["fta"] += 1
+                        ft_obj = {
+                            "event":       "shot_attempt",
+                            "shot_class":   "ft",
+                            "result":       "miss",
+                            "drill_labels": labels,
+                        }
+                        player_shot_list[roster_id].append(ft_obj)
+                        player_detail_list[roster_id].append(dict(ft_obj))
                         continue
 
                     # ─── Mapped basic stats (Assist, Turnover, etc.) ─────────————
@@ -265,6 +297,10 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     if token in stat_mapping:
                         key = stat_mapping[token]
                         player_stats_dict[roster_id][key] += 1
+                        player_detail_list[roster_id].append({
+                            "event": key,
+                            "drill_labels": labels,
+                        })
                         continue
 
                 # done processing tokens for this player in this offense row
