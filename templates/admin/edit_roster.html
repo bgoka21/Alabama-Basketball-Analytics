@@ -16,6 +16,7 @@
 </form>
 
 <!-- Current Roster Table -->
+<div class="overflow-x-auto">
 <table class="min-w-full bg-white mb-6 border rounded">
   <thead>
     <tr class="bg-gray-100">
@@ -38,6 +39,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 <!-- Add Player Form -->
 <form method="post" action="{{ url_for('admin.roster', season_id=selected_season) }}" class="flex mb-4">

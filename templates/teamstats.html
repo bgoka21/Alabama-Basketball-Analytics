@@ -9,7 +9,8 @@
     <h1>🏀 Team Stats</h1>
 
     <h2>📊 Game-by-Game Team Stats</h2>
-    <table border="1">
+    <div class="overflow-x-auto">
+    <table class="min-w-full table-auto text-sm" border="1">
         <tr>
             <th>Game ID</th>
             <th>Points</th>
@@ -27,9 +28,11 @@
         </tr>
         {% endfor %}
     </table>
+    </div>
 
     <h2>📊 Opponent Stats</h2>
-    <table border="1">
+    <div class="overflow-x-auto">
+    <table class="min-w-full table-auto text-sm" border="1">
         <tr>
             <th>Game ID</th>
             <th>Points</th>
@@ -47,5 +50,6 @@
         </tr>
         {% endfor %}
     </table>
+    </div>
 </body>
 </html>
