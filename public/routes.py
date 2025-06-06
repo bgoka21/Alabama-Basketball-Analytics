@@ -365,12 +365,13 @@ def practice_homepage(active_page="practice_home"):
     dunk_counts = defaultdict(int)
     stats = PlayerStats.query.filter(PlayerStats.practice_id.in_(practice_ids)).all()
     for rec in stats:
-        if not rec.shot_type_details:
+        details = rec.stat_details or rec.shot_type_details
+        if not details:
             continue
         details = (
-            json.loads(rec.shot_type_details)
-            if isinstance(rec.shot_type_details, str)
-            else rec.shot_type_details
+            json.loads(details)
+            if isinstance(details, str)
+            else details
         )
         for shot in details:
             if shot.get("result") != "made":
