@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import date
 
 import pytest
@@ -45,4 +46,8 @@ def test_win_loss_parsing(app, tmp_path):
         loss_row = PlayerStats.query.filter_by(player_name='#2 B').first()
         assert win_row.practice_wins == 1
         assert loss_row.practice_losses == 1
+        details_win = json.loads(win_row.stat_details)
+        details_loss = json.loads(loss_row.stat_details)
+        assert details_win == [{"event": "win", "team": "CRIMSON", "drill_labels": []}]
+        assert details_loss == [{"event": "loss", "team": "WHITE", "drill_labels": []}]
 

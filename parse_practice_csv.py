@@ -37,9 +37,10 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     df = pd.read_csv(practice_csv_path)
     
     # ─── Step A: Initialize accumulators ─────────────────────────────
-    player_stats_dict = defaultdict(lambda: defaultdict(int))
-    player_blue_dict  = defaultdict(lambda: defaultdict(int))
-    player_shot_list  = defaultdict(list)
+    player_stats_dict   = defaultdict(lambda: defaultdict(int))
+    player_blue_dict    = defaultdict(lambda: defaultdict(int))
+    player_shot_list    = defaultdict(list)
+    player_detail_list  = defaultdict(list)
     # ── Find all columns beginning with "#" to use for player tokens
     player_columns = [c for c in df.columns if c.startswith("#")]
     # ─────────────────────────────────────────────────────────────────────
@@ -47,6 +48,12 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # ─── Step B: Loop through each row in the CSV ────────────────────
     for _, row in df.iterrows():
         row_type = str(row.get("Row", "")).strip()
+        drill_val = row.get("DRILL TYPE", "")
+        if pd.isna(drill_val):
+            drill_str = ""
+        else:
+            drill_str = str(drill_val)
+        labels = [t.strip() for t in drill_str.split(",") if t.strip()]
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":
@@ -103,8 +110,16 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
                     if is_win:
                         player_stats_dict[roster_id]["practice_wins"] += 1
+                        event_type = "win"
                     else:
                         player_stats_dict[roster_id]["practice_losses"] += 1
+                        event_type = "loss"
+
+                    player_detail_list[roster_id].append({
+                        "event": event_type,
+                        "team": team_col,
+                        "drill_labels": labels,
+                    })
             continue
         # ───────────────────────────────────────────────────────────────────
 
@@ -173,11 +188,13 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             possession_str = str(poss_val).strip()
 
                         shot_obj = {
+                            "event":          "shot_attempt",
                             "shot_class":      cls,
                             "result":          result,
                             "possession_type": possession_str,
                             "Assisted":        "Assisted"     if assisted_flag else "",
-                            "Non-Assisted":    "" if assisted_flag else "Non-Assisted"
+                            "Non-Assisted":    "" if assisted_flag else "Non-Assisted",
+                            "drill_labels":    labels,
                         }
 
                         # For both ATR and 2FG shot types, capture 2FG‐subcategory columns:
@@ -224,6 +241,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                                         shot_obj[shot_obj_key] = val
 
                         player_shot_list[roster_id].append(shot_obj)
+                        player_detail_list[roster_id].append(dict(shot_obj))
 
                     # ─── Free Throws fallback (just in case) ─────────────────————
                     if token == "FT+":
@@ -279,9 +297,18 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         if token in blue_collar_mapping:
                             key = blue_collar_mapping[token]
                             player_blue_dict[roster_id][key] += 1
+                            event_name = key
                         elif token in sprint_mapping:
                             key = sprint_mapping[token]
                             player_stats_dict[roster_id][key] += 1
+                            event_name = key
+                        else:
+                            continue
+
+                        player_detail_list[roster_id].append({
+                            "event": event_name,
+                            "drill_labels": labels,
+                        })
             continue
         # ────────────────────────────────────────────────────────────────────
 
@@ -305,6 +332,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         stats = player_stats_dict.get(roster_id, {})
         blues = player_blue_dict.get(roster_id, {})
         shots = player_shot_list.get(roster_id, [])
+        details = player_detail_list.get(roster_id, [])
         
         # 1) Insert PlayerStats
         db.session.add(
@@ -336,7 +364,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 sprint_wins       = stats.get("sprint_wins", 0),
                 sprint_losses     = stats.get("sprint_losses", 0),
 
-                shot_type_details = json.dumps(shots) if shots else None
+                shot_type_details = json.dumps(shots) if shots else None,
+                stat_details      = json.dumps(details) if details else None
             )
         )
         
