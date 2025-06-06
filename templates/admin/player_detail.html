@@ -148,6 +148,25 @@
     {% endfor %}
   </div>
 
+  {% if label_filter %}
+  <h3 class="text-lg font-semibold mb-2">Filtered Totals ({{ label_filter|join(', ') }})</h3>
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    {% set ft = filt_agg %}
+    {% for label, value in [
+      ('Points', ft.points),
+      ('Assists', ft.assists),
+      ('Pot. Assists', ft.pot_assists),
+      ('2nd Assists', ft.second_assists),
+      ('Turnovers', ft.turnovers)
+    ] %}
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+        <div class="text-sm font-medium text-gray-500 uppercase">{{ label }}</div>
+        <div class="text-2xl font-bold mt-2">{{ value }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Row 4: Ratios -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 justify-items-center">
     <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center w-full sm:w-80">
@@ -200,6 +219,9 @@
           </tr>
         </tbody>
       </table>
+      {% if label_filter %}
+      <p class="font-semibold mt-2">Filtered BCP ({{ label_filter|join(', ') }}): {{ filt_blue.total_blue_collar }}</p>
+      {% endif %}
     </div>
   </div>
 </div>

@@ -158,6 +158,7 @@ class PlayerStats(db.Model):
     practice_losses = db.Column(db.Integer, default=0)
     sprint_wins     = db.Column(db.Integer, default=0)
     sprint_losses   = db.Column(db.Integer, default=0)
+    stat_details    = db.Column(db.Text, nullable=True)
 
 
 
