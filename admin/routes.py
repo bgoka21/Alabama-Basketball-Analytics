@@ -36,7 +36,7 @@ from models.user import User
 from sqlalchemy import func
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
-from parse_practice_csv import parse_practice_csv  # <— make sure this is here
+from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
 
 # --- Helper Functions at the top ---
 
@@ -1128,6 +1128,42 @@ def get_blue_breakdown(stats_list, roster_id):
     )
 
 
+# ─── Helper: compute filtered blue-collar totals from stat_details ────────────
+def compute_filtered_blue(stats_records, label_set):
+    """Return blue-collar counts filtered by drill label set."""
+    if not stats_records:
+        zeros = {k: 0 for k in blue_collar_values.keys()}
+        zeros["total_blue_collar"] = 0
+        return SimpleNamespace(**zeros)
+
+    counts = {k: 0 for k in blue_collar_values.keys()}
+    for rec in stats_records:
+        if not rec.stat_details:
+            continue
+        details = (
+            json.loads(rec.stat_details)
+            if isinstance(rec.stat_details, str)
+            else rec.stat_details
+        )
+        for ev in details:
+            event = ev.get("event")
+            if event not in counts:
+                continue
+            labels = {
+                lbl.strip().upper()
+                for lbl in ev.get("drill_labels", [])
+                if isinstance(lbl, str) and lbl.strip()
+            }
+            if label_set and not (labels & label_set):
+                continue
+            counts[event] += 1
+
+    counts["total_blue_collar"] = sum(
+        counts[k] * blue_collar_values[k] for k in blue_collar_values.keys()
+    )
+    return SimpleNamespace(**counts)
+
+
 
 
 @admin_bp.route('/admin/player/<player_name>', methods=['GET', 'POST'])
@@ -1370,7 +1406,10 @@ def player_detail(player_name):
         blue = player_blue_breakdown_game
     else:
         agg  = aggregated_practice
-        blue = player_blue_breakdown_practice
+        if label_set:
+            blue = compute_filtered_blue(practice_stats_records, label_set)
+        else:
+            blue = player_blue_breakdown_practice
 
 
         # ─── Override agg’s shooting fields with raw JSON counts ─────────────────
