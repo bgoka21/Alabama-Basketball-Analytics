@@ -48,7 +48,9 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # ─── Step B: Loop through each row in the CSV ────────────────────
     for _, row in df.iterrows():
         row_type = str(row.get("Row", "")).strip()
-        drill_val = row.get("DRILL TYPE", "")
+        drill_val = row.get("DRILL TYPE")
+        if pd.isna(drill_val) or str(drill_val).strip() == "":
+            drill_val = row.get("DRILL NAME", "")
         if pd.isna(drill_val):
             drill_str = ""
         else:
