@@ -21,15 +21,28 @@
 
   <!-- Game/Practice Buttons -->
   <div class="flex gap-4 mb-4">
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game') }}"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', label=selected_labels) }}"
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-100 text-gray-800' }}">
       Game
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice') }}"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', label=selected_labels) }}"
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-100 text-gray-800' }}">
       Practice
     </a>
   </div>
+
+  {% if mode == 'practice' %}
+  <form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
+    <input type="hidden" name="mode" value="practice" />
+    {% for lbl in label_options %}
+      <label class="inline-flex items-center text-sm mr-2">
+        <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+        <span class="ml-1">{{ lbl }}</span>
+      </label>
+    {% endfor %}
+    <button type="submit" class="px-3 py-1 border rounded">Apply</button>
+  </form>
+  {% endif %}
   
   <!-- Tab Buttons -->
   <div class="flex space-x-2 mb-4">
