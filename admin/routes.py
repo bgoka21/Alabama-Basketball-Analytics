@@ -1275,9 +1275,19 @@ def player_detail(player_name):
     aggregated_practice = aggregate_stats(practice_stats_records)
 
     # ─── Drill label filtering (practice mode only) ─────────────────────
-    label_options   = ['3V3','4V4','5V5','Advantage','Breakdown','Transition Series','Scrimmage']
-    selected_labels = [lbl for lbl in request.args.getlist('label') if lbl in label_options]
-    label_set       = {lbl.lower() for lbl in selected_labels}
+    label_options   = [
+        '3V3 DRILLS',
+        '4V4 DRILLS',
+        '5V5 DRILLS',
+        'ADVANTAGE DRILLS',
+        'BREAKDOWN DRILLS',
+        'TRANSITION SERIES',
+        'SCRIMMAGE',
+    ]
+    selected_labels = [
+        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+    ]
+    label_set       = {lbl.upper() for lbl in selected_labels}
 
     # ─── Compute blue‐collar via raw SQL (instead of get_blue_breakdown) ───
     zero_blue = SimpleNamespace(
@@ -1386,7 +1396,7 @@ def player_detail(player_name):
         )
         for shot in js:
             labels = set(
-                lbl.strip().lower()
+                lbl.strip().upper()
                 for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                 if lbl.strip()
             )
@@ -1434,7 +1444,7 @@ def player_detail(player_name):
         made_fg3 = 0
         for shot in js:
             labels = set(
-                lbl.strip().lower()
+                lbl.strip().upper()
                 for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                 if lbl.strip()
             )
@@ -1477,7 +1487,7 @@ def player_detail(player_name):
             )
             for shot in js:
                 labels = set(
-                    lbl.strip().lower()
+                    lbl.strip().upper()
                     for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
                     if lbl.strip()
                 )
@@ -1726,17 +1736,50 @@ def player_detail(player_name):
                 if isinstance(s.shot_type_details, str)
                 else s.shot_type_details
             )
+        if label_set:
+            filtered_js = []
+            for shot in js:
+                labels = {
+                    lbl.strip().upper()
+                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                    if lbl.strip()
+                }
+                if labels & label_set:
+                    filtered_js.append(shot)
+        else:
+            filtered_js = js
 
-        made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
-        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
-        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
-        ft_made   = s.ftm or 0
+        made_atr = sum(
+            1
+            for shot in filtered_js
+            if shot.get('shot_class', '').lower() == 'atr'
+            and shot.get('result') == 'made'
+        )
+        made_fg2 = sum(
+            1
+            for shot in filtered_js
+            if shot.get('shot_class', '').lower() == '2fg'
+            and shot.get('result') == 'made'
+        )
+        made_fg3 = sum(
+            1
+            for shot in filtered_js
+            if shot.get('shot_class', '').lower() == '3fg'
+            and shot.get('result') == 'made'
+        )
+        ft_made = s.ftm or 0
 
         pts_for_practice = (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
 
-        att_atr   = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr')
-        att_fg2   = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg')
-        att_fg3   = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg')
+        att_atr = sum(
+            1 for shot in filtered_js if shot.get('shot_class', '').lower() == 'atr'
+        )
+        att_fg2 = sum(
+            1 for shot in filtered_js if shot.get('shot_class', '').lower() == '2fg'
+        )
+        att_fg3 = sum(
+            1 for shot in filtered_js if shot.get('shot_class', '').lower() == '3fg'
+        )
 
         practice_breakdown[pid] = {
             "points":         pts_for_practice,
