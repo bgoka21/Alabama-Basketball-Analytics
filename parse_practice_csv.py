@@ -336,7 +336,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 sprint_wins       = stats.get("sprint_wins", 0),
                 sprint_losses     = stats.get("sprint_losses", 0),
 
-                shot_type_details = json.dumps(shots) if shots else None
+                shot_type_details = json.dumps(shots) if shots else None,
+                stat_details      = json.dumps(shots) if shots else None
             )
         )
         
