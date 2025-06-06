@@ -1274,6 +1274,21 @@ def player_detail(player_name):
     aggregated_game     = aggregate_stats(game_stats_records)
     aggregated_practice = aggregate_stats(practice_stats_records)
 
+    # ─── Drill label filtering (practice mode only) ─────────────────────
+    label_options   = [
+        '3V3 DRILLS',
+        '4V4 DRILLS',
+        '5V5 DRILLS',
+        'ADVANTAGE DRILLS',
+        'BREAKDOWN DRILLS',
+        'TRANSITION SERIES',
+        'SCRIMMAGE',
+    ]
+    selected_labels = [
+        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+    ]
+    label_set       = {lbl.upper() for lbl in selected_labels}
+
     # ─── Compute blue‐collar via raw SQL (instead of get_blue_breakdown) ───
     zero_blue = SimpleNamespace(
         def_reb=0, off_reb=0, misc=0, deflection=0,
@@ -1380,6 +1395,14 @@ def player_detail(player_name):
             else s.shot_type_details
         )
         for shot in js:
+            labels = set(
+                lbl.strip().upper()
+                for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                if lbl.strip()
+            )
+            if label_set and not (labels & label_set):
+                continue
+
             sc = shot.get('shot_class', '').strip().lower()
             made = (shot.get('result') == 'made')
             if sc == 'atr':
@@ -1415,10 +1438,25 @@ def player_detail(player_name):
             if isinstance(s.shot_type_details, str)
             else s.shot_type_details
         )
-        # count makes per shot class
-        made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
-        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
-        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
+        # count makes per shot class (filtered by labels)
+        made_atr = 0
+        made_fg2 = 0
+        made_fg3 = 0
+        for shot in js:
+            labels = set(
+                lbl.strip().upper()
+                for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                if lbl.strip()
+            )
+            if label_set and not (labels & label_set):
+                continue
+            sc = shot.get('shot_class','').lower()
+            if sc == 'atr' and shot.get('result') == 'made':
+                made_atr += 1
+            elif sc == '2fg' and shot.get('result') == 'made':
+                made_fg2 += 1
+            elif sc == '3fg' and shot.get('result') == 'made':
+                made_fg3 += 1
         # free throws
         ft_made   = s.ftm or 0
 
@@ -1442,10 +1480,20 @@ def player_detail(player_name):
     all_details = []
     for rec in stats_for_shot:
         if rec.shot_type_details:
-            js = (json.loads(rec.shot_type_details)
+            js = (
+                json.loads(rec.shot_type_details)
                 if isinstance(rec.shot_type_details, str)
-                else rec.shot_type_details)
-            all_details.extend(js)
+                else rec.shot_type_details
+            )
+            for shot in js:
+                labels = set(
+                    lbl.strip().upper()
+                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                    if lbl.strip()
+                )
+                if label_set and not (labels & label_set):
+                    continue
+                all_details.append(shot)
 
     # ─── Compute raw season totals directly from all_details ─────────────────
     makes_atr  = sum(1 for shot in all_details if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
@@ -1688,17 +1736,50 @@ def player_detail(player_name):
                 if isinstance(s.shot_type_details, str)
                 else s.shot_type_details
             )
+        if label_set:
+            filtered_js = []
+            for shot in js:
+                labels = {
+                    lbl.strip().upper()
+                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                    if lbl.strip()
+                }
+                if labels & label_set:
+                    filtered_js.append(shot)
+        else:
+            filtered_js = js
 
-        made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
-        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
-        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
-        ft_made   = s.ftm or 0
+        made_atr = sum(
+            1
+            for shot in filtered_js
+            if shot.get('shot_class', '').lower() == 'atr'
+            and shot.get('result') == 'made'
+        )
+        made_fg2 = sum(
+            1
+            for shot in filtered_js
+            if shot.get('shot_class', '').lower() == '2fg'
+            and shot.get('result') == 'made'
+        )
+        made_fg3 = sum(
+            1
+            for shot in filtered_js
+            if shot.get('shot_class', '').lower() == '3fg'
+            and shot.get('result') == 'made'
+        )
+        ft_made = s.ftm or 0
 
         pts_for_practice = (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
 
-        att_atr   = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr')
-        att_fg2   = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg')
-        att_fg3   = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg')
+        att_atr = sum(
+            1 for shot in filtered_js if shot.get('shot_class', '').lower() == 'atr'
+        )
+        att_fg2 = sum(
+            1 for shot in filtered_js if shot.get('shot_class', '').lower() == '2fg'
+        )
+        att_fg3 = sum(
+            1 for shot in filtered_js if shot.get('shot_class', '').lower() == '3fg'
+        )
 
         practice_breakdown[pid] = {
             "points":         pts_for_practice,
@@ -1781,7 +1862,9 @@ def player_detail(player_name):
         practice_breakdown                 = practice_breakdown,
         practice_details                   = practice_details,
         player                             = player,
-        has_stats                          = has_stats
+        has_stats                          = has_stats,
+        label_options                      = label_options,
+        selected_labels                    = selected_labels
     )
 
 
