@@ -21,11 +21,11 @@
 
   <!-- Game/Practice Buttons -->
   <div class="flex gap-4 mb-4">
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', label=selected_labels) }}"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', label=request.args.getlist('label')) }}"
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-100 text-gray-800' }}">
       Game
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', label=selected_labels) }}"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', label=request.args.getlist('label')) }}"
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-100 text-gray-800' }}">
       Practice
     </a>
