@@ -8,8 +8,11 @@
 </head>
 <body class="min-h-screen flex">
 
-  <!-- Sidebar: always visible -->
-  <aside class="w-64 bg-[#9E1B32] text-white flex flex-col px-4 py-6">
+  <!-- Mobile menu button -->
+  <button id="mobile-menu-btn" class="md:hidden p-4 text-2xl">&#9776;</button>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="hidden md:flex w-64 bg-[#9E1B32] text-white flex-col px-4 py-6">
     <h1 class="text-2xl font-bold mb-8">Alabama Basketball</h1>
 
     <nav class="flex flex-col gap-4 flex-1">
@@ -95,6 +98,14 @@
   {# ── Main page content ── #}
   {% block content %}{% endblock %}
 </main>
+
+  <script>
+    const btn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    btn.addEventListener('click', () => {
+      sidebar.classList.toggle('hidden');
+    });
+  </script>
 
 </body>
 </html>
