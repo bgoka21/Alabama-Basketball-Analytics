@@ -53,54 +53,27 @@ def create_app():
     def grade_atr2fg_pct(pct, attempts):
         """Return a gradient background-color style for ATR/2FG percentage.
 
-        Follows the same green/yellow/red gradient scheme as ``grade_pps``.
+        The color mapping mirrors ``grade_pps`` by converting the field goal
+        percentage into points per shot (value of a made 2-pointer).
         """
         if not attempts:
             return ""
 
-        def interpolate(start, end, factor):
-            return tuple(
-                round(s + (e - s) * max(0.0, min(factor, 1.0)))
-                for s, e in zip(start, end)
-            )
-
-        if pct >= 70:
-            start, end = (200, 255, 200), (0, 128, 0)
-            factor = min((pct - 70) / 30, 1.0)
-        elif pct >= 50:
-            start, end = (255, 255, 224), (255, 215, 0)
-            factor = (pct - 50) / 20
-        else:
-            start, end = (255, 200, 200), (255, 0, 0)
-            factor = min((50 - pct) / 50, 1.0)
-
-        r, g, b = interpolate(start, end, factor)
-        return f"background-color: rgb({r},{g},{b});"
+        pps = (pct / 100.0) * 2
+        return grade_pps(pps, attempts)
 
     @app.template_filter()
     def grade_3fg_pct(pct, attempts):
-        """Return a gradient background-color style for 3FG percentage."""
+        """Return a gradient background-color style for 3FG percentage.
+
+        The gradient is calculated using ``grade_pps`` with the 3-point shot
+        value so FG% and PPS share the same color logic.
+        """
         if not attempts:
             return ""
 
-        def interpolate(start, end, factor):
-            return tuple(
-                round(s + (e - s) * max(0.0, min(factor, 1.0)))
-                for s, e in zip(start, end)
-            )
-
-        if pct >= 40:
-            start, end = (200, 255, 200), (0, 128, 0)
-            factor = min((pct - 40) / 30, 1.0)
-        elif pct >= 30:
-            start, end = (255, 255, 224), (255, 215, 0)
-            factor = (pct - 30) / 10
-        else:
-            start, end = (255, 200, 200), (255, 0, 0)
-            factor = min((30 - pct) / 30, 1.0)
-
-        r, g, b = interpolate(start, end, factor)
-        return f"background-color: rgb({r},{g},{b});"
+        pps = (pct / 100.0) * 3
+        return grade_pps(pps, attempts)
 
     @app.template_filter()
     def grade_pps(pps, attempts):
