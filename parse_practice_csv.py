@@ -3,6 +3,11 @@ import pandas as pd
 from collections import defaultdict
 from models.database import db, Roster, PlayerStats, BlueCollarStats, Practice
 
+
+def safe_str(value):
+    """Safely convert a value to a string, returning an empty string for None."""
+    return "" if value is None else str(value)
+
 # ── COPY OF blue_collar_values FROM test_parse.py ───────────────────
 blue_collar_values = {
     "reb_tip":      0.5,
@@ -98,6 +103,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             "result":       "made",
                             "drill_labels": labels,
                         }
+                        shot_location = safe_str(row.get("Shot Location", ""))
+                        shot_obj["shot_location"] = shot_location
                         player_shot_list[roster_id].append(shot_obj)
                         player_detail_list[roster_id].append(dict(shot_obj))
                     elif token == "FT-":
@@ -108,6 +115,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             "result":       "miss",
                             "drill_labels": labels,
                         }
+                        shot_location = safe_str(row.get("Shot Location", ""))
+                        shot_obj["shot_location"] = shot_location
                         player_shot_list[roster_id].append(shot_obj)
                         player_detail_list[roster_id].append(dict(shot_obj))
             continue
@@ -257,6 +266,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             "Non-Assisted":    "" if assisted_flag else "Non-Assisted",
                             "drill_labels":    labels,
                         }
+                        shot_location = safe_str(row.get("Shot Location", ""))
+                        shot_obj["shot_location"] = shot_location
 
                         # For both ATR and 2FG shot types, capture 2FG‐subcategory columns:
                         if cls in ("2fg", "atr"):
@@ -315,6 +326,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             "result":       "made",
                             "drill_labels": labels,
                         }
+                        shot_location = safe_str(row.get("Shot Location", ""))
+                        ft_obj["shot_location"] = shot_location
                         player_shot_list[roster_id].append(ft_obj)
                         player_detail_list[roster_id].append(dict(ft_obj))
                         continue
@@ -326,6 +339,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             "result":       "miss",
                             "drill_labels": labels,
                         }
+                        shot_location = safe_str(row.get("Shot Location", ""))
+                        ft_obj["shot_location"] = shot_location
                         player_shot_list[roster_id].append(ft_obj)
                         player_detail_list[roster_id].append(dict(ft_obj))
                         continue

@@ -257,6 +257,8 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
             "Assisted":        "Assisted"     if assisted_flag else "",
             "Non-Assisted":    "" if assisted_flag else "Non-Assisted"
         }
+        shot_location = safe_str(row.get("Shot Location", ""))
+        shot_detail["shot_location"] = shot_location
         key_prefix = shooter_type.lower()  # → "atr" or "2fg" or "3fg"
 
         # ─── Shared ATR & 2FG subcategories (pull from "2FG (…)” columns) ────────────
