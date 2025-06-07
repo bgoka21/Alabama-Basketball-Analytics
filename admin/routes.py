@@ -1870,22 +1870,6 @@ def player_detail(player_name):
 
 
 
-        # ─── TEMPORARY DEBUG: print out every ATR shot detail for Game 1 (rec.id=9) ───
-    for rec in stats_for_shot:
-        if rec.shot_type_details:
-            js = json.loads(rec.shot_type_details) if isinstance(rec.shot_type_details, str) else rec.shot_type_details
-            # Only dump the first ATR shot so we don’t flood the console
-            for shot in js:
-                if shot.get('shot_class') == 'ATR':
-                    # print(">>> ATR shot_detail dict:", shot)  # removed debug output
-                    break
-            # And show how many ATR‐class entries exist in this rec:
-            num_atr = sum(1 for shot in js if shot.get('shot_class') == 'ATR')
-            # print(f"Game {rec.game_id} (rec.id={rec.id}) has {num_atr} ATR entries")
-
-
-
-
     # ─── Finally, render template with BOTH modes & all context ─────────
     return render_template(
         'admin/player_detail.html',
