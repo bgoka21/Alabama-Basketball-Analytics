@@ -48,13 +48,12 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     for _, row in df.iterrows():
         row_type = str(row.get("Row", "")).strip()
         drill_val = row.get("DRILL TYPE")
-        if pd.isna(drill_val) or str(drill_val).strip() == "":
-            drill_val = row.get("DRILL NAME", "")
         if pd.isna(drill_val):
             drill_str = ""
         else:
             drill_str = str(drill_val)
-        labels = [t.strip() for t in drill_str.split(",") if t.strip()]
+
+        labels = [t.strip().upper() for t in drill_str.split(",") if t.strip()]
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":

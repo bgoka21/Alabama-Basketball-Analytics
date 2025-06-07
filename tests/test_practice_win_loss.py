@@ -74,5 +74,5 @@ def test_drill_name_fallback(app, tmp_path):
         win_row = PlayerStats.query.filter_by(player_name='#1 A').first()
         assert win_row.practice_wins == 1
         details_win = json.loads(win_row.stat_details)
-        assert details_win == [{"event": "win", "team": "CRIMSON", "drill_labels": ["Shell"]}]
+        assert details_win == [{"event": "win", "team": "CRIMSON", "drill_labels": []}]
 
