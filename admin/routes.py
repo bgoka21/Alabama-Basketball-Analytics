@@ -1286,38 +1286,14 @@ def compute_filtered_totals(stats_records, label_set):
 
 # ─── Helper: collect all drill labels from practice stats ──────────────
 def collect_practice_labels(stats_records):
-    labels = set()
-    for rec in stats_records:
-        if rec.shot_type_details:
-            shots = (
-                json.loads(rec.shot_type_details)
-                if isinstance(rec.shot_type_details, str)
-                else rec.shot_type_details
-            )
-            for shot in shots:
-                labels.update(
-                    lbl.strip().upper()
-                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
-                    if lbl.strip()
-                )
-                labels.update(
-                    lbl.strip().upper()
-                    for lbl in shot.get('drill_labels', [])
-                    if isinstance(lbl, str) and lbl.strip()
-                )
-        if rec.stat_details:
-            details = (
-                json.loads(rec.stat_details)
-                if isinstance(rec.stat_details, str)
-                else rec.stat_details
-            )
-            for ev in details:
-                labels.update(
-                    lbl.strip().upper()
-                    for lbl in ev.get('drill_labels', [])
-                    if isinstance(lbl, str) and lbl.strip()
-                )
-    return sorted(labels)
+    """Return the fixed set of drill labels used for filtering practice stats."""
+    return [
+        "TRANSITION SERIES",
+        "ADVANTAGE DRILLS",
+        "3V3 DRILLS",
+        "4V4 DRILLS",
+        "5V5 DRILLS",
+    ]
 
 
 
