@@ -1055,6 +1055,7 @@ def aggregate_stats(stats_list):
     total_shots = agg["atr_attempts"] + agg["fg2_attempts"] + agg["fg3_attempts"]
     if total_shots:
         efg = (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots
+        # PPS uses weighted makes divided by all field goal attempts
         agg["efg_pct"]         = round(efg * 100, 1)
         agg["points_per_shot"] = round(
             (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots,
@@ -1517,6 +1518,7 @@ def player_detail(player_name):
     total_shots = agg.atr_attempts + agg.fg2_attempts + agg.fg3_attempts
     if total_shots:
         efg = (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots
+        # PPS uses the same weighted makes divided by shot attempts
         agg.efg_pct         = round(efg * 100, 1)
         agg.points_per_shot = round(
             (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots,
