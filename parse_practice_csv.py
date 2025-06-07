@@ -17,6 +17,24 @@ blue_collar_values = {
 }
 # ─────────────────────────────────────────────────────────────────────
 
+# Defensive token mapping (mirrors game parsing)
+defense_mapping = {
+    "Foul By": "foul_by",
+    "Front": "contest_front",
+    "Side": "contest_side",
+    "Behind": "contest_behind",
+    "Late": "contest_late",
+    "Contest": "contest_early",
+    "No Contest": "contest_no",
+    "None": "contest_no",
+    "Bump +": "bump_positive",
+    "Bump -": "bump_missed",
+    "Blowby": "blowby_total",
+    "Triple Threat": "blowby_triple_threat",
+    "Closeout": "blowby_closeout",
+    "Isolation": "blowby_isolation",
+}
+
 
 
 
@@ -139,6 +157,33 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             continue
         # ───────────────────────────────────────────────────────────────────
 
+        # ─── Defensive metrics parsing ─────────────────────────────────────
+        # Defensive labels like "Bump +" can appear under the same
+        # team rows that contain offensive stats. Parse them here so that
+        # we capture these metrics alongside the offensive ones.
+        if row_type in ("Crimson", "White", "Alabama", "Blue"):
+            for col in player_columns:
+                cell = str(row.get(col, "") or "").strip()
+                if not cell:
+                    continue
+                tokens = [t.strip() for t in cell.split(",") if t.strip()]
+                if not tokens:
+                    continue
+
+                roster_id = get_roster_id(col, season_id)
+                if roster_id is None:
+                    continue
+
+                for token in tokens:
+                    if token in defense_mapping:
+                        key = defense_mapping[token]
+                        player_stats_dict[roster_id][key] += 1
+                        player_detail_list[roster_id].append({
+                            "event": key,
+                            "drill_labels": labels,
+                        })
+        # allow offensive parsing to run as well for the same row
+        # ───────────────────────────────────────────────────────────────────
 
         # ─── 3) Offense‐equivalent rows: Shot Type, Mapped Stats ──────────
         if row_type in ("Crimson", "White", "Alabama", "Blue"):
@@ -390,10 +435,22 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 fg2_attempts      = stats.get("fg2_attempts", 0),
                 fg3_makes         = stats.get("fg3_makes", 0),
                 fg3_attempts      = stats.get("fg3_attempts", 0),
-                
+
                 ftm               = stats.get("ftm", 0),
                 fta               = stats.get("fta", 0),
                 foul_by           = stats.get("foul_by", 0),
+                contest_front     = stats.get("contest_front", 0),
+                contest_side      = stats.get("contest_side", 0),
+                contest_behind    = stats.get("contest_behind", 0),
+                contest_late      = stats.get("contest_late", 0),
+                contest_no        = stats.get("contest_no", 0),
+                contest_early     = stats.get("contest_early", 0),
+                bump_positive     = stats.get("bump_positive", 0),
+                bump_missed       = stats.get("bump_missed", 0),
+                blowby_total      = stats.get("blowby_total", 0),
+                blowby_triple_threat = stats.get("blowby_triple_threat", 0),
+                blowby_closeout    = stats.get("blowby_closeout", 0),
+                blowby_isolation   = stats.get("blowby_isolation", 0),
 
                 practice_wins     = stats.get("practice_wins", 0),
                 practice_losses   = stats.get("practice_losses", 0),
