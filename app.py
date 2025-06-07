@@ -51,42 +51,56 @@ def create_app():
     # --- Jinja2 Filters for coloring percentages ---
     @app.template_filter()
     def grade_atr2fg_pct(pct, attempts):
-        """
-        Return an inline background-color style based on ATR/2FG percentage.
-        If there are no attempts, returns an empty string.
-        """
+        """Return a gradient style for ATR/2FG% matching PPS colors."""
         if not attempts:
             return ""
-        # pick a base RGB tuple by threshold
-        if pct >= 70:
-            base = (0, 128, 0)    # green
-        elif pct >= 50:
-            base = (255, 165, 0)  # orange
-        else:
-            base = (255, 0, 0)    # red
-        r, g, b = base
-        return f"background-color: rgb({r},{g},{b});"
+
+        pps = pct / 100 * 2
+        return grade_pps(pps, attempts)
 
     @app.template_filter()
     def grade_3fg_pct(pct, attempts):
-        """
-        Return an inline background-color style based on 3FG percentage.
-        If there are no attempts, returns an empty string.
+        """Return a gradient style for 3FG% matching PPS colors."""
+        if not attempts:
+            return ""
+
+        pps = pct / 100 * 3
+        return grade_pps(pps, attempts)
+
+    @app.template_filter()
+    def grade_pps(pps, attempts):
+        """Return an inline background-color style for points per shot.
+
+        Shades of green, yellow and red are used for good, average and
+        poor efficiency respectively. No style is returned when there are
+        no attempts.
         """
         if not attempts:
             return ""
-        if pct >= 40:
-            base = (0, 128, 0)
-        elif pct >= 30:
-            base = (255, 165, 0)
+
+        def interpolate(start, end, factor):
+            return tuple(
+                round(s + (e - s) * max(0.0, min(factor, 1.0)))
+                for s, e in zip(start, end)
+            )
+
+        if pps >= 1.1:
+            start, end = (200, 255, 200), (0, 128, 0)
+            factor = min((pps - 1.1) / 0.5, 1.0)
+        elif pps >= 1.0:
+            start, end = (255, 255, 224), (255, 215, 0)
+            factor = (pps - 1.0) / 0.1
         else:
-            base = (255, 0, 0)
-        r, g, b = base
+            start, end = (255, 200, 200), (255, 0, 0)
+            factor = min((1.0 - pps) / 0.5, 1.0)
+
+        r, g, b = interpolate(start, end, factor)
         return f"background-color: rgb({r},{g},{b});"
 
 
     app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
     app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
+    app.jinja_env.filters['grade_pps'] = grade_pps
 
     # --- Register Blueprints ---
     from public.routes import public_bp
