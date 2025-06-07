@@ -1544,7 +1544,7 @@ def player_detail(player_name):
     if total_shots:
         efg = (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots
         agg.efg_pct         = round(efg * 100, 1)
-        agg.points_per_shot = round(agg.points / total_shots, 2)
+        agg.points_per_shot = round(efg * 2, 2)
     else:
         agg.efg_pct         = 0.0
         agg.points_per_shot = 0.0
@@ -1695,7 +1695,7 @@ def player_detail(player_name):
                 a = data[ctx]['attempts']
                 m = data[ctx]['makes']
                 data[ctx]['fg_pct']   = m / total_att
-                data[ctx]['pps']      = (pts * m / a) if a else 0
+                data[ctx]['pps']      = round((pts * m / a), 2) if a else 0
                 data[ctx]['freq_pct'] = a / total_att
 
     # ─── Build shot_summaries ────────────────────────────────────────────────
@@ -1726,23 +1726,42 @@ def player_detail(player_name):
         tp = sum(d['total']['makes'] * pts for d in bucket.values())
 
         shot_summaries[shot_type] = SimpleNamespace(
-            total      = SimpleNamespace(attempts=ta, makes=tm, fg_pct=(tm/ta*100), pps=(tp/ta)),
+            total      = SimpleNamespace(
+                attempts=ta,
+                makes=tm,
+                fg_pct=(tm / ta * 100),
+                pps=round(tp / ta, 2),
+            ),
             cats       = cats,
             transition = SimpleNamespace(
                 attempts=sum(d['transition']['attempts'] for d in bucket.values()),
                 makes   =sum(d['transition']['makes']    for d in bucket.values()),
                 fg_pct  =(sum(d['transition']['makes']    for d in bucket.values()) /
                         (sum(d['transition']['attempts'] for d in bucket.values()) or 1)),
-                pps     =(pts * sum(d['transition']['makes'] for d in bucket.values()) /
-                        (sum(d['transition']['attempts'] for d in bucket.values()) or 1))
+                pps     =round(
+                    (
+                        pts
+                        * sum(d['transition']['makes'] for d in bucket.values())
+                        /
+                        (sum(d['transition']['attempts'] for d in bucket.values()) or 1)
+                    ),
+                    2,
+                )
             ),
             halfcourt  = SimpleNamespace(
                 attempts=sum(d['halfcourt']['attempts'] for d in bucket.values()),
                 makes   =sum(d['halfcourt']['makes']    for d in bucket.values()),
                 fg_pct  =(sum(d['halfcourt']['makes']    for d in bucket.values()) /
                         (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1)),
-                pps     =(pts * sum(d['halfcourt']['makes'] for d in bucket.values()) /
-                        (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1))
+                pps     =round(
+                    (
+                        pts
+                        * sum(d['halfcourt']['makes'] for d in bucket.values())
+                        /
+                        (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1)
+                    ),
+                    2,
+                )
             )
         )
     # ←─── this “for shot_type…” loop ends here
