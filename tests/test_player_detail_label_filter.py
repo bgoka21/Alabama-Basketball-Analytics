@@ -67,8 +67,8 @@ def client(app):
 
 
 def test_label_filter_updates_metrics(client):
-    resp = client.get('/admin/player/%231%20Test', query_string={'mode':'practice', 'label':'SCRIMMAGE'})
+    resp = client.get('/admin/player/%231%20Test', query_string={'mode':'practice', 'label':'4V4 DRILLS'})
     assert resp.status_code == 200
     html = resp.data.decode('utf-8')
-    assert '1.67' in html
-    assert '83.3' in html
+    assert '1.5' in html
+    assert '75.0' in html
