@@ -1164,6 +1164,126 @@ def compute_filtered_blue(stats_records, label_set):
     return SimpleNamespace(**counts)
 
 
+# ─── Helper: compute filtered aggregate stats from details ─────────────
+def compute_filtered_totals(stats_records, label_set):
+    """Aggregate points and basic stats filtered by drill labels."""
+    totals = {
+        "points": 0,
+        "assists": 0,
+        "turnovers": 0,
+        "pot_assists": 0,
+        "second_assists": 0,
+        "atr_makes": 0,
+        "atr_attempts": 0,
+        "fg2_makes": 0,
+        "fg2_attempts": 0,
+        "fg3_makes": 0,
+        "fg3_attempts": 0,
+        "ftm": 0,
+        "fta": 0,
+    }
+
+    event_map = {
+        "assists": "assists",
+        "turnovers": "turnovers",
+        "pot_assists": "pot_assists",
+        "second_assists": "second_assists",
+        "foul_by": "foul_by",
+        "sprint_wins": "sprint_wins",
+        "sprint_losses": "sprint_losses",
+        "win": "practice_wins",
+        "loss": "practice_losses",
+    }
+
+    for rec in stats_records:
+        if rec.shot_type_details:
+            shots = (
+                json.loads(rec.shot_type_details)
+                if isinstance(rec.shot_type_details, str)
+                else rec.shot_type_details
+            )
+            for shot in shots:
+                labels = {
+                    lbl.strip().upper()
+                    for lbl in re.split(r"[,/]", shot.get("possession_type", ""))
+                    if lbl.strip()
+                }
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in shot.get("drill_labels", [])
+                    if isinstance(lbl, str) and lbl.strip()
+                )
+                if label_set and not (labels & label_set):
+                    continue
+                sc = shot.get("shot_class", "").lower()
+                made = shot.get("result") == "made"
+                if sc == "atr":
+                    totals["atr_attempts"] += 1
+                    if made:
+                        totals["atr_makes"] += 1
+                        totals["points"] += 2
+                elif sc == "2fg":
+                    totals["fg2_attempts"] += 1
+                    if made:
+                        totals["fg2_makes"] += 1
+                        totals["points"] += 2
+                elif sc == "3fg":
+                    totals["fg3_attempts"] += 1
+                    if made:
+                        totals["fg3_makes"] += 1
+                        totals["points"] += 3
+                elif sc == "ft":
+                    totals["fta"] += 1
+                    if made:
+                        totals["ftm"] += 1
+                        totals["points"] += 1
+
+        if rec.stat_details:
+            details = (
+                json.loads(rec.stat_details)
+                if isinstance(rec.stat_details, str)
+                else rec.stat_details
+            )
+            for ev in details:
+                lbls = {
+                    lbl.strip().upper()
+                    for lbl in ev.get("drill_labels", [])
+                    if isinstance(lbl, str) and lbl.strip()
+                }
+                if label_set and not (lbls & label_set):
+                    continue
+                key = event_map.get(ev.get("event"))
+                if key and key in totals:
+                    totals[key] += 1
+
+    total_shots = (
+        totals["atr_attempts"] + totals["fg2_attempts"] + totals["fg3_attempts"]
+    )
+    if total_shots:
+        efg = (
+            totals["atr_makes"] + totals["fg2_makes"] + 1.5 * totals["fg3_makes"]
+        ) / total_shots
+        totals["efg_pct"] = round(efg * 100, 1)
+        totals["points_per_shot"] = round(efg * 2, 2)
+    else:
+        totals["efg_pct"] = 0.0
+        totals["points_per_shot"] = 0.0
+
+    if totals["turnovers"]:
+        totals["assist_turnover_ratio"] = round(
+            totals["assists"] / totals["turnovers"], 2
+        )
+        total_ast = (
+            totals["assists"] + totals["second_assists"] + totals["pot_assists"]
+        )
+        totals["adj_assist_turnover_ratio"] = round(total_ast / totals["turnovers"], 2)
+    else:
+        totals["assist_turnover_ratio"] = 0.0
+        totals["adj_assist_turnover_ratio"] = 0.0
+
+    return SimpleNamespace(**totals)
+
+
 # ─── Helper: collect all drill labels from practice stats ──────────────
 def collect_practice_labels(stats_records):
     labels = set()
@@ -1427,131 +1547,19 @@ def player_detail(player_name):
         )
     else:
         player_blue_breakdown_practice = zero_blue
-
-    # ─── Now pick which “blue” to pass to the template ────────────
-    if mode == 'game':
+    # ─── Now pick which “blue” to pass to the template ───
+    if mode == "game":
         agg  = aggregated_game
         blue = player_blue_breakdown_game
     else:
-        agg  = aggregated_practice
         if label_set:
+            agg  = compute_filtered_totals(practice_stats_records, label_set)
             blue = compute_filtered_blue(practice_stats_records, label_set)
         else:
+            agg  = aggregated_practice
             blue = player_blue_breakdown_practice
 
 
-        # ─── Override agg’s shooting fields with raw JSON counts ─────────────────
-    # Count ATR/2FG/3FG from each PlayerStats.shot_type_details exactly once/shot
-    makes_atr = 0
-    att_atr   = 0
-    makes_fg2 = 0
-    att_fg2   = 0
-    makes_fg3 = 0
-    att_fg3   = 0
-
-    # Iterate through each PlayerStats record in the chosen mode
-    stats_for_totals = game_stats_records if mode == 'game' else practice_stats_records
-
-    for s in stats_for_totals:
-        if not s.shot_type_details:
-            continue
-
-        js = (
-            json.loads(s.shot_type_details)
-            if isinstance(s.shot_type_details, str)
-            else s.shot_type_details
-        )
-        for shot in js:
-            labels = {
-                lbl.strip().upper()
-                for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
-                if lbl.strip()
-            }
-            labels.update(
-                lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
-            )
-            if label_set and not (labels & label_set):
-                continue
-
-            sc = shot.get('shot_class', '').strip().lower()
-            made = (shot.get('result') == 'made')
-            if sc == 'atr':
-                att_atr += 1
-                makes_atr += 1 if made else 0
-            elif sc == '2fg':
-                att_fg2 += 1
-                makes_fg2 += 1 if made else 0
-            elif sc == '3fg':
-                att_fg3 += 1
-                makes_fg3 += 1 if made else 0
-
-    # Now overwrite the agg values for those fields
-    agg.atr_makes    = makes_atr
-    agg.atr_attempts = att_atr
-    agg.fg2_makes    = makes_fg2
-    agg.fg2_attempts = att_fg2
-    agg.fg3_makes    = makes_fg3
-    agg.fg3_attempts = att_fg3
-    # (Note: agg.ftm and agg.fta remain as parsed from PlayerStats.ftm/fta)
-
-
-        # ─── Recompute season‐long points from JSON + free throws ─────────────────
-    total_pts = 0
-    for s in stats_for_totals:
-        if not s.shot_type_details:
-            # just add free throws if no JSON present
-            total_pts += (s.ftm or 0)
-            continue
-
-        js = (
-            json.loads(s.shot_type_details)
-            if isinstance(s.shot_type_details, str)
-            else s.shot_type_details
-        )
-        # count makes per shot class (filtered by labels)
-        made_atr = 0
-        made_fg2 = 0
-        made_fg3 = 0
-        for shot in js:
-            labels = {
-                lbl.strip().upper()
-                for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
-                if lbl.strip()
-            }
-            labels.update(
-                lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
-            )
-            if label_set and not (labels & label_set):
-                continue
-            sc = shot.get('shot_class','').lower()
-            if sc == 'atr' and shot.get('result') == 'made':
-                made_atr += 1
-            elif sc == '2fg' and shot.get('result') == 'made':
-                made_fg2 += 1
-            elif sc == '3fg' and shot.get('result') == 'made':
-                made_fg3 += 1
-        # free throws
-        ft_made   = s.ftm or 0
-
-        # 2 pts for ATR/2FG, 3 pts for 3FG, 1 pt for each FT made
-        total_pts += (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
-
-    # overwrite agg.points
-    agg.points = total_pts
-
-    # After overwriting shooting/point totals, recompute eFG% and PPS
-    total_shots = agg.atr_attempts + agg.fg2_attempts + agg.fg3_attempts
-    if total_shots:
-        efg = (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots
-        agg.efg_pct         = round(efg * 100, 1)
-        agg.points_per_shot = round(efg * 2, 2)
-    else:
-        agg.efg_pct         = 0.0
-        agg.points_per_shot = 0.0
-
-    # ─────────────────────────────────────────────────────────────────────────────
-
-    # ─── End override ─────────────────────────────────────────────────────────
 
 
     # ─── Prepare Shot-Type Season Totals & Summaries ───────────────────
@@ -1828,88 +1836,31 @@ def player_detail(player_name):
             "sort_date":     g.game_date.strftime("%Y%m%d") if g and g.game_date else "0"
         }
 
-    # ─── Practice‐by‐practice breakdown (recompute points) ─────────────────
+    # ─── Practice-by-practice breakdown (recompute points) ───
     practice_breakdown = {}
     practice_details   = {}
 
     for s in practice_stats_records:
         pid = s.practice_id
-
-        js = []
-        if s.shot_type_details:
-            js = (
-                json.loads(s.shot_type_details)
-                if isinstance(s.shot_type_details, str)
-                else s.shot_type_details
-            )
         if label_set:
-            filtered_js = []
-            for shot in js:
-                labels = {
-                    lbl.strip().upper()
-                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
-                    if lbl.strip()
-                }
-                labels.update(
-                    lbl.strip().upper() for lbl in shot.get('drill_labels', []) if lbl.strip()
-                )
-                if labels & label_set:
-                    filtered_js.append(shot)
+            row_totals = compute_filtered_totals([s], label_set)
         else:
-            filtered_js = js
-
-        made_atr = sum(
-            1
-            for shot in filtered_js
-            if shot.get('shot_class', '').lower() == 'atr'
-            and shot.get('result') == 'made'
-        )
-        made_fg2 = sum(
-            1
-            for shot in filtered_js
-            if shot.get('shot_class', '').lower() == '2fg'
-            and shot.get('result') == 'made'
-        )
-        made_fg3 = sum(
-            1
-            for shot in filtered_js
-            if shot.get('shot_class', '').lower() == '3fg'
-            and shot.get('result') == 'made'
-        )
-        ft_made = s.ftm or 0
-
-        pts_for_practice = (2 * made_atr) + (2 * made_fg2) + (3 * made_fg3) + ft_made
-
-        att_atr = sum(
-            1 for shot in filtered_js if shot.get('shot_class', '').lower() == 'atr'
-        )
-        att_fg2 = sum(
-            1 for shot in filtered_js if shot.get('shot_class', '').lower() == '2fg'
-        )
-        att_fg3 = sum(
-            1 for shot in filtered_js if shot.get('shot_class', '').lower() == '3fg'
-        )
-
+            row_totals = aggregate_stats([s])
         practice_breakdown[pid] = {
-            "points":         pts_for_practice,
-            "assists":        s.assists or 0,
-            "turnovers":      s.turnovers or 0,
-            "pot_assists":    s.pot_assists or 0,
-            "second_assists": s.second_assists or 0,
-
-            "atr_makes":      made_atr,
-            "atr_attempts":   att_atr,
-
-            "fg2_makes":      made_fg2,
-            "fg2_attempts":   att_fg2,
-
-            "fg3_makes":      made_fg3,
-            "fg3_attempts":   att_fg3,
-
-            "ftm":            ft_made,
-            "fta":            s.fta or 0
+            "points":         row_totals.points,
+            "assists":        row_totals.assists,
+            "turnovers":      row_totals.turnovers,
+            "pot_assists":    row_totals.pot_assists,
+            "second_assists": row_totals.second_assists,
+            "atr_makes":      row_totals.atr_makes,
+            "atr_attempts":   row_totals.atr_attempts,
+            "fg2_makes":      row_totals.fg2_makes,
+            "fg2_attempts":   row_totals.fg2_attempts,
+            "fg3_makes":      row_totals.fg3_makes,
+            "fg3_attempts":   row_totals.fg3_attempts,
+            "ftm":            row_totals.ftm,
+            "fta":            row_totals.fta
         }
-
         pr = s.practice
         practice_details[pid] = {
             "game_date":     pr.date.strftime("%b %d") if pr and pr.date else "",
