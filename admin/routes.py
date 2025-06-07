@@ -1056,7 +1056,10 @@ def aggregate_stats(stats_list):
     if total_shots:
         efg = (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots
         agg["efg_pct"]         = round(efg * 100, 1)
-        agg["points_per_shot"] = round(efg * 2, 2)
+        agg["points_per_shot"] = round(
+            (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots,
+            2,
+        )
     else:
         agg["efg_pct"] = 0.0
         agg["points_per_shot"] = 0.0
@@ -1164,40 +1167,6 @@ def compute_filtered_blue(stats_records, label_set):
     return SimpleNamespace(**counts)
 
 
-# ─── Helper: collect all drill labels from practice stats ──────────────
-def collect_practice_labels(stats_records):
-    labels = set()
-    for rec in stats_records:
-        if rec.shot_type_details:
-            shots = (
-                json.loads(rec.shot_type_details)
-                if isinstance(rec.shot_type_details, str)
-                else rec.shot_type_details
-            )
-            for shot in shots:
-                labels.update(
-                    lbl.strip().upper()
-                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
-                    if lbl.strip()
-                )
-                labels.update(
-                    lbl.strip().upper()
-                    for lbl in shot.get('drill_labels', [])
-                    if isinstance(lbl, str) and lbl.strip()
-                )
-        if rec.stat_details:
-            details = (
-                json.loads(rec.stat_details)
-                if isinstance(rec.stat_details, str)
-                else rec.stat_details
-            )
-            for ev in details:
-                labels.update(
-                    lbl.strip().upper()
-                    for lbl in ev.get('drill_labels', [])
-                    if isinstance(lbl, str) and lbl.strip()
-                )
-    return sorted(labels)
 
 
 
@@ -1347,7 +1316,12 @@ def player_detail(player_name):
     aggregated_practice = aggregate_stats(practice_stats_records)
 
     # ─── Drill label filtering (practice mode only) ─────────────────────
-    label_options = collect_practice_labels(practice_stats_records)
+    label_options = [
+        "3V3 DRILLS",
+        "4V4 DRILLS",
+        "5V5 DRILLS",
+        "ADVANTAGE DRILLS",
+    ]
     selected_labels = [
         lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
     ]
@@ -1544,7 +1518,10 @@ def player_detail(player_name):
     if total_shots:
         efg = (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots
         agg.efg_pct         = round(efg * 100, 1)
-        agg.points_per_shot = round(agg.points / total_shots, 2)
+        agg.points_per_shot = round(
+            (agg.atr_makes + agg.fg2_makes + 1.5 * agg.fg3_makes) / total_shots,
+            2,
+        )
     else:
         agg.efg_pct         = 0.0
         agg.points_per_shot = 0.0
