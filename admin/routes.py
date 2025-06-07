@@ -1164,6 +1164,42 @@ def compute_filtered_blue(stats_records, label_set):
     return SimpleNamespace(**counts)
 
 
+# ─── Helper: collect all drill labels from practice stats ──────────────
+def collect_practice_labels(stats_records):
+    labels = set()
+    for rec in stats_records:
+        if rec.shot_type_details:
+            shots = (
+                json.loads(rec.shot_type_details)
+                if isinstance(rec.shot_type_details, str)
+                else rec.shot_type_details
+            )
+            for shot in shots:
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                    if lbl.strip()
+                )
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in shot.get('drill_labels', [])
+                    if isinstance(lbl, str) and lbl.strip()
+                )
+        if rec.stat_details:
+            details = (
+                json.loads(rec.stat_details)
+                if isinstance(rec.stat_details, str)
+                else rec.stat_details
+            )
+            for ev in details:
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in ev.get('drill_labels', [])
+                    if isinstance(lbl, str) and lbl.strip()
+                )
+    return sorted(labels)
+
+
 
 
 @admin_bp.route('/admin/player/<player_name>', methods=['GET', 'POST'])
@@ -1311,19 +1347,11 @@ def player_detail(player_name):
     aggregated_practice = aggregate_stats(practice_stats_records)
 
     # ─── Drill label filtering (practice mode only) ─────────────────────
-    label_options   = [
-        '3V3 DRILLS',
-        '4V4 DRILLS',
-        '5V5 DRILLS',
-        'ADVANTAGE DRILLS',
-        'BREAKDOWN DRILLS',
-        'TRANSITION SERIES',
-        'SCRIMMAGE',
-    ]
+    label_options = collect_practice_labels(practice_stats_records)
     selected_labels = [
         lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
     ]
-    label_set       = {lbl.upper() for lbl in selected_labels}
+    label_set = {lbl.upper() for lbl in selected_labels}
 
     # ─── Compute blue‐collar via raw SQL (instead of get_blue_breakdown) ───
     zero_blue = SimpleNamespace(
