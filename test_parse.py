@@ -648,9 +648,16 @@ def calculate_derived_metrics(player_stats):
 
         fg_denom = stats["atr_attempts"] + stats["fg2_attempts"] + stats["fg3_attempts"]
         if fg_denom > 0:
-            efg = ((stats["atr_makes"] + stats["fg2_makes"] + 1.5 * stats["fg3_makes"]) / fg_denom)
+            efg = (
+                (
+                    stats["atr_makes"]
+                    + stats["fg2_makes"]
+                    + 1.5 * stats["fg3_makes"]
+                )
+                / fg_denom
+            )
             stats["efg_pct"] = efg
-            stats["points_per_shot"] = efg * 2
+            stats["points_per_shot"] = round(efg * 2, 2)
         else:
             stats["efg_pct"] = None
             stats["points_per_shot"] = None
