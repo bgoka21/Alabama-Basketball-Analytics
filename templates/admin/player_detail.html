@@ -7,8 +7,6 @@
   halfcourt =namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0)
 ) %}
 
-{% set agg  = (aggregated_game      if mode=='game' else aggregated_practice) %}
-{% set blue = (player_blue_breakdown_game if mode=='game' else player_blue_breakdown_practice) %}
 
 
 <div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
@@ -79,14 +77,7 @@
 
 <!-- 1) Season Totals -->
 <div id="seasonTotals" class="tab-content block">
-  {# pick the right season‐totals & blue‐collar based on mode #}
-  {% if mode == 'game' %}
-    {% set agg  = aggregated_game %}
-    {% set blue = player_blue_breakdown_game %}
-  {% else %}
-    {% set agg  = aggregated_practice %}
-    {% set blue = player_blue_breakdown_practice %}
-  {% endif %}
+
 
   <!-- Row 1: Advanced Shooting Metrics -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 justify-items-center">
