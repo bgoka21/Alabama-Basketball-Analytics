@@ -45,7 +45,8 @@ defense_mapping = {
 
 def get_roster_id(name, season_id):
     """Lookup Roster.id by exact player_name & season."""
-    row = Roster.query.filter_by(player_name=name, season_id=season_id).first()
+    clean_name = name.strip() if isinstance(name, str) else name
+    row = Roster.query.filter_by(player_name=clean_name, season_id=season_id).first()
     return row.id if row else None
 
 
@@ -57,6 +58,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     4) Insert PlayerStats and BlueCollarStats for that practice.
     """
     df = pd.read_csv(practice_csv_path)
+    # Normalize column headers to avoid mismatches caused by stray whitespace
+    df.columns = [str(c).strip() for c in df.columns]
     
     # ─── Step A: Initialize accumulators ─────────────────────────────
     player_stats_dict   = defaultdict(lambda: defaultdict(int))
@@ -64,7 +67,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     player_shot_list    = defaultdict(list)
     player_detail_list  = defaultdict(list)
     # ── Find all columns beginning with "#" to use for player tokens
-    player_columns = [c for c in df.columns if c.startswith("#")]
+    player_columns = [c for c in df.columns if str(c).strip().startswith("#")]
     # ─────────────────────────────────────────────────────────────────────
 
     # ─── Step B: Loop through each row in the CSV ────────────────────
@@ -369,7 +372,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
         # ─── 4) Blue Collar parsing ──────────────────────────────────────────
         if row_type.startswith("#"):
-            cell = str(row.get(row_type, "") or "").strip()
+            cell = str(row.get(row_type.strip(), "") or "").strip()
             if cell:
                 tokens = [t.strip() for t in cell.split(",") if t.strip()]
                 roster_id = get_roster_id(row_type, season_id)
