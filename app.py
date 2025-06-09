@@ -49,31 +49,54 @@ def create_app():
 
 
     # --- Jinja2 Filters for coloring percentages ---
-    @app.template_filter()
-    def grade_atr2fg_pct(pct, attempts):
-        """Return a gradient background-color style for ATR/2FG percentage.
-
-        The color mapping mirrors ``grade_pps`` by converting the field goal
-        percentage into points per shot (value of a made 2-pointer).
-        """
+    def _grade_value(pps, attempts, avg_thres, good_thres):
+        """Helper to grade a value based on custom PPS thresholds."""
         if not attempts:
             return ""
 
-        pps = (pct / 100.0) * 2
-        return grade_pps(pps, attempts)
+        def interpolate(start, end, factor):
+            return tuple(
+                round(s + (e - s) * max(0.0, min(factor, 1.0)))
+                for s, e in zip(start, end)
+            )
+
+        if pps >= good_thres:
+            start, end = (200, 255, 200), (0, 128, 0)
+            factor = min((pps - good_thres) / 0.5, 1.0)
+        elif pps >= avg_thres:
+            start, end = (255, 255, 224), (255, 215, 0)
+            factor = (pps - avg_thres) / (good_thres - avg_thres or 1)
+        else:
+            start, end = (255, 200, 200), (255, 0, 0)
+            factor = min((avg_thres - pps) / 0.5, 1.0)
+
+        r, g, b = interpolate(start, end, factor)
+        return f"background-color: rgb({r},{g},{b});"
 
     @app.template_filter()
-    def grade_3fg_pct(pct, attempts):
-        """Return a gradient background-color style for 3FG percentage.
+    def grade_atr_pps(pps, attempts):
+        return _grade_value(pps, attempts, 1.2, 1.5)
 
-        The gradient is calculated using ``grade_pps`` with the 3-point shot
-        value so FG% and PPS share the same color logic.
-        """
-        if not attempts:
-            return ""
+    @app.template_filter()
+    def grade_fg2_pps(pps, attempts):
+        return _grade_value(pps, attempts, 0.9, 1.1)
 
-        pps = (pct / 100.0) * 3
-        return grade_pps(pps, attempts)
+    @app.template_filter()
+    def grade_fg3_pps(pps, attempts):
+        return _grade_value(pps, attempts, 1.0, 1.2)
+
+    @app.template_filter()
+    def grade_atr_pct(pct, attempts):
+        return grade_atr_pps((pct / 100.0) * 2, attempts)
+
+    @app.template_filter()
+    def grade_fg2_pct(pct, attempts):
+        return grade_fg2_pps((pct / 100.0) * 2, attempts)
+
+    @app.template_filter()
+    def grade_fg3_pct(pct, attempts):
+        return grade_fg3_pps((pct / 100.0) * 3, attempts)
+
 
     @app.template_filter()
     def grade_pps(pps, attempts):
@@ -106,9 +129,16 @@ def create_app():
         return f"background-color: rgb({r},{g},{b});"
 
 
-    app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
-    app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
+    app.jinja_env.filters['grade_atr_pct'] = grade_atr_pct
+    app.jinja_env.filters['grade_fg2_pct'] = grade_fg2_pct
+    app.jinja_env.filters['grade_fg3_pct'] = grade_fg3_pct
+    app.jinja_env.filters['grade_atr_pps'] = grade_atr_pps
+    app.jinja_env.filters['grade_fg2_pps'] = grade_fg2_pps
+    app.jinja_env.filters['grade_fg3_pps'] = grade_fg3_pps
     app.jinja_env.filters['grade_pps'] = grade_pps
+    # backwards compatibility
+    app.jinja_env.filters['grade_atr2fg_pct'] = grade_fg2_pct
+    app.jinja_env.filters['grade_3fg_pct'] = grade_fg3_pct
 
     # --- Register Blueprints ---
     from public.routes import public_bp
