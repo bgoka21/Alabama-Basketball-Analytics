@@ -1690,8 +1690,9 @@ def player_detail(player_name):
             for ctx in ('total','transition','halfcourt'):
                 a = data[ctx]['attempts']
                 m = data[ctx]['makes']
-                data[ctx]['fg_pct']   = m / total_att
-                data[ctx]['pps']      = round((pts * m / a), 2) if a else 0
+                fg = (m / a) if a else 0
+                data[ctx]['fg_pct']   = fg
+                data[ctx]['pps']      = round(pts * fg, 2) if a else 0
                 data[ctx]['freq_pct'] = a / total_att
 
     # ─── Build shot_summaries ────────────────────────────────────────────────
@@ -1716,46 +1717,41 @@ def player_detail(player_name):
         }
 
         # (3) Sum up totals and compute fg_pct, pps for this shot_type
-        ta = sum(d['total']['attempts'] for d in bucket.values()) or 1
-        tm = sum(d['total']['makes']    for d in bucket.values())
+        ta  = sum(d['total']['attempts'] for d in bucket.values()) or 1
+        tm  = sum(d['total']['makes']    for d in bucket.values())
         pts = 2 if shot_type in ('atr','fg2') else 3
-        tp = sum(d['total']['makes'] * pts for d in bucket.values())
 
         shot_summaries[shot_type] = SimpleNamespace(
             total      = SimpleNamespace(
                 attempts=ta,
                 makes=tm,
                 fg_pct=(tm / ta * 100),
-                pps=round(tp / ta, 2),
+                pps=round(pts * tm / ta, 2),
             ),
             cats       = cats,
             transition = SimpleNamespace(
-                attempts=sum(d['transition']['attempts'] for d in bucket.values()),
-                makes   =sum(d['transition']['makes']    for d in bucket.values()),
-                fg_pct  =(sum(d['transition']['makes']    for d in bucket.values()) /
-                        (sum(d['transition']['attempts'] for d in bucket.values()) or 1)),
-                pps     =round(
-                    (
-                        pts
-                        * sum(d['transition']['makes'] for d in bucket.values())
-                        /
-                        (sum(d['transition']['attempts'] for d in bucket.values()) or 1)
-                    ),
+                attempts = sum(d['transition']['attempts'] for d in bucket.values()),
+                makes    = sum(d['transition']['makes']    for d in bucket.values()),
+                fg_pct   = (
+                    sum(d['transition']['makes'] for d in bucket.values()) /
+                    (sum(d['transition']['attempts'] for d in bucket.values()) or 1)
+                ),
+                pps = round(
+                    pts * sum(d['transition']['makes'] for d in bucket.values()) /
+                    (sum(d['transition']['attempts'] for d in bucket.values()) or 1),
                     2,
                 )
             ),
             halfcourt  = SimpleNamespace(
-                attempts=sum(d['halfcourt']['attempts'] for d in bucket.values()),
-                makes   =sum(d['halfcourt']['makes']    for d in bucket.values()),
-                fg_pct  =(sum(d['halfcourt']['makes']    for d in bucket.values()) /
-                        (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1)),
-                pps     =round(
-                    (
-                        pts
-                        * sum(d['halfcourt']['makes'] for d in bucket.values())
-                        /
-                        (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1)
-                    ),
+                attempts = sum(d['halfcourt']['attempts'] for d in bucket.values()),
+                makes    = sum(d['halfcourt']['makes']    for d in bucket.values()),
+                fg_pct   = (
+                    sum(d['halfcourt']['makes'] for d in bucket.values()) /
+                    (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1)
+                ),
+                pps = round(
+                    pts * sum(d['halfcourt']['makes'] for d in bucket.values()) /
+                    (sum(d['halfcourt']['attempts'] for d in bucket.values()) or 1),
                     2,
                 )
             )
