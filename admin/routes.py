@@ -331,21 +331,33 @@ def parse_file(file_id):
             # use the file_date column (or fallback to today)
             file_date = uploaded_file.file_date or date.today()
 
-            # 2a) create a Practice row
-            practice = Practice(
+            # Check if a practice for this date/category already exists
+            practice = Practice.query.filter_by(
                 season_id=season_id,
-                date     =file_date,
-                category =uploaded_file.category
-            )
-            db.session.add(practice)
-            db.session.flush()   # so practice.id is available
+                date=file_date,
+                category=uploaded_file.category
+            ).first()
 
-            # 2b) parse into your practice-tables
+            if not practice:
+                practice = Practice(
+                    season_id=season_id,
+                    date=file_date,
+                    category=uploaded_file.category
+                )
+                db.session.add(practice)
+                db.session.flush()  # ensures practice.id is available
+            else:
+                # Existing practice: clear any previously parsed stats so we can re-parse
+                PlayerStats.query.filter_by(practice_id=practice.id).delete()
+                BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
+                db.session.flush()
+
+            # 2b) parse into your practice tables
             parse_practice_csv(
                 upload_path,
-                season_id = season_id,
-                category  = uploaded_file.category,
-                file_date = file_date,
+                season_id=season_id,
+                category=uploaded_file.category,
+                file_date=file_date,
             )
 
             # 3) mark the upload as parsed
