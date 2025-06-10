@@ -915,14 +915,17 @@
           <!-- Totals Row -->
           <tr class="bg-gray-100 font-semibold">
             <td class="px-4 py-2 text-sm border-t border-gray-300">Totals</td>
-            {% for key, subs in shot_map.items() %}
-              {% for sub in subs %}
-                {% set t = shot_totals[key][sub] %}
-                <td class="px-3 py-2 text-center text-sm border-t border-gray-300">
-                  {{ t.makes }}/{{ t.attempts }}
-                </td>
+              {% for key, subs in shot_map.items() %}
+                {% for sub in subs %}
+                  {% set t = shot_totals[key][sub] %}
+                  <td class="px-3 py-2 text-center text-sm border-t border-gray-300">
+                    {{ t.makes }}/{{ t.attempts }}<br />
+                    <span class="text-xs text-gray-600">
+                      ({% if t.attempts > 0 %}{{ (t.makes / t.attempts * 100)|round(1) }}{% else %}0.0{% endif %}%)
+                    </span>
+                  </td>
+                {% endfor %}
               {% endfor %}
-            {% endfor %}
           </tr>
 
           <!-- Per-date Drill Rows -->
