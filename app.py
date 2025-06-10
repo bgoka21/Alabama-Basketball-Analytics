@@ -7,6 +7,7 @@ from flask_migrate import Migrate
 from models.database import db
 from models.user import User
 from admin.routes import admin_bp
+from merge_app.app import merge_bp
 
 # Optional: Import auth blueprint if it exists
 try:
@@ -115,6 +116,9 @@ def create_app():
     app.register_blueprint(public_bp)
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
+
+    # Register merge tool blueprint under /merge
+    app.register_blueprint(merge_bp, url_prefix='/merge')
 
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')

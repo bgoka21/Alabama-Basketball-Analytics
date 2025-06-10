@@ -59,6 +59,11 @@
                     {{ 'bg-white text-[#9E1B32]' if active_page=='files' else '' }}">
             Files
           </a>
+          <a href="{{ url_for('merge.merge_csv') }}"
+             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]">
+            Merge CSV
+          </a>
+
 
           <!-- Roster -->
           <a href="{{ url_for('admin.roster') }}"
