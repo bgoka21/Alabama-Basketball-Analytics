@@ -19,7 +19,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for player, count in dunks %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
+            {% else %}
+              {{ player }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ count }}</td>
         </tr>
         {% endfor %}
@@ -39,7 +45,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for player, total, wins in bcp_leaders %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
+            {% else %}
+              {{ player }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ '%.1f'|format(total) }}</td>
           <td class="px-6 py-4 text-sm">{{ wins }}</td>
         </tr>
@@ -60,7 +72,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for p in atr_leaders %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ p.player_name }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=p.player_name) }}" class="text-blue-600 hover:underline">{{ p.player_name }}</a>
+            {% else %}
+              {{ p.player_name }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ p.atrm }}-{{ p.atra }}</td>
           <td class="px-6 py-4 text-sm">{{ '%.1f'|format(p.atr_pct) if p.atr_pct is not none else '—' }}</td>
         </tr>
@@ -81,7 +99,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for p in fg3_leaders %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ p.player_name }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=p.player_name) }}" class="text-blue-600 hover:underline">{{ p.player_name }}</a>
+            {% else %}
+              {{ p.player_name }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ p.fg3m }}-{{ p.fg3a }}</td>
           <td class="px-6 py-4 text-sm">{{ '%.1f'|format(p.fg3_pct) if p.fg3_pct is not none else '—' }}</td>
         </tr>
@@ -103,7 +127,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for player, record, pct in overall_records %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
+            {% else %}
+              {{ player }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ record }}</td>
           <td class="px-6 py-4 text-sm">{{ pct }}</td>
         </tr>
@@ -124,7 +154,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for player, wins in sprint_wins %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
+            {% else %}
+              {{ player }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ wins }}</td>
         </tr>
         {% endfor %}
@@ -144,7 +180,13 @@
       <tbody class="divide-y divide-gray-200">
         {% for player, losses in sprint_losses %}
         <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">{{ player }}</td>
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
+            {% else %}
+              {{ player }}
+            {% endif %}
+          </td>
           <td class="px-6 py-4 text-sm">{{ losses }}</td>
         </tr>
         {% endfor %}
