@@ -20,7 +20,7 @@ MERGE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "merge_config.json")
 
 def load_merge_config():
     """Load merge configuration from ``merge_config.json``."""
-    default = {"on": [], "how": "inner"}
+    default = {"files": {}, "on": [], "how": "inner"}
     if os.path.exists(MERGE_CONFIG_PATH):
         try:
             with open(MERGE_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -40,26 +40,34 @@ def save_merge_config(config):
 
 @merge_bp.route("/merge_csv", methods=["GET", "POST"])
 def merge_csv():
-    """Merge two uploaded CSV files according to the saved settings."""
+    """Merge uploaded CSV files according to the saved settings."""
     if request.method == "POST":
-        file1 = request.files.get("file1")
-        file2 = request.files.get("file2")
-        if not file1 or not file2:
-            flash("Please upload two CSV files", "error")
+        files = request.files.getlist("files")
+        if len(files) < 2:
+            flash("Please upload at least two CSV files", "error")
             return render_template("merge_csv.html")
 
         config = load_merge_config()
         on_columns = config.get("on") or []
         how = config.get("how", "inner")
+        file_cols = config.get("files", {})
 
         try:
-            df1 = pd.read_csv(file1)
-            df2 = pd.read_csv(file2)
+            dataframes = []
+            for idx, f in enumerate(files, 1):
+                df = pd.read_csv(f)
+                cols = file_cols.get(f"file{idx}")
+                if cols:
+                    cols_existing = [c for c in cols if c in df.columns]
+                    df = df[cols_existing]
+                dataframes.append(df)
 
-            if on_columns:
-                merged = pd.merge(df1, df2, on=on_columns, how=how)
-            else:
-                merged = pd.concat([df1, df2], axis=0, ignore_index=True)
+            merged = dataframes[0]
+            for df in dataframes[1:]:
+                if on_columns:
+                    merged = pd.merge(merged, df, on=on_columns, how=how)
+                else:
+                    merged = pd.concat([merged, df], axis=0, ignore_index=True)
 
             csv_io = BytesIO()
             merged.to_csv(csv_io, index=False)
@@ -86,10 +94,29 @@ def merge_settings():
 
         config["on"] = [k.strip() for k in keys.split(",") if k.strip()]
         config["how"] = how
+
+        files_cfg = {}
+        for key, value in request.form.items():
+            if key.startswith("cols_file"):
+                idx = key.replace("cols_file", "")
+                cols = [c.strip() for c in value.split(",") if c.strip()]
+                if cols:
+                    files_cfg[f"file{idx}"] = cols
+        config["files"] = files_cfg
+
         save_merge_config(config)
         flash("Settings updated", "success")
 
+    file_columns = config.get("files", {})
+    max_index = max([int(k.replace("file", "")) for k in file_columns.keys()] or [2])
+    file_fields = {
+        i: ", ".join(file_columns.get(f"file{i}", [])) for i in range(1, max_index + 1)
+    }
+
     merge_keys = ", ".join(config.get("on", []))
     return render_template(
-        "merge_settings.html", merge_keys=merge_keys, how=config.get("how", "inner")
+        "merge_settings.html",
+        merge_keys=merge_keys,
+        how=config.get("how", "inner"),
+        file_fields=file_fields,
     )

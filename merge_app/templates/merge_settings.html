@@ -16,6 +16,12 @@
       <option value="outer"  {% if how == 'outer' %}selected{% endif %}>outer</option>
     </select>
   </div>
+  {% for idx, value in file_fields.items() %}
+  <div>
+    <label class="block mb-1">Columns for File {{ idx }} (comma separated)</label>
+    <input type="text" name="cols_file{{ idx }}" value="{{ value }}" class="border p-2 w-full" />
+  </div>
+  {% endfor %}
   <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded">Save</button>
 </form>
 {% endblock %}
