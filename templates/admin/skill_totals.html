@@ -1,24 +1,40 @@
 {% extends 'admin/base.html' %}
 
 {% block page_controls %}
-<form method="get" class="mb-4 flex items-center gap-2">
-  <label class="font-semibold mr-2">Season:</label>
-  <select name="season_id" onchange="this.form.submit()" class="border p-2 rounded">
-    {% for s in all_seasons %}
-      <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
-    {% endfor %}
-  </select>
+<form method="get" class="mb-4 flex flex-wrap items-end gap-4">
+  <div>
+    <label class="font-semibold mr-2">Season:</label>
+    <select name="season_id" class="border p-2 rounded">
+      {% for s in all_seasons %}
+        <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">From</label>
+    <input type="date" name="start_date" value="{{ start_date }}" class="border p-2 rounded" />
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">To</label>
+    <input type="date" name="end_date" value="{{ end_date }}" class="border p-2 rounded" />
+  </div>
+  <div>
+    <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
+  </div>
+  <div>
+    <a href="{{ url_for('admin.skill_totals') }}" class="text-gray-600 hover:underline text-sm">Clear</a>
+  </div>
 </form>
 {% endblock %}
 
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">Skill Development Totals</h1>
 <div class="overflow-x-auto">
-  <table class="w-full table-fixed border border-gray-200 rounded-md">
+  <table id="skillTotalsTable" class="w-full table-fixed border border-gray-200 rounded-md">
     <thead>
       <tr class="bg-gray-200">
         <th rowspan="2" class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Player</th>
-        <th rowspan="2" class="px-4 py-2 text-center text-sm font-medium border-r border-gray-300">Total Shots</th>
+        <th rowspan="2" class="px-4 py-2 text-center text-sm font-medium border-r border-gray-300" data-sort-key="total_shots" style="cursor:pointer;">Total Shots<span class="sort-indicator ml-2">⇅</span></th>
         {% for key, subs in shot_map.items() %}
           <th colspan="{{ subs|length }}" class="px-4 py-2 text-center text-sm font-medium border-r border-gray-300">{{ label_map[key] }}</th>
         {% endfor %}
@@ -56,4 +72,26 @@
     </tbody>
   </table>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const table = document.getElementById('skillTotalsTable');
+  if (!table) return;
+  const header = table.querySelector('th[data-sort-key="total_shots"]');
+  if (!header) return;
+  const indicator = header.querySelector('.sort-indicator');
+  let order = 'desc';
+  header.addEventListener('click', () => {
+    const tbody = table.tBodies[0];
+    Array.from(tbody.rows)
+      .sort((a,b) => {
+        const aVal = parseInt(a.cells[1].textContent.trim()) || 0;
+        const bVal = parseInt(b.cells[1].textContent.trim()) || 0;
+        return order === 'asc' ? aVal - bVal : bVal - aVal;
+      })
+      .forEach(r => tbody.appendChild(r));
+    indicator.textContent = order === 'asc' ? ' ▲' : ' ▼';
+    order = order === 'asc' ? 'desc' : 'asc';
+  });
+});
+</script>
 {% endblock %}
