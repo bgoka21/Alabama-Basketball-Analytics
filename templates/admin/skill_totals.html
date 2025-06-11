@@ -1,0 +1,59 @@
+{% extends 'admin/base.html' %}
+
+{% block page_controls %}
+<form method="get" class="mb-4 flex items-center gap-2">
+  <label class="font-semibold mr-2">Season:</label>
+  <select name="season_id" onchange="this.form.submit()" class="border p-2 rounded">
+    {% for s in all_seasons %}
+      <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Skill Development Totals</h1>
+<div class="overflow-x-auto">
+  <table class="w-full table-fixed border border-gray-200 rounded-md">
+    <thead>
+      <tr class="bg-gray-200">
+        <th rowspan="2" class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Player</th>
+        <th rowspan="2" class="px-4 py-2 text-center text-sm font-medium border-r border-gray-300">Total Shots</th>
+        {% for key, subs in shot_map.items() %}
+          <th colspan="{{ subs|length }}" class="px-4 py-2 text-center text-sm font-medium border-r border-gray-300">{{ label_map[key] }}</th>
+        {% endfor %}
+      </tr>
+      <tr class="bg-gray-200">
+        {% for subs in shot_map.values() %}
+          {% for sub in subs %}
+            <th class="px-3 py-1 text-xs font-medium border-r border-gray-300">{{ sub }}</th>
+          {% endfor %}
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in players_summary %}
+        <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+          <td class="px-4 py-2 text-sm border-t border-gray-300">{{ row.player_name }}</td>
+          <td class="px-4 py-2 text-center text-sm border-t border-gray-300">{{ row.total_shots }}</td>
+          {% for key, subs in shot_map.items() %}
+            {% for sub in subs %}
+              {% set t = row.totals[key][sub] %}
+              <td class="px-3 py-2 text-center text-sm border-t border-gray-300">
+                {{ t.makes }}/{{ t.attempts }}<br />
+                <span class="text-xs text-gray-600">
+                  ({% if t.attempts > 0 %}{{ (t.makes / t.attempts * 100)|round(1) }}{% else %}0.0{% endif %}%)
+                </span>
+              </td>
+            {% endfor %}
+          {% endfor %}
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="{{ 2 + (shot_map.values()|map('length')|sum) }}" class="px-4 py-2 text-center text-sm text-gray-500">No players found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
