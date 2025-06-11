@@ -2218,6 +2218,13 @@ def skill_totals():
     if not season_id and seasons:
         season_id = seasons[0].id
 
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date:
+        start_date = date.fromisoformat(start_date)
+    if end_date:
+        end_date = date.fromisoformat(end_date)
+
     shot_map = {
         'atr':     ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
         'floater': ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
@@ -2244,7 +2251,12 @@ def skill_totals():
     for r in sorted(roster_entries, key=lambda x: sort_key(x.player_name)):
         totals = {cls: {sub: {'makes': 0, 'attempts': 0} for sub in subs} for cls, subs in shot_map.items()}
         total_shots = 0
-        for e in SkillEntry.query.filter_by(player_id=r.id).all():
+        q = SkillEntry.query.filter_by(player_id=r.id)
+        if start_date:
+            q = q.filter(SkillEntry.date >= start_date)
+        if end_date:
+            q = q.filter(SkillEntry.date <= end_date)
+        for e in q.all():
             if e.shot_class in totals and e.subcategory in totals[e.shot_class]:
                 t = totals[e.shot_class][e.subcategory]
                 t['makes'] += e.makes
@@ -2257,6 +2269,8 @@ def skill_totals():
         players_summary=summary,
         seasons=seasons,
         selected_season=season_id,
+        start_date=start_date.isoformat() if start_date else '',
+        end_date=end_date.isoformat() if end_date else '',
         shot_map=shot_map,
         label_map=label_map,
         active_page='skill_totals'
