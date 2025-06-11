@@ -2209,3 +2209,55 @@ def player_shot_type(player_name):
 
 
 
+@admin_bp.route('/skill_totals')
+@login_required
+def skill_totals():
+    """Display total skill-development shot counts for each player."""
+    season_id = request.args.get('season_id', type=int)
+    seasons = Season.query.order_by(Season.id.desc()).all()
+    if not season_id and seasons:
+        season_id = seasons[0].id
+
+    shot_map = {
+        'atr':     ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
+        'floater': ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
+        '3fg':     ['Catch & Shoot - Stationary', 'Catch & Shoot - On The Move', 'Off Dribble'],
+        'ft':      ['Free Throw']
+    }
+    label_map = {
+        'atr':     "ATR's",
+        'floater': "Floaters",
+        '3fg':     "3FG's",
+        'ft':      "Free Throws"
+    }
+
+    if season_id:
+        roster_entries = Roster.query.filter_by(season_id=season_id).all()
+    else:
+        roster_entries = Roster.query.all()
+
+    def sort_key(name):
+        m = re.match(r'#(\d+)', name)
+        return int(m.group(1)) if m else 9999
+
+    summary = []
+    for r in sorted(roster_entries, key=lambda x: sort_key(x.player_name)):
+        totals = {cls: {sub: {'makes': 0, 'attempts': 0} for sub in subs} for cls, subs in shot_map.items()}
+        total_shots = 0
+        for e in SkillEntry.query.filter_by(player_id=r.id).all():
+            if e.shot_class in totals and e.subcategory in totals[e.shot_class]:
+                t = totals[e.shot_class][e.subcategory]
+                t['makes'] += e.makes
+                t['attempts'] += e.attempts
+                total_shots += e.attempts
+        summary.append({'player_name': r.player_name, 'totals': totals, 'total_shots': total_shots})
+
+    return render_template(
+        'admin/skill_totals.html',
+        players_summary=summary,
+        seasons=seasons,
+        selected_season=season_id,
+        shot_map=shot_map,
+        label_map=label_map,
+        active_page='skill_totals'
+    )

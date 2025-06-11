@@ -44,6 +44,11 @@
                   {{ 'bg-white text-[#9E1B32]' if active_page=='players' else '' }}">
           Players
         </a>
+        <a href="{{ url_for('admin.skill_totals') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
+                  {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
+          Skill Totals
+        </a>
 
         {% if current_user.is_admin %}
           <!-- Dashboard -->
