@@ -18,71 +18,70 @@
     <nav class="flex flex-col gap-4 flex-1">
       <!-- Home -->
       <a href="{{ url_for('public.homepage') }}"
-         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                {{ 'bg-white text-[#9E1B32]' if active_page=='home' else '' }}">
+         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='home' else '' }}">
         Home
       </a>
 
       {% if current_user.is_authenticated %}
-        <!-- Game Reports -->
-        <a href="{{ url_for('admin.game_reports') }}"
-           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                  {{ 'bg-white text-[#9E1B32]' if active_page=='game_reports' else '' }}">
-          Game Reports
-        </a>
 
-        <!-- Practice Reports -->
-        <a href="{{ url_for('admin.practice_reports') }}"
-           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                  {{ 'bg-white text-[#9E1B32]' if active_page=='practice_reports' else '' }}">
-          Practice Reports
-        </a>
+        {# ── Reports dropdown ── #}
+        {% set reports_active = active_page in ['game_reports', 'practice_reports'] %}
+        <details class="group" {% if reports_active %}open{% endif %}>
+          <summary class="px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
+            Reports
+          </summary>
+          <div class="ml-4 mt-2 flex flex-col gap-2">
+            <a href="{{ url_for('admin.game_reports') }}"
+               class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='game_reports' else '' }}">
+              Game Reports
+            </a>
+            <a href="{{ url_for('admin.practice_reports') }}"
+               class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='practice_reports' else '' }}">
+              Practice Reports
+            </a>
+          </div>
+        </details>
 
         <!-- Players -->
         <a href="{{ url_for('admin.players_list') }}"
-           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                  {{ 'bg-white text-[#9E1B32]' if active_page=='players' else '' }}">
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='players' else '' }}">
           Players
         </a>
         <a href="{{ url_for('admin.skill_totals') }}"
-           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                  {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
           Skill Totals
         </a>
 
         {% if current_user.is_admin %}
-          <!-- Dashboard -->
-          <a href="{{ url_for('admin.dashboard') }}"
-             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                    {{ 'bg-white text-[#9E1B32]' if active_page=='dashboard' else '' }}">
-            Dashboard
-          </a>
-
-          <!-- Files -->
-          <a href="{{ url_for('admin.files_view_unique') }}"
-             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                    {{ 'bg-white text-[#9E1B32]' if active_page=='files' else '' }}">
-            Files
-          </a>
-          <a href="{{ url_for('merge.merge_csv') }}"
-             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]">
-            Merge CSV
-          </a>
-
-
-          <!-- Roster -->
-          <a href="{{ url_for('admin.roster') }}"
-             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                    {{ 'bg-white text-[#9E1B32]' if active_page=='roster' else '' }}">
-            Roster
-          </a>
-
-          <!-- Users -->
-          <a href="{{ url_for('admin.users_list') }}"
-             class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]
-                    {{ 'bg-white text-[#9E1B32]' if active_page=='users' else '' }}">
-            Users
-          </a>
+          {# ── Management dropdown ── #}
+          {% set mgmt_active = active_page in ['dashboard', 'files', 'roster', 'users'] or request.blueprint == 'merge' %}
+          <details class="group" {% if mgmt_active %}open{% endif %}>
+            <summary class="px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
+              Management
+            </summary>
+            <div class="ml-4 mt-2 flex flex-col gap-2">
+              <a href="{{ url_for('admin.dashboard') }}"
+                 class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='dashboard' else '' }}">
+                Dashboard
+              </a>
+              <a href="{{ url_for('admin.files_view_unique') }}"
+                 class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='files' else '' }}">
+                Files
+              </a>
+              <a href="{{ url_for('merge.merge_csv') }}"
+                 class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if request.endpoint.startswith('merge.') else '' }}">
+                Merge CSV
+              </a>
+              <a href="{{ url_for('admin.roster') }}"
+                 class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='roster' else '' }}">
+                Roster
+              </a>
+              <a href="{{ url_for('admin.users_list') }}"
+                 class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='users' else '' }}">
+                Users
+              </a>
+            </div>
+          </details>
         {% endif %}
 
         <!-- Logout -->
