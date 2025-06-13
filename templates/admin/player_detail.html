@@ -1009,6 +1009,21 @@
               </td>
               <td class="px-4 py-2 text-sm border-t border-gray-300">
                 {{ n.value }}/100
+                {% if current_user.is_admin %}
+                <form
+                  action="{{ url_for('admin.delete_nba100_entry', player_name=player_name, entry_id=n.id) }}"
+                  method="post"
+                  class="inline"
+                >
+                  <button
+                    type="submit"
+                    class="ml-2 text-red-600 hover:underline text-xs"
+                    onclick="return confirm('Delete this NBA 100 entry?');"
+                  >
+                    Delete
+                  </button>
+                </form>
+                {% endif %}
               </td>
             </tr>
           {% else %}

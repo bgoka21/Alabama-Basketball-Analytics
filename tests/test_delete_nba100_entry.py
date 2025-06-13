@@ -1,5 +1,5 @@
-import pytest
 from datetime import date
+import pytest
 from flask import Flask
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
@@ -32,6 +32,8 @@ def app():
         db.session.add(roster)
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
+        entry = SkillEntry(id=1, player_id=1, date=date(2024,1,5), skill_name='NBA 100', value=80)
+        db.session.add(entry)
         db.session.commit()
     yield app
     with app.app_context():
@@ -45,19 +47,8 @@ def client(app):
         yield client
 
 
-def _add_entry(app, shot_date, attempts):
+def test_delete_nba100_entry(client, app):
+    resp = client.post('/admin/player/%231%20Test/nba100/1/delete')
+    assert resp.status_code == 302
     with app.app_context():
-        db.session.add(SkillEntry(player_id=1, date=shot_date, skill_name='Free Throws', value=attempts,
-                                  shot_class='ft', subcategory='Free Throw', makes=attempts, attempts=attempts))
-        db.session.commit()
-
-
-def test_date_filter_applied(client, app):
-    _add_entry(app, date(2024, 1, 1), 10)
-    _add_entry(app, date(2024, 1, 5), 5)
-
-    resp = client.get('/admin/skill_totals', query_string={'start_date': '2024-01-04'})
-    assert resp.status_code == 200
-    html = resp.data.decode('utf-8')
-    assert '5' in html
-    assert '10' not in html
+        assert SkillEntry.query.get(1) is None
