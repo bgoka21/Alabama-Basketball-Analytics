@@ -238,3 +238,6 @@ class Roster(db.Model):
 
     def __repr__(self):
         return f"<Roster(season_id={self.season_id}, player_name='{self.player_name}')>"
+
+# Re-export for compatibility with older imports
+from .uploaded_file import UploadedFile

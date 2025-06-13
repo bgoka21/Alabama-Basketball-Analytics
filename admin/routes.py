@@ -2063,6 +2063,23 @@ def add_nba100_entry(player_name):
     return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
 
 
+@admin_bp.route('/admin/player/<player_name>/nba100/<int:entry_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_nba100_entry(player_name, entry_id):
+    """Delete a single NBA 100 entry."""
+    roster = Roster.query.filter_by(player_name=player_name).first_or_404()
+    entry = (
+        SkillEntry.query
+        .filter_by(id=entry_id, player_id=roster.id, skill_name="NBA 100")
+        .first_or_404()
+    )
+    db.session.delete(entry)
+    db.session.commit()
+    flash('NBA 100 entry deleted.', 'success')
+    return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
+
+
 
 @admin_bp.route('/admin/roster', methods=['GET', 'POST'])
 @login_required
@@ -2265,7 +2282,7 @@ def skill_totals():
         summary.append({'player_name': r.player_name, 'totals': totals, 'total_shots': total_shots})
 
     return render_template(
-        'admin/skill_totals.html',
+        'skill_totals.html',
         players_summary=summary,
         seasons=seasons,
         selected_season=season_id,

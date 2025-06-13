@@ -1,6 +1,7 @@
 import pytest
 from datetime import date
 from flask import Flask
+from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
 from models.database import db, Season, Roster
@@ -14,6 +15,13 @@ def app():
     app.config['SECRET_KEY'] = 'test'
     app.config['TESTING'] = True
     db.init_app(app)
+    lm = LoginManager()
+    lm.init_app(app)
+    lm.login_view = 'admin.login'
+
+    @lm.user_loader
+    def load_user(uid):
+        return User.query.get(int(uid))
     app.register_blueprint(admin_bp, url_prefix='/admin')
     with app.app_context():
         db.create_all()
