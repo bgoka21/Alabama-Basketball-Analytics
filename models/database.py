@@ -84,6 +84,12 @@ class TeamStats(db.Model):
     wins                 = db.Column(db.Integer, nullable=False, default=0)
     losses               = db.Column(db.Integer, nullable=False, default=0)
 
+    # ── PnR metrics ─────────────────────────────────────────────
+    pnr_count         = db.Column(db.Integer, default=0)
+    pnr_points        = db.Column(db.Integer, default=0)
+    pnr_ppp           = db.Column(db.Float,   default=0.0)
+    pnr_event_details = db.Column(db.Text)
+
 
 class SkillEntry(db.Model):
     __tablename__ = 'skill_entries'
@@ -220,6 +226,20 @@ class PlayerPossession(db.Model):
     player_id      = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False, index=True)
 
 
+class PnREvent(db.Model):
+    __tablename__ = 'pnr_events'
+    id            = db.Column(db.Integer, primary_key=True)
+    practice_id   = db.Column(db.Integer, db.ForeignKey('practice.id'), nullable=False)
+    possession_id = db.Column(db.Integer, nullable=True)
+    start_time    = db.Column(db.Float, nullable=False)
+    duration      = db.Column(db.Float, nullable=False)
+    ball_handler  = db.Column(db.String(100))
+    screener      = db.Column(db.String(100))
+    adv           = db.Column(db.Boolean, default=False)
+    direct        = db.Column(db.Boolean, default=False)
+    points        = db.Column(db.Integer, default=0)
+
+
 class Roster(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
     season_id    = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
@@ -238,3 +258,7 @@ class Roster(db.Model):
 
     def __repr__(self):
         return f"<Roster(season_id={self.season_id}, player_name='{self.player_name}')>"
+
+
+# Import UploadedFile at the end to avoid circular dependency
+from .uploaded_file import UploadedFile
