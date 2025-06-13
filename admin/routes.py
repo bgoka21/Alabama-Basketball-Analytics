@@ -11,7 +11,14 @@ from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, send_file, current_app, session, make_response
 )
-from flask_login import login_required, current_user, confirm_login, login_user, logout_user
+from flask_login import (
+    login_required,
+    current_user,
+    confirm_login,
+    login_user,
+    logout_user,
+    LoginManager,
+)
 from utils.auth       import admin_required
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -56,7 +63,21 @@ def extract_tokens(text):
     tokens = text.replace(',', ' ').split()
     return tokens
 
+
 admin_bp = Blueprint('admin', __name__, template_folder='../templates/admin')
+
+# Ensure a LoginManager exists even in test apps
+@admin_bp.record_once
+def _ensure_login_manager(state):
+    app = state.app
+    if not hasattr(app, 'login_manager'):
+        lm = LoginManager()
+        lm.init_app(app)
+        app.login_manager = lm
+
+        @lm.user_loader
+        def load_user(user_id):
+            return User.query.get(int(user_id))
 
 try:
     from auth.routes import auth_bp

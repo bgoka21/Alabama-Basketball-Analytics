@@ -1,12 +1,32 @@
 import json
 import pandas as pd
 from collections import defaultdict
-from models.database import db, Roster, PlayerStats, BlueCollarStats, Practice
+from models.database import (
+    db,
+    Roster,
+    PlayerStats,
+    BlueCollarStats,
+    Practice,
+    TeamStats,
+    PnREvent,
+)
 
 
 def safe_str(value):
     """Safely convert a value to a string, returning an empty string for None."""
     return "" if value is None else str(value)
+
+
+def safe_value(val, default=0):
+    if isinstance(val, (list, dict, tuple, pd.Series)):
+        return default
+    return default if pd.isna(val) else val
+
+
+def extract_tokens(cell_value):
+    if pd.isna(cell_value) or not isinstance(cell_value, str):
+        return []
+    return [t.strip().replace("–", "-") for t in cell_value.split(',') if t.strip()]
 
 # ── COPY OF blue_collar_values FROM test_parse.py ───────────────────
 blue_collar_values = {
@@ -21,6 +41,9 @@ blue_collar_values = {
     "charge_taken": 4.0
 }
 # ─────────────────────────────────────────────────────────────────────
+
+# ── Define any time-based event rows here ─────────────────────────
+TIME_BASED_EVENT_ROWS = ['PnR']
 
 # Defensive token mapping (mirrors game parsing)
 defense_mapping = {
@@ -63,6 +86,87 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     df = pd.read_csv(practice_csv_path, encoding="utf-8-sig")
     # Normalize column headers to avoid mismatches caused by stray whitespace
     df.columns = [str(c).strip() for c in df.columns]
+
+    # Locate the Practice and corresponding TeamStats row
+    practice = (
+        Practice.query
+        .filter_by(season_id=season_id, category=category, date=file_date)
+        .first()
+    )
+    if practice is None:
+        raise RuntimeError(
+            f"Could not find existing Practice row for season={season_id}, "
+            f"category='{category}', date={file_date}"
+        )
+
+    team_stats = TeamStats.query.filter_by(practice_id=practice.id).first()
+
+    # 1) Build possession windows from team rows
+    possession_intervals = []
+    if 'Start Time' in df.columns and 'Duration' in df.columns:
+        for idx, row in df[df['Row'].isin(['Crimson', 'White', 'Alabama', 'Blue'])].iterrows():
+            start = safe_value(row.get('Start Time'), 0.0)
+            dur = safe_value(row.get('Duration'), 0.0)
+            try:
+                start_f = float(start)
+                dur_f = float(dur)
+            except (TypeError, ValueError):
+                continue
+            possession_intervals.append({
+                'id': idx,
+                'start': start_f,
+                'end': start_f + dur_f,
+                'points': safe_value(row.get('Points', 0))
+            })
+
+    # 2) Loop over each time-based row and link into possessions
+    all_events = []
+    for event_name in TIME_BASED_EVENT_ROWS:
+        if event_name not in df['Row'].values:
+            continue
+        for idx, row in df[df['Row'] == event_name].iterrows():
+            start = safe_value(row.get('Start Time'), 0.0)
+            dur = safe_value(row.get('Duration'), 0.0)
+            try:
+                start_f = float(start)
+                dur_f = float(dur)
+            except (TypeError, ValueError):
+                continue
+            tokens = extract_tokens(row.get('Detail') or row.get(event_name))
+
+            if event_name == 'PnR':
+                bh = next((t.split(': ')[1] for t in tokens if t.startswith('PnR BH')), None)
+                sc = next((t.split(': ')[1] for t in tokens if t.startswith('PnR Screener')), None)
+                adv_flag = 'ADV+' in tokens
+                dir_flag = 'Direct' in tokens
+
+                match = next((p for p in possession_intervals if start_f >= p['start'] and start_f < p['end']), None)
+                pts = match['points'] if (match and dir_flag) else 0
+
+                evt = {
+                    'practice_id': practice.id,
+                    'possession_id': match['id'] if match else None,
+                    'start_time': start_f,
+                    'duration': dur_f,
+                    'ball_handler': bh,
+                    'screener': sc,
+                    'adv': adv_flag,
+                    'direct': dir_flag,
+                    'points': pts,
+                }
+                db.session.add(PnREvent(**evt))
+                all_events.append(evt)
+
+    # 3) Summarize and store on TeamStats
+    count = len(all_events)
+    total = sum(e['points'] for e in all_events)
+    ppp = (total / count) if count else 0.0
+
+    if team_stats is not None:
+        team_stats.pnr_count = count
+        team_stats.pnr_points = total
+        team_stats.pnr_ppp = ppp
+        team_stats.pnr_event_details = json.dumps(all_events) if all_events else None
     
     # ─── Step A: Initialize accumulators ─────────────────────────────
     player_stats_dict   = defaultdict(lambda: defaultdict(int))
@@ -416,17 +520,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
         # (Any rows we don’t explicitly parse just fall through.)
 
-    # ─── Step C: After looping all rows, find existing Practice and write to DB ───────
-    practice = (
-        Practice.query
-        .filter_by(season_id=season_id, category=category, date=file_date)
-        .first()
-    )
-    if practice is None:
-        raise RuntimeError(
-            f"Could not find existing Practice row for season={season_id}, "
-            f"category='{category}', date={file_date}"
-        )
+    # ─── Step C: After looping all rows, write aggregated stats to DB ───────
     practice_id = practice.id
 
     # Now insert each player’s aggregated stats + blue collar
