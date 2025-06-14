@@ -5,15 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alabama Basketball</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media (max-width: 768px) {
+      h1 {font-size:1.25rem;line-height:1.75rem;}
+      h2 {font-size:1.125rem;line-height:1.5rem;}
+      body {font-size:1rem;line-height:1.5rem;}
+      #sidebar a,#sidebar summary{display:block;width:100%;padding:0.75rem 1rem;}
+      table{display:block;width:100%;overflow-x:auto;}
+    }
+  </style>
 </head>
 <body class="min-h-screen flex">
 
   <!-- Mobile menu button -->
-  <button id="mobile-menu-btn" class="md:hidden p-4 text-2xl">&#9776;</button>
+  <button id="mobile-menu-btn" class="md:hidden w-11 h-11 p-2 text-2xl">&#9776;</button>
 
   <!-- Sidebar -->
-  <aside id="sidebar" class="hidden md:flex w-64 bg-[#9E1B32] text-white flex-col px-4 py-6">
-    <h1 class="text-2xl font-bold mb-8">Alabama Basketball</h1>
+  <aside id="sidebar" class="hidden md:flex w-64 bg-[#9E1B32] text-white flex-col px-2 py-4 sm:px-4 sm:py-6">
+    <h1 class="text-xl sm:text-2xl font-bold mb-8">Alabama Basketball</h1>
 
     <nav class="flex flex-col gap-4 flex-1">
       <!-- Home -->
@@ -100,7 +109,7 @@
   </aside>
 
 <!-- Main content -->
-<main class="flex-1 p-6 overflow-y-auto bg-white text-black">
+<main class="flex-1 p-4 sm:p-6 overflow-y-auto bg-white text-black">
   {# ── Page-specific controls (e.g. season dropdown) ── #}
   {% block page_controls %}{% endblock %}
 
