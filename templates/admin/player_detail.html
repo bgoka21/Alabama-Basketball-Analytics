@@ -9,22 +9,22 @@
 
 
 
-<div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-  <h1 class="text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+  <h1 class="text-xl sm:text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
   {% if not has_stats %}
     <p class="mb-4 text-yellow-600">No stats found for this player.</p>
   {% endif %}
 
-<div class="w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
 
   <!-- Game/Practice Buttons -->
-  <div class="flex gap-4 mb-4">
+  <div class="flex flex-col sm:flex-row gap-4 mb-4">
     <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', label=request.args.getlist('label')) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-100 text-gray-800' }}">
+       class="w-full sm:w-auto text-center px-4 py-3 sm:py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-100 text-gray-800' }}">
       Game
     </a>
     <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', label=request.args.getlist('label')) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-100 text-gray-800' }}">
+       class="w-full sm:w-auto text-center px-4 py-3 sm:py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-100 text-gray-800' }}">
       Practice
     </a>
   </div>
@@ -43,32 +43,32 @@
   {% endif %}
   
   <!-- Tab Buttons -->
-  <div class="flex space-x-2 mb-4">
+  <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
     <button
       id="btnSeasonTotals"
       onclick="showTab('seasonTotals')"
-      class="px-4 py-2 border rounded"
+      class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
       Season Totals
     </button>
     <button
       id="btnGameStats"
       onclick="showTab('gameStats')"
-      class="px-4 py-2 border rounded"
+      class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
       Game‑by‑Game Stats
     </button>
     <button
       id="btnShotType"
       onclick="showTab('shotType')"
-      class="px-4 py-2 border rounded"
+      class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
       Shot Type
     </button>
     <button
     id="btnSkillDevelopment"
     onclick="showTab('skillDevelopment')"
-    class="px-4 py-2 border rounded"
+    class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
   >
     Skill Development
   </button>
@@ -166,7 +166,7 @@
 
   <!-- Blue Collar Breakdown -->
   <div class="mt-8">
-    <h2 class="text-xl font-semibold mb-4">Blue Collar Breakdown</h2>
+    <h2 class="text-lg sm:text-xl font-semibold mb-4">Blue Collar Breakdown</h2>
     <div class="overflow-x-auto">
       <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
         <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
@@ -214,7 +214,7 @@
 
 <!-- 2) Game-by-Game / Practice-by-Practice Stats -->
 <div id="gameStats" class="tab-content hidden">
-  <h2 class="text-xl font-semibold mb-2">
+  <h2 class="text-lg sm:text-xl font-semibold mb-2">
     {% if mode == 'game' %}
       Game-by-Game Breakdown
     {% else %}
@@ -315,7 +315,7 @@
 
   <!-- Shot Type Section -->
   <div id="shotType" class="tab-content hidden">
-  <h2 class="text-xl font-semibold mb-4">Shot Type Overview</h2>
+  <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Type Overview</h2>
 
   <!-- Season Aggregates as big cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -699,12 +699,12 @@
   class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8"
 >
   <!-- ─── Section Title ──────────────────────────────────────────────────────── -->
-  <h2 class="text-3xl font-bold mb-6 border-b pb-2">Skill Development</h2>
+  <h2 class="text-2xl sm:text-3xl font-bold mb-6 border-b pb-2">Skill Development</h2>
 
   <!-- ─── Drill-by-Drill Entry Form (ATR / Floater / 3FG / FT) ─────────────────── -->
   {% if current_user.is_admin %}
-  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
-    <h3 class="text-2xl font-semibold mb-4">Drill-by-Drill Entry</h3>
+  <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
+    <h3 class="text-xl sm:text-2xl font-semibold mb-4">Drill-by-Drill Entry</h3>
     <form method="post" class="w-full">
       <div class="overflow-x-auto">
         <table class="w-full table-fixed border border-gray-200 rounded-md">
@@ -797,8 +797,8 @@
   {% if current_user.is_admin %}
 
   <!-- ─── “NBA 100” Entry Form ──────────────────────────────────────────────────── -->
-  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
-    <h3 class="text-2xl font-semibold mb-4">NBA 100 Exercise</h3>
+  <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
+    <h3 class="text-xl sm:text-2xl font-semibold mb-4">NBA 100 Exercise</h3>
     <form
       method="post"
       action="{{ url_for('admin.add_nba100_entry', player_name=player_name) }}"
@@ -840,8 +840,8 @@
   {% endif %}
 
   <!-- ─── Date-Range Filter Form ──────────────────────────────────────────────── -->
-  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
-    <h3 class="text-2xl font-semibold mb-4">Filter History</h3>
+  <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
+    <h3 class="text-xl sm:text-2xl font-semibold mb-4">Filter History</h3>
     <form method="get" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
       <div class="flex-1">
         <label class="block text-sm font-medium mb-1">From</label>
@@ -881,7 +881,7 @@
 
   <!-- ─── Drill History Table ─────────────────────────────────────────────────── -->
   <div class="mb-8">
-    <h3 class="text-2xl font-semibold mb-4">Drill History</h3>
+    <h3 class="text-xl sm:text-2xl font-semibold mb-4">Drill History</h3>
     <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
       <table class="w-full table-fixed border border-gray-200 rounded-md">
         <thead>
@@ -988,7 +988,7 @@
 
   <!-- ─── NBA 100 History Table ────────────────────────────────────────────────── -->
   <div class="mb-4">
-    <h3 class="text-2xl font-semibold mb-4">NBA 100 History</h3>
+    <h3 class="text-xl sm:text-2xl font-semibold mb-4">NBA 100 History</h3>
     <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
       <table class="w-full table-fixed border border-gray-200 rounded-md">
         <thead>
@@ -1121,12 +1121,23 @@ function showShotTypeDetail(detail) {
           sortState.order = (sortKey === "game_date" ? "desc" : "asc");
         }
         // restyle headers
-        headers.forEach(h => h.classList.remove("bg-[#9E1B32]","text-white"));
+        headers.forEach(h =>
+          h.classList.remove(
+            "bg-[#9E1B32]",
+            "bg-blue-600",
+            "bg-white",
+            "text-white",
+            "text-black"
+          ));
         headers.forEach(h => {
           const ind = h.querySelector(".sort-indicator");
           if (ind) ind.textContent = " ⇅";
         });
-        header.classList.add("bg-blue-600","text-white");
+        if (window.innerWidth <= 768) {
+          header.classList.add("bg-white", "text-black");
+        } else {
+          header.classList.add("bg-blue-600", "text-white");
+        }
         if (indicator) indicator.textContent = (sortState.order === "asc" ? " ▲" : " ▼");
         // actually sort
         const sortMapping = {
