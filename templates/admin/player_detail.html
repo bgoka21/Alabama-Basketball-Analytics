@@ -1121,12 +1121,23 @@ function showShotTypeDetail(detail) {
           sortState.order = (sortKey === "game_date" ? "desc" : "asc");
         }
         // restyle headers
-        headers.forEach(h => h.classList.remove("bg-[#9E1B32]","text-white"));
+        headers.forEach(h =>
+          h.classList.remove(
+            "bg-[#9E1B32]",
+            "bg-blue-600",
+            "bg-white",
+            "text-white",
+            "text-black"
+          ));
         headers.forEach(h => {
           const ind = h.querySelector(".sort-indicator");
           if (ind) ind.textContent = " ⇅";
         });
-        header.classList.add("bg-blue-600","text-white");
+        if (window.innerWidth <= 768) {
+          header.classList.add("bg-white", "text-black");
+        } else {
+          header.classList.add("bg-blue-600", "text-white");
+        }
         if (indicator) indicator.textContent = (sortState.order === "asc" ? " ▲" : " ▼");
         // actually sort
         const sortMapping = {
