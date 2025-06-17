@@ -28,7 +28,8 @@ from models.database import (
     Season,
     Roster,
     Practice,
-    SkillEntry
+    SkillEntry,
+    PnRStats
 )
 
 from models.uploaded_file import UploadedFile
@@ -1495,6 +1496,29 @@ def player_detail(player_name):
     aggregated_game     = aggregate_stats(game_stats_records)
     aggregated_practice = aggregate_stats(practice_stats_records)
 
+    # ─── Direct PnR totals for this player ─────────────────────────────
+    pnrs = PnRStats.query.filter_by(player_id=player.id).all()
+    total_pnrs = len(pnrs)
+    pnrs_as_bh = sum(1 for p in pnrs if p.role == 'BH')
+    pnrs_as_screener = sum(1 for p in pnrs if p.role == 'Screener')
+    adv_plus = sum(1 for p in pnrs if p.advantage_created == 'Adv+')
+    direct = [p for p in pnrs if p.direct]
+    direct_count = len(direct)
+    direct_points = sum(p.points_scored or 0 for p in direct)
+    direct_turnovers = sum(1 for p in direct if p.turnover_occurred)
+    direct_assists = sum(1 for p in direct if p.assist_occurred)
+    pct_adv_plus = adv_plus / total_pnrs if total_pnrs else 0
+    direct_points_per = direct_points / direct_count if direct_count else 0
+    pnr_totals = SimpleNamespace(
+        total_pnrs=total_pnrs,
+        pnrs_as_bh=pnrs_as_bh,
+        pnrs_as_screener=pnrs_as_screener,
+        pct_adv_plus=pct_adv_plus,
+        direct_pnr_points_per=round(direct_points_per, 3) if direct_count else 0,
+        direct_pnr_turnovers=direct_turnovers,
+        direct_pnr_assists=direct_assists,
+    )
+
     # ─── Drill label filtering (practice mode only) ─────────────────────
     label_options = collect_practice_labels(practice_stats_records)
     selected_labels = [
@@ -1933,7 +1957,8 @@ def player_detail(player_name):
         player                             = player,
         has_stats                          = has_stats,
         label_options                      = label_options,
-        selected_labels                    = selected_labels
+        selected_labels                    = selected_labels,
+        pnr_totals                         = pnr_totals
     )
 
 
