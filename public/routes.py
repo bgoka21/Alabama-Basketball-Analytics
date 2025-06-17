@@ -1,6 +1,6 @@
 # basketball_analytics/public/routes.py
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
 from collections import defaultdict
@@ -16,6 +16,7 @@ from models.database import (
     Possession,
     Practice,
     Roster,
+    PnRStats,
 )
 
 
@@ -526,3 +527,35 @@ def practice_homepage(active_page="practice_home"):
 def homepage():
     """Alias for practice_homepage as the main home view."""
     return practice_homepage(active_page="home")
+
+
+@public_bp.route('/api/direct_pnr_for_player/<int:player_id>', methods=['GET'])
+@login_required
+def direct_pnr_for_player(player_id):
+    """Return aggregated Direct PnR statistics for a given player."""
+    pnrs = PnRStats.query.filter_by(player_id=player_id).all()
+
+    total = len(pnrs)
+    pnrs_as_bh = sum(1 for p in pnrs if p.role == 'BH')
+    pnrs_as_screener = sum(1 for p in pnrs if p.role == 'Screener')
+    adv_plus = sum(1 for p in pnrs if p.advantage_created == 'Adv+')
+
+    direct = [p for p in pnrs if p.direct]
+    direct_count = len(direct)
+    direct_points = sum(p.points_scored or 0 for p in direct)
+    direct_turnovers = sum(1 for p in direct if p.turnover_occurred)
+    direct_assists = sum(1 for p in direct if p.assist_occurred)
+
+    pct_adv_plus = adv_plus / total if total else 0
+    direct_points_per = direct_points / direct_count if direct_count else 0
+
+    return jsonify({
+        'player_id': player_id,
+        'total_pnrs': total,
+        'pnrs_as_bh': pnrs_as_bh,
+        'pnrs_as_screener': pnrs_as_screener,
+        'pct_adv_plus': round(pct_adv_plus, 3) if total else 0,
+        'direct_pnr_points_per': round(direct_points_per, 3) if direct_count else 0,
+        'direct_pnr_turnovers': direct_turnovers,
+        'direct_pnr_assists': direct_assists,
+    })

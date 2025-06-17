@@ -50,7 +50,7 @@ class Practice(db.Model):
 
 class TeamStats(db.Model):
     id                   = db.Column(db.Integer, primary_key=True)
-    game_id              = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False, index=True)
+    game_id              = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True, index=True)
     practice_id          = db.Column(db.Integer, db.ForeignKey('practice.id'), nullable=True, index=True)
     player_id            = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=True)
     season_id            = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False, index=True)
@@ -218,6 +218,23 @@ class PlayerPossession(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     possession_id  = db.Column(db.Integer, db.ForeignKey('possession.id'), nullable=False, index=True)
     player_id      = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False, index=True)
+
+
+class PnRStats(db.Model):
+    __tablename__ = 'pnr_stats'
+    id                = db.Column(db.Integer, primary_key=True)
+    game_id           = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True)
+    practice_id       = db.Column(db.Integer, db.ForeignKey('practice.id'), nullable=True)
+    possession_id     = db.Column(db.Integer, nullable=False)
+    player_id         = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False)
+    role              = db.Column(db.String(10), nullable=False)        # "BH" or "Screener"
+    advantage_created = db.Column(db.String(5), nullable=False)         # "Adv+" or "Adv-"
+    direct            = db.Column(db.Boolean, nullable=False)
+    points_scored     = db.Column(db.Integer, nullable=True)
+    turnover_occurred = db.Column(db.Boolean, nullable=True)
+    assist_occurred   = db.Column(db.Boolean, nullable=True)
+    start_time        = db.Column(db.Float, nullable=False)
+    duration          = db.Column(db.Float, nullable=False)
 
 
 class Roster(db.Model):

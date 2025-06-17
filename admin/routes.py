@@ -58,6 +58,47 @@ def extract_tokens(text):
 
 admin_bp = Blueprint('admin', __name__, template_folder='../templates/admin')
 
+@admin_bp.record
+def register_filters(setup_state):
+    """Ensure Jinja filters are available when blueprint is used standalone."""
+    app = setup_state.app
+    def grade_pps(pps, attempts):
+        if not attempts:
+            return ""
+
+        def interpolate(start, end, factor):
+            return tuple(round(s + (e - s) * max(0.0, min(factor, 1.0))) for s, e in zip(start, end))
+
+        if pps >= 1.1:
+            start, end = (200, 255, 200), (0, 128, 0)
+            factor = min((pps - 1.1) / 0.5, 1.0)
+        elif pps >= 1.0:
+            start, end = (255, 255, 224), (255, 215, 0)
+            factor = (pps - 1.0) / 0.1
+        else:
+            start, end = (255, 200, 200), (255, 0, 0)
+            factor = min((1.0 - pps) / 0.5, 1.0)
+
+        r, g, b = interpolate(start, end, factor)
+        return f"background-color: rgb({r},{g},{b});"
+
+    def grade_atr2fg_pct(pct, attempts):
+        if not attempts:
+            return ""
+        pps = (pct / 100.0) * 2
+        return grade_pps(pps, attempts)
+
+    def grade_3fg_pct(pct, attempts):
+        if not attempts:
+            return ""
+        pps = (pct / 100.0) * 3
+        return grade_pps(pps, attempts)
+
+    app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
+    app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
+    app.jinja_env.filters['grade_pps'] = grade_pps
+    app.jinja_env.globals['view_exists'] = lambda name: name in app.view_functions
+
 try:
     from auth.routes import auth_bp
     AUTH_EXISTS = True
@@ -1310,7 +1351,7 @@ def collect_practice_labels(stats_records):
 
 
 
-@admin_bp.route('/admin/player/<player_name>', methods=['GET', 'POST'])
+@admin_bp.route('/player/<player_name>', methods=['GET', 'POST'])
 @login_required
 def player_detail(player_name):
     # ─── Define shot_map & label_map for both POST and GET ──────────
@@ -1856,7 +1897,7 @@ def player_detail(player_name):
 
     # ─── Finally, render template with BOTH modes & all context ─────────
     return render_template(
-        'admin/player_detail.html',
+        'player_detail.html',
         player_name                        = player_name,
         mode                               = mode,
         agg                                = agg,
@@ -2063,7 +2104,7 @@ def add_nba100_entry(player_name):
     return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
 
 
-@admin_bp.route('/admin/player/<player_name>/nba100/<int:entry_id>/delete', methods=['POST'])
+@admin_bp.route('/player/<player_name>/nba100/<int:entry_id>/delete', methods=['POST'])
 @login_required
 @admin_required
 def delete_nba100_entry(player_name, entry_id):
@@ -2081,7 +2122,7 @@ def delete_nba100_entry(player_name, entry_id):
 
 
 
-@admin_bp.route('/admin/roster', methods=['GET', 'POST'])
+@admin_bp.route('/roster', methods=['GET', 'POST'])
 @login_required
 def roster():
     # 1) Load seasons
@@ -2116,7 +2157,7 @@ def roster():
     )
 
 
-@admin_bp.route('/admin/season/create', methods=['GET', 'POST'])
+@admin_bp.route('/season/create', methods=['GET', 'POST'])
 @admin_required
 def create_season():
     if request.method == 'POST':
@@ -2137,7 +2178,7 @@ def create_season():
 
 
 
-@admin_bp.route('/admin/roster/delete/<int:id>', methods=['POST'])
+@admin_bp.route('/roster/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_roster(id):
     entry = Roster.query.get_or_404(id)
