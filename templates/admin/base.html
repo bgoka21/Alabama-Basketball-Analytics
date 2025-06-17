@@ -6,13 +6,13 @@
   <title>Alabama Basketball</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @media (max-width: 768px) {
-      h1 {font-size:1.25rem;line-height:1.75rem;}
-      h2 {font-size:1.125rem;line-height:1.5rem;}
-      body {font-size:1rem;line-height:1.5rem;}
-      #sidebar a,#sidebar summary{display:block;width:100%;padding:0.75rem 1rem;}
-      table{display:block;width:100%;overflow-x:auto;}
-    }
+      @media (max-width: 768px) {
+        h1 {font-size:1.25rem;line-height:1.75rem;}
+        h2 {font-size:1.125rem;line-height:1.5rem;}
+        body {font-size:1rem;line-height:1.5rem;}
+        #sidebar a,#sidebar summary{display:block;padding:0.75rem 1rem;}
+        table{display:block;overflow-x:auto;}
+      }
   </style>
 </head>
 <body class="min-h-screen flex">
@@ -26,7 +26,8 @@
 
     <nav class="flex flex-col gap-4 flex-1">
       <!-- Home -->
-      <a href="{{ url_for('public.homepage') }}"
+      {% set home_url = url_for('public.homepage') if view_exists('public.homepage') else '#' %}
+      <a href="{{ home_url }}"
          class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='home' else '' }}">
         Home
       </a>
@@ -77,10 +78,12 @@
                  class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='files' else '' }}">
                 Files
               </a>
+              {% if view_exists('merge.merge_csv') %}
               <a href="{{ url_for('merge.merge_csv') }}"
                  class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if request.endpoint.startswith('merge.') else '' }}">
                 Merge CSV
               </a>
+              {% endif %}
               <a href="{{ url_for('admin.roster') }}"
                  class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='roster' else '' }}">
                 Roster

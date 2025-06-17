@@ -58,7 +58,10 @@
               <td class="px-3 py-2 text-center text-sm border-t border-gray-300">
                 {{ t.makes }}/{{ t.attempts }}<br />
                 <span class="text-xs text-gray-600">
-                  ({% if t.attempts > 0 %}{{ (t.makes / t.attempts * 100)|round(1) }}{% else %}0.0{% endif %}%)
+                  ({% if t.attempts > 0 %}
+                    {% set pct = (t.makes / t.attempts * 100)|round(1) %}
+                    {% if pct == 100 %}complete{% else %}{{ pct }}%{% endif %}
+                  {% else %}0.0{% endif %})
                 </span>
               </td>
             {% endfor %}

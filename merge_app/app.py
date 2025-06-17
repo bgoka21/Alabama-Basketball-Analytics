@@ -70,7 +70,7 @@ def merge_csv():
                     merged = pd.concat([merged, df], axis=0, ignore_index=True)
 
             csv_io = BytesIO()
-            merged.to_csv(csv_io, index=False)
+            merged.to_csv(csv_io, index=False, float_format='%.15g')
             csv_io.seek(0)
             return send_file(
                 csv_io,
