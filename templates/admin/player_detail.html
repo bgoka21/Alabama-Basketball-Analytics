@@ -206,6 +206,31 @@
       </table>
     </div>
   </div>
+
+  <!-- Direct PnR Breakdown -->
+  <div class="mt-8">
+    <h2 class="text-lg sm:text-xl font-semibold mb-4">Direct PnR Summary</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+        <tbody>
+          {% for label, value in [
+            ('Total PnRs', pnr_totals.total_pnrs),
+            ('PnRs as BH', pnr_totals.pnrs_as_bh),
+            ('PnRs as Screener', pnr_totals.pnrs_as_screener),
+            ('% Advantage+', (pnr_totals.pct_adv_plus * 100)|round(1)),
+            ('Direct PnR Pts/Play', pnr_totals.direct_pnr_points_per),
+            ('Direct PnR Turnovers', pnr_totals.direct_pnr_turnovers),
+            ('Direct PnR Assists', pnr_totals.direct_pnr_assists)
+          ] %}
+          <tr class="odd:bg-white even:bg-gray-100">
+            <td class="px-4 py-2">{{ label }}</td>
+            <td class="px-4 py-2">{{ value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 </div>  <!-- closes <div id="seasonTotals"> -->
