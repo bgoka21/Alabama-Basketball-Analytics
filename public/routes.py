@@ -342,6 +342,7 @@ def practice_homepage(active_page="practice_home"):
             bcp_leaders=[],
             atr_leaders=[],
             fg3_leaders=[],
+            pps_leaders=[],
             overall_records=[],
             sprint_wins=[],
             sprint_losses=[],
@@ -356,6 +357,7 @@ def practice_homepage(active_page="practice_home"):
             bcp_leaders=[],
             atr_leaders=[],
             fg3_leaders=[],
+            pps_leaders=[],
             overall_records=[],
             sprint_wins=[],
             sprint_losses=[],
@@ -509,12 +511,46 @@ def practice_homepage(active_page="practice_home"):
     )
     sprint_losses = [(r.player_name, int(r.losses)) for r in sprint_losses_q.all()]
 
+    # ─── PPS Leaders (entire roster) ─────────────────────────────────────
+    pps_rows = (
+        db.session.query(
+            PlayerStats.player_name.label("player_name"),
+            func.coalesce(func.sum(PlayerStats.atr_makes), 0).label("atrm"),
+            func.coalesce(func.sum(PlayerStats.fg2_makes), 0).label("fg2m"),
+            func.coalesce(func.sum(PlayerStats.fg3_makes), 0).label("fg3m"),
+            func.coalesce(func.sum(PlayerStats.atr_attempts), 0).label("atra"),
+            func.coalesce(func.sum(PlayerStats.fg2_attempts), 0).label("fg2a"),
+            func.coalesce(func.sum(PlayerStats.fg3_attempts), 0).label("fg3a"),
+        )
+        .filter(PlayerStats.practice_id.in_(practice_ids))
+        .group_by(PlayerStats.player_name)
+        .all()
+    )
+
+    stats_map = {r.player_name: r for r in pps_rows}
+
+    roster_names = [r.player_name for r in Roster.query.filter_by(season_id=season_id).all()]
+
+    pps_leaders = []
+    for name in roster_names:
+        row = stats_map.get(name)
+        if row:
+            attempts = (row.atra or 0) + (row.fg2a or 0) + (row.fg3a or 0)
+            makes = (row.atrm or 0) + (row.fg2m or 0) + 1.5 * (row.fg3m or 0)
+            pps = round((makes * 2 / attempts), 2) if attempts else 0.0
+        else:
+            pps = 0.0
+        pps_leaders.append((name, pps))
+
+    pps_leaders.sort(key=lambda x: x[1], reverse=True)
+
     return render_template(
         "practice_home.html",
         dunks=dunks,
         bcp_leaders=bcp_leaders,
         atr_leaders=atr_leaders,
         fg3_leaders=fg3_leaders,
+        pps_leaders=pps_leaders,
         overall_records=overall_records,
         sprint_wins=sprint_wins,
         sprint_losses=sprint_losses,

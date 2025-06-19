@@ -115,6 +115,32 @@
   </div>
 
   <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
+    <h2 class="text-xl font-semibold mb-4">PPS Leaders</h2>
+    <table class="min-w-full">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">PPS</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for player, pps in pps_leaders %}
+        <tr class="bg-white hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm">
+            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
+              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
+            {% else %}
+              {{ player }}
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-sm">{{ '%.2f'|format(pps) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
     <h2 class="text-xl font-semibold mb-4">Overall Record</h2>
     <table class="min-w-full">
       <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
