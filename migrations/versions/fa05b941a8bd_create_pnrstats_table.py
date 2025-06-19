@@ -39,3 +39,4 @@ def upgrade():
 
 def downgrade():
     op.drop_table('pnr_stats')
+
