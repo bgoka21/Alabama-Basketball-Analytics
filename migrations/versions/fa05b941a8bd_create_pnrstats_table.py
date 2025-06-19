@@ -10,10 +10,11 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'fa05b941a8bd'
-down_revision = '929486bc4df5'
+revision = 'fa05b941a8bd'          # keep this file’s own ID
+down_revision = 'dfc35024adde'     # your last- stamped head
 branch_labels = None
 depends_on = None
+
 
 
 def upgrade():
