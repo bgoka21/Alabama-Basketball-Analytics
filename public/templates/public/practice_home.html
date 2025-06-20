@@ -6,6 +6,15 @@
     <a href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}" class="text-blue-600 underline">My Player Page</a>
   </p>
 {% endif %}
+<form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
+  {% for lbl in label_options %}
+    <label class="inline-flex items-center text-sm mr-2">
+      <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+      <span class="ml-1">{{ lbl }}</span>
+    </label>
+  {% endfor %}
+  <button type="submit" class="px-3 py-1 border rounded">Apply</button>
+</form>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
     <h2 class="text-xl font-semibold mb-4">Dunks Get You Paid</h2>
