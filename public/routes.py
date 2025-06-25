@@ -356,14 +356,23 @@ def practice_homepage(active_page="practice_home"):
             active_page=active_page,
             label_options=collect_practice_labels([]),
             selected_labels=[],
+            start_date=request.args.get("start_date", ""),
+            end_date=request.args.get("end_date", ""),
         )
 
     start_date_param = request.args.get("start_date")
+    end_date_param   = request.args.get("end_date")
     practice_q = Practice.query.filter_by(season_id=season_id)
     if start_date_param:
         try:
             start_dt = date.fromisoformat(start_date_param)
             practice_q = practice_q.filter(Practice.date >= start_dt)
+        except ValueError:
+            pass
+    if end_date_param:
+        try:
+            end_dt = date.fromisoformat(end_date_param)
+            practice_q = practice_q.filter(Practice.date <= end_dt)
         except ValueError:
             pass
     practice_ids = [p.id for p in practice_q.all()]
@@ -381,6 +390,8 @@ def practice_homepage(active_page="practice_home"):
             active_page=active_page,
             label_options=collect_practice_labels([]),
             selected_labels=[],
+            start_date=start_date_param or '',
+            end_date=end_date_param or '',
         )
 
     stats = PlayerStats.query.filter(PlayerStats.practice_id.in_(practice_ids)).all()
@@ -670,6 +681,8 @@ def practice_homepage(active_page="practice_home"):
         active_page=active_page,
         label_options=label_options,
         selected_labels=selected_labels,
+        start_date=start_date_param or '',
+        end_date=end_date_param or '',
     )
 
 
