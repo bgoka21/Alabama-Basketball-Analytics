@@ -29,8 +29,8 @@
     </a>
   </div>
 
-  {% if mode == 'practice' %}
-  <form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
+{% if mode == 'practice' %}
+<form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
     <input type="hidden" name="mode" value="practice" />
     {% for lbl in label_options %}
       <label class="inline-flex items-center text-sm mr-2">
@@ -39,11 +39,55 @@
       </label>
     {% endfor %}
     <button type="submit" class="px-3 py-1 border rounded">Apply</button>
+</form>
+{% endif %}
+
+<!-- ─── Date-Range Filter Form ─────────────────────────────────────────────── -->
+<div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
+  <h3 class="text-xl sm:text-2xl font-semibold mb-4">Filter History</h3>
+  <form id="dateRangeForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    {% for lbl in selected_labels %}
+      <input type="hidden" name="label" value="{{ lbl }}">
+    {% endfor %}
+    <div class="flex-1">
+      <label class="block text-sm font-medium mb-1">From</label>
+      <input
+        type="date"
+        name="start_date"
+        value="{{ start_date }}"
+        class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+      />
+    </div>
+    <div class="flex-1">
+      <label class="block text-sm font-medium mb-1">To</label>
+      <input
+        type="date"
+        name="end_date"
+        value="{{ end_date }}"
+        class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+      />
+    </div>
+    <div class="flex items-end">
+      <button
+        type="submit"
+        class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+      >
+        Apply
+      </button>
+    </div>
+    <div class="flex items-end">
+      <a
+        href="{{ url_for('admin.player_detail', player_name=player_name) }}"
+        class="text-gray-600 hover:underline text-sm font-medium"
+        >Clear</a
+      >
+    </div>
   </form>
-  {% endif %}
-  
-  <!-- Tab Buttons -->
-  <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
+</div>
+
+<!-- Tab Buttons -->
+<div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
     <button
       id="btnSeasonTotals"
       onclick="showTab('seasonTotals')"
@@ -870,45 +914,6 @@
   </div>
   {% endif %}
 
-  <!-- ─── Date-Range Filter Form ──────────────────────────────────────────────── -->
-  <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
-    <h3 class="text-xl sm:text-2xl font-semibold mb-4">Filter History</h3>
-    <form method="get" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
-      <div class="flex-1">
-        <label class="block text-sm font-medium mb-1">From</label>
-        <input
-          type="date"
-          name="start_date"
-          value="{{ start_date }}"
-          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
-        />
-      </div>
-      <div class="flex-1">
-        <label class="block text-sm font-medium mb-1">To</label>
-        <input
-          type="date"
-          name="end_date"
-          value="{{ end_date }}"
-          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
-        />
-      </div>
-      <div class="flex items-end">
-        <button
-          type="submit"
-          class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
-        >
-          Apply
-        </button>
-      </div>
-      <div class="flex items-end">
-        <a
-          href="{{ url_for('admin.player_detail', player_name=player_name) }}"
-          class="text-gray-600 hover:underline text-sm font-medium"
-          >Clear</a
-        >
-      </div>
-    </form>
-  </div>
 
   <!-- ─── Drill History Table ─────────────────────────────────────────────────── -->
   <div class="mb-8">
@@ -1133,6 +1138,14 @@ function showShotTypeDetail(detail) {
       showTab(hash);
     } else {
       showTab('seasonTotals');
+    }
+
+    // Keep active tab when submitting date filter
+    const df = document.getElementById('dateRangeForm');
+    if (df) {
+      df.addEventListener('submit', () => {
+        df.action = df.action.split('#')[0] + window.location.hash;
+      });
     }
 
   // 2) Wire up Game‑by‑Game sorting
