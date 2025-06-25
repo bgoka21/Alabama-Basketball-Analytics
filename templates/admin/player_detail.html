@@ -32,6 +32,12 @@
 {% if mode == 'practice' %}
 <form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
     <input type="hidden" name="mode" value="practice" />
+    {% if start_date %}
+    <input type="hidden" name="start_date" value="{{ start_date }}" />
+    {% endif %}
+    {% if end_date %}
+    <input type="hidden" name="end_date" value="{{ end_date }}" />
+    {% endif %}
     {% for lbl in label_options %}
       <label class="inline-flex items-center text-sm mr-2">
         <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
