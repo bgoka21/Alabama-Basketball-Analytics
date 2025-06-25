@@ -107,7 +107,7 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
         ],
 
         # 3FG‐specific columns
-        "3FG (Contest)":        ["Contest", "Uncontested", "Late Contest", "Blocked"],
+        "3FG (Contest)":        ["Contested", "Uncontested", "Late Contest", "Blocked"],
         "3FG (Footwork)":       ["WTN Left-Right", "WTN Right-Left", "Left-Right", "Right-Left", "Hop"],
         "3FG (Good/Bad)":       ["Good", "Bad", "Neutral Three"],
         "3FG (Line)":           ["On The Line", "Off The Line"],
