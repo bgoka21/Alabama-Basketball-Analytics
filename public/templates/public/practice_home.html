@@ -6,30 +6,32 @@
     <a href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}" class="text-blue-600 underline">My Player Page</a>
   </p>
 {% endif %}
-<form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
-  {% for lbl in label_options %}
-    <label class="inline-flex items-center text-sm mr-2">
-      <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-      <span class="ml-1">{{ lbl }}</span>
-    </label>
-  {% endfor %}
-  <label class="inline-flex items-center text-sm mr-2">
-    <span class="mr-1">From:</span>
-    <input type="date"
-           name="start_date"
-           value="{{ request.args.get('start_date', '') }}"
-           class="border p-1 rounded" />
-  </label>
-  <label class="inline-flex items-center text-sm mr-2">
-    <span class="mr-1">To:</span>
-    <input type="date"
-           name="end_date"
-           value="{{ request.args.get('end_date', '') }}"
-           class="border p-1 rounded" />
-  </label>
-  <button type="submit" class="px-3 py-1 border rounded">Apply</button>
-  <a href="{{ url_for('public.practice_homepage') }}" class="text-sm text-gray-600 hover:underline">Clear</a>
-</form>
+<div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
+  <form method="get" id="labelFilterForm" class="flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
+    <div class="flex flex-wrap gap-4">
+      {% for lbl in label_options %}
+        <label class="inline-flex items-center text-sm mr-2">
+          <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+          <span class="ml-1">{{ lbl }}</span>
+        </label>
+      {% endfor %}
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">From</label>
+      <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">To</label>
+      <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
+    </div>
+    <div class="flex items-end">
+      <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">Apply</button>
+    </div>
+    <div class="flex items-end">
+      <a href="{{ url_for('public.practice_homepage') }}" class="text-gray-600 hover:underline text-sm font-medium">Clear</a>
+    </div>
+  </form>
+</div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
     <h2 class="text-xl font-semibold mb-4">Dunks Get You Paid</h2>
