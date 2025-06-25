@@ -1655,10 +1655,21 @@ def player_detail(player_name):
     fg_pct_fg2  = (makes_fg2 / att_fg2 * 100) if att_fg2 else 0
     fg_pct_fg3  = (makes_fg3 / att_fg3 * 100) if att_fg3 else 0
 
+    total_att = att_atr + att_fg2 + att_fg3
+    pps_atr = round((makes_atr * 2) / att_atr, 2) if att_atr else 0
+    pps_fg2 = round((makes_fg2 * 2) / att_fg2, 2) if att_fg2 else 0
+    pps_fg3 = round((makes_fg3 * 3) / att_fg3, 2) if att_fg3 else 0
+    freq_atr = (att_atr / total_att * 100) if total_att else 0
+    freq_fg2 = (att_fg2 / total_att * 100) if total_att else 0
+    freq_fg3 = (att_fg3 / total_att * 100) if total_att else 0
+
     raw_season_totals = SimpleNamespace(
-        atr  = SimpleNamespace(makes=makes_atr,  attempts=att_atr,  fg_pct=fg_pct_atr),
-        fg2  = SimpleNamespace(makes=makes_fg2,  attempts=att_fg2,  fg_pct=fg_pct_fg2),
-        fg3  = SimpleNamespace(makes=makes_fg3,  attempts=att_fg3,  fg_pct=fg_pct_fg3)
+        atr  = SimpleNamespace(makes=makes_atr,  attempts=att_atr,  fg_pct=fg_pct_atr,
+                              pps=pps_atr, freq=freq_atr),
+        fg2  = SimpleNamespace(makes=makes_fg2,  attempts=att_fg2,  fg_pct=fg_pct_fg2,
+                              pps=pps_fg2, freq=freq_fg2),
+        fg3  = SimpleNamespace(makes=makes_fg3,  attempts=att_fg3,  fg_pct=fg_pct_fg3,
+                              pps=pps_fg3, freq=freq_fg3)
     )
 
     # ─── Initialize counters ───────────────────────────────────────────────────
