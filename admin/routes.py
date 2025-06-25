@@ -1435,18 +1435,24 @@ def player_detail(player_name):
     start_date = request.args.get('start_date')
     end_date   = request.args.get('end_date')
     start_dt = None
+    end_dt   = None
     if start_date:
         try:
             start_dt = date.fromisoformat(start_date)
         except ValueError:
             start_dt = None
+    if end_date:
+        try:
+            end_dt = date.fromisoformat(end_date)
+        except ValueError:
+            end_dt = None
 
     # ─── Load & filter SkillEntry rows ─────────────────────────────────
     q = SkillEntry.query.filter_by(player_id=player.id)
     if start_dt:
         q = q.filter(SkillEntry.date >= start_dt)
-    if end_date:
-        q = q.filter(SkillEntry.date <= date.fromisoformat(end_date))
+    if end_dt:
+        q = q.filter(SkillEntry.date <= end_dt)
     all_entries = q.order_by(SkillEntry.date.desc()).all()
     nba100_entries = [e for e in all_entries if e.skill_name == "NBA 100"]
     entries_list  = [e for e in all_entries if e.skill_name != "NBA 100"]
@@ -1476,20 +1482,28 @@ def player_detail(player_name):
 
     # ─── Fetch ALL stats for this player ────────────────────────────────
     all_stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
-    if start_dt:
+    if start_dt or end_dt:
         filtered_records = []
         for rec in all_stats_records:
-            keep = False
-            if rec.practice_id:
-                pr = Practice.query.get(rec.practice_id)
-                if pr and pr.date >= start_dt:
-                    keep = True
-            elif rec.game_id:
-                gm = Game.query.get(rec.game_id)
-                if gm and gm.game_date >= start_dt:
-                    keep = True
-            else:
-                keep = True
+            keep = True
+            if start_dt:
+                if rec.practice_id:
+                    pr = Practice.query.get(rec.practice_id)
+                    if not (pr and pr.date >= start_dt):
+                        keep = False
+                elif rec.game_id:
+                    gm = Game.query.get(rec.game_id)
+                    if not (gm and gm.game_date >= start_dt):
+                        keep = False
+            if end_dt and keep:
+                if rec.practice_id:
+                    pr = Practice.query.get(rec.practice_id)
+                    if not (pr and pr.date <= end_dt):
+                        keep = False
+                elif rec.game_id:
+                    gm = Game.query.get(rec.game_id)
+                    if not (gm and gm.game_date <= end_dt):
+                        keep = False
             if keep:
                 filtered_records.append(rec)
         all_stats_records = filtered_records

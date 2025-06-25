@@ -85,7 +85,7 @@ def _atr_ratio(html):
     return m.group(0) if m else ''
 
 
-def test_practice_home_start_date_filter(client):
+def test_practice_home_date_filters(client):
     resp = client.get('/practice_home')
     html = resp.data.decode('utf-8')
     assert _dunk_count(html) == 2
@@ -94,8 +94,12 @@ def test_practice_home_start_date_filter(client):
     html = resp.data.decode('utf-8')
     assert _dunk_count(html) == 1
 
+    resp = client.get('/practice_home', query_string={'end_date': '2024-01-03'})
+    html = resp.data.decode('utf-8')
+    assert _dunk_count(html) == 1
 
-def test_player_detail_start_date_filter(client):
+
+def test_player_detail_date_filters(client):
     resp = client.get('/admin/player/%231%20Test', query_string={'mode': 'practice'})
     html = resp.data.decode('utf-8')
     assert '4/5' in _atr_ratio(html)
@@ -103,4 +107,8 @@ def test_player_detail_start_date_filter(client):
     resp = client.get('/admin/player/%231%20Test', query_string={'mode': 'practice', 'start_date': '2024-01-04'})
     html = resp.data.decode('utf-8')
     assert '3/4' in _atr_ratio(html)
+
+    resp = client.get('/admin/player/%231%20Test', query_string={'mode': 'practice', 'end_date': '2024-01-03'})
+    html = resp.data.decode('utf-8')
+    assert '1/1' in _atr_ratio(html)
 
