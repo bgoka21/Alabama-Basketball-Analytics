@@ -30,22 +30,26 @@
   </div>
 
 {% if mode == 'practice' %}
-<form method="get" id="labelFilterForm" class="mb-4 flex flex-wrap gap-2 items-center">
-    <input type="hidden" name="mode" value="practice" />
-    {% if start_date %}
-    <input type="hidden" name="start_date" value="{{ start_date }}" />
-    {% endif %}
-    {% if end_date %}
-    <input type="hidden" name="end_date" value="{{ end_date }}" />
-    {% endif %}
-    {% for lbl in label_options %}
-      <label class="inline-flex items-center text-sm mr-2">
-        <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-        <span class="ml-1">{{ lbl }}</span>
-      </label>
-    {% endfor %}
-    <button type="submit" class="px-3 py-1 border rounded">Apply</button>
-</form>
+<div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
+  <form method="get" id="labelFilterForm" class="flex flex-wrap gap-4 items-end">
+      <input type="hidden" name="mode" value="practice" />
+      {% if start_date %}
+      <input type="hidden" name="start_date" value="{{ start_date }}" />
+      {% endif %}
+      {% if end_date %}
+      <input type="hidden" name="end_date" value="{{ end_date }}" />
+      {% endif %}
+      {% for lbl in label_options %}
+        <label class="inline-flex items-center text-sm mr-2">
+          <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+          <span class="ml-1">{{ lbl }}</span>
+        </label>
+      {% endfor %}
+      <div class="flex items-end">
+        <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">Apply</button>
+      </div>
+  </form>
+</div>
 {% endif %}
 
 <!-- ─── Date-Range Filter Form ─────────────────────────────────────────────── -->
