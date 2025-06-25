@@ -3,6 +3,7 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
+from datetime import date
 from collections import defaultdict
 import json
 from types import SimpleNamespace
@@ -357,7 +358,15 @@ def practice_homepage(active_page="practice_home"):
             selected_labels=[],
         )
 
-    practice_ids = [p.id for p in Practice.query.filter_by(season_id=season_id).all()]
+    start_date_param = request.args.get("start_date")
+    practice_q = Practice.query.filter_by(season_id=season_id)
+    if start_date_param:
+        try:
+            start_dt = date.fromisoformat(start_date_param)
+            practice_q = practice_q.filter(Practice.date >= start_dt)
+        except ValueError:
+            pass
+    practice_ids = [p.id for p in practice_q.all()]
     if not practice_ids:
         return render_template(
             "practice_home.html",

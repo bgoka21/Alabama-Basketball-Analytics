@@ -1434,11 +1434,17 @@ def player_detail(player_name):
     # ─── Read optional date‐range filters ────────────────────────────────
     start_date = request.args.get('start_date')
     end_date   = request.args.get('end_date')
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = date.fromisoformat(start_date)
+        except ValueError:
+            start_dt = None
 
     # ─── Load & filter SkillEntry rows ─────────────────────────────────
     q = SkillEntry.query.filter_by(player_id=player.id)
-    if start_date:
-        q = q.filter(SkillEntry.date >= date.fromisoformat(start_date))
+    if start_dt:
+        q = q.filter(SkillEntry.date >= start_dt)
     if end_date:
         q = q.filter(SkillEntry.date <= date.fromisoformat(end_date))
     all_entries = q.order_by(SkillEntry.date.desc()).all()
@@ -1470,6 +1476,23 @@ def player_detail(player_name):
 
     # ─── Fetch ALL stats for this player ────────────────────────────────
     all_stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
+    if start_dt:
+        filtered_records = []
+        for rec in all_stats_records:
+            keep = False
+            if rec.practice_id:
+                pr = Practice.query.get(rec.practice_id)
+                if pr and pr.date >= start_dt:
+                    keep = True
+            elif rec.game_id:
+                gm = Game.query.get(rec.game_id)
+                if gm and gm.game_date >= start_dt:
+                    keep = True
+            else:
+                keep = True
+            if keep:
+                filtered_records.append(rec)
+        all_stats_records = filtered_records
     has_stats = bool(all_stats_records)
     if not all_stats_records:
         flash("No stats found for this player.", "info")
