@@ -17,21 +17,31 @@
 
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
 
-  <!-- Game/Practice Buttons -->
-  <div class="flex flex-col sm:flex-row gap-4 mb-4">
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', label=request.args.getlist('label')) }}"
-       class="w-full sm:w-auto text-center px-4 py-3 sm:py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-100 text-gray-800' }}">
+  <!-- Filters -->
+  <div class="flex flex-wrap items-end gap-4 mb-4">
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', start_date=start_date, end_date=end_date, label=selected_labels) }}"
+       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-200 text-black' }}">
       Game
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', label=request.args.getlist('label')) }}"
-       class="w-full sm:w-auto text-center px-4 py-3 sm:py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-100 text-gray-800' }}">
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', start_date=start_date, end_date=end_date, label=selected_labels) }}"
+       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
       Practice
     </a>
+    <form id="dateRangeForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="mode" value="{{ mode }}">
+      {% for lbl in selected_labels %}
+        <input type="hidden" name="label" value="{{ lbl }}">
+      {% endfor %}
+      <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+      <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+      <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
+      <a href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
+    </form>
   </div>
 
 {% if mode == 'practice' %}
-<div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
-  <form method="get" id="labelFilterForm" class="flex flex-wrap gap-4 items-end">
+  <div class="flex flex-wrap gap-2 mb-4">
+    <form method="get" id="labelFilterForm" class="flex flex-wrap items-center gap-2">
       <input type="hidden" name="mode" value="practice" />
       {% if start_date %}
       <input type="hidden" name="start_date" value="{{ start_date }}" />
@@ -45,56 +55,11 @@
           <span class="ml-1">{{ lbl }}</span>
         </label>
       {% endfor %}
-      <div class="flex items-end">
-        <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">Apply</button>
-      </div>
-  </form>
-</div>
+      <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
+    </form>
+  </div>
 {% endif %}
 
-<!-- ─── Date-Range Filter Form ─────────────────────────────────────────────── -->
-<div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
-  <h3 class="text-xl sm:text-2xl font-semibold mb-4">Filter History</h3>
-  <form id="dateRangeForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
-    <input type="hidden" name="mode" value="{{ mode }}">
-    {% for lbl in selected_labels %}
-      <input type="hidden" name="label" value="{{ lbl }}">
-    {% endfor %}
-    <div class="flex-1">
-      <label class="block text-sm font-medium mb-1">From</label>
-      <input
-        type="date"
-        name="start_date"
-        value="{{ start_date }}"
-        class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
-      />
-    </div>
-    <div class="flex-1">
-      <label class="block text-sm font-medium mb-1">To</label>
-      <input
-        type="date"
-        name="end_date"
-        value="{{ end_date }}"
-        class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
-      />
-    </div>
-    <div class="flex items-end">
-      <button
-        type="submit"
-        class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
-      >
-        Apply
-      </button>
-    </div>
-    <div class="flex items-end">
-      <a
-        href="{{ url_for('admin.player_detail', player_name=player_name) }}"
-        class="text-gray-600 hover:underline text-sm font-medium"
-        >Clear</a
-      >
-    </div>
-  </form>
-</div>
 
 <!-- Tab Buttons -->
 <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
