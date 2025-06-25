@@ -4,6 +4,7 @@ from flask import Blueprint, request, render_template, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
 from collections import defaultdict
+from datetime import date
 import json
 from types import SimpleNamespace
 from admin.routes import (
@@ -94,13 +95,33 @@ def game_homepage():
     view_opt = request.args.get("view", "season")  # reserved for future use
     # Read sort choice from query string (default to total BCP)
     sort_by = request.args.get("sort", "bcp")  # 'bcp' or 'efficiency'
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    if start_date:
+        start_date_dt = date.fromisoformat(start_date)
+    else:
+        start_date_dt = None
+    if end_date:
+        end_date_dt = date.fromisoformat(end_date)
+    else:
+        end_date_dt = None
 
     # 2) Pick games to include
     if filter_opt == "last5":
-        game_ids = get_last_n_game_ids(5)
+        q = Game.query.order_by(Game.game_date.desc())
+        if start_date_dt:
+            q = q.filter(Game.game_date >= start_date_dt)
+        if end_date_dt:
+            q = q.filter(Game.game_date <= end_date_dt)
+        game_ids = [g.id for g in q.limit(5).all()]
     else:
-        # both 'season' and 'true_data' use the full season
-        game_ids = get_all_game_ids_for_current_season()
+        season_id = get_current_season_id()
+        q = Game.query.filter_by(season_id=season_id)
+        if start_date_dt:
+            q = q.filter(Game.game_date >= start_date_dt)
+        if end_date_dt:
+            q = q.filter(Game.game_date <= end_date_dt)
+        game_ids = [g.id for g in q.all()]
 
     # 3) Attempt‐thresholds: only apply for season & last5
     min_3fg = None if filter_opt == "true_data" else 10
@@ -333,6 +354,8 @@ def game_homepage():
         view_opt=view_opt,
         active_page="home",
         summary=summary,
+        start_date=start_date or "",
+        end_date=end_date or "",
     )
 
 
@@ -341,6 +364,10 @@ def game_homepage():
 def practice_homepage(active_page="practice_home"):
     """Leaderboard-style homepage for practice statistics."""
     season_id = get_current_season_id()
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    start_date_dt = date.fromisoformat(start_date) if start_date else None
+    end_date_dt = date.fromisoformat(end_date) if end_date else None
     if not season_id:
         return render_template(
             "practice_home.html",
@@ -355,9 +382,16 @@ def practice_homepage(active_page="practice_home"):
             active_page=active_page,
             label_options=collect_practice_labels([]),
             selected_labels=[],
+            start_date=start_date or "",
+            end_date=end_date or "",
         )
 
-    practice_ids = [p.id for p in Practice.query.filter_by(season_id=season_id).all()]
+    practice_query = Practice.query.filter_by(season_id=season_id)
+    if start_date_dt:
+        practice_query = practice_query.filter(Practice.date >= start_date_dt)
+    if end_date_dt:
+        practice_query = practice_query.filter(Practice.date <= end_date_dt)
+    practice_ids = [p.id for p in practice_query.all()]
     if not practice_ids:
         return render_template(
             "practice_home.html",
@@ -372,6 +406,8 @@ def practice_homepage(active_page="practice_home"):
             active_page=active_page,
             label_options=collect_practice_labels([]),
             selected_labels=[],
+            start_date=start_date or "",
+            end_date=end_date or "",
         )
 
     stats = PlayerStats.query.filter(PlayerStats.practice_id.in_(practice_ids)).all()
@@ -661,6 +697,8 @@ def practice_homepage(active_page="practice_home"):
         active_page=active_page,
         label_options=label_options,
         selected_labels=selected_labels,
+        start_date=start_date or "",
+        end_date=end_date or "",
     )
 
 

@@ -13,6 +13,12 @@
       <span class="ml-1">{{ lbl }}</span>
     </label>
   {% endfor %}
+  <label class="text-sm mr-2">From:
+    <input type="date" name="start_date" value="{{ start_date }}" class="border p-1 rounded" />
+  </label>
+  <label class="text-sm mr-2">To:
+    <input type="date" name="end_date" value="{{ end_date }}" class="border p-1 rounded" />
+  </label>
   <button type="submit" class="px-3 py-1 border rounded">Apply</button>
 </form>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
