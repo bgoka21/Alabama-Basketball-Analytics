@@ -18,14 +18,14 @@
   <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
     <thead class="bg-gray-100">
       <tr>
-        <th class="px-4 py-2 text-left">User ID</th>
+        <th class="px-4 py-2 text-left">Username</th>
         <th class="px-4 py-2">Views</th>
       </tr>
     </thead>
     <tbody>
-      {% for uid, count in user_stats %}
+      {% for username, count in user_stats %}
       <tr>
-        <td class="px-4 py-2">{{ uid }}</td>
+        <td class="px-4 py-2">{{ username or 'Anonymous' }}</td>
         <td class="px-4 py-2 text-center">{{ count }}</td>
       </tr>
       {% endfor %}
