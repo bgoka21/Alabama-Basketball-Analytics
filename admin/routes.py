@@ -2422,7 +2422,12 @@ def usage_report():
         query = query.filter(PageView.timestamp >= start)
     if end:
         query = query.filter(PageView.timestamp <= end)
-    user_stats = query.with_entities(PageView.user_id, db.func.count(PageView.id)).group_by(PageView.user_id).all()
+    user_stats = (
+        query.outerjoin(User, PageView.user_id == User.id)
+        .with_entities(User.username, db.func.count(PageView.id))
+        .group_by(User.username)
+        .all()
+    )
     page_stats = query.with_entities(PageView.endpoint, db.func.count(PageView.id)).group_by(PageView.endpoint).all()
     return render_template(
         'usage_report.html',
