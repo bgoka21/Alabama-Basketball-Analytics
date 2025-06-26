@@ -31,6 +31,7 @@ from models.database import (
     SkillEntry,
     PnRStats
 )
+from models.database import PageView
 
 from models.uploaded_file import UploadedFile
 from models.user import User
@@ -2405,4 +2406,26 @@ def skill_totals():
         shot_map=shot_map,
         label_map=label_map,
         active_page='skill_totals'
+    )
+
+
+@admin_bp.route('/usage')
+@login_required
+@admin_required
+def usage_report():
+    start = request.args.get('start_date')
+    end = request.args.get('end_date')
+    query = PageView.query
+    if start:
+        query = query.filter(PageView.timestamp >= start)
+    if end:
+        query = query.filter(PageView.timestamp <= end)
+    user_stats = query.with_entities(PageView.user_id, db.func.count(PageView.id)).group_by(PageView.user_id).all()
+    page_stats = query.with_entities(PageView.endpoint, db.func.count(PageView.id)).group_by(PageView.endpoint).all()
+    return render_template(
+        'usage_report.html',
+        user_stats=user_stats,
+        page_stats=page_stats,
+        start=start,
+        end=end
     )
