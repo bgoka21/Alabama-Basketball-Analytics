@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
 
 # Initialize SQLAlchemy
@@ -255,6 +255,16 @@ class Roster(db.Model):
 
     def __repr__(self):
         return f"<Roster(season_id={self.season_id}, player_name='{self.player_name}')>"
+
+
+class PageView(db.Model):
+    __tablename__ = 'page_view'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    endpoint = db.Column(db.String(128), nullable=False)
+    path = db.Column(db.String(256), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user_agent = db.Column(db.String(256), nullable=True)
 
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile

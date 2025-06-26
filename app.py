@@ -1,10 +1,11 @@
 import os
-from flask import Flask, redirect, url_for, render_template
+from flask import Flask, redirect, url_for, render_template, request
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 
-from models.database import db
+from datetime import datetime
+from models.database import db, PageView
 from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
@@ -122,6 +123,20 @@ def create_app():
 
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')
+
+    @app.before_request
+    def log_page_view():
+        if request.endpoint in ('static', None):
+            return
+        pv = PageView(
+            user_id=current_user.get_id() if current_user.is_authenticated else None,
+            endpoint=request.endpoint,
+            path=request.path,
+            timestamp=datetime.utcnow(),
+            user_agent=request.user_agent.string,
+        )
+        db.session.add(pv)
+        db.session.commit()
 
     # --- Public Home Route ---
     @app.route('/')
