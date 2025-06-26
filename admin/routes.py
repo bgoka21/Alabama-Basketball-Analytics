@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from flask import (
     Blueprint, render_template, request, redirect,
-    url_for, flash, send_file, current_app, session, make_response
+    url_for, flash, send_file, current_app, session, make_response, abort
 )
 from flask_login import login_required, current_user, confirm_login, login_user, logout_user
 from utils.auth       import admin_required
@@ -2413,6 +2413,8 @@ def skill_totals():
 @login_required
 @admin_required
 def usage_report():
+    if current_user.username != 'bgoka21':
+        abort(403)
     start = request.args.get('start_date')
     end = request.args.get('end_date')
     query = PageView.query
@@ -2427,5 +2429,6 @@ def usage_report():
         user_stats=user_stats,
         page_stats=page_stats,
         start=start,
-        end=end
+        end=end,
+        active_page='usage'
     )
