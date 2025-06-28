@@ -78,8 +78,8 @@ def get_last_n_game_ids(n):
 
 @public_bp.route("/", methods=["GET"])
 def root():
-    # always send new visitors to the login page
-    return redirect(url_for("admin.login"))
+    # show landing cover page
+    return render_template("cover.html")
 
 
 # ───────────────────────────────────────────────

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cover</title>
+  <!-- keep your Tailwind link, but we’ll override with inline CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+</head>
+<body style="margin:0; padding:0;">
+  <section
+    style="
+      width: 100vw;
+      height: 100vh;
+      background: url('{{ url_for('static', filename='images/tide_infinity.jpg') }}') 
+                  no-repeat center center;
+      background-size: cover;
+    "
+  >
+  </section>
+</body>
+</html>
