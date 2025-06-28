@@ -2274,6 +2274,14 @@ def inject_seasons():
     }
 
 
+@admin_bp.context_processor
+def inject_last_stats_update():
+    """Provide timestamp of last successful stats parse."""
+    last = db.session.query(func.max(UploadedFile.last_parsed)).scalar()
+    formatted = last.strftime('%Y-%m-%d %H:%M UTC') if last else 'Never'
+    return {'last_stats_update': formatted}
+
+
 
 
 

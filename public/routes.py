@@ -24,6 +24,7 @@ from models.database import (
     Practice,
     Roster,
     PnRStats,
+    UploadedFile,
 )
 
 
@@ -32,6 +33,13 @@ public_bp = Blueprint(
     __name__,
     template_folder="templates/public",  # points at public/templates/public/
 )
+
+@public_bp.context_processor
+def inject_last_stats_update():
+    """Provide timestamp of last successful stats parse."""
+    last = db.session.query(func.max(UploadedFile.last_parsed)).scalar()
+    formatted = last.strftime('%Y-%m-%d %H:%M UTC') if last else 'Never'
+    return {'last_stats_update': formatted}
 
 @public_bp.before_request
 def public_bp_before_request():
