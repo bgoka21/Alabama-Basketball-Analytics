@@ -115,6 +115,9 @@
         </a>
       {% endif %}
     </nav>
+    <div class="mt-auto text-xs text-white">
+      Stats Updated: {{ last_stats_update }}
+    </div>
   </aside>
 
 <!-- Main content -->
@@ -126,9 +129,6 @@
   {% block content %}{% endblock %}
 </main>
 
-  <div class="fixed bottom-2 right-2 text-xs text-gray-500">
-    Stats updated: {{ last_stats_update }}
-  </div>
 
   <script>
     const btn = document.getElementById('mobile-menu-btn');
