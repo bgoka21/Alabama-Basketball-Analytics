@@ -11,11 +11,15 @@
     style="
       width: 100vw;
       height: 100vh;
-      background: url('{{ url_for('static', filename='images/tide_infinity.jpg') }}') 
+      background: url('{{ url_for('static', filename='images/tide_infinity.jpg') }}')
                   no-repeat center center;
       background-size: cover;
     "
+    class="flex items-center justify-center"
   >
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('public.homepage') }}" class="bg-white text-[#9E1B32] px-6 py-3 rounded-lg shadow-lg text-xl font-semibold">Home</a>
+    {% endif %}
   </section>
 </body>
 </html>
