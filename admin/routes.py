@@ -2276,9 +2276,14 @@ def inject_seasons():
 
 @admin_bp.context_processor
 def inject_last_stats_update():
-    """Provide timestamp of last successful stats parse."""
+    """Provide date of last successful stats parse."""
     last = db.session.query(func.max(UploadedFile.last_parsed)).scalar()
-    formatted = last.strftime('%Y-%m-%d %H:%M UTC') if last else 'Never'
+    if last:
+        def ordinal(n):
+            return "%d%s" % (n, "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th"))
+        formatted = f"Through {last.strftime('%B')} {ordinal(last.day)}"
+    else:
+        formatted = 'Never'
     return {'last_stats_update': formatted}
 
 
