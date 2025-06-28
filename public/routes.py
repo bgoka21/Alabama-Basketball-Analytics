@@ -78,8 +78,10 @@ def get_last_n_game_ids(n):
 
 @public_bp.route("/", methods=["GET"])
 def root():
-    # show landing cover page
-    return render_template("cover.html")
+    """Landing page - login if unauthenticated, cover if logged in."""
+    if current_user.is_authenticated:
+        return render_template("cover.html")
+    return redirect(url_for("admin.login"))
 
 
 # ───────────────────────────────────────────────

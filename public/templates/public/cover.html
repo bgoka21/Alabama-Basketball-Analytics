@@ -3,21 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Cover</title>
-  <!-- keep your Tailwind link, but we’ll override with inline CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body style="margin:0; padding:0;">
-  <section
-    style="
-      width: 100vw;
-      height: 100vh;
-      background: url('{{ url_for('static', filename='images/tide_infinity.jpg') }}')
-                  no-repeat center center;
-      background-size: cover;
-    "
-    class="flex items-center justify-center"
-  >
-    <a href="{{ url_for('public.homepage') }}" class="bg-white text-[#9E1B32] px-6 py-3 rounded-lg shadow-lg text-xl font-semibold">Home</a>
+<body class="m-0 p-0">
+  <section class="relative w-screen h-screen bg-cover bg-center" style="background-image: url('{{ url_for('static', filename='images/tide_infinity.jpg') }}');">
+    <div class="absolute inset-0 bg-black opacity-40"></div>
+    <a href="{{ url_for('public.homepage') }}" class="absolute left-1/2 transform -translate-x-1/2 bg-white text-[#9E1B32] px-8 py-4 rounded-lg shadow-lg text-xl font-semibold" style="bottom:12.5%;">Home</a>
   </section>
 </body>
 </html>
