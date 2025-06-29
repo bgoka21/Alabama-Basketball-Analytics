@@ -12,32 +12,23 @@
       <th>Updated</th><th>⟳</th>
     </tr>
   </thead>
-  <tbody>
+    <tbody>
     {% for r in recruits %}
-    <tr>
-      <td>{{ r.name }}</td>
-      <td>{{ r.school or '—' }}</td>
-      <td>{{ r.position or '—' }}</td>
-      <td>{{ r.three_fg_pct or '—' }}</td>
-      <td>{{ r.ft_pct or '—' }}</td>
-      <td>{{ r.ast_to_to_ratio or '—' }}</td>
-      <td>{{ r.off_rating or '—' }}</td>
-      <td>{{ r.def_rating or '—' }}</td>
-      <td>{{ r.s247_overall_rank or '—' }}</td>
-      <td>{{ r.s247_position_rank or '—' }}</td>
-      <td>{{ r.last_updated.strftime('%Y-%m-%d %H:%M') if r.last_updated else '—' }}</td>
-      <td>
-        <a href="{{ url_for('recruit.add_recruit',
-            name=r.name, school=r.school, position=r.position, s247_url=r.s247_url) }}"
-           class="btn-sm">🔄</a>
-        <form method="post"
-              action="{{ url_for('recruit.delete_recruit', id=r.id) }}"
-              style="display:inline" onsubmit="return confirm('Delete this recruit?');">
-          <button type="submit" class="btn-sm text-red-600">🗑</button>
-        </form>
-      </td>
-    </tr>
+      <tr>
+        <td>{{ r.name }}</td>
+        <td>{{ r.school or '–' }}</td>
+        <td>{{ r.position or '–' }}</td>
+        <td>{{ r.synergy_player_id or '–' }}</td>
+        <td>{{ r.off_rating }}</td>
+        <td>{{ r.def_rating }}</td>
+        <td>{{ r.minutes_played }}</td>
+        <td>{{ r.last_updated.strftime('%Y-%m-%d') }}</td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="8" class="text-center">No recruits to display.</td>
+      </tr>
     {% endfor %}
-  </tbody>
+    </tbody>
 </table>
 {% endblock %}
