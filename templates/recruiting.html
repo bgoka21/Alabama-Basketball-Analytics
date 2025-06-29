@@ -17,6 +17,7 @@
         <th>247 Pos</th>
         <th>Updated</th>
         <th>⟳</th>
+        <th>Delete</th>
       </tr>
   </thead>
     <tbody>
@@ -34,10 +35,15 @@
         <td>{{ r.s247_position_rank or '–' }}</td>
         <td>{{ r.last_updated.strftime('%Y-%m-%d') }}</td>
         <td></td>
+        <td>
+          <form method="post" action="{{ url_for('recruit.delete_recruit', id=r.id) }}" class="inline">
+            <button type="submit" class="text-red-600 hover:underline">Delete</button>
+          </form>
+        </td>
       </tr>
     {% else %}
       <tr>
-        <td colspan="12" class="text-center">No recruits to display.</td>
+        <td colspan="13" class="text-center">No recruits to display.</td>
       </tr>
     {% endfor %}
     </tbody>
