@@ -61,10 +61,12 @@
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
           Skill Totals
         </a>
-        <a href="{{ url_for('recruit_bp.recruiting') }}"
-           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if request.endpoint == 'recruit_bp.recruiting' else '' }}">
+        {% if view_exists('recruit.recruiting_home') %}
+        <a href="{{ url_for('recruit.recruiting_home') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if request.endpoint == 'recruit.recruiting_home' else '' }}">
           Recruiting
         </a>
+        {% endif %}
 
         {% if current_user.is_admin %}
           {# ── Management dropdown ── #}
