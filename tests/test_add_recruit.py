@@ -47,8 +47,15 @@ def test_duplicate_check_case_insensitive(client, app):
         rec = Recruit.query.filter_by(name='John Doe').first()
         assert rec is not None
 
-    resp = client.post('/recruiting/add', data={'name': 'john doe'})
+    # Adding the exact same name again should error due to the unique constraint
+    resp = client.post('/recruiting/add', data={'name': 'John Doe'})
     assert resp.status_code == 200
     assert b'Recruit already exists.' in resp.data
     with app.app_context():
         assert Recruit.query.count() == 1
+
+    # A name with different casing is treated as a new record
+    resp = client.post('/recruiting/add', data={'name': 'john doe'})
+    assert resp.status_code == 302
+    with app.app_context():
+        assert Recruit.query.count() == 2
