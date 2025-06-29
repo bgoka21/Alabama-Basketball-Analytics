@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from datetime import datetime
 from models.recruit import Recruit
 from models.database import db
+from sqlalchemy.exc import IntegrityError
 
 
 recruit_bp = Blueprint('recruit', __name__, url_prefix='/recruiting')
@@ -31,6 +32,11 @@ def add_recruit():
         def_rating = float(request.form.get('def_rating') or 0.0)
         minutes_played = float(request.form.get('minutes_played') or 0.0)
 
+        # Check for existing recruit to avoid IntegrityError
+        if Recruit.query.filter_by(name=name).first():
+            error = 'Recruit already exists.'
+            return render_template('add_recruit.html', error=error)
+
         rec = Recruit(
             name=name,
             synergy_player_id=synergy_player_id,
@@ -40,7 +46,12 @@ def add_recruit():
             last_updated=datetime.utcnow(),
         )
         db.session.add(rec)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            error = 'Recruit already exists.'
+            return render_template('add_recruit.html', error=error)
         return redirect(url_for('recruit.list_recruits'))
 
     return render_template('add_recruit.html')
