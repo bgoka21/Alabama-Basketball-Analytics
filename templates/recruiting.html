@@ -1,41 +1,38 @@
-{% extends 'admin/base.html' %}
-
+{% extends 'base.html' %}
 {% block content %}
-  <h1 class="text-2xl font-bold mb-4">Recruiting</h1>
-  <a href="{{ url_for('recruit.add_recruit') }}" class="mb-4 inline-block px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">Add Recruit</a>
-
-  <table class="min-w-full divide-y divide-gray-200 text-sm">
-    <thead class="bg-gray-50">
-      <tr>
-        <th class="px-4 py-2 text-left">Name</th>
-        <th class="px-4 py-2 text-left">Position</th>
-        <th class="px-4 py-2 text-left">School</th>
-        <th class="px-4 py-2 text-left">3FG%</th>
-        <th class="px-4 py-2 text-left">Assists</th>
-        <th class="px-4 py-2 text-left">Turnovers</th>
-        <th class="px-4 py-2 text-left">A/T Ratio</th>
-        <th class="px-4 py-2 text-left">FT%</th>
-        <th class="px-4 py-2 text-left">247 Overall</th>
-        <th class="px-4 py-2 text-left">247 Pos</th>
-        <th class="px-4 py-2 text-left">Last Updated</th>
-      </tr>
-    </thead>
-    <tbody class="bg-white divide-y divide-gray-200">
+<h1>Recruits</h1>
+<a href="{{ url_for('recruit.add_recruit') }}" class="btn">+ Add Recruit</a>
+<table class="table-auto w-full mt-4 text-left">
+  <thead>
+    <tr>
+      <th>Name</th><th>School</th><th>Pos</th>
+      <th>3FG%</th><th>FT%</th><th>A/T</th>
+      <th>OffRtg</th><th>DefRtg</th>
+      <th>247 Ovr</th><th>247 Pos</th>
+      <th>Updated</th><th>⟳</th>
+    </tr>
+  </thead>
+  <tbody>
     {% for r in recruits %}
-      <tr>
-        <td class="px-4 py-2">{{ r.name }}</td>
-        <td class="px-4 py-2">{{ r.position or '' }}</td>
-        <td class="px-4 py-2">{{ r.school or '' }}</td>
-        <td class="px-4 py-2">{{ r.three_fg_pct or '' }}</td>
-        <td class="px-4 py-2">{{ r.assists or '' }}</td>
-        <td class="px-4 py-2">{{ r.turnovers or '' }}</td>
-        <td class="px-4 py-2">{{ r.assist_turnover_ratio or '' }}</td>
-        <td class="px-4 py-2">{{ r.ft_pct or '' }}</td>
-        <td class="px-4 py-2">{{ r.s247_overall_rank or '' }}</td>
-        <td class="px-4 py-2">{{ r.s247_position_rank or '' }}</td>
-        <td class="px-4 py-2">{{ r.last_updated.strftime('%Y-%m-%d') }}</td>
-      </tr>
+    <tr>
+      <td>{{ r.name }}</td>
+      <td>{{ r.school or '—' }}</td>
+      <td>{{ r.position or '—' }}</td>
+      <td>{{ r.three_fg_pct or '—' }}</td>
+      <td>{{ r.ft_pct or '—' }}</td>
+      <td>{{ r.ast_to_to_ratio or '—' }}</td>
+      <td>{{ r.off_rating or '—' }}</td>
+      <td>{{ r.def_rating or '—' }}</td>
+      <td>{{ r.s247_overall_rank or '—' }}</td>
+      <td>{{ r.s247_position_rank or '—' }}</td>
+      <td>{{ r.last_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>
+        <a href="{{ url_for('recruit.add_recruit',
+            name=r.name, school=r.school, position=r.position) }}"
+           class="btn-sm">🔄</a>
+      </td>
+    </tr>
     {% endfor %}
-    </tbody>
-  </table>
+  </tbody>
+</table>
 {% endblock %}

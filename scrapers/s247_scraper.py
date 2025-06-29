@@ -1,36 +1,13 @@
-import re
 import requests
 from bs4 import BeautifulSoup
-from typing import Optional, Dict
 
 
-def _extract_int(text: str) -> Optional[int]:
-    if not text:
-        return None
-    m = re.search(r"(\d+)", text)
-    return int(m.group(1)) if m else None
-
-
-def scrape_247_stats(s247_url: str) -> Dict[str, Optional[int]]:
-    """Scrape ranking data from a 247Sports recruiting profile."""
-    stats = {
-        's247_overall_rank': None,
-        's247_position_rank': None,
-    }
-    try:
-        resp = requests.get(s247_url, timeout=10)
-        resp.raise_for_status()
-    except Exception:
-        return stats
-
+def scrape_247_stats(url: str) -> dict:
+    resp = requests.get(url)
+    resp.raise_for_status()
     soup = BeautifulSoup(resp.text, 'html.parser')
-
-    overall = soup.find(string=re.compile('Overall.*Rank', re.I))
-    if overall:
-        stats['s247_overall_rank'] = _extract_int(overall)
-
-    position = soup.find(string=re.compile('Position.*Rank', re.I))
-    if position:
-        stats['s247_position_rank'] = _extract_int(position)
-
-    return stats
+    ovr_elem = soup.select_one('.rankings-overall .rank')
+    pos_elem = soup.select_one('.rankings-position .rank')
+    overall = int(ovr_elem.text.strip('#')) if ovr_elem else None
+    position = int(pos_elem.text.strip('#')) if pos_elem else None
+    return {'overall_rank': overall, 'position_rank': position}
