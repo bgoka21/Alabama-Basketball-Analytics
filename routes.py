@@ -14,17 +14,16 @@ def list_recruits():
 
 @recruit_bp.route('/add', methods=['GET','POST'])
 def add_recruit():
-    if request.method == 'POST':
+    synergy = SynergyAPI()
+    if request.method == 'POST' and request.form.get('action') == 'save':
         name     = request.form['name']
         school   = request.form.get('school')
         position = request.form.get('position')
         s247_url = request.form.get('s247_url')
 
-        synergy = SynergyAPI()
-        pid     = synergy.find_player_id(name)
-        stats   = synergy.get_player_stats(pid) if pid else {}
-
-        s247    = scrape_247_stats(s247_url) if s247_url else {}
+        pid   = synergy.find_player_id(name)
+        stats = synergy.get_player_stats(pid) if pid else {}
+        s247  = scrape_247_stats(s247_url) if s247_url else {}
 
         rec = Recruit.query.filter_by(name=name).first() or Recruit(name=name)
         rec.school              = school
@@ -47,9 +46,27 @@ def add_recruit():
         flash(f'Recruit “{name}” added/updated.', 'success')
         return redirect(url_for('recruit.list_recruits'))
 
-    return render_template('add_recruit.html',
-        name=request.args.get('name',''),
-        school=request.args.get('school',''),
-        position=request.args.get('position',''),
-        s247_url=request.args.get('s247_url','')
+    stats = None
+    if request.method == 'POST' and request.form.get('action') == 'search':
+        name = request.form['name']
+        pid  = synergy.find_player_id(name)
+        stats = synergy.get_player_stats(pid) if pid else {}
+        if not pid:
+            flash(f'No Synergy player found for "{name}".', 'danger')
+
+    return render_template(
+        'add_recruit.html',
+        stats=stats,
+        name=request.form.get('name', request.args.get('name','')),
+        school=request.form.get('school', request.args.get('school','')),
+        position=request.form.get('position', request.args.get('position','')),
+        s247_url=request.form.get('s247_url', request.args.get('s247_url',''))
     )
+
+@recruit_bp.route('/delete/<int:id>', methods=['POST'])
+def delete_recruit(id):
+    rec = Recruit.query.get_or_404(id)
+    db.session.delete(rec)
+    db.session.commit()
+    flash(f'Recruit “{rec.name}” deleted.', 'warning')
+    return redirect(url_for('recruit.list_recruits'))
