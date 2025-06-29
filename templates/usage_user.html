@@ -11,36 +11,11 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Usage Report</h1>
-
-<h2 class="text-xl font-semibold mt-4 mb-2">Views by User</h2>
-<div class="overflow-x-auto mb-6">
-  <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-4 py-2 text-left">Username</th>
-        <th class="px-4 py-2">Views</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for uid, username, count in user_stats %}
-      <tr>
-        <td class="px-4 py-2">
-          {% if uid %}
-          <a href="{{ url_for('admin.user_usage_report', user_id=uid) }}" class="text-blue-600 hover:underline">{{ username }}</a>
-          {% else %}
-          Anonymous
-          {% endif %}
-        </td>
-        <td class="px-4 py-2 text-center">{{ count }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<h1 class="text-2xl font-bold mb-4">Usage for {{ user.username }}</h1>
+<a href="{{ url_for('admin.usage_report', start_date=start, end_date=end) }}" class="text-blue-600 hover:underline">&larr; Back to Summary</a>
 
 <h2 class="text-xl font-semibold mt-4 mb-2">Views by Page</h2>
-<div class="overflow-x-auto">
+<div class="overflow-x-auto mb-6">
   <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
     <thead class="bg-gray-100">
       <tr>
@@ -49,10 +24,32 @@
       </tr>
     </thead>
     <tbody>
-      {% for ep, count in page_stats %}
+      {% for ep, count in page_counts %}
       <tr>
         <td class="px-4 py-2">{{ ep }}</td>
         <td class="px-4 py-2 text-center">{{ count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="text-xl font-semibold mt-4 mb-2">Page View Log</h2>
+<div class="overflow-x-auto">
+  <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="px-4 py-2 text-left">Timestamp</th>
+        <th class="px-4 py-2 text-left">Endpoint</th>
+        <th class="px-4 py-2 text-left">Path</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td class="px-4 py-2">{{ log.timestamp }}</td>
+        <td class="px-4 py-2">{{ log.endpoint }}</td>
+        <td class="px-4 py-2">{{ log.path }}</td>
       </tr>
       {% endfor %}
     </tbody>
