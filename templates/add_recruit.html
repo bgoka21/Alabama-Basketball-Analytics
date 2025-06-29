@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Add Recruit</h1>
+{% if error %}
+<div class="text-red-600">{{ error }}</div>
+{% endif %}
 <form method="post" action="{{ url_for('recruit.add_recruit') }}" class="mt-4 space-y-2">
   <label for="name-search" class="block">Name</label>
   <input id="name-search" name="name" autocomplete="off" class="border px-2 py-1 w-full" required>
