@@ -28,8 +28,13 @@
       <td>{{ r.last_updated.strftime('%Y-%m-%d %H:%M') if r.last_updated else '—' }}</td>
       <td>
         <a href="{{ url_for('recruit.add_recruit',
-            name=r.name, school=r.school, position=r.position) }}"
+            name=r.name, school=r.school, position=r.position, s247_url=r.s247_url) }}"
            class="btn-sm">🔄</a>
+        <form method="post"
+              action="{{ url_for('recruit.delete_recruit', id=r.id) }}"
+              style="display:inline" onsubmit="return confirm('Delete this recruit?');">
+          <button type="submit" class="btn-sm text-red-600">🗑</button>
+        </form>
       </td>
     </tr>
     {% endfor %}
