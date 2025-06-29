@@ -25,7 +25,7 @@
       <td>{{ r.def_rating or '—' }}</td>
       <td>{{ r.s247_overall_rank or '—' }}</td>
       <td>{{ r.s247_position_rank or '—' }}</td>
-      <td>{{ r.last_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>{{ r.last_updated.strftime('%Y-%m-%d %H:%M') if r.last_updated else '—' }}</td>
       <td>
         <a href="{{ url_for('recruit.add_recruit',
             name=r.name, school=r.school, position=r.position) }}"
