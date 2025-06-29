@@ -2437,15 +2437,50 @@ def usage_report():
         query = query.filter(PageView.timestamp <= end)
     user_stats = (
         query.outerjoin(User, PageView.user_id == User.id)
-        .with_entities(User.username, db.func.count(PageView.id))
-        .group_by(User.username)
+        .with_entities(User.id, User.username, db.func.count(PageView.id))
+        .group_by(User.id, User.username)
         .all()
     )
-    page_stats = query.with_entities(PageView.endpoint, db.func.count(PageView.id)).group_by(PageView.endpoint).all()
+    page_stats = (
+        query.with_entities(PageView.endpoint, db.func.count(PageView.id))
+        .group_by(PageView.endpoint)
+        .all()
+    )
     return render_template(
         'usage_report.html',
         user_stats=user_stats,
         page_stats=page_stats,
+        start=start,
+        end=end,
+        active_page='usage'
+    )
+
+
+@admin_bp.route('/usage/user/<int:user_id>')
+@login_required
+@admin_required
+def user_usage_report(user_id):
+    if current_user.username != 'bgoka21':
+        abort(403)
+    start = request.args.get('start_date')
+    end = request.args.get('end_date')
+    user = User.query.get_or_404(user_id)
+    query = PageView.query.filter(PageView.user_id == user_id)
+    if start:
+        query = query.filter(PageView.timestamp >= start)
+    if end:
+        query = query.filter(PageView.timestamp <= end)
+    logs = query.order_by(PageView.timestamp.desc()).all()
+    page_counts = (
+        query.with_entities(PageView.endpoint, db.func.count(PageView.id))
+        .group_by(PageView.endpoint)
+        .all()
+    )
+    return render_template(
+        'usage_user.html',
+        user=user,
+        logs=logs,
+        page_counts=page_counts,
         start=start,
         end=end,
         active_page='usage'
