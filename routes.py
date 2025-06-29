@@ -3,6 +3,7 @@ from datetime import datetime
 from models.recruit import Recruit
 from models.database import db
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 
 
 recruit_bp = Blueprint('recruit', __name__, url_prefix='/recruiting')
@@ -26,14 +27,14 @@ def search_synergy():
 @recruit_bp.route('/add', methods=['GET', 'POST'])
 def add_recruit():
     if request.method == 'POST':
-        name = request.form['name']
+        name = request.form['name'].strip()
         synergy_player_id = request.form.get('synergy_player_id')
         off_rating = float(request.form.get('off_rating') or 0.0)
         def_rating = float(request.form.get('def_rating') or 0.0)
         minutes_played = float(request.form.get('minutes_played') or 0.0)
 
         # Check for existing recruit to avoid IntegrityError
-        if Recruit.query.filter_by(name=name).first():
+        if Recruit.query.filter(func.lower(Recruit.name) == name.lower()).first():
             error = 'Recruit already exists.'
             return render_template('add_recruit.html', error=error)
 
