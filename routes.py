@@ -1,49 +1,55 @@
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for
-
-from models.database import db
 from models.recruit import Recruit
-from scrapers.espn_scraper import scrape_espn_stats
+from models.database import db
+from clients.synergy_client import SynergyAPI
 from scrapers.s247_scraper import scrape_247_stats
 
-recruit_bp = Blueprint('recruit', __name__)
+recruit_bp = Blueprint('recruit', __name__, url_prefix='/recruiting')
 
+@recruit_bp.route('/')
+def list_recruits():
+    recs = Recruit.query.order_by(Recruit.last_updated.desc()).all()
+    return render_template('recruiting.html', recruits=recs)
 
-@recruit_bp.route('/recruiting')
-def recruiting_home():
-    recruits = Recruit.query.order_by(Recruit.last_updated.desc()).all()
-    return render_template('recruiting.html', recruits=recruits)
-
-
-@recruit_bp.route('/recruiting/add', methods=['GET', 'POST'])
+@recruit_bp.route('/add', methods=['GET','POST'])
 def add_recruit():
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        position = request.form.get('position', '').strip() or None
-        school = request.form.get('school', '').strip() or None
-        espn_url = request.form.get('espn_url', '').strip()
-        s247_url = request.form.get('s247_url', '').strip()
+        name     = request.form['name']
+        school   = request.form.get('school')
+        position = request.form.get('position')
+        s247_url = request.form.get('s247_url')
 
-        espn_data = scrape_espn_stats(espn_url) if espn_url else {}
-        s247_data = scrape_247_stats(s247_url) if s247_url else {}
+        synergy = SynergyAPI()
+        pid     = synergy.find_player_id(name)
+        stats   = synergy.get_player_stats(pid) if pid else {}
 
-        recruit = Recruit.query.filter_by(espn_url=espn_url).first()
-        if not recruit:
-            recruit = Recruit(espn_url=espn_url, s247_url=s247_url)
-            db.session.add(recruit)
+        s247    = scrape_247_stats(s247_url) if s247_url else {}
 
-        recruit.name = name
-        recruit.position = position
-        recruit.school = school
-        recruit.espn_url = espn_url
-        recruit.s247_url = s247_url
+        rec = Recruit.query.filter_by(name=name).first() or Recruit(name=name)
+        rec.school              = school
+        rec.position            = position
+        rec.synergy_player_id   = pid
+        rec.off_rating          = stats.get('offensive_rating')
+        rec.def_rating          = stats.get('defensive_rating')
+        rec.minutes_played      = stats.get('minutes_played')
+        rec.three_fg_pct        = stats.get('three_fg_pct')
+        rec.ft_pct              = stats.get('ft_pct')
+        rec.assists             = stats.get('assists')
+        rec.turnovers           = stats.get('turnovers')
+        rec.ast_to_to_ratio     = stats.get('ast_to_to_ratio')
+        rec.s247_overall_rank   = s247.get('overall_rank')
+        rec.s247_position_rank  = s247.get('position_rank')
+        rec.last_updated        = datetime.utcnow()
 
-        for key, val in {**espn_data, **s247_data}.items():
-            setattr(recruit, key, val)
-
-        recruit.last_updated = datetime.utcnow()
+        db.session.add(rec)
         db.session.commit()
-        return redirect(url_for('recruit.recruiting_home'))
+        flash(f'Recruit “{name}” added/updated.', 'success')
+        return redirect(url_for('recruit.list_recruits'))
 
-    return render_template('add_recruit.html')
-
+    return render_template('add_recruit.html',
+        name=request.args.get('name',''),
+        school=request.args.get('school',''),
+        position=request.args.get('position',''),
+        s247_url=request.args.get('s247_url','')
+    )

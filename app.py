@@ -24,6 +24,7 @@ def create_app():
 
     # --- Basic Configuration ---
     app.config['SECRET_KEY'] = 'your_secret_key_here'
+    app.config['SYNERGY_API_KEY'] = "0vBg4oX7mqNx"
 
     # Database path setup
     basedir = os.path.abspath(os.path.dirname(__file__))
