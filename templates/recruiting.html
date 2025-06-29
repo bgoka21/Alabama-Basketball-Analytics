@@ -6,17 +6,9 @@
   <thead>
       <tr>
         <th>Name</th>
+        <th>Position</th>
         <th>School</th>
-        <th>Pos</th>
-        <th>3FG%</th>
-        <th>FT%</th>
-        <th>A/T</th>
-        <th>OffRtg</th>
-        <th>DefRtg</th>
-        <th>247 Ovr</th>
-        <th>247 Pos</th>
-        <th>Updated</th>
-        <th>⟳</th>
+        <th>247Sports</th>
         <th>Delete</th>
       </tr>
   </thead>
@@ -24,26 +16,27 @@
     {% for r in recruits %}
       <tr>
         <td>{{ r.name }}</td>
-        <td>{{ r.school or '–' }}</td>
-        <td>{{ r.position or '–' }}</td>
-        <td>{{ '{:.1f}'.format(r.three_fg_pct) if r.three_fg_pct is not none else '–' }}</td>
-        <td>{{ '{:.1f}'.format(r.ft_pct) if r.ft_pct is not none else '–' }}</td>
-        <td>{{ r.ast_to_to_ratio if r.ast_to_to_ratio is not none else '–' }}</td>
-        <td>{{ r.off_rating if r.off_rating is not none else '–' }}</td>
-        <td>{{ r.def_rating if r.def_rating is not none else '–' }}</td>
-        <td>{{ r.s247_overall_rank or '–' }}</td>
-        <td>{{ r.s247_position_rank or '–' }}</td>
-        <td>{{ r.last_updated.strftime('%Y-%m-%d') }}</td>
-        <td></td>
+        <td>{{ r.position }}</td>
+        <td>{{ r.school }}</td>
         <td>
-          <form method="post" action="{{ url_for('recruit.delete_recruit', id=r.id) }}" class="inline">
-            <button type="submit" class="text-red-600 hover:underline">Delete</button>
+          {% if r.s247_url %}
+            <a href="{{ r.s247_url }}" target="_blank">247 Profile</a>
+          {% else %}
+            <form method="post" action="{{ url_for('recruit.update_recruit_url', id=r.id) }}">
+              <input name="s247_url" placeholder="247Sports URL" required>
+              <button type="submit">Save URL</button>
+            </form>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('recruit.delete_recruit', id=r.id) }}">
+            <button type="submit">Delete</button>
           </form>
         </td>
       </tr>
     {% else %}
       <tr>
-        <td colspan="13" class="text-center">No recruits to display.</td>
+        <td colspan="5" class="text-center">No recruits to display.</td>
       </tr>
     {% endfor %}
     </tbody>

@@ -28,19 +28,10 @@ def search_synergy():
 def add_recruit():
     if request.method == 'POST':
         name = request.form['name'].strip()
-        synergy_player_id = request.form.get('synergy_player_id')
-        off_rating = float(request.form.get('off_rating') or 0.0)
-        def_rating = float(request.form.get('def_rating') or 0.0)
-        minutes_played = float(request.form.get('minutes_played') or 0.0)
+        position = request.form.get('position')
+        school = request.form.get('school')
 
-        rec = Recruit(
-            name=name,
-            synergy_player_id=synergy_player_id,
-            off_rating=off_rating,
-            def_rating=def_rating,
-            minutes_played=minutes_played,
-            last_updated=datetime.utcnow(),
-        )
+        rec = Recruit(name=name, position=position, school=school)
         db.session.add(rec)
         try:
             db.session.commit()
@@ -57,5 +48,13 @@ def add_recruit():
 def delete_recruit(id):
     r = Recruit.query.get_or_404(id)
     db.session.delete(r)
+    db.session.commit()
+    return redirect(url_for('recruit.list_recruits'))
+
+
+@recruit_bp.route('/<int:id>/url', methods=['POST'])
+def update_recruit_url(id):
+    r = Recruit.query.get_or_404(id)
+    r.s247_url = request.form['s247_url']
     db.session.commit()
     return redirect(url_for('recruit.list_recruits'))

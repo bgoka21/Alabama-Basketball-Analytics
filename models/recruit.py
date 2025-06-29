@@ -18,4 +18,5 @@ class Recruit(db.Model):
     ast_to_to_ratio    = db.Column(db.Float, nullable=True)
     s247_overall_rank  = db.Column(db.Integer, nullable=True)
     s247_position_rank = db.Column(db.Integer, nullable=True)
+    s247_url           = db.Column(db.String, nullable=True)
     last_updated       = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

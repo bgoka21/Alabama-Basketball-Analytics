@@ -5,40 +5,9 @@
 <div class="text-red-600">{{ error }}</div>
 {% endif %}
 <form method="post" action="{{ url_for('recruit.add_recruit') }}" class="mt-4 space-y-2">
-  <label for="name-search" class="block">Name</label>
-  <input id="name-search" name="name" autocomplete="off" class="border px-2 py-1 w-full" required>
-  <ul id="synergy-results" class="border rounded mt-1"></ul>
-  <input type="hidden" name="synergy_player_id" id="synergy_player_id">
-  <input type="hidden" name="off_rating" id="off_rating">
-  <input type="hidden" name="def_rating" id="def_rating">
-  <input type="hidden" name="minutes_played" id="minutes_played">
+  <input name="name" placeholder="Name" class="border px-2 py-1 w-full" required>
+  <input name="position" placeholder="Position" class="border px-2 py-1 w-full">
+  <input name="school" placeholder="School" class="border px-2 py-1 w-full">
   <button type="submit" class="btn-primary mt-2">Add Recruit</button>
 </form>
-<script>
-const nameInput = document.getElementById('name-search');
-const resultsEl = document.getElementById('synergy-results');
-nameInput.addEventListener('input', function() {
-  const q = this.value;
-  if(!q) { resultsEl.innerHTML = ''; return; }
-  fetch('{{ url_for('recruit.search_synergy') }}?q=' + encodeURIComponent(q))
-    .then(r => r.json())
-    .then(data => {
-      resultsEl.innerHTML = '';
-      data.forEach(p => {
-        const li = document.createElement('li');
-        li.textContent = p.name;
-        li.classList.add('cursor-pointer','px-2','py-1','hover:bg-gray-200');
-        li.addEventListener('click', () => {
-          nameInput.value = p.name;
-          document.getElementById('synergy_player_id').value = p.id;
-          document.getElementById('off_rating').value = p.off_rating;
-          document.getElementById('def_rating').value = p.def_rating;
-          document.getElementById('minutes_played').value = p.mpg;
-          resultsEl.innerHTML = '';
-        });
-        resultsEl.appendChild(li);
-      });
-    });
-});
-</script>
 {% endblock %}
