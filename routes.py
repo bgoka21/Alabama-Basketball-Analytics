@@ -58,3 +58,39 @@ def update_recruit_url(id):
     r.s247_url = request.form['s247_url']
     db.session.commit()
     return redirect(url_for('recruit.list_recruits'))
+
+
+# ---- API Endpoints ----
+
+@recruit_bp.route('/api/recruits', methods=['GET', 'POST'])
+def recruits_api():
+    """List recruits or add a new recruit via JSON."""
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'name required'}), 400
+        rec = Recruit(name=name,
+                      position=data.get('position'),
+                      school=data.get('school'))
+        db.session.add(rec)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({'error': 'Recruit already exists.'}), 400
+        return jsonify({'id': rec.id,
+                        'name': rec.name,
+                        'position': rec.position,
+                        'school': rec.school}), 201
+
+    recs = Recruit.query.order_by(Recruit.last_updated.desc()).all()
+    return jsonify([
+        {
+            'id': r.id,
+            'name': r.name,
+            'position': r.position,
+            'school': r.school,
+        }
+        for r in recs
+    ])
