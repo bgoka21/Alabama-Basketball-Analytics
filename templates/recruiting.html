@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Recruits</h1>
-<a href="{{ url_for('recruit.add_recruit') }}" class="btn">+ Add Recruit</a>
+<a href="{{ url_for('recruiting.add_recruit') }}" class="btn">+ Add Recruit</a>
 <table class="table-auto w-full mt-4 text-left">
   <thead>
       <tr>
@@ -9,34 +9,41 @@
         <th>Position</th>
         <th>School</th>
         <th>247Sports</th>
-        <th>Delete</th>
+        <th>ESPN</th>
+        <th>Synergy ID</th>
+        <th>Actions</th>
       </tr>
   </thead>
     <tbody>
-    {% for r in recruits %}
+    {% for recruit in recruits %}
       <tr>
-        <td>{{ r.name }}</td>
-        <td>{{ r.position }}</td>
-        <td>{{ r.school }}</td>
+        <td>{{ recruit.name }}</td>
+        <td>{{ recruit.position }}</td>
+        <td>{{ recruit.school }}</td>
         <td>
-          {% if r.s247_url %}
-            <a href="{{ r.s247_url }}" target="_blank">247 Profile</a>
-          {% else %}
-            <form method="post" action="{{ url_for('recruit.update_recruit_url', id=r.id) }}">
-              <input name="s247_url" placeholder="247Sports URL" required>
-              <button type="submit">Save URL</button>
-            </form>
+          {% if recruit.s247_url %}
+            <a href="{{ recruit.s247_url }}" target="_blank">247 Profile</a>
           {% endif %}
         </td>
         <td>
-          <form method="post" action="{{ url_for('recruit.delete_recruit', id=r.id) }}">
-            <button type="submit">Delete</button>
+          {% if recruit.espn_url %}
+            <a href="{{ recruit.espn_url }}" target="_blank">ESPN Profile</a>
+          {% endif %}
+        </td>
+        <td>{{ recruit.synergy_player_id or '—' }}</td>
+        <td>
+          <a href="{{ url_for('recruiting.update_synergy', id=recruit.id) }}" class="btn btn-sm btn-secondary">Set Synergy</a>
+          <a href="{{ url_for('recruiting.edit_recruit', id=recruit.id) }}" class="btn btn-sm btn-primary">Edit</a>
+          <form action="{{ url_for('recruiting.delete_recruit', id=recruit.id) }}"
+                method="post" style="display:inline;">
+            {{ csrf_token() }}
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
           </form>
         </td>
       </tr>
     {% else %}
       <tr>
-        <td colspan="5" class="text-center">No recruits to display.</td>
+        <td colspan="7" class="text-center">No recruits to display.</td>
       </tr>
     {% endfor %}
     </tbody>

@@ -9,7 +9,7 @@ from models.database import db, PageView
 from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
-from routes import recruit_bp
+from routes import recruiting_bp
 
 # Optional: Import auth blueprint if it exists
 try:
@@ -122,7 +122,7 @@ def create_app():
 
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
-    app.register_blueprint(recruit_bp)
+    app.register_blueprint(recruiting_bp, url_prefix='/recruiting')
 
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')

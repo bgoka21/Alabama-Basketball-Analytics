@@ -4,10 +4,26 @@
 {% if error %}
 <div class="text-red-600">{{ error }}</div>
 {% endif %}
-<form method="post" action="{{ url_for('recruit.add_recruit') }}" class="mt-4 space-y-2">
+<form method="post" action="{{ url_for('recruiting.add_recruit') }}" class="mt-4 space-y-2">
   <input name="name" placeholder="Name" class="border px-2 py-1 w-full" required>
   <input name="position" placeholder="Position" class="border px-2 py-1 w-full">
   <input name="school" placeholder="School" class="border px-2 py-1 w-full">
+  <div class="form-group">
+    <label for="s247_url">247Sports URL</label>
+    <input type="url" class="form-control" name="s247_url" id="s247_url"
+           placeholder="https://247sports.com/..." value="{{ request.form.s247_url or '' }}">
+  </div>
+  <div class="form-group">
+    <label for="espn_url">ESPN URL</label>
+    <input type="url" class="form-control" name="espn_url" id="espn_url"
+           placeholder="https://espn.com/..." value="{{ request.form.espn_url or '' }}">
+  </div>
+  <div class="form-group">
+    <label for="synergy_query">Search Synergy</label>
+    <input type="text" class="form-control" name="synergy_query" id="synergy_query"
+           placeholder="Player name or ID…">
+    <button type="button" id="synergy-search-btn">Search</button>
+  </div>
   <button type="submit" class="btn-primary mt-2">Add Recruit</button>
 </form>
 {% endblock %}

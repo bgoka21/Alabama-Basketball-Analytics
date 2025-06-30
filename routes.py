@@ -4,34 +4,45 @@ from models.recruit import Recruit
 from models.database import db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
+from synergy_client import SynergyClient
+
+synergy = SynergyClient()
 
 
-recruit_bp = Blueprint('recruit', __name__, url_prefix='/recruiting')
+recruiting_bp = Blueprint('recruiting', __name__, url_prefix='/recruiting')
+# maintain old name for backward compatibility
+recruit_bp = recruiting_bp
 
-@recruit_bp.route('/')
+@recruiting_bp.route('/')
 def list_recruits():
     recs = Recruit.query.order_by(Recruit.last_updated.desc()).all()
     return render_template('recruiting.html', recruits=recs)
 
 
-@recruit_bp.route('/search_synergy')
+@recruiting_bp.route('/search_synergy', methods=['POST'])
 def search_synergy():
-    q = request.args.get('q', '')
-    dummy = [
-        {'id': '123', 'name': 'John Doe', 'off_rating': 75.2, 'def_rating': 82.1, 'mpg': 32.5},
-        {'id': '456', 'name': 'Jane Smith', 'off_rating': 68.4, 'def_rating': 70.3, 'mpg': 29.0},
-    ]
-    results = [p for p in dummy if q.lower() in p['name'].lower()]
+    query = request.form['query']
+    results = synergy.search(query)
     return jsonify(results)
 
-@recruit_bp.route('/add', methods=['GET', 'POST'])
+@recruiting_bp.route('/add', methods=['GET', 'POST'])
 def add_recruit():
     if request.method == 'POST':
         name = request.form['name'].strip()
-        position = request.form.get('position')
-        school = request.form.get('school')
+        position = request.form.get('position') or ''
+        school = request.form.get('school') or ''
+        s247_url = request.form.get('s247_url')
+        espn_url = request.form.get('espn_url')
+        synergy_player_id = request.form.get('synergy_player_id')
 
-        rec = Recruit(name=name, position=position, school=school)
+        rec = Recruit(
+            name=name,
+            position=position,
+            school=school,
+            s247_url=s247_url,
+            espn_url=espn_url,
+            synergy_player_id=synergy_player_id,
+        )
         db.session.add(rec)
         try:
             db.session.commit()
@@ -40,29 +51,37 @@ def add_recruit():
             error = 'Recruit already exists.'
             return render_template('add_recruit.html', error=error)
 
-        return redirect(url_for('recruit.list_recruits'))
+        return redirect(url_for('recruiting.list_recruits'))
 
     return render_template('add_recruit.html')
 
-@recruit_bp.route('/<int:id>/delete', methods=['POST'])
+@recruiting_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_recruit(id):
     r = Recruit.query.get_or_404(id)
     db.session.delete(r)
     db.session.commit()
-    return redirect(url_for('recruit.list_recruits'))
+    return redirect(url_for('recruiting.list_recruits'))
 
 
-@recruit_bp.route('/<int:id>/url', methods=['POST'])
+@recruiting_bp.route('/<int:id>/url', methods=['POST'])
 def update_recruit_url(id):
     r = Recruit.query.get_or_404(id)
-    r.s247_url = request.form['s247_url']
+    r.s247_url = request.form.get('s247_url')
+    r.espn_url = request.form.get('espn_url')
     db.session.commit()
-    return redirect(url_for('recruit.list_recruits'))
+    return redirect(url_for('recruiting.list_recruits'))
+
+@recruiting_bp.route('/<int:id>/update_synergy', methods=['POST'])
+def update_synergy(id):
+    recruit = Recruit.query.get_or_404(id)
+    recruit.synergy_player_id = request.form['synergy_player_id']
+    db.session.commit()
+    return redirect(url_for('recruiting.list_recruits'))
 
 
 # ---- API Endpoints ----
 
-@recruit_bp.route('/api/recruits', methods=['GET', 'POST'])
+@recruiting_bp.route('/api/recruits', methods=['GET', 'POST'])
 def recruits_api():
     """List recruits or add a new recruit via JSON."""
     if request.method == 'POST':
@@ -71,8 +90,8 @@ def recruits_api():
         if not name:
             return jsonify({'error': 'name required'}), 400
         rec = Recruit(name=name,
-                      position=data.get('position'),
-                      school=data.get('school'))
+                      position=data.get('position') or '',
+                      school=data.get('school') or '')
         db.session.add(rec)
         try:
             db.session.commit()
