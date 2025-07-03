@@ -49,14 +49,14 @@ def add_recruit():
             espn_url=espn_url,
             synergy_player_id=synergy_player_id,
         )
-        if rec.synergy_player_id:
+        spid = synergy_player_id
+        if spid:
             try:
-                stats = synergy.get_player_stats(rec.synergy_player_id)
-            except Exception:
-                stats = {}
-                flash('Failed to fetch Synergy stats.', 'warning')
-            for key, value in stats.items():
-                setattr(rec, key, value)
+                stats = synergy.get_player_stats(spid)
+                for field, value in stats.items():
+                    setattr(rec, field, value)
+            except Exception as e:
+                flash(f"\u26a0\ufe0f Synergy stats fetch failed: {e}", "warning")
 
         db.session.add(rec)
         try:
