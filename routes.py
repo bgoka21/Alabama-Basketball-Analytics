@@ -16,7 +16,7 @@ recruit_bp = recruiting_bp
 @recruiting_bp.route('/')
 def list_recruits():
     recs = Recruit.query.order_by(Recruit.last_updated.desc()).all()
-    return render_template('recruiting.html', recruits=recs)
+    return render_template('recruiting.html', recruits=recs, active_page='recruits')
 
 
 @recruiting_bp.route('/search_synergy', methods=['POST'])
@@ -43,6 +43,18 @@ def add_recruit():
             espn_url=espn_url,
             synergy_player_id=synergy_player_id,
         )
+
+        if rec.synergy_player_id:
+            stats = synergy.get_player_stats(rec.synergy_player_id)
+            rec.off_rating      = stats.get('off_rating')
+            rec.def_rating      = stats.get('def_rating')
+            rec.minutes_played  = stats.get('minutes_played')
+            rec.three_fg_pct    = stats.get('three_fg_pct')
+            rec.ft_pct          = stats.get('ft_pct')
+            rec.assists         = stats.get('assists')
+            rec.turnovers       = stats.get('turnovers')
+            rec.ast_to_to_ratio = stats.get('ast_to_to_ratio')
+
         db.session.add(rec)
         try:
             db.session.commit()

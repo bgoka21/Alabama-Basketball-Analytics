@@ -11,6 +11,14 @@
         <th>247Sports</th>
         <th>ESPN</th>
         <th>Synergy ID</th>
+        <th>Off Rating</th>
+        <th>Def Rating</th>
+        <th>MP</th>
+        <th>3FG %</th>
+        <th>FT %</th>
+        <th>Ast</th>
+        <th>TO</th>
+        <th>A/T</th>
         <th>Actions</th>
       </tr>
   </thead>
@@ -31,6 +39,14 @@
           {% endif %}
         </td>
         <td>{{ recruit.synergy_player_id or '—' }}</td>
+        <td>{{ recruit.off_rating or '—' }}</td>
+        <td>{{ recruit.def_rating or '—' }}</td>
+        <td>{{ recruit.minutes_played or '—' }}</td>
+        <td>{{ recruit.three_fg_pct or '—' }}</td>
+        <td>{{ recruit.ft_pct or '—' }}</td>
+        <td>{{ recruit.assists or '—' }}</td>
+        <td>{{ recruit.turnovers or '—' }}</td>
+        <td>{{ recruit.ast_to_to_ratio or '—' }}</td>
         <td>
           <a href="{{ url_for('recruiting.update_synergy', id=recruit.id) }}" class="btn btn-sm btn-secondary">Set Synergy</a>
           <a href="{{ url_for('recruiting.edit_recruit', id=recruit.id) }}" class="btn btn-sm btn-primary">Edit</a>
