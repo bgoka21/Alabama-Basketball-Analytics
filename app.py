@@ -127,6 +127,10 @@ def create_app():
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')
 
+    # Ensure all tables exist when the application starts
+    with app.app_context():
+        db.create_all()
+
     @app.before_request
     def log_page_view():
         if request.endpoint in ('static', None):
