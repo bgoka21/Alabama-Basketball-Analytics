@@ -1,6 +1,6 @@
 import os
 import requests
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, RequestException
 
 
 class SynergyClient:
@@ -22,7 +22,11 @@ class SynergyClient:
         return resp.json()
 
     def search_players(self, query: str):
-        from requests.exceptions import HTTPError
+        """Search for players by name.
+
+        Returns an empty list if the player is not found or if the API
+        request fails for any reason.
+        """
         endpoints = [
             ("/players", {"search": query}),
             ("/players/search", {"search": query}),
@@ -40,6 +44,10 @@ class SynergyClient:
                     continue
                 # otherwise re-raise
                 raise
+            except RequestException:
+                # network issues or other request errors - abort and
+                # return no results
+                break
         # if none succeed, return empty list
         return []
 
