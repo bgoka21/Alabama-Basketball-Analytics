@@ -22,7 +22,7 @@ def list_recruits():
 @recruiting_bp.route('/search_synergy', methods=['POST'])
 def search_synergy():
     query = request.form['query']
-    results = synergy.search(query)
+    results = synergy.search_players(query)
     return jsonify(results)
 
 @recruiting_bp.route('/add', methods=['GET', 'POST'])
@@ -35,6 +35,12 @@ def add_recruit():
         espn_url = request.form.get('espn_url')
         synergy_player_id = request.form.get('synergy_player_id')
 
+        if synergy_player_id:
+            existing = Recruit.query.filter_by(synergy_player_id=synergy_player_id).first()
+            if existing:
+                error = 'Recruit already exists.'
+                return render_template('add_recruit.html', error=error)
+
         rec = Recruit(
             name=name,
             position=position,
@@ -43,17 +49,14 @@ def add_recruit():
             espn_url=espn_url,
             synergy_player_id=synergy_player_id,
         )
-
         if rec.synergy_player_id:
-            stats = synergy.get_player_stats(rec.synergy_player_id)
-            rec.off_rating      = stats.get('off_rating')
-            rec.def_rating      = stats.get('def_rating')
-            rec.minutes_played  = stats.get('minutes_played')
-            rec.three_fg_pct    = stats.get('three_fg_pct')
-            rec.ft_pct          = stats.get('ft_pct')
-            rec.assists         = stats.get('assists')
-            rec.turnovers       = stats.get('turnovers')
-            rec.ast_to_to_ratio = stats.get('ast_to_to_ratio')
+            try:
+                stats = synergy.get_player_stats(rec.synergy_player_id)
+            except Exception:
+                stats = {}
+                flash('Failed to fetch Synergy stats.', 'warning')
+            for key, value in stats.items():
+                setattr(rec, key, value)
 
         db.session.add(rec)
         try:

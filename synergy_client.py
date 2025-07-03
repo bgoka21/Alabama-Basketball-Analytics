@@ -1,25 +1,40 @@
-class SynergyClient:
-    """Simple stub for Synergy search used in tests."""
+import os
+import requests
 
-    def search(self, query: str):
-        # In a real implementation this would query the Synergy API.
-        # For now return a static list filtered by the query string.
-        players = [
-            {'id': '123', 'name': 'John Doe'},
-            {'id': '456', 'name': 'Jane Smith'},
-        ]
-        q = query.lower()
-        return [p for p in players if q in p['name'].lower()]
+
+class SynergyClient:
+    """Minimal wrapper for the Synergy Sports API."""
+
+    def __init__(self, timeout: float = 10.0):
+        self.api_key = os.getenv("SYNERGY_API_KEY")
+        if not self.api_key:
+            raise RuntimeError("SYNERGY_API_KEY not set")
+        self.base = "https://api.synergysportstech.com/v1"
+        self.timeout = timeout
+
+    def _get(self, path: str, **kwargs):
+        url = f"{self.base}{path}"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        resp = requests.get(url, headers=headers, timeout=self.timeout, **kwargs)
+        resp.raise_for_status()
+        return resp.json() or {}
+
+    def search_players(self, query: str):
+        data = self._get("/players", params={"search": query})
+        return data.get("players", [])
+
+    # backwards compatibility
+    search = search_players
 
     def get_player_stats(self, player_id: str):
-        # TODO: replace stub with real API call
+        data = self._get(f"/players/{player_id}/stats")
         return {
-            'off_rating': 90.0,
-            'def_rating': 85.0,
-            'minutes_played': 120.0,
-            'three_fg_pct': 38.5,
-            'ft_pct': 75.0,
-            'assists': 4.1,
-            'turnovers': 2.3,
-            'ast_to_to_ratio': 1.78
+            "off_rating": data.get("offensiveRating"),
+            "def_rating": data.get("defensiveRating"),
+            "minutes_played": data.get("minutesPlayed"),
+            "three_fg_pct": data.get("threePointPct"),
+            "ft_pct": data.get("freeThrowPct"),
+            "assists": data.get("assists"),
+            "turnovers": data.get("turnovers"),
+            "ast_to_to_ratio": data.get("assistTurnoverRatio"),
         }

@@ -18,37 +18,39 @@
     <input type="url" class="form-control" name="espn_url" id="espn_url"
            placeholder="https://espn.com/..." value="{{ request.form.espn_url or '' }}">
   </div>
-  <div class="form-group">
+  <div class="form-group relative">
     <label for="synergy_query">Search Synergy</label>
-    <input type="text" class="form-control" name="synergy_query" id="synergy_query"
-           placeholder="Player name or ID…">
-    <button type="button" id="synergy-search-btn">Search</button>
+    <input type="text" class="form-control" name="synergy_query" id="synergy_query" autocomplete="off" placeholder="Player name…">
+    <ul id="synergy-dropdown" class="absolute z-10 bg-white border w-full hidden"></ul>
+    <input type="hidden" name="synergy_player_id" id="synergy_player_id">
   </div>
   <button type="submit" class="btn-primary mt-2">Add Recruit</button>
   <script>
-  document.getElementById('synergy-search-btn').addEventListener('click', async () => {
-    const query = document.getElementById('synergy_query').value.trim();
-    if (!query) return alert('Enter a name or ID to search Synergy.');
+  const queryInput = document.getElementById('synergy_query');
+  const dropdown = document.getElementById('synergy-dropdown');
+
+  queryInput.addEventListener('input', async () => {
+    const query = queryInput.value.trim();
+    if (!query) { dropdown.classList.add('hidden'); dropdown.innerHTML=''; return; }
     const formData = new FormData();
     formData.append('query', query);
-    const res = await fetch("{{ url_for('recruiting.search_synergy') }}", {
-      method: 'POST',
-      body: formData
-    });
+    const res = await fetch("{{ url_for('recruiting.search_synergy') }}", { method:'POST', body: formData });
     const results = await res.json();
-    if (!results.length) return alert('No players found on Synergy.');
-    const p = results[0];
-    document.querySelector('input[name="name"]').value = p.name;
-    if (p.position) document.querySelector('input[name="position"]').value = p.position;
-    if (p.school)   document.querySelector('input[name="school"]').value = p.school;
-    let hid = document.querySelector('input[name="synergy_player_id"]');
-    if (!hid) {
-      hid = document.createElement('input');
-      hid.type = 'hidden';
-      hid.name = 'synergy_player_id';
-      document.querySelector('form').appendChild(hid);
-    }
-    hid.value = p.id;
+    dropdown.innerHTML = '';
+    results.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = p.name;
+      li.className = 'px-2 py-1 cursor-pointer hover:bg-gray-200';
+      li.addEventListener('click', () => {
+        document.querySelector('input[name="name"]').value = p.name;
+        if (p.position) document.querySelector('input[name="position"]').value = p.position;
+        if (p.school)   document.querySelector('input[name="school"]').value   = p.school;
+        document.getElementById('synergy_player_id').value = p.id;
+        dropdown.classList.add('hidden');
+      });
+      dropdown.appendChild(li);
+    });
+    dropdown.classList.toggle('hidden', results.length === 0);
   });
   </script>
 </form>
