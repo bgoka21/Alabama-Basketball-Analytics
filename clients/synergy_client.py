@@ -6,9 +6,12 @@ class SynergyAPI:
     """Simple wrapper around the Synergy Basketball API."""
 
     def __init__(self, timeout: float = 10.0):
-        self.api_key = current_app.config['SYNERGY_API_KEY']
         self.base = 'https://api.synergybasketball.com/v1'
         self.timeout = timeout
+
+    @property
+    def api_key(self):
+        return current_app.config['SYNERGY_API_KEY']
 
     def find_player_id(self, name: str) -> str:
         try:

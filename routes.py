@@ -4,7 +4,7 @@ from models.recruit import Recruit
 from models.database import db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from synergy_client import SynergyClient
+from clients.synergy_client import SynergyAPI as SynergyClient
 
 synergy = SynergyClient()
 
@@ -21,13 +21,13 @@ def list_recruits():
 
 @recruiting_bp.route('/search_synergy', methods=['POST'])
 def search_synergy():
-    query = request.form['query']
-    try:
-        results = synergy.search_players(query)
-    except Exception as e:
-        current_app.logger.exception('Synergy player search failed: %s', e)
-        results = []
-    return jsonify(results)
+    query = request.form.get('query', '').strip()
+    if not query:
+        return jsonify([])
+    player_id = synergy.find_player_id(query)
+    if not player_id:
+        return jsonify([])
+    return jsonify([{'id': player_id, 'name': query}])
 
 @recruiting_bp.route('/add', methods=['GET', 'POST'])
 def add_recruit():
@@ -53,14 +53,17 @@ def add_recruit():
             espn_url=espn_url,
             synergy_player_id=synergy_player_id,
         )
-        spid = synergy_player_id
+        spid = request.form.get('synergy_player_id')
         if spid:
-            try:
-                stats = synergy.get_player_stats(spid)
-                for field, value in stats.items():
-                    setattr(rec, field, value)
-            except Exception as e:
-                flash(f"\u26a0\ufe0f Synergy stats fetch failed: {e}", "warning")
+            stats = synergy.get_player_stats(spid)
+            rec.off_rating      = stats.get('off_rating')
+            rec.def_rating      = stats.get('def_rating')
+            rec.minutes_played  = stats.get('minutes_played')
+            rec.three_fg_pct    = stats.get('three_fg_pct')
+            rec.ft_pct          = stats.get('ft_pct')
+            rec.assists         = stats.get('assists')
+            rec.turnovers       = stats.get('turnovers')
+            rec.ast_to_to_ratio = stats.get('ast_to_to_ratio')
 
         db.session.add(rec)
         try:
