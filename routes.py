@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from datetime import datetime
 from models.recruit import Recruit
 from models.database import db
@@ -22,7 +22,11 @@ def list_recruits():
 @recruiting_bp.route('/search_synergy', methods=['POST'])
 def search_synergy():
     query = request.form['query']
-    results = synergy.search_players(query)
+    try:
+        results = synergy.search_players(query)
+    except Exception as e:
+        current_app.logger.exception('Synergy player search failed: %s', e)
+        results = []
     return jsonify(results)
 
 @recruiting_bp.route('/add', methods=['GET', 'POST'])
