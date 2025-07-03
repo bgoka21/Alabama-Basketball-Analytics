@@ -1,5 +1,6 @@
 import os
 import requests
+from requests.exceptions import HTTPError
 
 
 class SynergyClient:
@@ -21,8 +22,26 @@ class SynergyClient:
         return resp.json()
 
     def search_players(self, query: str):
-        data = self._get("/players", {"search": query})
-        return data.get("players", [])
+        from requests.exceptions import HTTPError
+        endpoints = [
+            ("/players", {"search": query}),
+            ("/players/search", {"search": query}),
+            ("/players/search", {"query": query}),
+            ("/players", {"q": query}),
+            ("/players/search", {"q": query}),
+        ]
+        for path, params in endpoints:
+            try:
+                data = self._get(path, params)
+                return data.get("players", [])
+            except HTTPError as e:
+                # if it's a 404, try the next endpoint
+                if e.response is not None and e.response.status_code == 404:
+                    continue
+                # otherwise re-raise
+                raise
+        # if none succeed, return empty list
+        return []
 
     # backwards compatibility
     search = search_players
