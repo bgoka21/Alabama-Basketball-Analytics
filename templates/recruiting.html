@@ -23,34 +23,34 @@
       </tr>
   </thead>
     <tbody>
-    {% for recruit in recruits %}
+    {% for r in recruits %}
       <tr>
-        <td>{{ recruit.name }}</td>
-        <td>{{ recruit.position }}</td>
-        <td>{{ recruit.school }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.position }}</td>
+        <td>{{ r.school }}</td>
         <td>
-          {% if recruit.s247_url %}
-            <a href="{{ recruit.s247_url }}" target="_blank">247 Profile</a>
+          {% if r.s247_url %}
+            <a href="{{ r.s247_url }}" target="_blank">247 Profile</a>
           {% endif %}
         </td>
         <td>
-          {% if recruit.espn_url %}
-            <a href="{{ recruit.espn_url }}" target="_blank">ESPN Profile</a>
+          {% if r.espn_url %}
+            <a href="{{ r.espn_url }}" target="_blank">ESPN Profile</a>
           {% endif %}
         </td>
-        <td>{{ recruit.synergy_player_id or '—' }}</td>
-        <td>{{ recruit.off_rating or '—' }}</td>
-        <td>{{ recruit.def_rating or '—' }}</td>
-        <td>{{ recruit.minutes_played or '—' }}</td>
-        <td>{{ recruit.three_fg_pct or '—' }}</td>
-        <td>{{ recruit.ft_pct or '—' }}</td>
-        <td>{{ recruit.assists or '—' }}</td>
-        <td>{{ recruit.turnovers or '—' }}</td>
-        <td>{{ recruit.ast_to_to_ratio or '—' }}</td>
+        <td>{{ r.synergy_player_id or '—' }}</td>
+        <td>{{ r.off_rating or '—' }}</td>
+        <td>{{ r.def_rating or '—' }}</td>
+        <td>{{ r.minutes_played or '—' }}</td>
+        <td>{{ r.three_fg_pct or '—' }}</td>
+        <td>{{ r.ft_pct or '—' }}</td>
+        <td>{{ r.assists or '—' }}</td>
+        <td>{{ r.turnovers or '—' }}</td>
+        <td>{{ r.ast_to_to_ratio or '—' }}</td>
         <td>
-          <a href="{{ url_for('recruiting.update_synergy', id=recruit.id) }}" class="btn btn-sm btn-secondary">Set Synergy</a>
-          <a href="{{ url_for('recruiting.edit_recruit', id=recruit.id) }}" class="btn btn-sm btn-primary">Edit</a>
-          <form action="{{ url_for('recruiting.delete_recruit', id=recruit.id) }}"
+          <a href="{{ url_for('recruiting.update_synergy', id=r.id) }}" class="btn btn-sm btn-secondary">Set Synergy</a>
+          <a href="{{ url_for('recruiting.edit_recruit', id=r.id) }}" class="btn btn-sm btn-primary">Edit</a>
+          <form action="{{ url_for('recruiting.delete_recruit', id=r.id) }}"
                 method="post" style="display:inline;">
             {{ csrf_token() }}
             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
