@@ -5,10 +5,8 @@ import requests
 class SynergyClient:
     """Minimal wrapper for the Synergy Sports API."""
 
-    def __init__(self, timeout: float = 10.0):
-        self.api_key = os.getenv("SYNERGY_API_KEY")
-        if not self.api_key:
-            raise RuntimeError("SYNERGY_API_KEY not set")
+    def __init__(self, api_key: str | None = None, timeout: float = 10.0):
+        self.api_key = api_key or os.getenv("SYNERGY_API_KEY") or "0vBg4oX7mqNx"
         self.base = "https://api.synergysportstech.com/v1"
         self.timeout = timeout
 
