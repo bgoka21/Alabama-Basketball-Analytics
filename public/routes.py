@@ -752,7 +752,13 @@ def season_leaderboard():
     # 1) Core A+B aggregates
     core_q = (
         Roster.query
-        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .join(
+            PlayerStats,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        )
         .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
         .filter(PlayerStats.season_id == get_current_season_id())
         .with_entities(
@@ -785,7 +791,13 @@ def season_leaderboard():
     shot_details = {}
     shot_rows = (
         Roster.query
-        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .join(
+            PlayerStats,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        )
         .filter(PlayerStats.season_id == get_current_season_id())
         .with_entities(
             Roster.player_name,
