@@ -28,6 +28,8 @@ def create_app():
     # --- Basic Configuration ---
     app.config['SECRET_KEY'] = 'your_secret_key_here'
     app.config['SYNERGY_API_KEY'] = "0vBg4oX7mqNx"
+    app.config['SYNERGY_CLIENT_ID'] = os.environ.get('SYNERGY_CLIENT_ID', 'client.basketball.alabamambb')
+    app.config['SYNERGY_CLIENT_SECRET'] = os.environ.get('SYNERGY_CLIENT_SECRET', '0vBg4oX7mqNx')
 
     # Database path setup
     basedir = os.path.abspath(os.path.dirname(__file__))
