@@ -36,6 +36,7 @@ from models.database import PageView
 from models.uploaded_file import UploadedFile
 from models.user import User
 from sqlalchemy import func, and_
+from utils.db_helpers import array_agg_or_group_concat
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
@@ -250,7 +251,7 @@ def dashboard():
         .filter(PlayerStats.season_id == sid)
         .with_entities(
             Roster.player_name,
-            func.array_agg(PlayerStats.shot_type_details)
+            array_agg_or_group_concat(PlayerStats.shot_type_details)
         )
         .group_by(Roster.player_name)
         .all()
@@ -258,7 +259,11 @@ def dashboard():
     shot_details = {}
     for player, blobs in shot_rows:
         all_shots = []
-        for blob in blobs or []:
+        if isinstance(blobs, str):
+            blob_list = blobs.split(';') if blobs else []
+        else:
+            blob_list = blobs or []
+        for blob in blob_list:
             if blob:
                 all_shots.extend(json.loads(blob))
         detail_counts = {}

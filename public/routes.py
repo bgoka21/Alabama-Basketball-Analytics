@@ -3,6 +3,7 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
+from utils.db_helpers import array_agg_or_group_concat
 from datetime import date
 from collections import defaultdict
 import json
@@ -801,14 +802,18 @@ def season_leaderboard():
         .filter(PlayerStats.season_id == get_current_season_id())
         .with_entities(
             Roster.player_name,
-            func.array_agg(PlayerStats.shot_type_details)
+            array_agg_or_group_concat(PlayerStats.shot_type_details)
         )
         .group_by(Roster.player_name)
         .all()
     )
     for player, blobs in shot_rows:
         all_shots = []
-        for blob in blobs or []:
+        if isinstance(blobs, str):
+            blob_list = blobs.split(';') if blobs else []
+        else:
+            blob_list = blobs or []
+        for blob in blob_list:
             if blob:
                 all_shots.extend(json.loads(blob))
         detail_counts = {}
