@@ -54,6 +54,15 @@ def api_player_stats():
     return jsonify(stats)
 
 
+@app.route('/api/players', methods=['GET'])
+def api_players():
+    q = request.args.get('query', '').strip()
+    if not q:
+        return jsonify([])
+    results = Recruit.query.filter(Recruit.name.ilike(f'%{q}%')).limit(10).all()
+    return jsonify([{'id': r.id, 'name': r.name} for r in results])
+
+
 # ------------------------------------------------------------------
 #  Simple page to query Synergy player stats
 # ------------------------------------------------------------------

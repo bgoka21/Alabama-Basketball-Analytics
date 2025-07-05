@@ -39,6 +39,12 @@
         Recruits
       </a>
 
+      {% set synergy_url = url_for('synergy_player_page') if view_exists('synergy_player_page') else '#' %}
+      <a href="{{ synergy_url }}"
+         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {% if request.path == '/recruits/synergy_player' %}bg-white text-[#9E1B32]{% endif %}">
+        Synergy Player Stats
+      </a>
+
       {% if current_user.is_authenticated %}
 
         {# ── Reports dropdown ── #}

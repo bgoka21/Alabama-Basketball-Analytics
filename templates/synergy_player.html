@@ -2,28 +2,43 @@
 {% block content %}
   <h1>Synergy Player Stats</h1>
   <form id="player-form" class="my-4">
-    <input type="text" name="player_name" id="player-name" placeholder="e.g. John Doe" required class="border p-2 mr-2"/>
+    <input list="players-list" id="player-name" name="player_name" placeholder="Type a name…" required class="border p-2 mr-2">
+    <datalist id="players-list"></datalist>
     <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Search</button>
   </form>
   <div id="stats"></div>
 
-  <script>
-    document.getElementById('player-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const name = document.getElementById('player-name').value;
-      const res = await fetch(`/api/player_stats?player_name=${encodeURIComponent(name)}`);
-      const data = await res.json();
-      if (data.error) {
-        document.getElementById('stats').innerHTML = `<p style="color:red;">${data.error}</p>`;
-        return;
-      }
-      let html = '<table class="table-auto border">';
-      html += '<tr><th class="px-2 py-1 border">Stat</th><th class="px-2 py-1 border">Value</th></tr>';
-      for (let key in data) {
-        html += `<tr><td class="px-2 py-1 border">${key}</td><td class="px-2 py-1 border">${data[key]}</td></tr>`;
-      }
-      html += '</table>';
-      document.getElementById('stats').innerHTML = html;
-    };
-  </script>
+    <script>
+    const input = document.getElementById('player-name');
+    const list = document.getElementById('players-list');
+    let timeout;
+    input.addEventListener('input', () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(async () => {
+        const q = input.value.trim();
+        if (!q) return;
+        const res = await fetch(`/api/players?query=${encodeURIComponent(q)}`);
+        const players = await res.json();
+        list.innerHTML = players.map(p => `<option value="${p.name}">`).join('');
+      }, 300);
+    });
+
+      document.getElementById('player-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('player-name').value;
+        const res = await fetch(`/api/player_stats?player_name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById('stats').innerHTML = `<p style="color:red;">${data.error}</p>`;
+          return;
+        }
+        let html = '<table class="table-auto border">';
+        html += '<tr><th class="px-2 py-1 border">Stat</th><th class="px-2 py-1 border">Value</th></tr>';
+        for (let key in data) {
+          html += `<tr><td class="px-2 py-1 border">${key}</td><td class="px-2 py-1 border">${data[key]}</td></tr>`;
+        }
+        html += '</table>';
+        document.getElementById('stats').innerHTML = html;
+      };
+    </script>
 {% endblock %}
