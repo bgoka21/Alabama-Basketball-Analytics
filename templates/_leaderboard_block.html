@@ -20,9 +20,9 @@
     </tr>
   </thead>
   <tbody>
-    {% for i,(player,val) in enumerate(rows,1) %}
+    {% for player,val in rows %}
       <tr class="border-t">
-        <td class="px-4 py-2">{{ i }}</td>
+        <td class="px-4 py-2">{{ loop.index }}</td>
         <td class="px-4 py-2">{{ player }}</td>
         <td class="px-4 py-2">
           {% if selected.format=='pct' %}
