@@ -52,3 +52,13 @@ def api_player_stats():
 
     stats = synergy_api.get_player_stats(player_id)
     return jsonify(stats)
+
+
+# ------------------------------------------------------------------
+#  Simple page to query Synergy player stats
+# ------------------------------------------------------------------
+
+@app.route('/recruits/synergy_player')
+def synergy_player_page():
+    """Render the player stats search page."""
+    return render_template('synergy_player.html')
