@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block content %}
+  <h1 class="text-3xl font-bold mb-6">Season Leaderboard</h1>
+
+  <form method="get" class="mb-4">
+    <label for="stat-select">Stat:</label>
+    <select id="stat-select" name="stat" onchange="this.form.submit()">
+      {% for s in stats_config %}
+        <option value="{{ s.key }}" {% if s.key==selected.key %}selected{% endif %}>
+          {{ s.label }}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <table class="min-w-full bg-white rounded-lg shadow">
+    <thead>
+      <tr class="bg-gray-100">
+        <th class="px-4 py-2">#</th>
+        <th class="px-4 py-2">Player</th>
+        <th class="px-4 py-2">{{ selected.label }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i,(player,val) in enumerate(rows,1) %}
+        <tr class="border-t">
+          <td class="px-4 py-2">{{ i }}</td>
+          <td class="px-4 py-2">{{ player }}</td>
+          <td class="px-4 py-2">
+            {% if selected.format=='pct' %}
+              {{ val|round(1) }}%
+            {% else %}
+              {{ val }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

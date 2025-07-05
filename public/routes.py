@@ -1,12 +1,13 @@
 # basketball_analytics/public/routes.py
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify
+from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
 from datetime import date
 from collections import defaultdict
 import json
 from types import SimpleNamespace
+from stats_config import LEADERBOARD_STATS
 from admin.routes import (
     collect_practice_labels,
     compute_filtered_blue,
@@ -738,3 +739,100 @@ def direct_pnr_for_player(player_id):
         'direct_pnr_turnovers': direct_turnovers,
         'direct_pnr_assists': direct_assists,
     })
+
+
+@public_bp.route('/leaderboard')
+@login_required
+def season_leaderboard():
+    stat_key = request.args.get('stat', LEADERBOARD_STATS[0]['key'])
+    cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
+    if not cfg:
+        abort(404)
+
+    # 1) Core A+B aggregates
+    core_q = (
+        Roster.query
+        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
+        .filter(PlayerStats.season_id == get_current_season_id())
+        .with_entities(
+            Roster.player_name.label('player'),
+            *[
+                func.coalesce(func.sum(getattr(PlayerStats, key)), 0).label(key)
+                for key in [
+                    'points','assists','pot_assists','second_assists','turnovers',
+                    'fta','ftm','atr_attempts','atr_makes',
+                    'fg2_attempts','fg2_makes','fg3_attempts','fg3_makes',
+                    'foul_by','contest_front','contest_side','contest_behind',
+                    'contest_late','contest_early','contest_no',
+                    'bump_positive','bump_missed',
+                    'blowby_total','blowby_triple_threat','blowby_closeout','blowby_isolation',
+                    'practice_wins','practice_losses','sprint_wins','sprint_losses',
+                ]
+            ] + [
+                func.coalesce(func.sum(getattr(BlueCollarStats, key)), 0).label(key)
+                for key in [
+                    'total_blue_collar','reb_tip','def_reb','misc',
+                    'deflection','steal','block','off_reb','floor_dive','charge_taken'
+                ]
+            ]
+        )
+        .group_by(Roster.player_name)
+    )
+    core_rows = {r.player: r._asdict() for r in core_q.all()}
+
+    # 2) Shot-type details: collect & parse JSON
+    shot_details = {}
+    shot_rows = (
+        Roster.query
+        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .filter(PlayerStats.season_id == get_current_season_id())
+        .with_entities(
+            Roster.player_name,
+            func.array_agg(PlayerStats.shot_type_details)
+        )
+        .group_by(Roster.player_name)
+        .all()
+    )
+    for player, blobs in shot_rows:
+        all_shots = []
+        for blob in blobs or []:
+            if blob:
+                all_shots.extend(json.loads(blob))
+        detail_counts = {}
+        for shot in all_shots:
+            sc = shot.get('shot_class', '').lower()
+            label = 'Assisted' if shot.get('Assisted') else 'Non-Assisted'
+            ctx = shot.get('POSSESSION TYPE', '').lower()
+            if sc not in ['atr','fg2','fg3'] or ctx not in ['transition','halfcourt','total']:
+                continue
+            detail_counts.setdefault((sc, label, ctx), {'attempts': 0, 'makes': 0})
+            bucket = detail_counts[(sc, label, ctx)]
+            bucket['attempts'] += 1
+            bucket['makes'] += (shot.get('result') == 'made')
+        flat = {}
+        for (sc, label, ctx), data in detail_counts.items():
+            a = data['attempts']
+            m = data['makes']
+            pts = 2 if sc in ('atr', 'fg2') else 3
+            flat[f"{sc}_{label}_{ctx}_attempts"] = a
+            flat[f"{sc}_{label}_{ctx}_makes"] = m
+            flat[f"{sc}_{label}_{ctx}_fg_pct"] = (m / a * 100 if a else 0)
+            flat[f"{sc}_{label}_{ctx}_pps"] = (pts * m / a if a else 0)
+            total = sum(d['attempts'] for k, d in detail_counts.items() if k[0] == sc) or 1
+            flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
+        shot_details[player] = flat
+
+    # 3) Combine and sort
+    leaderboard = []
+    for player, core in core_rows.items():
+        val = core.get(stat_key) or shot_details.get(player, {}).get(stat_key, 0)
+        leaderboard.append((player, val))
+    leaderboard.sort(key=lambda x: x[1], reverse=True)
+
+    return render_template(
+        'public/leaderboard.html',
+        stats_config=LEADERBOARD_STATS,
+        selected=cfg,
+        rows=leaderboard
+    )
