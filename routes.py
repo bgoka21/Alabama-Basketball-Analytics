@@ -1,7 +1,7 @@
 from flask import render_template, jsonify, request, current_app
 from app import app
 from models.recruit import Recruit
-from clients.synergy_client import SynergyDataCoreClient
+from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 
 
 @app.route('/recruits')
@@ -36,3 +36,19 @@ def api_stats():
     client = _get_synergy_client()
     games = client.get_recent_games_with_stats(competition_id)
     return jsonify(games)
+
+
+@app.route('/api/player_stats', methods=['GET'])
+def api_player_stats():
+    """Return cumulative Synergy stats for a given player name."""
+    player_name = request.args.get('player_name')
+    if not player_name:
+        return jsonify({'error': 'player_name required'}), 400
+
+    synergy_api = SynergyAPI()
+    player_id = synergy_api.find_player_id(player_name)
+    if not player_id:
+        return jsonify({'error': 'player not found'}), 404
+
+    stats = synergy_api.get_player_stats(player_id)
+    return jsonify(stats)
