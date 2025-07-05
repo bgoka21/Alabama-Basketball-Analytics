@@ -1,4 +1,5 @@
 import os, json
+from collections import defaultdict
 from datetime import datetime, date
 import io
 import re
@@ -256,24 +257,44 @@ def dashboard():
         .group_by(Roster.player_name)
         .all()
     )
-    shot_details = {}
+    new_shot_rows = []
     for player, blobs in shot_rows:
-        all_shots = []
+        # Normalize blobs into a list of JSON strings
         if isinstance(blobs, str):
-            blob_list = blobs.split(';') if blobs else []
+            parts = blobs.split('|||')
+        elif isinstance(blobs, (list, tuple)):
+            parts = blobs
         else:
-            blob_list = blobs or []
-        for blob in blob_list:
-            if blob:
-                all_shots.extend(json.loads(blob))
-        detail_counts = {}
+            parts = []
+
+        # Parse each JSON fragment safely
+        json_list = []
+        for fragment in parts:
+            if not fragment:
+                continue
+            try:
+                parsed = json.loads(fragment)
+            except ValueError:
+                # Skip invalid JSON fragments
+                continue
+            # If it's a list of shot dicts, extend; if a single dict, append
+            if isinstance(parsed, list):
+                json_list.extend(parsed)
+            else:
+                json_list.append(parsed)
+
+        new_shot_rows.append((player, json_list))
+
+    shot_details = {}
+    for player, shot_list in new_shot_rows:
+        all_shots = shot_list
+        detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
         for shot in all_shots:
             sc = shot.get('shot_class', '').lower()
             label = 'Assisted' if shot.get('Assisted') else 'Non-Assisted'
             ctx = shot.get('POSSESSION TYPE', '').lower()
             if sc not in ['atr','fg2','fg3'] or ctx not in ['transition','halfcourt','total']:
                 continue
-            detail_counts.setdefault((sc, label, ctx), {'attempts': 0, 'makes': 0})
             bucket = detail_counts[(sc, label, ctx)]
             bucket['attempts'] += 1
             bucket['makes'] += (shot.get('result') == 'made')
