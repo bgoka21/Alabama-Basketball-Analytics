@@ -39,6 +39,7 @@ from sqlalchemy import func
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
+from stats_config import LEADERBOARD_STATS
 
 # --- Helper Functions at the top ---
 
@@ -202,12 +203,99 @@ def dashboard():
     # 1c) fetch seasons for dropdown
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
+    # ─── Leaderboard data ──────────────────────────────────────────────
+    stat_key = request.args.get('stat', LEADERBOARD_STATS[0]['key'])
+    cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
+    if not cfg:
+        abort(404)
+
+    core_q = (
+        Roster.query
+        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
+        .filter(PlayerStats.season_id == sid)
+        .with_entities(
+            Roster.player_name.label('player'),
+            *[
+                func.coalesce(func.sum(getattr(PlayerStats, key)), 0).label(key)
+                for key in [
+                    'points','assists','pot_assists','second_assists','turnovers',
+                    'fta','ftm','atr_attempts','atr_makes',
+                    'fg2_attempts','fg2_makes','fg3_attempts','fg3_makes',
+                    'foul_by','contest_front','contest_side','contest_behind',
+                    'contest_late','contest_early','contest_no',
+                    'bump_positive','bump_missed',
+                    'blowby_total','blowby_triple_threat','blowby_closeout','blowby_isolation',
+                    'practice_wins','practice_losses','sprint_wins','sprint_losses',
+                ]
+            ] + [
+                func.coalesce(func.sum(getattr(BlueCollarStats, key)), 0).label(key)
+                for key in [
+                    'total_blue_collar','reb_tip','def_reb','misc',
+                    'deflection','steal','block','off_reb','floor_dive','charge_taken'
+                ]
+            ]
+        )
+        .group_by(Roster.player_name)
+    )
+    core_rows = {r.player: r._asdict() for r in core_q.all()}
+
+    shot_rows = (
+        Roster.query
+        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .filter(PlayerStats.season_id == sid)
+        .with_entities(
+            Roster.player_name,
+            func.array_agg(PlayerStats.shot_type_details)
+        )
+        .group_by(Roster.player_name)
+        .all()
+    )
+    shot_details = {}
+    for player, blobs in shot_rows:
+        all_shots = []
+        for blob in blobs or []:
+            if blob:
+                all_shots.extend(json.loads(blob))
+        detail_counts = {}
+        for shot in all_shots:
+            sc = shot.get('shot_class', '').lower()
+            label = 'Assisted' if shot.get('Assisted') else 'Non-Assisted'
+            ctx = shot.get('POSSESSION TYPE', '').lower()
+            if sc not in ['atr','fg2','fg3'] or ctx not in ['transition','halfcourt','total']:
+                continue
+            detail_counts.setdefault((sc, label, ctx), {'attempts': 0, 'makes': 0})
+            bucket = detail_counts[(sc, label, ctx)]
+            bucket['attempts'] += 1
+            bucket['makes'] += (shot.get('result') == 'made')
+        flat = {}
+        for (sc, label, ctx), data in detail_counts.items():
+            a = data['attempts']
+            m = data['makes']
+            pts = 2 if sc in ('atr','fg2') else 3
+            flat[f"{sc}_{label}_{ctx}_attempts"] = a
+            flat[f"{sc}_{label}_{ctx}_makes"] = m
+            flat[f"{sc}_{label}_{ctx}_fg_pct"] = (m / a * 100 if a else 0)
+            flat[f"{sc}_{label}_{ctx}_pps"] = (pts * m / a if a else 0)
+            total = sum(d['attempts'] for k, d in detail_counts.items() if k[0] == sc) or 1
+            flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
+        shot_details[player] = flat
+
+    leaderboard = []
+    for player, core in core_rows.items():
+        val = core.get(stat_key) or shot_details.get(player, {}).get(stat_key, 0)
+        leaderboard.append((player, val))
+    leaderboard.sort(key=lambda x: x[1], reverse=True)
+
     return render_template(
         'admin/dashboard.html',
         uploaded_files   = uploaded_files,
         all_seasons      = all_seasons,
         selected_season  = sid,
-        active_page      = 'dashboard'
+        active_page      = 'dashboard',
+        stats_config     = LEADERBOARD_STATS,
+        selected         = cfg,
+        rows             = leaderboard,
     )
 
 
