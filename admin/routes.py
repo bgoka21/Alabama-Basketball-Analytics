@@ -35,7 +35,7 @@ from models.database import PageView
 
 from models.uploaded_file import UploadedFile
 from models.user import User
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
@@ -211,7 +211,9 @@ def dashboard():
 
     core_q = (
         Roster.query
-        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .join(PlayerStats,
+              and_(PlayerStats.player_name == Roster.player_name,
+                   PlayerStats.season_id == Roster.season_id))
         .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
         .filter(PlayerStats.season_id == sid)
         .with_entities(
@@ -242,7 +244,9 @@ def dashboard():
 
     shot_rows = (
         Roster.query
-        .join(PlayerStats, PlayerStats.player_id == Roster.id)
+        .join(PlayerStats,
+              and_(PlayerStats.player_name == Roster.player_name,
+                   PlayerStats.season_id == Roster.season_id))
         .filter(PlayerStats.season_id == sid)
         .with_entities(
             Roster.player_name,
