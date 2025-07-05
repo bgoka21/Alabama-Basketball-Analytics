@@ -61,6 +61,10 @@
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
           Skill Totals
         </a>
+        <a href="{{ url_for('admin.leaderboard') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='leaderboard' else '' }}">
+          Leaderboard
+        </a>
         {% if view_exists('recruit.list_recruits') %}
         <a class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if request.endpoint.startswith('recruit.') else '' }}"
            href="{{ url_for('recruit.list_recruits') }}">
