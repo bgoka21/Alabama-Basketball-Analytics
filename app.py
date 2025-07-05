@@ -3,13 +3,16 @@ from flask import Flask, redirect, url_for, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
+from flask_apscheduler import APScheduler
 
 from datetime import datetime
 from models.database import db, PageView
 from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
-from routes import recruiting_bp
+from scraping.recruit_scraper import run_full_refresh
+
+scheduler = APScheduler()
 
 # Optional: Import auth blueprint if it exists
 try:
@@ -122,7 +125,15 @@ def create_app():
 
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
-    app.register_blueprint(recruiting_bp, url_prefix='/recruiting')
+
+    if scheduler.state == 0:
+        scheduler.init_app(app)
+        scheduler.start()
+        scheduler.add_job(
+            id='refresh_recruits',
+            func=lambda: run_full_refresh(years=[2025, 2024]),
+            trigger='cron', hour=3, minute=0
+        )
 
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -154,6 +165,7 @@ def create_app():
 
 # Create the app instance for CLI & WSGI
 app = create_app()
+import routes  # register route definitions
 
 if __name__ == "__main__":
     with app.app_context():
