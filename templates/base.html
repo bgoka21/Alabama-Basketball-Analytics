@@ -61,8 +61,8 @@
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
           Skill Totals
         </a>
-        {% if view_exists('recruiting.list_recruits') %}
-        <a href="{{ url_for('recruiting.list_recruits') }}"
+        {% if view_exists('recruits_view') %}
+        <a href="{{ url_for('recruits_view') }}"
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]"
            {% if active_page=='recruits' %}aria-current="page"{% endif %}>
           Recruits
