@@ -67,38 +67,44 @@ def compute_leaderboard(stat_key, season_id):
     if not cfg:
         abort(404)
 
-    core_q = (
-        Roster.query
-        .join(PlayerStats,
-              and_(PlayerStats.player_name == Roster.player_name,
-                   PlayerStats.season_id == Roster.season_id))
-        .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
-        .filter(PlayerStats.season_id == season_id)
-        .with_entities(
-            Roster.player_name.label('player'),
-            *[
-                func.coalesce(func.sum(getattr(PlayerStats, key)), 0).label(key)
-                for key in [
-                    'points','assists','pot_assists','second_assists','turnovers',
-                    'fta','ftm','atr_attempts','atr_makes',
-                    'fg2_attempts','fg2_makes','fg3_attempts','fg3_makes',
-                    'foul_by','contest_front','contest_side','contest_behind',
-                    'contest_late','contest_early','contest_no',
-                    'bump_positive','bump_missed',
-                    'blowby_total','blowby_triple_threat','blowby_closeout','blowby_isolation',
-                    'practice_wins','practice_losses','sprint_wins','sprint_losses',
-                ]
-            ] + [
-                func.coalesce(func.sum(getattr(BlueCollarStats, key)), 0).label(key)
-                for key in [
-                    'total_blue_collar','reb_tip','def_reb','misc',
-                    'deflection','steal','block','off_reb','floor_dive','charge_taken'
-                ]
-            ]
+    ps_fields = [
+        'points','assists','pot_assists','second_assists','turnovers',
+        'fta','ftm','atr_attempts','atr_makes',
+        'fg2_attempts','fg2_makes','fg3_attempts','fg3_makes',
+        'foul_by','contest_front','contest_side','contest_behind',
+        'contest_late','contest_early','contest_no',
+        'bump_positive','bump_missed',
+        'blowby_total','blowby_triple_threat','blowby_closeout','blowby_isolation',
+        'practice_wins','practice_losses','sprint_wins','sprint_losses'
+    ]
+    ps_q = (
+        db.session.query(
+            PlayerStats.player_name.label('player'),
+            *[func.coalesce(func.sum(getattr(PlayerStats, k)), 0).label(k) for k in ps_fields]
         )
+        .filter(PlayerStats.season_id == season_id)
+        .group_by(PlayerStats.player_name)
+    )
+    ps_rows = {r.player: r._asdict() for r in ps_q.all()}
+
+    bc_fields = [
+        'total_blue_collar','reb_tip','def_reb','misc',
+        'deflection','steal','block','off_reb','floor_dive','charge_taken'
+    ]
+    bc_q = (
+        db.session.query(
+            Roster.player_name.label('player'),
+            *[func.coalesce(func.sum(getattr(BlueCollarStats, k)), 0).label(k) for k in bc_fields]
+        )
+        .join(Roster, BlueCollarStats.player_id == Roster.id)
+        .filter(BlueCollarStats.season_id == season_id)
         .group_by(Roster.player_name)
     )
-    core_rows = {r.player: r._asdict() for r in core_q.all()}
+    bc_rows = {r.player: r._asdict() for r in bc_q.all()}
+
+    core_rows = {}
+    for player in set(ps_rows) | set(bc_rows):
+        core_rows[player] = {**ps_rows.get(player, {}), **bc_rows.get(player, {})}
 
     shot_rows = (
         Roster.query
