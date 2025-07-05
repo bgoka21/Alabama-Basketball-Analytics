@@ -71,3 +71,9 @@ def api_players():
 def synergy_player_page():
     """Render the player stats search page."""
     return render_template('synergy_player.html')
+
+
+@app.route('/recruits/synergy_stats')
+def synergy_stats_page():
+    """Render the competition stats page."""
+    return render_template('synergy_stats.html')
