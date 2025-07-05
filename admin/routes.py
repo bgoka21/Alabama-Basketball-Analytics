@@ -61,8 +61,13 @@ def extract_tokens(text):
     tokens = text.replace(',', ' ').split()
     return tokens
 
-def compute_leaderboard(stat_key, season_id):
-    """Return (config, rows) for the leaderboard."""
+def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
+    """Return (config, rows) for the leaderboard.
+
+    Optional ``start_dt`` and ``end_dt`` parameters limit the stats to a
+    specific date range (inclusive). Dates are matched against the associated
+    ``Practice.date`` or ``Game.game_date`` fields.
+    """
     cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
     if not cfg:
         abort(404)
@@ -83,8 +88,28 @@ def compute_leaderboard(stat_key, season_id):
             *[func.coalesce(func.sum(getattr(PlayerStats, k)), 0).label(k) for k in ps_fields]
         )
         .filter(PlayerStats.season_id == season_id)
-        .group_by(PlayerStats.player_name)
     )
+    if start_dt or end_dt:
+        ps_q = (
+            ps_q
+            .outerjoin(Game, PlayerStats.game_id == Game.id)
+            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+        )
+        if start_dt:
+            ps_q = ps_q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            ps_q = ps_q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    ps_q = ps_q.group_by(PlayerStats.player_name)
     ps_rows = {r.player: r._asdict() for r in ps_q.all()}
 
     bc_fields = [
@@ -98,8 +123,28 @@ def compute_leaderboard(stat_key, season_id):
         )
         .join(Roster, BlueCollarStats.player_id == Roster.id)
         .filter(BlueCollarStats.season_id == season_id)
-        .group_by(Roster.player_name)
     )
+    if start_dt or end_dt:
+        bc_q = (
+            bc_q
+            .outerjoin(Game, BlueCollarStats.game_id == Game.id)
+            .outerjoin(Practice, BlueCollarStats.practice_id == Practice.id)
+        )
+        if start_dt:
+            bc_q = bc_q.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date >= start_dt),
+                    and_(BlueCollarStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            bc_q = bc_q.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date <= end_dt),
+                    and_(BlueCollarStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    bc_q = bc_q.group_by(Roster.player_name)
     bc_rows = {r.player: r._asdict() for r in bc_q.all()}
 
     core_rows = {}
@@ -112,6 +157,29 @@ def compute_leaderboard(stat_key, season_id):
               and_(PlayerStats.player_name == Roster.player_name,
                    PlayerStats.season_id == Roster.season_id))
         .filter(PlayerStats.season_id == season_id)
+    )
+    if start_dt or end_dt:
+        shot_rows = (
+            shot_rows
+            .outerjoin(Game, PlayerStats.game_id == Game.id)
+            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+        )
+        if start_dt:
+            shot_rows = shot_rows.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            shot_rows = shot_rows.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    shot_rows = (
+        shot_rows
         .with_entities(
             Roster.player_name,
             array_agg_or_group_concat(PlayerStats.shot_type_details)
@@ -2550,8 +2618,22 @@ def leaderboard():
         latest = Season.query.order_by(Season.start_date.desc()).first()
         sid = latest.id if latest else None
 
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    start_dt = end_dt = None
+    if start_date:
+        try:
+            start_dt = date.fromisoformat(start_date)
+        except ValueError:
+            start_date = ''
+    if end_date:
+        try:
+            end_dt = date.fromisoformat(end_date)
+        except ValueError:
+            end_date = ''
+
     stat_key = request.args.get('stat', LEADERBOARD_STATS[0]['key'])
-    cfg, rows = compute_leaderboard(stat_key, sid)
+    cfg, rows = compute_leaderboard(stat_key, sid, start_dt, end_dt)
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
@@ -2562,6 +2644,8 @@ def leaderboard():
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
         rows=rows,
+        start_date=start_date or '',
+        end_date=end_date or '',
         active_page='leaderboard'
     )
 
