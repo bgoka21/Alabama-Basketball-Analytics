@@ -32,23 +32,10 @@
         Home
       </a>
 
-      {% set rec_url = url_for('recruits_view') if view_exists('recruits_view') else '#' %}
+      {% set rec_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
       <a href="{{ rec_url }}"
-         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]"
-         {% if active_page=='recruits' %}aria-current="page"{% endif %}>
-        Recruits
-      </a>
-
-      {% set synergy_player_url = url_for('synergy_player_page') if view_exists('synergy_player_page') else '#' %}
-      <a href="{{ synergy_player_url }}"
-         class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {% if request.path == '/recruits/synergy_player' %}bg-white text-[#9E1B32]{% endif %}">
-        Synergy Player Stats
-      </a>
-
-      {% set synergy_stats_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
-      <a href="{{ synergy_stats_url }}"
          class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {% if request.path == '/recruits/synergy_stats' %}bg-white text-[#9E1B32]{% endif %}">
-        Synergy Competition Stats
+        Recruits
       </a>
 
       {% if current_user.is_authenticated %}
