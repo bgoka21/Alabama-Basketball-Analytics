@@ -59,3 +59,14 @@
     {% endfor %}
   </tbody>
 </table>
+<script>
+  const statSelect = document.getElementById('stat-select');
+  if (statSelect) {
+    statSelect.addEventListener('change', function() {
+      const catSelect = document.getElementById('category-select');
+      if (catSelect) {
+        catSelect.value = this.value;
+      }
+    });
+  }
+</script>
