@@ -19,21 +19,34 @@
     <tr class="bg-gray-100">
       <th class="px-4 py-2">#</th>
       <th class="px-4 py-2">Player</th>
-      <th class="px-4 py-2">{{ selected.label }}</th>
+      {% if selected.key.endswith('_fg_pct') %}
+        <th class="px-4 py-2">FG</th>
+        <th class="px-4 py-2">FG%</th>
+      {% else %}
+        <th class="px-4 py-2">{{ selected.label }}</th>
+      {% endif %}
     </tr>
   </thead>
   <tbody>
-    {% for player,val in rows %}
+    {% for row in rows %}
       <tr class="border-t">
         <td class="px-4 py-2">{{ loop.index }}</td>
-        <td class="px-4 py-2">{{ player }}</td>
-        <td class="px-4 py-2">
-          {% if selected.format=='pct' %}
-            {{ val|round(1) }}%
-          {% else %}
-            {{ val }}
-          {% endif %}
-        </td>
+        {% if selected.key.endswith('_fg_pct') %}
+          {% set player, makes, attempts, pct = row %}
+          <td class="px-4 py-2">{{ player }}</td>
+          <td class="px-4 py-2">{{ makes }}-{{ attempts }}</td>
+          <td class="px-4 py-2">{{ pct|round(1) }}%</td>
+        {% else %}
+          {% set player, val = row %}
+          <td class="px-4 py-2">{{ player }}</td>
+          <td class="px-4 py-2">
+            {% if selected.format=='pct' %}
+              {{ val|round(1) }}%
+            {% else %}
+              {{ val }}
+            {% endif %}
+          </td>
+        {% endif %}
       </tr>
     {% endfor %}
   </tbody>

@@ -237,11 +237,23 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
             flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
         shot_details[player] = flat
 
+    all_players = set(core_rows) | set(shot_details)
     leaderboard = []
-    for player, core in core_rows.items():
-        val = core.get(stat_key) or shot_details.get(player, {}).get(stat_key, 0)
-        leaderboard.append((player, val))
-    leaderboard.sort(key=lambda x: x[1], reverse=True)
+    if stat_key.endswith('_fg_pct'):
+        for player in all_players:
+            details = shot_details.get(player, {})
+            pct = details.get(stat_key, 0)
+            att_key = stat_key.replace('_fg_pct', '_attempts')
+            make_key = stat_key.replace('_fg_pct', '_makes')
+            attempts = details.get(att_key, 0)
+            makes = details.get(make_key, 0)
+            leaderboard.append((player, makes, attempts, pct))
+        leaderboard.sort(key=lambda x: x[3], reverse=True)
+    else:
+        for player in all_players:
+            val = core_rows.get(player, {}).get(stat_key) or shot_details.get(player, {}).get(stat_key, 0)
+            leaderboard.append((player, val))
+        leaderboard.sort(key=lambda x: x[1], reverse=True)
 
     return cfg, leaderboard
 
