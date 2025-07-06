@@ -11,7 +11,15 @@ LEADERBOARD_STATS = [
     {"key": "ftm",            "label": "FT Makes",          "format": "int"},
 ]
 
-# ─── Shot Detail FG% Categories ──────────────────────────────────────────────
+# ─── Simple Shot Type FG% Categories ─────────────────────────────────────────
+for sc in ["atr", "fg2", "fg3"]:
+    LEADERBOARD_STATS.append({
+        "key": f"{sc}_fg_pct",
+        "label": f"{sc.upper()} FG%",
+        "format": "pct",
+    })
+
+# ─── Detailed Shot Type FG% Categories (hidden from dropdown for now) ─────────
 shot_classes = ["atr", "fg2", "fg3"]
 labels = ["Assisted", "Non-Assisted"]
 contexts = ["total", "transition", "halfcourt"]
@@ -21,4 +29,5 @@ for sc, lbl, ctx in product(shot_classes, labels, contexts):
         "key": f"{sc}_{lbl}_{ctx}_fg_pct",
         "label": f"{sc.upper()} {lbl} {ctx.title()} FG%",
         "format": "pct",
+        "hidden": True,
     })

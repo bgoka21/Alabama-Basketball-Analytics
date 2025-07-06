@@ -2,13 +2,21 @@
 
 <form method="get" class="mb-4">
   <label for="stat-select">Stat:</label>
-  <select id="stat-select" name="stat" onchange="this.form.submit()">
-    {% for s in stats_config %}
+  <select id="stat-select" name="{{ 'stat' if not category_options else 'base_stat' }}" onchange="this.form.submit()">
+    {% for s in stats_config if not s.get('hidden') %}
       <option value="{{ s.key }}" {% if s.key==selected.key %}selected{% endif %}>
         {{ s.label }}
       </option>
     {% endfor %}
   </select>
+  {% if category_options %}
+    <select id="category-select" name="stat" onchange="this.form.submit()" class="ml-2">
+      <option value="{{ selected_base }}" {% if selected.key==selected_base %}selected{% endif %}>Overall</option>
+      {% for opt in category_options %}
+        <option value="{{ opt.key }}" {% if opt.key==selected.key %}selected{% endif %}>{{ opt.label }}</option>
+      {% endfor %}
+    </select>
+  {% endif %}
   <input type="hidden" name="season_id" value="{{ selected_season }}">
   <input type="hidden" name="start_date" value="{{ start_date }}">
   <input type="hidden" name="end_date" value="{{ end_date }}">

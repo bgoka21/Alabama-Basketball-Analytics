@@ -225,6 +225,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
             bucket['attempts'] += 1
             bucket['makes'] += (shot.get('result') == 'made')
         flat = {}
+        totals_by_sc = defaultdict(lambda: {'attempts': 0, 'makes': 0})
         for (sc, label, ctx), data in detail_counts.items():
             a = data['attempts']
             m = data['makes']
@@ -235,6 +236,18 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
             flat[f"{sc}_{label}_{ctx}_pps"] = (pts * m / a if a else 0)
             total = sum(d['attempts'] for k, d in detail_counts.items() if k[0] == sc) or 1
             flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
+            totals_by_sc[sc]['attempts'] += a
+            totals_by_sc[sc]['makes'] += m
+
+        for sc, t in totals_by_sc.items():
+            a = t['attempts']
+            m = t['makes']
+            pts = 2 if sc in ('atr','fg2') else 3
+            flat[f"{sc}_attempts"] = a
+            flat[f"{sc}_makes"] = m
+            flat[f"{sc}_fg_pct"] = (m / a * 100 if a else 0)
+            flat[f"{sc}_pps"] = (pts * m / a if a else 0)
+
         shot_details[player] = flat
 
     all_players = set(core_rows) | set(shot_details)
@@ -2644,8 +2657,33 @@ def leaderboard():
         except ValueError:
             end_date = ''
 
-    stat_key = request.args.get('stat', LEADERBOARD_STATS[0]['key'])
+    stat_key = request.args.get('stat') or request.args.get('base_stat')
+    if not stat_key:
+        stat_key = LEADERBOARD_STATS[0]['key']
     cfg, rows = compute_leaderboard(stat_key, sid, start_dt, end_dt)
+
+    # Build category dropdown options for simple shot types
+    categories_map = defaultdict(list)
+    for s in LEADERBOARD_STATS:
+        if s.get('hidden'):
+            sc = s['key'].split('_')[0]
+            categories_map[sc].append({'key': s['key'], 'label': s['label']})
+
+    selected_base = stat_key
+    category_options = None
+    for sc in ['atr', 'fg2', 'fg3']:
+        if stat_key.startswith(f'{sc}_') and stat_key != f'{sc}_fg_pct':
+            selected_base = f'{sc}_fg_pct'
+            category_options = categories_map.get(sc)
+            break
+        elif stat_key == f'{sc}_fg_pct':
+            selected_base = stat_key
+            category_options = categories_map.get(sc)
+            break
+
+    if stat_key not in [c['key'] for c in LEADERBOARD_STATS]:
+        category_options = None
+        selected_base = stat_key
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
@@ -2658,6 +2696,8 @@ def leaderboard():
         rows=rows,
         start_date=start_date or '',
         end_date=end_date or '',
+        category_options=category_options,
+        selected_base=selected_base,
         active_page='leaderboard'
     )
 
