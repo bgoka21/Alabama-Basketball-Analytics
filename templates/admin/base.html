@@ -32,6 +32,12 @@
         Home
       </a>
 
+      {% set rec_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
+      <a class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {% if request.path == '/recruits/synergy_stats' %}bg-white text-[#9E1B32]{% endif %}"
+         href="{{ rec_url }}">
+        Recruits
+      </a>
+
       {% if current_user.is_authenticated %}
 
         {# ── Reports dropdown ── #}
@@ -66,12 +72,6 @@
             Leaderboard
           </a>
         {% endif %}
-
-        {% set rec_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
-        <a class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {% if request.path == '/recruits/synergy_stats' %}bg-white text-[#9E1B32]{% endif %}"
-           href="{{ rec_url }}">
-          Recruits
-        </a>
 
         {% if current_user.is_authenticated %}
 
