@@ -746,13 +746,39 @@ def direct_pnr_for_player(player_id):
 @public_bp.route('/leaderboard')
 @login_required
 def season_leaderboard():
-    stat_key = request.args.get('stat', LEADERBOARD_STATS[0]['key'])
+    stat_key = request.args.get('stat') or request.args.get('base_stat')
+    if not stat_key:
+        stat_key = LEADERBOARD_STATS[0]['key']
     sid = get_current_season_id()
     cfg, rows = compute_leaderboard(stat_key, sid)
+
+    categories_map = defaultdict(list)
+    for s in LEADERBOARD_STATS:
+        if s.get('hidden'):
+            sc = s['key'].split('_')[0]
+            categories_map[sc].append({'key': s['key'], 'label': s['label']})
+
+    selected_base = stat_key
+    category_options = None
+    for sc in ['atr', 'fg2', 'fg3']:
+        if stat_key.startswith(f'{sc}_') and stat_key != f'{sc}_fg_pct':
+            selected_base = f'{sc}_fg_pct'
+            category_options = categories_map.get(sc)
+            break
+        elif stat_key == f'{sc}_fg_pct':
+            selected_base = stat_key
+            category_options = categories_map.get(sc)
+            break
+
+    if stat_key not in [c['key'] for c in LEADERBOARD_STATS]:
+        category_options = None
+        selected_base = stat_key
 
     return render_template(
         'public/leaderboard.html',
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
-        rows=rows
+        rows=rows,
+        category_options=category_options,
+        selected_base=selected_base
     )

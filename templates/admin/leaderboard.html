@@ -21,6 +21,9 @@
     <input type="date" name="end_date" value="{{ end_date }}" class="border p-2 rounded" />
   </div>
   <input type="hidden" name="stat" value="{{ selected.key }}">
+  {% if category_options %}
+    <input type="hidden" name="base_stat" value="{{ selected_base }}">
+  {% endif %}
   <div>
     <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
   </div>
