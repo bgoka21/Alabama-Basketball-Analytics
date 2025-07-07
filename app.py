@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_apscheduler import APScheduler
+import pdfkit
 
 from datetime import datetime
 from models.database import db, PageView
@@ -13,6 +14,20 @@ from merge_app.app import merge_bp
 from scraping.recruit_scraper import run_full_refresh
 
 scheduler = APScheduler()
+
+try:
+    PDFKIT_CONFIG = pdfkit.configuration()
+except OSError:
+    PDFKIT_CONFIG = None
+PDF_OPTIONS = {
+    'page-size': 'Letter',
+    'margin-top': '0.75in',
+    'margin-right': '0.75in',
+    'margin-bottom': '0.75in',
+    'margin-left': '0.75in',
+    'encoding': 'UTF-8',
+    'enable-local-file-access': None
+}
 
 # Optional: Import auth blueprint if it exists
 try:

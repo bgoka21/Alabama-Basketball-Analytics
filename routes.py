@@ -1,5 +1,8 @@
-from flask import render_template, jsonify, request, current_app
-from app import app
+from flask import render_template, jsonify, request, current_app, make_response
+from app import app, PDFKIT_CONFIG, PDF_OPTIONS
+import pdfkit
+from public.routes import game_homepage, season_leaderboard
+from admin.routes import player_detail
 from models.recruit import Recruit
 from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 
@@ -16,6 +19,34 @@ def _get_synergy_client() -> SynergyDataCoreClient:
         current_app.config['SYNERGY_CLIENT_ID'],
         current_app.config['SYNERGY_CLIENT_SECRET'],
     )
+
+
+def render_pdf_from_html(html, name):
+    pdf = pdfkit.from_string(html, False, options=PDF_OPTIONS, configuration=PDFKIT_CONFIG)
+    resp = make_response(pdf)
+    resp.headers['Content-Type'] = 'application/pdf'
+    resp.headers['Content-Disposition'] = f'attachment; filename="{name}.pdf"'
+    return resp
+
+
+@app.route('/pdf/home')
+def pdf_home():
+    html = game_homepage()
+    return render_pdf_from_html(html, 'home')
+
+
+@app.route('/pdf/leaderboard')
+def pdf_leaderboard():
+    html = season_leaderboard()
+    return render_pdf_from_html(html, 'leaderboard')
+
+
+@app.route('/pdf/player/<int:player_id>')
+def pdf_player(player_id):
+    from models.database import Roster
+    player = Roster.query.get_or_404(player_id)
+    html = player_detail(player.player_name)
+    return render_pdf_from_html(html, f'player_{player_id}')
 
 
 @app.route('/api/competitions', methods=['GET'])

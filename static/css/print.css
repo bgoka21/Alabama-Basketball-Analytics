@@ -1,0 +1,10 @@
+@media print {
+  body { width: 100%; margin: 0; background: white; color: #000; }
+  header, nav, footer, .btn, .no-print { display: none !important; }
+  .content { width: 100% !important; }
+  table, th, td { border: 1px solid #ccc; }
+  /* Preserve team colors */
+  .stat-header { background: #9E1B32; color: white; }
+  /* control page breaks */
+  .page-break { page-break-after: always; }
+}
