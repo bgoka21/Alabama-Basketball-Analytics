@@ -13,6 +13,13 @@
         #sidebar a,#sidebar summary{display:block;padding:0.75rem 1rem;}
         table{display:block;overflow-x:auto;}
       }
+
+      .stat-header {
+        background: #9E1B32;
+        color: white;
+        padding: 0.5rem 1rem;
+        margin-bottom: 1rem;
+      }
   </style>
 </head>
 <body class="min-h-screen flex">
@@ -67,6 +74,12 @@
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
           Skill Totals
         </a>
+        {% if view_exists('practice_team_totals') %}
+        <a href="{{ url_for('practice_team_totals') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]">
+          Team Totals
+        </a>
+        {% endif %}
           <a href="{{ url_for('admin.leaderboard') }}"
              class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='leaderboard' else '' }}">
             Leaderboard

@@ -1,5 +1,7 @@
 from flask import render_template, jsonify, request, current_app, make_response
 from app import app, PDFKIT_CONFIG, PDF_OPTIONS
+from yourapp import db
+from yourapp.stats_utils import get_practice_team_totals
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
@@ -108,3 +110,9 @@ def synergy_player_page():
 def synergy_stats_page():
     """Render the competition stats page."""
     return render_template('synergy_stats.html')
+
+
+@app.route('/practice/team_totals')
+def practice_team_totals():
+    team_totals = get_practice_team_totals(db.session)
+    return render_template('practice_team_totals.html', team_totals=team_totals)
