@@ -109,7 +109,10 @@
    <!-- Row 2: Shooting Breakdown -->
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
     <!-- ATR -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
+         {% if agg.atr_attempts %}
+           style="{{ (agg.atr_makes / agg.atr_attempts * 100) | grade_atr2fg_pct(agg.atr_attempts) }}"
+         {% endif %}>
       <div class="text-sm font-medium text-gray-500 uppercase">ATR</div>
       <div class="text-3xl font-bold my-2">
         {% if agg.atr_attempts > 0 %}
@@ -119,7 +122,10 @@
       <div class="text-xs text-gray-500">{{ agg.atr_makes }}/{{ agg.atr_attempts }}</div>
     </div>
     <!-- 2FG -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
+         {% if agg.fg2_attempts %}
+           style="{{ (agg.fg2_makes / agg.fg2_attempts * 100) | grade_atr2fg_pct(agg.fg2_attempts) }}"
+         {% endif %}>
       <div class="text-sm font-medium text-gray-500 uppercase">2FG</div>
       <div class="text-3xl font-bold my-2">
         {% if agg.fg2_attempts > 0 %}
@@ -129,7 +135,10 @@
       <div class="text-xs text-gray-500">{{ agg.fg2_makes }}/{{ agg.fg2_attempts }}</div>
     </div>
     <!-- 3FG -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
+         {% if agg.fg3_attempts %}
+           style="{{ (agg.fg3_makes / agg.fg3_attempts * 100) | grade_3fg_pct(agg.fg3_attempts) }}"
+         {% endif %}>
       <div class="text-sm font-medium text-gray-500 uppercase">3FG</div>
       <div class="text-3xl font-bold my-2">
         {% if agg.fg3_attempts > 0 %}
