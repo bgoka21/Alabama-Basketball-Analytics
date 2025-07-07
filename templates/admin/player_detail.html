@@ -113,49 +113,55 @@
          {% if agg.atr_attempts %}
            style="{{ (agg.atr_makes / agg.atr_attempts * 100) | grade_atr2fg_pct(agg.atr_attempts) }}"
          {% endif %}>
-      <div class="text-sm font-medium text-gray-500 uppercase">ATR</div>
-      <div class="text-3xl font-bold my-2">
+      <div class="text-sm font-medium text-black uppercase">ATR</div>
+      <div class="text-3xl font-bold my-2 text-black">
         {% if agg.atr_attempts > 0 %}
           {{ (agg.atr_makes/agg.atr_attempts*100)|round(1) }}%
         {% else %}0%{% endif %}
       </div>
-      <div class="text-xs text-gray-500">{{ agg.atr_makes }}/{{ agg.atr_attempts }}</div>
+      <div class="text-xs text-black">{{ agg.atr_makes }}/{{ agg.atr_attempts }}</div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.atr.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.atr.freq|round(1) }}%</div>
     </div>
     <!-- 2FG -->
     <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
          {% if agg.fg2_attempts %}
            style="{{ (agg.fg2_makes / agg.fg2_attempts * 100) | grade_atr2fg_pct(agg.fg2_attempts) }}"
          {% endif %}>
-      <div class="text-sm font-medium text-gray-500 uppercase">2FG</div>
-      <div class="text-3xl font-bold my-2">
+      <div class="text-sm font-medium text-black uppercase">2FG</div>
+      <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fg2_attempts > 0 %}
           {{ (agg.fg2_makes/agg.fg2_attempts*100)|round(1) }}%
         {% else %}0%{% endif %}
       </div>
-      <div class="text-xs text-gray-500">{{ agg.fg2_makes }}/{{ agg.fg2_attempts }}</div>
+      <div class="text-xs text-black">{{ agg.fg2_makes }}/{{ agg.fg2_attempts }}</div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.fg2.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg2.freq|round(1) }}%</div>
     </div>
     <!-- 3FG -->
     <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
          {% if agg.fg3_attempts %}
            style="{{ (agg.fg3_makes / agg.fg3_attempts * 100) | grade_3fg_pct(agg.fg3_attempts) }}"
          {% endif %}>
-      <div class="text-sm font-medium text-gray-500 uppercase">3FG</div>
-      <div class="text-3xl font-bold my-2">
+      <div class="text-sm font-medium text-black uppercase">3FG</div>
+      <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fg3_attempts > 0 %}
           {{ (agg.fg3_makes/agg.fg3_attempts*100)|round(1) }}%
         {% else %}0%{% endif %}
       </div>
-      <div class="text-xs text-gray-500">{{ agg.fg3_makes }}/{{ agg.fg3_attempts }}</div>
+      <div class="text-xs text-black">{{ agg.fg3_makes }}/{{ agg.fg3_attempts }}</div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.fg3.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg3.freq|round(1) }}%</div>
     </div>
     <!-- FT -->
     <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
-      <div class="text-sm font-medium text-gray-500 uppercase">FT</div>
-      <div class="text-3xl font-bold my-2">
+      <div class="text-sm font-medium text-black uppercase">FT</div>
+      <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fta > 0 %}
           {{ (agg.ftm/agg.fta*100)|round(1) }}%
         {% else %}0%{% endif %}
       </div>
-      <div class="text-xs text-gray-500">{{ agg.ftm }}/{{ agg.fta }}</div>
+      <div class="text-xs text-black">{{ agg.ftm }}/{{ agg.fta }}</div>
     </div>
   </div>
 
