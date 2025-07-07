@@ -15,6 +15,13 @@
         table{display:block;overflow-x:auto;}
       }
 
+      .stat-header {
+        background: #9E1B32;
+        color: white;
+        padding: 0.5rem 1rem;
+        margin-bottom: 1rem;
+      }
+
       @media print {
         #sidebar, #mobile-menu-btn, .no-print { display: none !important; }
         main { margin: 0; padding: 0; width: 100%; }
@@ -75,6 +82,12 @@
            class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32] {{ 'bg-white text-[#9E1B32]' if active_page=='skill_totals' else '' }}">
           Skill Totals
         </a>
+        {% if view_exists('practice_team_totals') %}
+        <a href="{{ url_for('practice_team_totals') }}"
+           class="px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]">
+          Team Totals
+        </a>
+        {% endif %}
 
         {% if current_user.is_admin %}
           {# ── Management dropdown ── #}
