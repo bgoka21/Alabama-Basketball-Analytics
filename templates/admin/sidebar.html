@@ -11,15 +11,17 @@
       Recruits
     </a>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.game_reports' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.game_reports') }}">
-      Game Reports
-    </a>
-  </li>
-  <li class="nav-item{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.practice_reports') }}">
-      Practice Reports
-    </a>
+  {% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports'] %}
+  <li class="nav-item">
+    <details class="group" {% if reports_active %}open{% endif %}>
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
+        Reports
+      </summary>
+      <div class="ml-4 mt-2 flex flex-col gap-2">
+        <a class="nav-link{% if request.endpoint == 'admin.game_reports' %} active{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
+        <a class="nav-link{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
+      </div>
+    </details>
   </li>
   <li class="nav-item{% if request.endpoint == 'admin.players_list' %} active{% endif %}">
     <a class="nav-link" href="{{ url_for('admin.players_list') }}">
@@ -42,46 +44,40 @@
       Leaderboard
     </a>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.dashboard' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.dashboard') }}">
-      Dashboard
-    </a>
+  {% if current_user.is_admin %}
+  {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
+                        'merge.merge_csv', 'admin.roster', 'admin.users_list',
+                        'admin.usage_report'] %}
+  <li class="nav-item">
+    <details class="group" {% if mgmt_active %}open{% endif %}>
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
+        Management
+      </summary>
+      <div class="ml-4 mt-2 flex flex-col gap-2">
+        <a class="nav-link{% if request.endpoint == 'admin.dashboard' %} active{% endif %}" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
+        <a class="nav-link{% if request.endpoint == 'admin.files_view_unique' %} active{% endif %}" href="{{ url_for('admin.files_view_unique') }}">Files</a>
+        {% if view_exists('merge.merge_csv') %}
+        <a class="nav-link{% if request.endpoint == 'merge.merge_csv' %} active{% endif %}" href="{{ url_for('merge.merge_csv') }}">Merge CSV</a>
+        {% endif %}
+        <a class="nav-link{% if request.endpoint == 'admin.roster' %} active{% endif %}" href="{{ url_for('admin.roster') }}">Roster</a>
+        <a class="nav-link{% if request.endpoint == 'admin.users_list' %} active{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
+        {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
+        <a class="nav-link{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
+      </div>
+    </details>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.files_view_unique' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.files_view_unique') }}">
-      Files
-    </a>
-  </li>
-  {% set merge_url = url_for('merge.merge_csv') if view_exists('merge.merge_csv') else '#' %}
-  <li class="nav-item{% if request.endpoint == 'merge.merge_csv' %} active{% endif %}">
-    <a class="nav-link" href="{{ merge_url }}">
-      Merge CSV
-    </a>
-  </li>
-  <li class="nav-item{% if request.endpoint == 'admin.roster' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.roster') }}">
-      Roster
-    </a>
-  </li>
-  <li class="nav-item{% if request.endpoint == 'admin.users_list' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.users_list') }}">
-      Users
-    </a>
-  </li>
-  {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
-  <li class="nav-item{% if request.endpoint == 'admin.usage_report' %} active{% endif %}">
-    <a class="nav-link" href="{{ usage_url }}">
-      Usage
-    </a>
-  </li>
+  {% endif %}
+  {% if current_user.is_authenticated %}
   <li class="nav-item{% if request.endpoint == 'admin.logout' %} active{% endif %}">
     <a class="nav-link" href="{{ url_for('admin.logout') }}">
       Logout
     </a>
   </li>
+  {% else %}
   <li class="nav-item{% if request.endpoint == 'admin.login' %} active{% endif %}">
     <a class="nav-link" href="{{ url_for('admin.login') }}">
       Login
     </a>
   </li>
+  {% endif %}
 </ul>
