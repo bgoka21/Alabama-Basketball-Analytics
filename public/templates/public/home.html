@@ -1,6 +1,7 @@
 {# templates/public/home.html #}
 {% extends 'admin/base.html' %}
 {% block content %}
+<a href="{{ url_for('pdf_home') }}" class="btn no-print">Download PDF</a>
 
 <section class="bg-white py-12">
   <div class="max-w-7xl mx-auto px-4 text-center">

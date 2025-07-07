@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
 {% block content %}
+  <a href="{{ url_for('pdf_leaderboard') }}" class="btn no-print">Download PDF</a>
   {% include "_leaderboard_block.html" %}
 {% endblock %}
