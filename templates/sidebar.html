@@ -1,13 +1,13 @@
-<ul class="nav flex-column">
+<ul class="flex flex-col gap-2">
   {% set home_url = url_for('public.homepage') if view_exists('public.homepage') else '#' %}
   <li class="nav-item{% if request.endpoint == 'public.homepage' %} active{% endif %}">
-    <a class="nav-link" href="{{ home_url }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ home_url }}">
       Home
     </a>
   </li>
   {% set recruits_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
   <li class="nav-item{% if request.endpoint == 'synergy_stats_page' %} active{% endif %}">
-    <a class="nav-link" href="{{ recruits_url }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ recruits_url }}">
       Recruits
     </a>
   </li>
@@ -18,29 +18,29 @@
         Reports
       </summary>
       <div class="ml-4 mt-2 flex flex-col gap-2">
-        <a class="nav-link{% if request.endpoint == 'admin.game_reports' %} active{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
-        <a class="nav-link{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.game_reports' %} active{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
       </div>
     </details>
   </li>
   <li class="nav-item{% if request.endpoint == 'admin.players_list' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.players_list') }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.players_list') }}">
       Players
     </a>
   </li>
   <li class="nav-item{% if request.endpoint == 'admin.skill_totals' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.skill_totals') }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.skill_totals') }}">
       Skill Totals
     </a>
   </li>
   {% set team_totals_url = url_for('practice_team_totals') if view_exists('practice_team_totals') else '#' %}
   <li class="nav-item{% if request.endpoint == 'practice_team_totals' %} active{% endif %}">
-    <a class="nav-link" href="{{ team_totals_url }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ team_totals_url }}">
       Team Totals
     </a>
   </li>
   <li class="nav-item{% if request.endpoint == 'admin.leaderboard' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.leaderboard') }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.leaderboard') }}">
       Leaderboard
     </a>
   </li>
@@ -54,28 +54,28 @@
         Management
       </summary>
       <div class="ml-4 mt-2 flex flex-col gap-2">
-        <a class="nav-link{% if request.endpoint == 'admin.dashboard' %} active{% endif %}" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
-        <a class="nav-link{% if request.endpoint == 'admin.files_view_unique' %} active{% endif %}" href="{{ url_for('admin.files_view_unique') }}">Files</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.dashboard' %} active{% endif %}" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.files_view_unique' %} active{% endif %}" href="{{ url_for('admin.files_view_unique') }}">Files</a>
         {% if view_exists('merge.merge_csv') %}
-        <a class="nav-link{% if request.endpoint == 'merge.merge_csv' %} active{% endif %}" href="{{ url_for('merge.merge_csv') }}">Merge CSV</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'merge.merge_csv' %} active{% endif %}" href="{{ url_for('merge.merge_csv') }}">Merge CSV</a>
         {% endif %}
-        <a class="nav-link{% if request.endpoint == 'admin.roster' %} active{% endif %}" href="{{ url_for('admin.roster') }}">Roster</a>
-        <a class="nav-link{% if request.endpoint == 'admin.users_list' %} active{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.roster' %} active{% endif %}" href="{{ url_for('admin.roster') }}">Roster</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.users_list' %} active{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
-        <a class="nav-link{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
       </div>
     </details>
   </li>
   {% endif %}
   {% if current_user.is_authenticated %}
   <li class="nav-item{% if request.endpoint == 'admin.logout' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.logout') }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.logout') }}">
       Logout
     </a>
   </li>
   {% else %}
   <li class="nav-item{% if request.endpoint == 'admin.login' %} active{% endif %}">
-    <a class="nav-link" href="{{ url_for('admin.login') }}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.login') }}">
       Login
     </a>
   </li>
