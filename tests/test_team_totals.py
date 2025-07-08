@@ -1,0 +1,79 @@
+import pytest
+from datetime import date
+from flask import Flask
+from flask_login import LoginManager
+from werkzeug.security import generate_password_hash
+
+from models.database import db, Season, PlayerStats, BlueCollarStats, Roster
+from models.user import User
+from admin.routes import admin_bp
+
+
+@pytest.fixture
+def app():
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app.config['SECRET_KEY'] = 'test'
+    app.config['TESTING'] = True
+    db.init_app(app)
+    lm = LoginManager()
+    lm.init_app(app)
+    lm.login_view = 'admin.login'
+
+    @lm.user_loader
+    def load_user(uid):
+        return User.query.get(int(uid))
+
+    app.register_blueprint(admin_bp, url_prefix='/admin')
+    with app.app_context():
+        db.create_all()
+        season = Season(id=1, season_name='2024', start_date=date(2024, 1, 1))
+        db.session.add(season)
+        r1 = Roster(id=1, season_id=1, player_name='#1 A')
+        r2 = Roster(id=2, season_id=1, player_name='#2 B')
+        db.session.add_all([r1, r2])
+        admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
+        db.session.add(admin)
+        db.session.add(PlayerStats(season_id=1, player_name='#1 A',
+                                  atr_makes=2, atr_attempts=4,
+                                  fg2_makes=3, fg2_attempts=6,
+                                  fg3_makes=1, fg3_attempts=2,
+                                  ftm=1, fta=2, points=14,
+                                  assists=5, turnovers=3,
+                                  second_assists=1, pot_assists=2))
+        db.session.add(PlayerStats(season_id=1, player_name='#2 B',
+                                  atr_makes=1, atr_attempts=2,
+                                  fg2_makes=2, fg2_attempts=4,
+                                  fg3_makes=0, fg3_attempts=1,
+                                  ftm=2, fta=2, points=8,
+                                  assists=3, turnovers=1,
+                                  second_assists=0, pot_assists=1))
+        db.session.add(BlueCollarStats(season_id=1, player_id=1,
+                                       def_reb=1, off_reb=1, misc=0,
+                                       deflection=1, steal=1, block=0,
+                                       floor_dive=0, charge_taken=1,
+                                       reb_tip=0, total_blue_collar=4))
+        db.session.add(BlueCollarStats(season_id=1, player_id=2,
+                                       def_reb=2, off_reb=0, misc=0,
+                                       deflection=0, steal=0, block=1,
+                                       floor_dive=0, charge_taken=0,
+                                       reb_tip=0, total_blue_collar=3))
+        db.session.commit()
+    yield app
+    with app.app_context():
+        db.drop_all()
+
+
+@pytest.fixture
+def client(app):
+    with app.test_client() as client:
+        client.post('/admin/login', data={'username': 'admin', 'password': 'pw'})
+        yield client
+
+
+def test_team_totals_aggregate(client):
+    resp = client.get('/admin/team_totals', query_string={'season_id': 1})
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    assert '22' in html  # points total
+    assert '50.0' in html  # efg percent

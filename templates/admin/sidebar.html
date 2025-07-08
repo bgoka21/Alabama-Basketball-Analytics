@@ -36,9 +36,9 @@
       Skill Totals
     </a>
   </li>
-  {% set has_team_totals = (view_exists('practice_team_totals') if view_exists is defined else True) %}
-  {% set team_totals_url = url_for('practice_team_totals') if has_team_totals else '#' %}
-  <li class="nav-item{% if request.endpoint == 'practice_team_totals' %} active{% endif %}">
+  {% set has_team_totals = (view_exists('admin.team_totals') if view_exists is defined else True) %}
+  {% set team_totals_url = url_for('admin.team_totals') if has_team_totals else '#' %}
+  <li class="nav-item{% if request.endpoint == 'admin.team_totals' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ team_totals_url }}">
       Team Totals
     </a>
