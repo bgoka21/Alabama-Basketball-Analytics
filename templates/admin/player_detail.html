@@ -26,7 +26,7 @@
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
 
   <!-- Filters -->
-  <div class="flex flex-wrap items-end gap-4 mb-4">
+  <div class="flex flex-wrap items-end gap-4 mb-4 no-print">
     <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', start_date=start_date, end_date=end_date, label=selected_labels) }}"
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-200 text-black' }}">
       Game
