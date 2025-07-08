@@ -2,6 +2,8 @@ from flask import render_template, jsonify, request, current_app, make_response
 from app import app, PDFKIT_CONFIG, PDF_OPTIONS
 from yourapp import db
 from yourapp.stats_utils import get_practice_team_totals
+from admin.routes import collect_practice_labels, compute_filtered_totals
+from flask_login import login_required
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
@@ -113,6 +115,20 @@ def synergy_stats_page():
 
 
 @app.route('/practice/team_totals')
+@login_required
 def practice_team_totals():
-    team_totals = get_practice_team_totals(db.session)
-    return render_template('practice_team_totals.html', team_totals=team_totals)
+    """Show aggregated practice totals with optional drill-label filtering."""
+    stats = get_practice_team_totals(db.session, raw=True)
+    label_options = collect_practice_labels(stats)
+    selected_labels = [
+        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+    ]
+    label_set = {lbl.upper() for lbl in selected_labels}
+
+    totals = compute_filtered_totals(stats, label_set) if label_set else compute_filtered_totals(stats, set())
+    return render_template(
+        'practice_team_totals.html',
+        team_totals=vars(totals),
+        label_options=label_options,
+        selected_labels=selected_labels,
+    )
