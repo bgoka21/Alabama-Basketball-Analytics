@@ -2643,9 +2643,42 @@ def team_totals():
     if not season_id and seasons:
         season_id = seasons[0].id
 
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    start_dt = end_dt = None
+    if start_date:
+        try:
+            start_dt = date.fromisoformat(start_date)
+        except ValueError:
+            start_date = ''
+    if end_date:
+        try:
+            end_dt = date.fromisoformat(end_date)
+        except ValueError:
+            end_date = ''
+
     q = PlayerStats.query
     if season_id:
         q = q.filter_by(season_id=season_id)
+    if start_dt or end_dt:
+        q = (
+            q.outerjoin(Game, PlayerStats.game_id == Game.id)
+             .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+        )
+        if start_dt:
+            q = q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            q = q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
     stats_list = q.all()
 
     totals = aggregate_stats(stats_list)
@@ -2664,6 +2697,25 @@ def team_totals():
     )
     if season_id:
         bc_query = bc_query.filter(BlueCollarStats.season_id == season_id)
+    if start_dt or end_dt:
+        bc_query = (
+            bc_query.outerjoin(Game, BlueCollarStats.game_id == Game.id)
+                    .outerjoin(Practice, BlueCollarStats.practice_id == Practice.id)
+        )
+        if start_dt:
+            bc_query = bc_query.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date >= start_dt),
+                    and_(BlueCollarStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            bc_query = bc_query.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date <= end_dt),
+                    and_(BlueCollarStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
     bc = bc_query.one()
     blue_totals = SimpleNamespace(
         def_reb=bc.def_reb,
@@ -2684,6 +2736,8 @@ def team_totals():
         blue_totals=blue_totals,
         seasons=seasons,
         selected_season=season_id,
+        start_date=start_date or '',
+        end_date=end_date or '',
         active_page='team_totals',
     )
 
