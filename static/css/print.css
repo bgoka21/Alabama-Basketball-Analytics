@@ -46,4 +46,62 @@
 
   /* hide tab buttons */
   #tabButtons { display: none !important; }
+
+  .player-header {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .shot-cards-container {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    margin-bottom: 8px !important;
+  }
+
+  .shot-card {
+    flex: 0 0 32% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* hide any original full table */
+  .full-table { display: none !important; }
+
+  /* side-by-side holder */
+  .print-table-container {
+    display: flex !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+  }
+
+  /* both tables become visible */
+  .print-table-first,
+  .print-table-second {
+    display: table !important;
+    border-collapse: collapse !important;
+    width: auto !important;
+    font-size: 7pt !important;
+  }
+
+  /* first table: hide columns 7+ */
+  .print-table-first th:nth-child(n+7),
+  .print-table-first td:nth-child(n+7) {
+    display: none !important;
+  }
+
+  /* second table: hide columns 1–6 */
+  .print-table-second th:nth-child(-n+6),
+  .print-table-second td:nth-child(-n+6) {
+    display: none !important;
+  }
+
+  /* small gutter between tables */
+  .print-table-second {
+    margin-left: 6px !important;
+  }
+
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 2px 3px !important;
+  }
 }
