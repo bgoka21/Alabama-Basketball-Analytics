@@ -2,8 +2,11 @@ from sqlalchemy import func, Integer, Float
 from yourapp.models import PracticeStats
 
 
-def get_practice_team_totals(session):
-    """Return a dict of {stat_name: total_value} for all numeric PracticeStats columns."""
+def get_practice_team_totals(session, raw=False):
+    """Return aggregated totals or raw PracticeStats records."""
+    if raw:
+        return session.query(PracticeStats).filter(PracticeStats.practice_id != None).all()
+
     totals = {}
     numeric_cols = [
         col for col in PracticeStats.__table__.columns
