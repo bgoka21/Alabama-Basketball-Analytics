@@ -3,7 +3,15 @@
   <div class="no-print" style="text-align:right; margin-bottom:10px;">
     <button onclick="window.print()">Print {{ title }}</button>
   </div>
-  <h1 class="stat-header">{{ title }}</h1>
+  <div class="player-header">
+    <h1 class="stat-header">{{ title }}</h1>
+  </div>
+
+  <div class="shot-cards-container">
+    <div class="shot-card">ATR Card</div>
+    <div class="shot-card">2FG Card</div>
+    <div class="shot-card">3FG Card</div>
+  </div>
   <div class="shot-report-container">
     {{ render_shot_section(shot_type, data)|safe }}
   </div>

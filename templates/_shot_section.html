@@ -1,5 +1,5 @@
 <div class="shot-section">
-  <table class="min-w-full text-sm">
+  <table class="min-w-full text-sm full-table">
     <thead class="bg-gray-100">
       <tr>
         <th class="px-2 py-1 text-left">Stat</th>
@@ -21,4 +21,50 @@
       </tr>
     </tbody>
   </table>
+  <div class="print-table-container">
+    <table class="print-table-first">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-2 py-1 text-left">Stat</th>
+          <th class="px-2 py-1 text-right">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="px-2 py-1">Makes</td>
+          <td class="px-2 py-1 text-right">{{ data.makes }}</td>
+        </tr>
+        <tr>
+          <td class="px-2 py-1">Attempts</td>
+          <td class="px-2 py-1 text-right">{{ data.attempts }}</td>
+        </tr>
+        <tr>
+          <td class="px-2 py-1">FG%</td>
+          <td class="px-2 py-1 text-right">{{ data.pct|round(1) }}%</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="print-table-second">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-2 py-1 text-left">Stat</th>
+          <th class="px-2 py-1 text-right">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="px-2 py-1">Makes</td>
+          <td class="px-2 py-1 text-right">{{ data.makes }}</td>
+        </tr>
+        <tr>
+          <td class="px-2 py-1">Attempts</td>
+          <td class="px-2 py-1 text-right">{{ data.attempts }}</td>
+        </tr>
+        <tr>
+          <td class="px-2 py-1">FG%</td>
+          <td class="px-2 py-1 text-right">{{ data.pct|round(1) }}%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
