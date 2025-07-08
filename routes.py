@@ -1,4 +1,4 @@
-from flask import render_template, jsonify, request, current_app, make_response
+from flask import render_template, jsonify, request, current_app, make_response, abort
 from app import app, PDFKIT_CONFIG, PDF_OPTIONS
 from yourapp import db
 from admin.routes import (
@@ -39,6 +39,32 @@ def render_pdf_from_html(html, name):
     resp.headers['Content-Type'] = 'application/pdf'
     resp.headers['Content-Disposition'] = f'attachment; filename="{name}.pdf"'
     return resp
+
+
+def get_shot_data(shot_type):
+    """Aggregate makes and attempts for the given shot type."""
+    if shot_type == 'atr':
+        makes_col = PlayerStats.atr_makes
+        att_col = PlayerStats.atr_attempts
+    elif shot_type == '2fg':
+        makes_col = PlayerStats.fg2_makes
+        att_col = PlayerStats.fg2_attempts
+    else:  # 3fg
+        makes_col = PlayerStats.fg3_makes
+        att_col = PlayerStats.fg3_attempts
+
+    makes, attempts = db.session.query(
+        func.coalesce(func.sum(makes_col), 0),
+        func.coalesce(func.sum(att_col), 0)
+    ).one()
+    pct = (makes / attempts * 100) if attempts else 0
+    return SimpleNamespace(makes=makes, attempts=attempts, pct=pct)
+
+
+@app.template_global()
+def render_shot_section(shot_type, data):
+    """Render a single shot-type section."""
+    return render_template('_shot_section.html', shot_type=shot_type, data=data)
 
 
 @app.route('/pdf/home')
@@ -206,3 +232,14 @@ def practice_team_totals():
         selected_season=None,
         active_page='team_totals',
     )
+
+
+@app.route('/shot-type/<string:shot_type>')
+def shot_type_report(shot_type):
+    """Printable report for a single shot type."""
+    valid = {'atr': 'ATR', '2fg': '2FG', '3fg': '3FG'}
+    if shot_type not in valid:
+        abort(404)
+    data = get_shot_data(shot_type)
+    title = valid[shot_type] + ' Shot Type Report'
+    return render_template('shot_type.html', shot_type=shot_type, title=title, data=data)
