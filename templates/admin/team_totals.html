@@ -1,44 +1,47 @@
 {% extends 'base.html' %}
 
 {% block page_controls %}
-<form method="get" class="mb-4 flex flex-wrap items-end gap-4">
-  <div>
-    <label class="font-semibold mr-2">Season:</label>
-    <select name="season_id" class="border p-2 rounded">
-      {% for s in seasons %}
-        <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
+<div class="flex flex-wrap items-end gap-4 mb-4">
+  <form id="filterForm" method="get" class="flex flex-wrap items-end gap-2">
+    <div>
+      <label class="font-semibold mr-2">Season:</label>
+      <select name="season_id" class="border p-2 rounded">
+        {% for s in seasons %}
+          <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">From</label>
+      <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">To</label>
+      <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+    </div>
+    {% if label_options %}
+    <div class="flex flex-wrap items-center gap-2">
+      {% for lbl in label_options %}
+        <label class="inline-flex items-center text-sm mr-2">
+          <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+          <span class="ml-1">{{ lbl }}</span>
+        </label>
       {% endfor %}
-    </select>
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">From</label>
-    <input type="date" name="start_date" value="{{ start_date }}" class="border p-2 rounded" />
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">To</label>
-    <input type="date" name="end_date" value="{{ end_date }}" class="border p-2 rounded" />
-  </div>
-  {% if label_options %}
-  <div class="flex flex-wrap items-center gap-2">
-    {% for lbl in label_options %}
-      <label class="inline-flex items-center text-sm mr-2">
-        <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-        <span class="ml-1">{{ lbl }}</span>
-      </label>
-    {% endfor %}
-  </div>
-  {% endif %}
-  <div>
-    <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
-  </div>
-  <div>
-    <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 hover:underline text-sm">Clear</a>
-  </div>
-</form>
+    </div>
+    {% endif %}
+    <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
+    <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
+  </form>
+</div>
 {% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Team Totals</h1>
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-bold">Team Totals</h1>
+  <div class="space-x-2">
+    <button onclick="window.print()" class="no-print bg-gray-200 text-black px-3 py-1 rounded text-sm">Print</button>
+  </div>
+</div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
   <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
     <div class="text-sm font-medium text-gray-500 uppercase">PTS/SHOT</div>
@@ -56,7 +59,12 @@
         ('3FG', totals.fg3_makes, totals.fg3_attempts),
         ('FT', totals.ftm, totals.fta)
       ] %}
-  <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+  {% if label == '3FG' %}
+    {% set style = (makes/attempts*100) | grade_3fg_pct(attempts) if attempts else '' %}
+  {% else %}
+    {% set style = (makes/attempts*100) | grade_atr2fg_pct(attempts) if attempts else '' %}
+  {% endif %}
+  <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"{% if style %} style="{{ style }}"{% endif %}>
     <div class="text-sm font-medium text-black uppercase">{{ label }}</div>
     <div class="text-3xl font-bold my-2 text-black">
       {% if attempts > 0 %}{{ (makes/attempts*100)|round(1) }}%{% else %}0%{% endif %}
