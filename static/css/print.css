@@ -6,6 +6,9 @@
     print-color-adjust: exact;
   }
   header, nav, footer, .btn, .no-print { display: none !important; }
+  main { overflow: visible !important; height: auto !important; }
+  .overflow-x-auto { overflow-x: visible !important; }
+  .overflow-y-auto { overflow-y: visible !important; }
   .content { width: 100% !important; }
   table, th, td { border: 1px solid #ccc; }
   /* Preserve team colors */
