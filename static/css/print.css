@@ -44,7 +44,6 @@
   #shotType table { font-size: 7pt !important; }
   #shotType th, #shotType td { padding: 1px 2px !important; }
 
-  /* hide tab buttons and display all tab contents */
+  /* hide tab buttons */
   #tabButtons { display: none !important; }
-  .tab-content { display: block !important; }
 }
