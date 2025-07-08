@@ -1472,7 +1472,7 @@ def compute_filtered_totals(stats_records, label_set):
             for shot in shots:
                 labels = {
                     lbl.strip().upper()
-                    for lbl in re.split(r"[,/]", shot.get("possession_type", ""))
+                    for lbl in re.split(r",", shot.get("possession_type", ""))
                     if lbl.strip()
                 }
                 labels.update(
@@ -1883,7 +1883,7 @@ def player_detail(player_name):
             for shot in js:
                 labels = {
                     lbl.strip().upper()
-                    for lbl in re.split(r'[,/]', shot.get('possession_type', ''))
+                    for lbl in re.split(r',', shot.get('possession_type', ''))
                     if lbl.strip()
                 }
                 labels.update(
@@ -1964,7 +1964,7 @@ def player_detail(player_name):
                 old_key = f"{sc}_{suffix.lower().replace(' ', '_')}"
                 val = shot.get(old_key, "")
                 if val:
-                    sublabels = [lbl.strip() for lbl in re.split(r'[,/]', str(val)) if lbl.strip()]
+                    sublabels = [lbl.strip() for lbl in re.split(r',', str(val)) if lbl.strip()]
                     labels_for_this_shot.extend(sublabels)
         else:  # sc == '3fg'
             suffix_keys = ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]
@@ -1972,7 +1972,7 @@ def player_detail(player_name):
                 old_key = f"{sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
                 val = shot.get(old_key, "")
                 if val:
-                    sublabels = [lbl.strip() for lbl in re.split(r'[,/]', str(val)) if lbl.strip()]
+                    sublabels = [lbl.strip() for lbl in re.split(r',', str(val)) if lbl.strip()]
                     labels_for_this_shot.extend(sublabels)
 
         # ─── Now pull in every “_scheme_attack” / “_scheme_drive” / “_scheme_pass” tag ───────────
@@ -1983,7 +1983,7 @@ def player_detail(player_name):
             old_key = f"{sc}_{scheme}"
             val = shot.get(old_key, "")
             if val:
-                sublabels = [lbl.strip() for lbl in re.split(r'[,/]', str(val)) if lbl.strip()]
+                sublabels = [lbl.strip() for lbl in re.split(r',', str(val)) if lbl.strip()]
                 labels_for_this_shot.extend(sublabels)
 
 
