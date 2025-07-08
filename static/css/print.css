@@ -1,7 +1,8 @@
 /* landscape orientation for detailed reports */
 @page {
   size: letter landscape;
-  margin: 0.5in;
+  /* reduce margins so the report uses more page space */
+  margin: 0.25in;
 }
 @media print {
   /* hide navigation, sidebar and any no-print elements */
@@ -38,7 +39,8 @@
 
   /* shrink shot type section for better page fit */
   #shotType {
-    transform: scale(0.6);
+    /* enlarge shot type section to utilize blank space */
+    transform: scale(0.8);
     transform-origin: top left;
   }
   #shotType table { font-size: 7pt !important; }
