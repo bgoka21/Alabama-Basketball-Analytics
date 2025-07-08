@@ -439,8 +439,9 @@
     {% set atr_summary = shot_summaries['atr'] %}
     {% set fg2_summary = shot_summaries['fg2'] %}
     {% set fg3_summary = shot_summaries['fg3'] %}
-    
-    
+
+    <div class="shot-report-container">
+
     {# ── ATR Detail Table ── #}
     {% set atr_groups = [
       ('Assisted',        ['Assisted','Non-Assisted']),
@@ -461,7 +462,8 @@
       ])
     ] %}
     
-    <div id="atr" class="detail-content hidden">
+    <div class="shot-section">
+      <div id="atr" class="detail-content hidden">
       <table class="min-w-full divide-y divide-gray-200 mb-6">
         <thead class="bg-gray-100">
           <tr>
@@ -562,8 +564,8 @@
         </tbody>
       </table>
     </div>
+    </div>
 
-    
     {# ── 2FG Detail Table ── #}
     {% set fg2_groups = [
       ('Assisted',        ['Assisted','Non-Assisted']),
@@ -584,6 +586,7 @@
       ])
     ] %}
     
+    <div class="shot-section">
     <div id="fg2" class="detail-content hidden">
       <table class="min-w-full divide-y divide-gray-200 mb-6">
         <thead class="bg-gray-100">
@@ -655,9 +658,8 @@
         </tbody>
       </table>
     </div>
-    
+    </div>
 
-    
     {# ── 3FG Detail Table ── #}
     {% set fg3_groups = [
       ('Assisted',        ['Assisted','Non-Assisted']),
@@ -678,6 +680,7 @@
       ])
     ] %}
     
+    <div class="shot-section">
     <div id="fg3" class="detail-content hidden">
       <table class="min-w-full divide-y divide-gray-200 mb-6">
         <thead class="bg-gray-100">
@@ -750,8 +753,8 @@
       </table>
     </div>
     </div>
-    
-  
+    </div>
+
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <!-- 4) Skill Development                                                           -->
 <!-- ──────────────────────────────────────────────────────────────────────────── -->

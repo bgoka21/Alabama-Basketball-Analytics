@@ -1,25 +1,30 @@
+/* force landscape & full-page */
+@page {
+  size: letter landscape;
+  margin: 1cm;
+}
+
 @media print {
-  body {
-    width: 100%;
-    margin: 0;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    transform: scale(0.85);
-    transform-origin: top left;
+  /* hide UI chrome */
+  nav, header, footer, .btn, .search-bar { display: none !important; }
+
+  /* container flex across the page */
+  .shot-report-container {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-between;
   }
-  header, nav, footer, .btn, .no-print { display: none !important; }
-  main { overflow: visible !important; height: auto !important; }
-  .overflow-x-auto { overflow-x: visible !important; }
-  .overflow-y-auto { overflow-y: visible !important; }
-  .content { width: 100% !important; }
-  table, th, td { border: 1px solid #ccc; }
-  /* Preserve team colors */
-  .stat-header { background: #9E1B32; color: white; }
-  /* control page breaks */
-  .page-break { page-break-after: always; }
-  /* Make shot type tables more compact */
-  #shotType { transform: scale(0.7); transform-origin: top left; }
-  #shotType table { font-size: 0.65rem; }
-  #shotType th, #shotType td { padding: 2px 4px; }
-  @page { size: letter landscape; margin: 0.5in; }
+
+  /* each section takes ~1/3 width, no breaks inside */
+  .shot-section {
+    width: 32%;
+    page-break-inside: avoid;
+  }
+
+  /* ensure tables and charts shrink to fit */
+  .shot-section table,
+  .shot-section img {
+    max-width: 100% !important;
+    font-size: 10pt;
+  }
 }
