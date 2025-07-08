@@ -2634,6 +2634,60 @@ def skill_totals():
     )
 
 
+@admin_bp.route('/team_totals')
+@login_required
+def team_totals():
+    """Aggregate all PlayerStats for a given season."""
+    season_id = request.args.get('season_id', type=int)
+    seasons = Season.query.order_by(Season.id.desc()).all()
+    if not season_id and seasons:
+        season_id = seasons[0].id
+
+    q = PlayerStats.query
+    if season_id:
+        q = q.filter_by(season_id=season_id)
+    stats_list = q.all()
+
+    totals = aggregate_stats(stats_list)
+
+    bc_query = db.session.query(
+        func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
+        func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
+        func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
+        func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
+        func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
+        func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
+        func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
+        func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
+        func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
+        func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
+    )
+    if season_id:
+        bc_query = bc_query.filter(BlueCollarStats.season_id == season_id)
+    bc = bc_query.one()
+    blue_totals = SimpleNamespace(
+        def_reb=bc.def_reb,
+        off_reb=bc.off_reb,
+        misc=bc.misc,
+        deflection=bc.deflection,
+        steal=bc.steal,
+        block=bc.block,
+        floor_dive=bc.floor_dive,
+        charge_taken=bc.charge_taken,
+        reb_tip=bc.reb_tip,
+        total_blue_collar=bc.total_blue_collar,
+    )
+
+    return render_template(
+        'team_totals.html',
+        totals=totals,
+        blue_totals=blue_totals,
+        seasons=seasons,
+        selected_season=season_id,
+        active_page='team_totals',
+    )
+
+
 @admin_bp.route('/leaderboard')
 @login_required
 def leaderboard():
