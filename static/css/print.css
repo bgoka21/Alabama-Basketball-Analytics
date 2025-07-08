@@ -38,9 +38,13 @@
 
   /* shrink shot type section for better page fit */
   #shotType {
-    transform: scale(0.8);
+    transform: scale(0.6);
     transform-origin: top left;
   }
   #shotType table { font-size: 7pt !important; }
   #shotType th, #shotType td { padding: 1px 2px !important; }
+
+  /* hide tab buttons and display all tab contents */
+  #tabButtons { display: none !important; }
+  .tab-content { display: block !important; }
 }
