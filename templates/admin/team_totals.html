@@ -52,6 +52,7 @@
     <div class="text-3xl font-bold mt-2">{{ totals.efg_pct }}</div>
   </div>
 </div>
+{% set total_attempts = totals.atr_attempts + totals.fg2_attempts + totals.fg3_attempts %}
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
   {% for label, makes, attempts in [
         ('ATR', totals.atr_makes, totals.atr_attempts),
@@ -70,6 +71,15 @@
       {% if attempts > 0 %}{{ (makes/attempts*100)|round(1) }}%{% else %}0%{% endif %}
     </div>
     <div class="text-xs text-black">{{ makes }}/{{ attempts }}</div>
+    {% if label != 'FT' %}
+      {% if label == '3FG' %}
+        {% set pps = (3 * makes / attempts) if attempts else 0 %}
+      {% else %}
+        {% set pps = (2 * makes / attempts) if attempts else 0 %}
+      {% endif %}
+      <div class="text-base font-semibold text-black">PPS: {{ pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ (attempts / total_attempts * 100)|round(1) if total_attempts else 0 }}%</div>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
