@@ -4,6 +4,8 @@
     margin: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    transform: scale(0.85);
+    transform-origin: top left;
   }
   header, nav, footer, .btn, .no-print { display: none !important; }
   main { overflow: visible !important; height: auto !important; }
@@ -15,4 +17,5 @@
   .stat-header { background: #9E1B32; color: white; }
   /* control page breaks */
   .page-break { page-break-after: always; }
+  @page { size: letter landscape; margin: 0.5in; }
 }
