@@ -18,11 +18,21 @@
     <label class="block text-sm font-medium mb-1">To</label>
     <input type="date" name="end_date" value="{{ end_date }}" class="border p-2 rounded" />
   </div>
+  {% if label_options %}
+  <div class="flex flex-wrap items-center gap-2">
+    {% for lbl in label_options %}
+      <label class="inline-flex items-center text-sm mr-2">
+        <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+        <span class="ml-1">{{ lbl }}</span>
+      </label>
+    {% endfor %}
+  </div>
+  {% endif %}
   <div>
     <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
   </div>
   <div>
-    <a href="{{ url_for('admin.team_totals') }}" class="text-gray-600 hover:underline text-sm">Clear</a>
+    <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 hover:underline text-sm">Clear</a>
   </div>
 </form>
 {% endblock %}
