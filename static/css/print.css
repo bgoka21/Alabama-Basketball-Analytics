@@ -17,5 +17,9 @@
   .stat-header { background: #9E1B32; color: white; }
   /* control page breaks */
   .page-break { page-break-after: always; }
+  /* Make shot type tables more compact */
+  #shotType { transform: scale(0.7); transform-origin: top left; }
+  #shotType table { font-size: 0.65rem; }
+  #shotType th, #shotType td { padding: 2px 4px; }
   @page { size: letter landscape; margin: 0.5in; }
 }
