@@ -1,8 +1,16 @@
 from flask import render_template, jsonify, request, current_app, make_response
 from app import app, PDFKIT_CONFIG, PDF_OPTIONS
 from yourapp import db
-from yourapp.stats_utils import get_practice_team_totals
-from admin.routes import collect_practice_labels, compute_filtered_totals
+from admin.routes import (
+    collect_practice_labels,
+    compute_filtered_totals,
+    compute_filtered_blue,
+    aggregate_stats,
+)
+from models.database import PlayerStats, Practice, BlueCollarStats
+from datetime import date
+from sqlalchemy import func
+from types import SimpleNamespace
 from flask_login import login_required
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
@@ -117,18 +125,84 @@ def synergy_stats_page():
 @app.route('/practice/team_totals')
 @login_required
 def practice_team_totals():
-    """Show aggregated practice totals with optional drill-label filtering."""
-    stats = get_practice_team_totals(db.session, raw=True)
+    """Show aggregated practice totals with date and drill label filters."""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    start_dt = end_dt = None
+    if start_date:
+        try:
+            start_dt = date.fromisoformat(start_date)
+        except ValueError:
+            start_date = ''
+    if end_date:
+        try:
+            end_dt = date.fromisoformat(end_date)
+        except ValueError:
+            end_date = ''
+
+    q = PlayerStats.query.filter(PlayerStats.practice_id != None)
+    if start_dt or end_dt:
+        q = q.join(Practice, PlayerStats.practice_id == Practice.id)
+        if start_dt:
+            q = q.filter(Practice.date >= start_dt)
+        if end_dt:
+            q = q.filter(Practice.date <= end_dt)
+
+    stats = q.all()
+
     label_options = collect_practice_labels(stats)
     selected_labels = [
         lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
     ]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    totals = compute_filtered_totals(stats, label_set) if label_set else compute_filtered_totals(stats, set())
+    if label_set:
+        totals = compute_filtered_totals(stats, label_set)
+        blue_totals = compute_filtered_blue(stats, label_set)
+    else:
+        totals = aggregate_stats(stats)
+        bc_query = db.session.query(
+            func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
+            func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
+            func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
+            func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
+            func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
+            func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
+            func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
+            func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
+            func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
+            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
+        ).filter(BlueCollarStats.practice_id != None)
+        if start_dt or end_dt:
+            bc_query = bc_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
+            if start_dt:
+                bc_query = bc_query.filter(Practice.date >= start_dt)
+            if end_dt:
+                bc_query = bc_query.filter(Practice.date <= end_dt)
+        bc = bc_query.one()
+        blue_totals = SimpleNamespace(
+            def_reb=bc.def_reb,
+            off_reb=bc.off_reb,
+            misc=bc.misc,
+            deflection=bc.deflection,
+            steal=bc.steal,
+            block=bc.block,
+            floor_dive=bc.floor_dive,
+            charge_taken=bc.charge_taken,
+            reb_tip=bc.reb_tip,
+            total_blue_collar=bc.total_blue_collar,
+        )
+
     return render_template(
-        'practice_team_totals.html',
-        team_totals=vars(totals),
+        'admin/team_totals.html',
+        totals=totals,
+        blue_totals=blue_totals,
         label_options=label_options,
         selected_labels=selected_labels,
+        start_date=start_date or '',
+        end_date=end_date or '',
+        seasons=[],
+        selected_season=None,
+        active_page='team_totals',
     )

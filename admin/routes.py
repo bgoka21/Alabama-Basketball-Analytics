@@ -2657,78 +2657,64 @@ def team_totals():
         except ValueError:
             end_date = ''
 
-    q = PlayerStats.query
+    q = PlayerStats.query.filter(PlayerStats.practice_id != None)
     if season_id:
         q = q.filter_by(season_id=season_id)
     if start_dt or end_dt:
         q = (
-            q.outerjoin(Game, PlayerStats.game_id == Game.id)
-             .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+            q.join(Practice, PlayerStats.practice_id == Practice.id)
         )
         if start_dt:
-            q = q.filter(
-                or_(
-                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
-                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
-                )
-            )
+            q = q.filter(Practice.date >= start_dt)
         if end_dt:
-            q = q.filter(
-                or_(
-                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
-                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
-                )
-            )
+            q = q.filter(Practice.date <= end_dt)
     stats_list = q.all()
 
-    totals = aggregate_stats(stats_list)
+    label_options = collect_practice_labels(stats_list)
+    selected_labels = [
+        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+    ]
+    label_set = {lbl.upper() for lbl in selected_labels}
 
-    bc_query = db.session.query(
-        func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
-        func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
-        func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
-        func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
-        func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
-        func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
-        func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
-        func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
-        func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
-        func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
-    )
-    if season_id:
-        bc_query = bc_query.filter(BlueCollarStats.season_id == season_id)
-    if start_dt or end_dt:
-        bc_query = (
-            bc_query.outerjoin(Game, BlueCollarStats.game_id == Game.id)
-                    .outerjoin(Practice, BlueCollarStats.practice_id == Practice.id)
+    if label_set:
+        totals = compute_filtered_totals(stats_list, label_set)
+        blue_totals = compute_filtered_blue(stats_list, label_set)
+    else:
+        totals = aggregate_stats(stats_list)
+
+        bc_query = db.session.query(
+            func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
+            func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
+            func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
+            func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
+            func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
+            func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
+            func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
+            func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
+            func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
+            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
+        ).filter(BlueCollarStats.practice_id != None)
+        if season_id:
+            bc_query = bc_query.filter(BlueCollarStats.season_id == season_id)
+        if start_dt or end_dt:
+            bc_query = bc_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
+            if start_dt:
+                bc_query = bc_query.filter(Practice.date >= start_dt)
+            if end_dt:
+                bc_query = bc_query.filter(Practice.date <= end_dt)
+        bc = bc_query.one()
+        blue_totals = SimpleNamespace(
+            def_reb=bc.def_reb,
+            off_reb=bc.off_reb,
+            misc=bc.misc,
+            deflection=bc.deflection,
+            steal=bc.steal,
+            block=bc.block,
+            floor_dive=bc.floor_dive,
+            charge_taken=bc.charge_taken,
+            reb_tip=bc.reb_tip,
+            total_blue_collar=bc.total_blue_collar,
         )
-        if start_dt:
-            bc_query = bc_query.filter(
-                or_(
-                    and_(BlueCollarStats.game_id != None, Game.game_date >= start_dt),
-                    and_(BlueCollarStats.practice_id != None, Practice.date >= start_dt),
-                )
-            )
-        if end_dt:
-            bc_query = bc_query.filter(
-                or_(
-                    and_(BlueCollarStats.game_id != None, Game.game_date <= end_dt),
-                    and_(BlueCollarStats.practice_id != None, Practice.date <= end_dt),
-                )
-            )
-    bc = bc_query.one()
-    blue_totals = SimpleNamespace(
-        def_reb=bc.def_reb,
-        off_reb=bc.off_reb,
-        misc=bc.misc,
-        deflection=bc.deflection,
-        steal=bc.steal,
-        block=bc.block,
-        floor_dive=bc.floor_dive,
-        charge_taken=bc.charge_taken,
-        reb_tip=bc.reb_tip,
-        total_blue_collar=bc.total_blue_collar,
-    )
 
     return render_template(
         'team_totals.html',
@@ -2738,6 +2724,8 @@ def team_totals():
         selected_season=season_id,
         start_date=start_date or '',
         end_date=end_date or '',
+        label_options=label_options,
+        selected_labels=selected_labels,
         active_page='team_totals',
     )
 
