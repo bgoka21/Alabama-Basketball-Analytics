@@ -31,15 +31,6 @@
       </div>
       {% endif %}
       <div>
-        <label class="block text-sm font-medium mb-1">Players</label>
-        <input id="playerSearch" type="text" placeholder="Search players" class="border border-gray-300 rounded px-2 py-1 text-sm mb-1 w-full" />
-        <select name="player" multiple class="border border-gray-300 rounded px-2 py-1 text-sm">
-          {% for p in roster_names %}
-            <option value="{{ p }}" {% if p in selected_players %}selected{% endif %}>{{ p }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
         <label class="block text-sm font-medium mb-1">Stat</label>
         <select name="stat" class="border border-gray-300 rounded px-2 py-1 text-sm">
           {% for s in ['points','assists','turnovers','atr_makes','fg3_makes'] %}
@@ -50,6 +41,10 @@
       <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
       <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
     </form>
+    <div class="flex gap-2 mt-2">
+      <a href="{{ url_for(request.endpoint, season_id=selected_season, last=5) }}" class="px-3 py-1 rounded bg-gray-200 text-sm">Last 5 Practices</a>
+      <a href="{{ url_for(request.endpoint, season_id=selected_season, last=10) }}" class="px-3 py-1 rounded bg-gray-200 text-sm">Last 10 Practices</a>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -72,7 +67,7 @@
   <button id="btnTrends" onclick="showTab('trends')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Trends</button>
 </div>
 <div id="seasonTotals" class="tab-content block">
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
   <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
     <div class="text-sm font-medium text-gray-500 uppercase">PTS/SHOT</div>
     <div class="text-3xl font-bold mt-2">{{ totals.points_per_shot }}</div>
@@ -80,6 +75,14 @@
   <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
     <div class="text-sm font-medium text-gray-500 uppercase">EFG%</div>
     <div class="text-3xl font-bold mt-2">{{ totals.efg_pct }}</div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+    <div class="text-sm font-medium text-gray-500 uppercase">ATR%</div>
+    <div class="text-3xl font-bold mt-2">{{ totals.atr_pct }}</div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
+    <div class="text-sm font-medium text-gray-500 uppercase">3FG%</div>
+    <div class="text-3xl font-bold mt-2">{{ totals.fg3_pct }}</div>
   </div>
 </div>
 {% set total_attempts = totals.atr_attempts + totals.fg2_attempts + totals.fg3_attempts %}
@@ -603,16 +606,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     }));
     new Chart(document.getElementById('trendChart'),{
       type:'line',data:{labels,datasets},options:{responsive:true}
-    });
-  }
-  const ps=document.getElementById('playerSearch');
-  const sel=document.querySelector('select[name="player"]');
-  if(ps && sel){
-    ps.addEventListener('input',()=>{
-      const t=ps.value.toLowerCase();
-      Array.from(sel.options).forEach(o=>{
-        o.hidden=!o.text.toLowerCase().includes(t);
-      });
     });
   }
 });
