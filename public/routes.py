@@ -520,8 +520,16 @@ def practice_homepage(active_page="practice_home"):
             sprint_losses.append((player, sl))
             pps_rows.append((player, totals.points_per_shot))
 
-        atr_leaders = sorted(atr_rows, key=lambda r: r.atr_pct if r.atr_pct is not None else -1, reverse=True)[:5]
-        fg3_leaders = sorted(fg3_rows, key=lambda r: r.fg3_pct if r.fg3_pct is not None else -1, reverse=True)[:5]
+        atr_leaders = sorted(
+            atr_rows,
+            key=lambda r: r.atr_pct if r.atr_pct is not None else -1,
+            reverse=True,
+        )
+        fg3_leaders = sorted(
+            fg3_rows,
+            key=lambda r: r.fg3_pct if r.fg3_pct is not None else -1,
+            reverse=True,
+        )
         overall_records = sorted(records, key=lambda x: x[2], reverse=True)
         overall_records = [(n, rec, f"{pct:.1f}%") for n, rec, pct in overall_records]
         sprint_wins.sort(key=lambda x: x[1], reverse=True)
@@ -584,7 +592,6 @@ def practice_homepage(active_page="practice_home"):
             .group_by(PlayerStats.player_name)
             .having(func.sum(PlayerStats.atr_attempts) >= 10)
             .order_by(desc("atr_pct"))
-            .limit(5)
         )
         atr_leaders = qa.all()
 
@@ -604,7 +611,6 @@ def practice_homepage(active_page="practice_home"):
             .group_by(PlayerStats.player_name)
             .having(func.sum(PlayerStats.fg3_attempts) >= 10)
             .order_by(desc("fg3_pct"))
-            .limit(5)
         )
         fg3_leaders = q3.all()
 
