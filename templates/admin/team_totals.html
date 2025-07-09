@@ -591,6 +591,7 @@ function showTab(tabName){
   });
   const active=document.getElementById('btn'+capitalize(tabName));
   if(active)active.classList.add('bg-[#9E1B32]','text-white');
+  window.location.hash = tabName;
   if(tabName==='shotType'){showShotTypeDetail('atr');}
 }
 function showShotTypeDetail(detail){
