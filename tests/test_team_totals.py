@@ -160,3 +160,12 @@ def test_team_totals_access_for_staff(app):
         c.post('/admin/login', data={'username': 'staff', 'password': 'pw'})
         resp = c.get('/admin/team_totals', query_string={'season_id': 1})
         assert resp.status_code == 200
+
+
+def test_team_totals_trend_multiple_stats(client):
+    resp = client.get(
+        '/admin/team_totals',
+        query_string=[('season_id', 1), ('trend_stat', 'points'), ('trend_stat', 'assists')]
+    )
+    html = resp.data.decode('utf-8')
+    assert 'const trendStats = ["points", "assists"]' in html
