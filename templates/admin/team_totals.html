@@ -67,11 +67,14 @@
       {% endif %}
       <div>
         <label class="block text-sm font-medium mb-1">Stat</label>
-        <select name="trend_stat" class="border border-gray-300 rounded px-2 py-1 text-sm" multiple size="6">
+        <div class="flex flex-col border border-gray-300 rounded px-2 py-1 text-sm space-y-1">
           {% for s in ['points','assists','turnovers','atr_makes','fg3_makes','atr_pct','fg3_pct'] %}
-            <option value="{{ s }}" {% if s in trend_selected_stats %}selected{% endif %}>{{ s }}</option>
+            <label class="inline-flex items-center">
+              <input type="checkbox" name="trend_stat" value="{{ s }}" {% if s in trend_selected_stats %}checked{% endif %}>
+              <span class="ml-1">{{ s }}</span>
+            </label>
           {% endfor %}
-        </select>
+        </div>
       </div>
       <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
       <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
