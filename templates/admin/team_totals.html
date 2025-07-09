@@ -68,7 +68,7 @@
       <div>
         <label class="block text-sm font-medium mb-1">Stat</label>
         <div class="flex flex-col border border-gray-300 rounded px-2 py-1 text-sm space-y-1">
-          {% for s in ['points','assists','turnovers','atr_makes','fg3_makes','atr_pct','fg3_pct'] %}
+          {% for s in ['points','assists','turnovers','atr_makes','fg3_makes','atr_pct','fg3_pct','efg_pct','points_per_shot','assist_turnover_ratio','adj_assist_turnover_ratio','second_assists','pot_assists','ft_pct','fg_pct','fg2_pct','total_blue_collar','deflection','steal','block'] %}
             <label class="inline-flex items-center">
               <input type="checkbox" name="trend_stat" value="{{ s }}" {% if s in trend_selected_stats %}checked{% endif %}>
               <span class="ml-1">{{ s }}</span>
