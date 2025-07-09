@@ -142,7 +142,6 @@ def game_homepage():
     bcp_leaders = (
         db.session.query(bcp_sub.c.player_name, bcp_sub.c.total_bcp)
         .order_by(desc(bcp_sub.c.total_bcp))
-        .limit(10)
         .all()
     )
 
@@ -203,7 +202,6 @@ def game_homepage():
         .filter(max_bcp_sub.c.max_bcp > 0)
         .group_by(PlayerStats.player_name)
         .order_by(desc("hard_hat_count"))
-        .limit(10)
         .all()
     )
 
@@ -225,7 +223,7 @@ def game_homepage():
     if min_3fg:
         # only players whose **total** 3FG attempts ≥ threshold
         q3 = q3.having(func.sum(PlayerStats.fg3_attempts) >= min_3fg)
-    fg3_leaders = q3.order_by(desc("fg3_pct")).limit(10).all()
+    fg3_leaders = q3.order_by(desc("fg3_pct")).all()
 
     # ─── 4D) ATR% Leaders ──────────────────────────────
     qa = (
@@ -244,7 +242,7 @@ def game_homepage():
     )
     if min_atr:
         qa = qa.having(func.sum(PlayerStats.atr_attempts) >= min_atr)
-    atr_leaders = qa.order_by(desc("atr_pct")).limit(10).all()
+    atr_leaders = qa.order_by(desc("atr_pct")).all()
 
     # 4E) Possessions per BCP
 
@@ -292,8 +290,8 @@ def game_homepage():
     else:
         players_q = players_q.order_by(desc(bcp_sub.c.total_bcp))
 
-    # e) Grab top 10 and shape for template
-    top10 = players_q.limit(10).all()
+    # e) Grab rows for the entire roster
+    all_rows = players_q.all()
     bcp_leaders = [
         (
             r.player_name,
@@ -301,7 +299,7 @@ def game_homepage():
             int(r.possessions),
             None if r.poss_per_bcp is None else round(r.poss_per_bcp, 2),
         )
-        for r in top10
+        for r in all_rows
     ]
 
     # ── Summary cards data ────────────────────────────
