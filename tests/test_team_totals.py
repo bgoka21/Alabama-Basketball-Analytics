@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash
 from models.database import db, Season, Practice, PlayerStats, BlueCollarStats, Roster
 from models.user import User
 from admin.routes import admin_bp
+from public.routes import public_bp
 
 
 @pytest.fixture
@@ -25,6 +26,7 @@ def app():
         return User.query.get(int(uid))
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(public_bp)
     with app.app_context():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024, 1, 1))
@@ -130,3 +132,14 @@ def test_team_totals_shot_type_tab(client):
     assert 'ATR Season' in html
     assert '4/9' in html
     assert '53.3%' in html
+
+
+def test_team_totals_access_for_players(app):
+    with app.test_client() as c:
+        user = User(username='player', password_hash=generate_password_hash('pw'), is_admin=False, is_player=True)
+        with app.app_context():
+            db.session.add(user)
+            db.session.commit()
+        c.post('/admin/login', data={'username': 'player', 'password': 'pw'})
+        resp = c.get('/admin/team_totals', query_string={'season_id': 1})
+        assert resp.status_code == 200

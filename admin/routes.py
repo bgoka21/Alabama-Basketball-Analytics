@@ -358,7 +358,11 @@ def admin_bp_before_request():
 
     # Limit players to their own page and logout
     if current_user.is_player:
-        allowed = {'admin.player_detail', 'admin.logout'}
+        allowed = {
+            'admin.player_detail',
+            'admin.logout',
+            'admin.team_totals',
+        }
         if request.endpoint not in allowed:
             flash("You do not have permission to view that page.", "error")
             return redirect(url_for('public.practice_homepage'))
