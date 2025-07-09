@@ -143,3 +143,20 @@ def test_team_totals_access_for_players(app):
         c.post('/admin/login', data={'username': 'player', 'password': 'pw'})
         resp = c.get('/admin/team_totals', query_string={'season_id': 1})
         assert resp.status_code == 200
+
+
+def test_team_totals_access_for_staff(app):
+    """Non-admin, non-player users should access team totals."""
+    with app.test_client() as c:
+        user = User(
+            username='staff',
+            password_hash=generate_password_hash('pw'),
+            is_admin=False,
+            is_player=False,
+        )
+        with app.app_context():
+            db.session.add(user)
+            db.session.commit()
+        c.post('/admin/login', data={'username': 'staff', 'password': 'pw'})
+        resp = c.get('/admin/team_totals', query_string={'season_id': 1})
+        assert resp.status_code == 200
