@@ -1,53 +1,56 @@
 {% extends 'base.html' %}
 
 {% block page_controls %}
-<div class="flex flex-wrap items-end gap-4 mb-4 no-print">
-  <form id="filterForm" method="get" class="flex flex-wrap items-end gap-2">
-    <div>
-      <label class="font-semibold mr-2">Season:</label>
-      <select name="season_id" class="border p-2 rounded">
-        {% for s in seasons %}
-          <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
+<div id="trendControls" class="hidden">
+  <div class="flex flex-wrap items-end gap-4 mb-4 no-print">
+    <form id="filterForm" method="get" class="flex flex-wrap items-end gap-2">
+      <div>
+        <label class="font-semibold mr-2">Season:</label>
+        <select name="season_id" class="border p-2 rounded">
+          {% for s in seasons %}
+            <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.season_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">From</label>
+        <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">To</label>
+        <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+      </div>
+      {% if label_options %}
+      <div class="flex flex-wrap items-center gap-2">
+        {% for lbl in label_options %}
+          <label class="inline-flex items-center text-sm mr-2">
+            <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
+            <span class="ml-1">{{ lbl }}</span>
+          </label>
         {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">From</label>
-      <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">To</label>
-      <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
-    </div>
-    {% if label_options %}
-    <div class="flex flex-wrap items-center gap-2">
-      {% for lbl in label_options %}
-        <label class="inline-flex items-center text-sm mr-2">
-          <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-          <span class="ml-1">{{ lbl }}</span>
-        </label>
-      {% endfor %}
-    </div>
-    {% endif %}
-    <div>
-      <label class="block text-sm font-medium mb-1">Players</label>
-      <select name="player" multiple class="border border-gray-300 rounded px-2 py-1 text-sm">
-        {% for p in roster_names %}
-          <option value="{{ p }}" {% if p in selected_players %}selected{% endif %}>{{ p }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">Stat</label>
-      <select name="stat" class="border border-gray-300 rounded px-2 py-1 text-sm">
-        {% for s in ['points','assists','turnovers','atr_makes','fg3_makes'] %}
-          <option value="{{ s }}" {% if s in selected_stats %}selected{% endif %}>{{ s }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
-    <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
-  </form>
+      </div>
+      {% endif %}
+      <div>
+        <label class="block text-sm font-medium mb-1">Players</label>
+        <input id="playerSearch" type="text" placeholder="Search players" class="border border-gray-300 rounded px-2 py-1 text-sm mb-1 w-full" />
+        <select name="player" multiple class="border border-gray-300 rounded px-2 py-1 text-sm">
+          {% for p in roster_names %}
+            <option value="{{ p }}" {% if p in selected_players %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Stat</label>
+        <select name="stat" class="border border-gray-300 rounded px-2 py-1 text-sm">
+          {% for s in ['points','assists','turnovers','atr_makes','fg3_makes'] %}
+            <option value="{{ s }}" {% if s in selected_stats %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
+      <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
+    </form>
+  </div>
 </div>
 {% endblock %}
 
@@ -544,6 +547,8 @@ function showTab(tabName){
     const el=document.getElementById(id);
     if(el){el.classList.toggle('hidden',id!==tabName);el.classList.toggle('block',id===tabName);}
   });
+  const tc=document.getElementById('trendControls');
+  if(tc){tc.classList.toggle('hidden',tabName!=='trends');}
   ['btnSeasonTotals','btnShotType','btnTrends'].forEach(btnId=>{
     const b=document.getElementById(btnId);
     if(b)b.classList.remove('bg-[#9E1B32]','text-white');
@@ -586,7 +591,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   }
   if(window.Chart && document.getElementById('trendChart')){
-    const labels = trendData.map(d=>d.date);
+    const labels = trendData.map(d => {
+      const dt = new Date(d.date);
+      return dt.toLocaleDateString('en-US',{month:'long', day:'numeric'});
+    });
     const datasets = trendStats.map((s,i)=>({
       label:s,
       data: trendData.map(d=>d[s]||0),
@@ -595,6 +603,16 @@ document.addEventListener('DOMContentLoaded',()=>{
     }));
     new Chart(document.getElementById('trendChart'),{
       type:'line',data:{labels,datasets},options:{responsive:true}
+    });
+  }
+  const ps=document.getElementById('playerSearch');
+  const sel=document.querySelector('select[name="player"]');
+  if(ps && sel){
+    ps.addEventListener('input',()=>{
+      const t=ps.value.toLowerCase();
+      Array.from(sel.options).forEach(o=>{
+        o.hidden=!o.text.toLowerCase().includes(t);
+      });
     });
   }
 });
