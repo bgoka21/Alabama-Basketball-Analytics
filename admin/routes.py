@@ -1331,6 +1331,10 @@ def aggregate_stats(stats_list):
     else:
         agg["efg_pct"] = 0.0
         agg["points_per_shot"] = 0.0
+
+    # shot percentages
+    agg["atr_pct"] = round(agg["atr_makes"] / agg["atr_attempts"] * 100, 1) if agg["atr_attempts"] else 0.0
+    agg["fg3_pct"] = round(agg["fg3_makes"] / agg["fg3_attempts"] * 100, 1) if agg["fg3_attempts"] else 0.0
     # 3) assist/turnover ratios
     if agg["turnovers"]:
         agg["assist_turnover_ratio"]     = round(agg["assists"]     / agg["turnovers"], 2)
@@ -1539,6 +1543,9 @@ def compute_filtered_totals(stats_records, label_set):
     else:
         totals["efg_pct"] = 0.0
         totals["points_per_shot"] = 0.0
+
+    totals["atr_pct"] = round(totals["atr_makes"] / totals["atr_attempts"] * 100, 1) if totals["atr_attempts"] else 0.0
+    totals["fg3_pct"] = round(totals["fg3_makes"] / totals["fg3_attempts"] * 100, 1) if totals["fg3_attempts"] else 0.0
 
     if totals["turnovers"]:
         totals["assist_turnover_ratio"] = round(
@@ -2852,6 +2859,19 @@ def team_totals():
         except ValueError:
             end_date = ''
 
+    last_n = request.args.get('last', type=int)
+    if last_n:
+        dates = (
+            Practice.query.filter_by(season_id=season_id)
+            .order_by(Practice.date.desc())
+            .limit(last_n)
+            .with_entities(Practice.date)
+            .all()
+        )
+        if dates:
+            start_dt = dates[-1].date
+            start_date = start_dt.isoformat()
+
     q = PlayerStats.query.filter(PlayerStats.practice_id != None)
     if season_id:
         q = q.filter_by(season_id=season_id)
@@ -2912,10 +2932,7 @@ def team_totals():
     shot_type_totals, shot_summaries = compute_team_shot_details(stats_list, label_set)
 
     # ─── Build trend data by date ───────────────────────────────────────────
-    roster_names = [r.player_name for r in Roster.query.filter_by(season_id=season_id).order_by(Roster.player_name).all()] if season_id else []
-    selected_players = request.args.getlist('player')
-    if not selected_players:
-        selected_players = roster_names
+    # Trend graph aggregates all players; player filters removed
 
     allowed_stats = {
         'points','assists','turnovers','atr_makes','atr_attempts','fg2_makes',
@@ -2939,8 +2956,7 @@ def team_totals():
         trend_query = trend_query.filter(Practice.date >= start_dt)
     if end_dt:
         trend_query = trend_query.filter(Practice.date <= end_dt)
-    if selected_players:
-        trend_query = trend_query.filter(PlayerStats.player_name.in_(selected_players))
+    # No player-level filtering
     trend_rows = [
         {'date': r.dt.isoformat(), **{s: getattr(r, s) for s in selected_stats}}
         for r in trend_query.group_by(Practice.date).order_by(Practice.date)
@@ -2959,8 +2975,6 @@ def team_totals():
         label_options=label_options,
         selected_labels=selected_labels,
         trend_rows=trend_rows,
-        selected_players=selected_players,
-        roster_names=roster_names,
         selected_stats=selected_stats,
         active_page='team_totals',
     )
