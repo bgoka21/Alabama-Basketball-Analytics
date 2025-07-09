@@ -67,7 +67,7 @@
       {% endif %}
       <div>
         <label class="block text-sm font-medium mb-1">Stat</label>
-        <select name="trend_stat" class="border border-gray-300 rounded px-2 py-1 text-sm">
+        <select name="trend_stat" class="border border-gray-300 rounded px-2 py-1 text-sm" multiple size="6">
           {% for s in ['points','assists','turnovers','atr_makes','fg3_makes','atr_pct','fg3_pct'] %}
             <option value="{{ s }}" {% if s in trend_selected_stats %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
