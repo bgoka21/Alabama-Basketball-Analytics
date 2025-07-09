@@ -1121,7 +1121,8 @@ function showShotTypeDetail(detail) {
   // —— DOM-ready initialization ——
   document.addEventListener('DOMContentLoaded', () => {
     // pull the hash (without the leading “#”)
-    const hash = window.location.hash.slice(1);
+    const rawHash = window.location.hash.slice(1);
+    const hash = rawHash === 'skillDev' ? 'skillDevelopment' : rawHash;
     // if it matches one of our tab IDs, show it, otherwise default
     if (['seasonTotals','gameStats','shotType','skillDevelopment'].includes(hash)) {
       showTab(hash);
