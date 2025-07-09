@@ -2956,30 +2956,62 @@ def team_totals():
 
     allowed_stats = {
         'points','assists','turnovers','atr_makes','atr_attempts','fg2_makes',
-        'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta','atr_pct','fg3_pct'
+        'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta','atr_pct','fg3_pct',
+        'efg_pct','points_per_shot','assist_turnover_ratio','adj_assist_turnover_ratio',
+        'second_assists','pot_assists','ft_pct','fg_pct','fg2_pct',
+        'total_blue_collar','deflection','steal','block'
     }
     selected_stats = [s for s in request.args.getlist('trend_stat') if s in allowed_stats]
     if not selected_stats:
         selected_stats = ['points']
 
+    selected_set = set(selected_stats)
     query_stats = set(selected_stats)
     if 'atr_pct' in query_stats:
         query_stats.update({'atr_makes','atr_attempts'})
     if 'fg3_pct' in query_stats:
         query_stats.update({'fg3_makes','fg3_attempts'})
-    sql_fields = [func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s)
-                  for s in query_stats if s not in {'atr_pct','fg3_pct'}]
+    if query_stats & {'efg_pct','points_per_shot','fg_pct','fg2_pct'}:
+        query_stats.update({'atr_makes','atr_attempts','fg2_makes','fg2_attempts','fg3_makes','fg3_attempts'})
+    if 'ft_pct' in query_stats:
+        query_stats.update({'ftm','fta'})
+    if query_stats & {'assist_turnover_ratio','adj_assist_turnover_ratio'}:
+        query_stats.update({'assists','turnovers','second_assists','pot_assists'})
+
+    bc_fields = {'total_blue_collar','deflection','steal','block'}
+    computed_fields = {
+        'atr_pct','fg3_pct','efg_pct','points_per_shot','assist_turnover_ratio',
+        'adj_assist_turnover_ratio','fg_pct','fg2_pct','ft_pct'
+    }
+
+    sql_fields = [
+        func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s)
+        for s in query_stats
+        if s not in computed_fields and s not in bc_fields
+    ]
+
+    bc_sql_fields = [
+        func.coalesce(func.sum(getattr(BlueCollarStats, s)), 0).label(s)
+        for s in (query_stats & bc_fields)
+    ]
 
     trend_query = (
         db.session.query(
             Practice.date.label('dt'),
-            *sql_fields
+            *sql_fields,
+            *bc_sql_fields
         )
         .join(Practice, PlayerStats.practice_id == Practice.id)
-        .filter(PlayerStats.practice_id != None)
     )
+    if bc_sql_fields:
+        trend_query = trend_query.outerjoin(
+            BlueCollarStats, BlueCollarStats.practice_id == Practice.id
+        )
+    trend_query = trend_query.filter(PlayerStats.practice_id != None)
     if trend_season_id:
         trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
+        if bc_sql_fields:
+            trend_query = trend_query.filter(BlueCollarStats.season_id == trend_season_id)
     if trend_start_dt:
         trend_query = trend_query.filter(Practice.date >= trend_start_dt)
     if trend_end_dt:
@@ -2987,7 +3019,7 @@ def team_totals():
     # No player-level filtering
     trend_rows = []
     for r in trend_query.group_by(Practice.date).order_by(Practice.date):
-        base = {s: getattr(r, s) for s in query_stats if s not in {'atr_pct','fg3_pct'}}
+        base = {s: getattr(r, s) for s in query_stats if s not in computed_fields}
         if 'atr_pct' in selected_stats:
             att = base.get('atr_attempts', 0)
             pct = round(base.get('atr_makes', 0) / att * 100, 1) if att else 0.0
@@ -2996,6 +3028,39 @@ def team_totals():
             att = base.get('fg3_attempts', 0)
             pct = round(base.get('fg3_makes', 0) / att * 100, 1) if att else 0.0
             base['fg3_pct'] = pct
+        if 'ft_pct' in selected_stats:
+            att = base.get('fta', 0)
+            pct = round(base.get('ftm', 0) / att * 100, 1) if att else 0.0
+            base['ft_pct'] = pct
+        if selected_set & {'efg_pct','points_per_shot','fg_pct'}:
+            total_shots = base.get('atr_attempts',0)+base.get('fg2_attempts',0)+base.get('fg3_attempts',0)
+            if total_shots:
+                efg = (base.get('atr_makes',0)+base.get('fg2_makes',0)+1.5*base.get('fg3_makes',0))/total_shots
+                if 'efg_pct' in selected_stats:
+                    base['efg_pct'] = round(efg*100,1)
+                if 'points_per_shot' in selected_stats:
+                    base['points_per_shot'] = round(efg*2,2)
+                if 'fg_pct' in selected_stats:
+                    fg = (base.get('atr_makes',0)+base.get('fg2_makes',0)+base.get('fg3_makes',0))/total_shots
+                    base['fg_pct'] = round(fg*100,1)
+            else:
+                if 'efg_pct' in selected_stats:
+                    base['efg_pct'] = 0.0
+                if 'points_per_shot' in selected_stats:
+                    base['points_per_shot'] = 0.0
+                if 'fg_pct' in selected_stats:
+                    base['fg_pct'] = 0.0
+        if 'fg2_pct' in selected_stats:
+            att = base.get('fg2_attempts',0)
+            pct = round(base.get('fg2_makes',0)/att*100,1) if att else 0.0
+            base['fg2_pct'] = pct
+        if 'assist_turnover_ratio' in selected_stats:
+            tos = base.get('turnovers',0)
+            base['assist_turnover_ratio'] = round(base.get('assists',0)/tos,2) if tos else 0.0
+        if 'adj_assist_turnover_ratio' in selected_stats:
+            tos = base.get('turnovers',0)
+            total_ast = base.get('assists',0)+base.get('second_assists',0)+base.get('pot_assists',0)
+            base['adj_assist_turnover_ratio'] = round(total_ast/tos,2) if tos else 0.0
         trend_rows.append({'date': r.dt.isoformat(), **{s: base.get(s, 0) for s in selected_stats}})
 
     return render_template(
