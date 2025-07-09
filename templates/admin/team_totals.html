@@ -29,6 +29,22 @@
       {% endfor %}
     </div>
     {% endif %}
+    <div>
+      <label class="block text-sm font-medium mb-1">Players</label>
+      <select name="player" multiple class="border border-gray-300 rounded px-2 py-1 text-sm">
+        {% for p in roster_names %}
+          <option value="{{ p }}" {% if p in selected_players %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Stat</label>
+      <select name="stat" class="border border-gray-300 rounded px-2 py-1 text-sm">
+        {% for s in ['points','assists','turnovers','atr_makes','fg3_makes'] %}
+          <option value="{{ s }}" {% if s in selected_stats %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
     <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
   </form>
@@ -50,6 +66,7 @@
 <div id="tabButtons" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
   <button id="btnSeasonTotals" onclick="showTab('seasonTotals')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Totals</button>
   <button id="btnShotType" onclick="showTab('shotType')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Shot Type</button>
+  <button id="btnTrends" onclick="showTab('trends')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Trends</button>
 </div>
 <div id="seasonTotals" class="tab-content block">
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -508,18 +525,26 @@
       </table>
   </div>
   </div>
-  </div>
-
-  </div>
 </div>
+
+</div>
+</div>
+<div id="trends" class="tab-content hidden">
+  <canvas id="trendChart" class="w-full h-64"></canvas>
+</div>
+<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+<script>
+const trendData = {{ trend_rows|tojson }};
+const trendStats = {{ selected_stats|tojson }};
+</script>
 <script>
 function capitalize(str){return str.charAt(0).toUpperCase()+str.slice(1);}
 function showTab(tabName){
-  ['seasonTotals','shotType'].forEach(id=>{
+  ['seasonTotals','shotType','trends'].forEach(id=>{
     const el=document.getElementById(id);
     if(el){el.classList.toggle('hidden',id!==tabName);el.classList.toggle('block',id===tabName);}
   });
-  ['btnSeasonTotals','btnShotType'].forEach(btnId=>{
+  ['btnSeasonTotals','btnShotType','btnTrends'].forEach(btnId=>{
     const b=document.getElementById(btnId);
     if(b)b.classList.remove('bg-[#9E1B32]','text-white');
   });
@@ -549,7 +574,7 @@ function showShotTypeDetail(detail){
 }
 document.addEventListener('DOMContentLoaded',()=>{
   const hash=window.location.hash.slice(1);
-  if(['seasonTotals','shotType'].includes(hash)){
+  if(['seasonTotals','shotType','trends'].includes(hash)){
     showTab(hash);
   }else{
     showTab('seasonTotals');
@@ -558,6 +583,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(df){
     df.addEventListener('submit',()=>{
       df.action=df.action.split('#')[0]+window.location.hash;
+    });
+  }
+  if(window.Chart && document.getElementById('trendChart')){
+    const labels = trendData.map(d=>d.date);
+    const datasets = trendStats.map((s,i)=>({
+      label:s,
+      data: trendData.map(d=>d[s]||0),
+      borderColor: ['#9E1B32','#1f77b4','#2ca02c','#ff7f0e'][i%4],
+      fill:false
+    }));
+    new Chart(document.getElementById('trendChart'),{
+      type:'line',data:{labels,datasets},options:{responsive:true}
     });
   }
 });

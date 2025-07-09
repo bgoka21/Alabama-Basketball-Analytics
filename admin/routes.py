@@ -2856,9 +2856,7 @@ def team_totals():
     if season_id:
         q = q.filter_by(season_id=season_id)
     if start_dt or end_dt:
-        q = (
-            q.join(Practice, PlayerStats.practice_id == Practice.id)
-        )
+        q = q.join(Practice, PlayerStats.practice_id == Practice.id)
         if start_dt:
             q = q.filter(Practice.date >= start_dt)
         if end_dt:
@@ -2913,6 +2911,41 @@ def team_totals():
 
     shot_type_totals, shot_summaries = compute_team_shot_details(stats_list, label_set)
 
+    # ─── Build trend data by date ───────────────────────────────────────────
+    roster_names = [r.player_name for r in Roster.query.filter_by(season_id=season_id).order_by(Roster.player_name).all()] if season_id else []
+    selected_players = request.args.getlist('player')
+    if not selected_players:
+        selected_players = roster_names
+
+    allowed_stats = {
+        'points','assists','turnovers','atr_makes','atr_attempts','fg2_makes',
+        'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta'
+    }
+    selected_stats = [s for s in request.args.getlist('stat') if s in allowed_stats]
+    if not selected_stats:
+        selected_stats = ['points']
+
+    trend_query = (
+        db.session.query(
+            Practice.date.label('dt'),
+            *[func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s) for s in selected_stats]
+        )
+        .join(Practice, PlayerStats.practice_id == Practice.id)
+        .filter(PlayerStats.practice_id != None)
+    )
+    if season_id:
+        trend_query = trend_query.filter(PlayerStats.season_id == season_id)
+    if start_dt:
+        trend_query = trend_query.filter(Practice.date >= start_dt)
+    if end_dt:
+        trend_query = trend_query.filter(Practice.date <= end_dt)
+    if selected_players:
+        trend_query = trend_query.filter(PlayerStats.player_name.in_(selected_players))
+    trend_rows = [
+        {'date': r.dt.isoformat(), **{s: getattr(r, s) for s in selected_stats}}
+        for r in trend_query.group_by(Practice.date).order_by(Practice.date)
+    ]
+
     return render_template(
         'team_totals.html',
         totals=totals,
@@ -2925,6 +2958,10 @@ def team_totals():
         end_date=end_date or '',
         label_options=label_options,
         selected_labels=selected_labels,
+        trend_rows=trend_rows,
+        selected_players=selected_players,
+        roster_names=roster_names,
+        selected_stats=selected_stats,
         active_page='team_totals',
     )
 
