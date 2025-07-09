@@ -3077,6 +3077,7 @@ def team_totals():
         selected_labels=selected_labels,
         trend_rows=trend_rows,
         trend_selected_stats=selected_stats,
+        trend_stat_options=sorted(allowed_stats),
         trend_selected_season=trend_season_id,
         trend_start_date=trend_start_date or '',
         trend_end_date=trend_end_date or '',
