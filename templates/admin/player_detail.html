@@ -1092,6 +1092,7 @@ function showTab(tabName) {
   if (tabName === 'shotType') {
     showShotTypeDetail('atr');  // default into ATR whenever you open ShotType
   }
+  window.location.hash = tabName;
 }
 
 

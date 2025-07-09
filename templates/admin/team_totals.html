@@ -526,6 +526,7 @@ function showTab(tabName){
   const active=document.getElementById('btn'+capitalize(tabName));
   if(active)active.classList.add('bg-[#9E1B32]','text-white');
   if(tabName==='shotType'){showShotTypeDetail('atr');}
+  window.location.hash = tabName;
 }
 function showShotTypeDetail(detail){
   ['atr','fg2','fg3'].forEach(id=>{
