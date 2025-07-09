@@ -121,3 +121,12 @@ def test_team_totals_date_filters(client):
     html = resp.data.decode('utf-8')
     assert '22' in html
     assert '50.0' in html
+
+
+def test_team_totals_shot_type_tab(client):
+    resp = client.get('/admin/team_totals', query_string={'season_id': 1})
+    html = resp.data.decode('utf-8')
+    assert 'Shot Type Overview' in html
+    assert 'ATR Season' in html
+    assert '4/9' in html
+    assert '53.3%' in html

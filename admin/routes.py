@@ -1551,6 +1551,197 @@ def compute_filtered_totals(stats_records, label_set):
     return SimpleNamespace(**totals)
 
 
+# ─── Helper: compute team shot-type aggregates and summaries ─────────────
+def compute_team_shot_details(stats_records, label_set):
+    """Return season shot totals and detail summaries for a list of PlayerStats."""
+    all_details = []
+    for rec in stats_records:
+        if not rec.shot_type_details:
+            continue
+        js = (
+            json.loads(rec.shot_type_details)
+            if isinstance(rec.shot_type_details, str)
+            else rec.shot_type_details
+        )
+        for shot in js:
+            labels = {
+                lbl.strip().upper()
+                for lbl in re.split(r",", shot.get("possession_type", ""))
+                if lbl.strip()
+            }
+            labels.update(
+                lbl.strip().upper() for lbl in shot.get("drill_labels", []) if lbl.strip()
+            )
+            if label_set and not (labels & label_set):
+                continue
+            all_details.append(shot)
+
+    makes_atr = sum(1 for s in all_details if s.get("shot_class", "").lower() == "atr" and s.get("result") == "made")
+    att_atr   = sum(1 for s in all_details if s.get("shot_class", "").lower() == "atr")
+    makes_fg2 = sum(1 for s in all_details if s.get("shot_class", "").lower() == "2fg" and s.get("result") == "made")
+    att_fg2   = sum(1 for s in all_details if s.get("shot_class", "").lower() == "2fg")
+    makes_fg3 = sum(1 for s in all_details if s.get("shot_class", "").lower() == "3fg" and s.get("result") == "made")
+    att_fg3   = sum(1 for s in all_details if s.get("shot_class", "").lower() == "3fg")
+
+    total_att = att_atr + att_fg2 + att_fg3
+    raw_totals = SimpleNamespace(
+        atr=SimpleNamespace(
+            makes=makes_atr,
+            attempts=att_atr,
+            fg_pct=(makes_atr / att_atr * 100) if att_atr else 0,
+            pps=round((makes_atr * 2) / att_atr, 2) if att_atr else 0,
+            freq=(att_atr / total_att * 100) if total_att else 0,
+        ),
+        fg2=SimpleNamespace(
+            makes=makes_fg2,
+            attempts=att_fg2,
+            fg_pct=(makes_fg2 / att_fg2 * 100) if att_fg2 else 0,
+            pps=round((makes_fg2 * 2) / att_fg2, 2) if att_fg2 else 0,
+            freq=(att_fg2 / total_att * 100) if total_att else 0,
+        ),
+        fg3=SimpleNamespace(
+            makes=makes_fg3,
+            attempts=att_fg3,
+            fg_pct=(makes_fg3 / att_fg3 * 100) if att_fg3 else 0,
+            pps=round((makes_fg3 * 3) / att_fg3, 2) if att_fg3 else 0,
+            freq=(att_fg3 / total_att * 100) if total_att else 0,
+        ),
+    )
+
+    detail_counts = {"atr": {}, "fg2": {}, "fg3": {}}
+    cls_map = {"atr": "atr", "2fg": "fg2", "3fg": "fg3"}
+
+    for shot in all_details:
+        sc = shot.get("shot_class", "").lower()
+        shot_cls = cls_map.get(sc)
+        if not shot_cls:
+            continue
+
+        made = shot.get("result") == "made"
+        raw = shot.get("possession_type", "").strip().lower()
+        if "trans" in raw:
+            ctx = "transition"
+        elif "half" in raw:
+            ctx = "halfcourt"
+        else:
+            ctx = "total"
+
+        labels_for_this_shot = []
+        if shot.get("Assisted"):
+            labels_for_this_shot.append("Assisted")
+        else:
+            labels_for_this_shot.append("Non-Assisted")
+
+        if sc in ("atr", "2fg"):
+            suffix_keys = ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]
+            for suffix in suffix_keys:
+                val = shot.get(f"{sc}_{suffix.lower().replace(' ', '_')}", "")
+                if val:
+                    labels_for_this_shot.extend([lbl.strip() for lbl in re.split(r",", str(val)) if lbl.strip()])
+        else:
+            suffix_keys = ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]
+            for suffix in suffix_keys:
+                key = f"{sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
+                val = shot.get(key, "")
+                if val:
+                    labels_for_this_shot.extend([lbl.strip() for lbl in re.split(r",", str(val)) if lbl.strip()])
+
+        for scheme in ("scheme_attack", "scheme_drive", "scheme_pass"):
+            val = shot.get(f"{sc}_{scheme}", "")
+            if val:
+                labels_for_this_shot.extend([lbl.strip() for lbl in re.split(r",", str(val)) if lbl.strip()])
+
+        for lbl in set(labels_for_this_shot):
+            ent = detail_counts[shot_cls].setdefault(
+                lbl,
+                {
+                    "total": {"attempts": 0, "makes": 0},
+                    "transition": {"attempts": 0, "makes": 0},
+                    "halfcourt": {"attempts": 0, "makes": 0},
+                },
+            )
+            ent["total"]["attempts"] += 1
+            if made:
+                ent["total"]["makes"] += 1
+            if ctx in ("transition", "halfcourt"):
+                ent[ctx]["attempts"] += 1
+                if made:
+                    ent[ctx]["makes"] += 1
+
+    for stype, bucket in detail_counts.items():
+        for data in bucket.values():
+            total_att = data["total"]["attempts"] or 1
+            pts = 2 if stype in ("atr", "fg2") else 3
+            for ctx in ("total", "transition", "halfcourt"):
+                a = data[ctx]["attempts"]
+                m = data[ctx]["makes"]
+                fg = (m / a) if a else 0
+                data[ctx]["fg_pct"] = fg
+                data[ctx]["pps"] = round(pts * fg, 2) if a else 0
+                data[ctx]["freq_pct"] = a / total_att
+
+    shot_summaries = {}
+    for stype, bucket in detail_counts.items():
+        for lbl in ("Assisted", "Non-Assisted"):
+            bucket.setdefault(
+                lbl,
+                {
+                    "total": {"attempts": 0, "makes": 0, "fg_pct": 0, "pps": 0, "freq_pct": 0},
+                    "transition": {"attempts": 0, "makes": 0, "fg_pct": 0, "pps": 0, "freq_pct": 0},
+                    "halfcourt": {"attempts": 0, "makes": 0, "fg_pct": 0, "pps": 0, "freq_pct": 0},
+                },
+            )
+
+        cats = {
+            lbl: SimpleNamespace(
+                total=SimpleNamespace(**data["total"]),
+                transition=SimpleNamespace(**data["transition"]),
+                halfcourt=SimpleNamespace(**data["halfcourt"]),
+            )
+            for lbl, data in bucket.items()
+        }
+
+        ta = sum(d["total"]["attempts"] for d in bucket.values()) or 1
+        tm = sum(d["total"]["makes"] for d in bucket.values())
+        pts = 2 if stype in ("atr", "fg2") else 3
+
+        shot_summaries[stype] = SimpleNamespace(
+            total=SimpleNamespace(
+                attempts=ta,
+                makes=tm,
+                fg_pct=(tm / ta * 100),
+                pps=round(pts * tm / ta, 2),
+            ),
+            cats=cats,
+            transition=SimpleNamespace(
+                attempts=sum(d["transition"]["attempts"] for d in bucket.values()),
+                makes=sum(d["transition"]["makes"] for d in bucket.values()),
+                fg_pct=sum(d["transition"]["makes"] for d in bucket.values())
+                / (sum(d["transition"]["attempts"] for d in bucket.values()) or 1),
+                pps=round(
+                    pts
+                    * sum(d["transition"]["makes"] for d in bucket.values())
+                    / (sum(d["transition"]["attempts"] for d in bucket.values()) or 1),
+                    2,
+                ),
+            ),
+            halfcourt=SimpleNamespace(
+                attempts=sum(d["halfcourt"]["attempts"] for d in bucket.values()),
+                makes=sum(d["halfcourt"]["makes"] for d in bucket.values()),
+                fg_pct=sum(d["halfcourt"]["makes"] for d in bucket.values())
+                / (sum(d["halfcourt"]["attempts"] for d in bucket.values()) or 1),
+                pps=round(
+                    pts
+                    * sum(d["halfcourt"]["makes"] for d in bucket.values())
+                    / (sum(d["halfcourt"]["attempts"] for d in bucket.values()) or 1),
+                    2,
+                ),
+            ),
+        )
+
+    return raw_totals, shot_summaries
+
+
 # ─── Helper: collect all drill labels from practice stats ──────────────
 def collect_practice_labels(stats_records):
     """Return the fixed set of drill labels used for filtering practice stats."""
@@ -2716,10 +2907,14 @@ def team_totals():
             total_blue_collar=bc.total_blue_collar,
         )
 
+    shot_type_totals, shot_summaries = compute_team_shot_details(stats_list, label_set)
+
     return render_template(
         'team_totals.html',
         totals=totals,
         blue_totals=blue_totals,
+        shot_type_totals=shot_type_totals,
+        shot_summaries=shot_summaries,
         seasons=seasons,
         selected_season=season_id,
         start_date=start_date or '',
