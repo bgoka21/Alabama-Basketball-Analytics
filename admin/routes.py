@@ -2859,6 +2859,21 @@ def team_totals():
         except ValueError:
             end_date = ''
 
+    trend_season_id = request.args.get('trend_season_id', type=int) or season_id
+    trend_start_date = request.args.get('trend_start_date', start_date)
+    trend_end_date = request.args.get('trend_end_date', end_date)
+    trend_start_dt = trend_end_dt = None
+    if trend_start_date:
+        try:
+            trend_start_dt = date.fromisoformat(trend_start_date)
+        except ValueError:
+            trend_start_date = ''
+    if trend_end_date:
+        try:
+            trend_end_dt = date.fromisoformat(trend_end_date)
+        except ValueError:
+            trend_end_date = ''
+
     last_n = request.args.get('last', type=int)
     if last_n:
         dates = (
@@ -2888,6 +2903,11 @@ def team_totals():
         lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
     ]
     label_set = {lbl.upper() for lbl in selected_labels}
+
+    trend_selected_labels = [
+        lbl for lbl in request.args.getlist('trend_label') if lbl.upper() in label_options
+    ]
+    trend_label_set = {lbl.upper() for lbl in trend_selected_labels}
 
     if label_set:
         totals = compute_filtered_totals(stats_list, label_set)
@@ -2936,31 +2956,47 @@ def team_totals():
 
     allowed_stats = {
         'points','assists','turnovers','atr_makes','atr_attempts','fg2_makes',
-        'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta'
+        'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta','atr_pct','fg3_pct'
     }
-    selected_stats = [s for s in request.args.getlist('stat') if s in allowed_stats]
+    selected_stats = [s for s in request.args.getlist('trend_stat') if s in allowed_stats]
     if not selected_stats:
         selected_stats = ['points']
+
+    query_stats = set(selected_stats)
+    if 'atr_pct' in query_stats:
+        query_stats.update({'atr_makes','atr_attempts'})
+    if 'fg3_pct' in query_stats:
+        query_stats.update({'fg3_makes','fg3_attempts'})
+    sql_fields = [func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s)
+                  for s in query_stats if s not in {'atr_pct','fg3_pct'}]
 
     trend_query = (
         db.session.query(
             Practice.date.label('dt'),
-            *[func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s) for s in selected_stats]
+            *sql_fields
         )
         .join(Practice, PlayerStats.practice_id == Practice.id)
         .filter(PlayerStats.practice_id != None)
     )
-    if season_id:
-        trend_query = trend_query.filter(PlayerStats.season_id == season_id)
-    if start_dt:
-        trend_query = trend_query.filter(Practice.date >= start_dt)
-    if end_dt:
-        trend_query = trend_query.filter(Practice.date <= end_dt)
+    if trend_season_id:
+        trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
+    if trend_start_dt:
+        trend_query = trend_query.filter(Practice.date >= trend_start_dt)
+    if trend_end_dt:
+        trend_query = trend_query.filter(Practice.date <= trend_end_dt)
     # No player-level filtering
-    trend_rows = [
-        {'date': r.dt.isoformat(), **{s: getattr(r, s) for s in selected_stats}}
-        for r in trend_query.group_by(Practice.date).order_by(Practice.date)
-    ]
+    trend_rows = []
+    for r in trend_query.group_by(Practice.date).order_by(Practice.date):
+        base = {s: getattr(r, s) for s in query_stats if s not in {'atr_pct','fg3_pct'}}
+        if 'atr_pct' in selected_stats:
+            att = base.get('atr_attempts', 0)
+            pct = round(base.get('atr_makes', 0) / att * 100, 1) if att else 0.0
+            base['atr_pct'] = pct
+        if 'fg3_pct' in selected_stats:
+            att = base.get('fg3_attempts', 0)
+            pct = round(base.get('fg3_makes', 0) / att * 100, 1) if att else 0.0
+            base['fg3_pct'] = pct
+        trend_rows.append({'date': r.dt.isoformat(), **{s: base.get(s, 0) for s in selected_stats}})
 
     return render_template(
         'team_totals.html',
@@ -2975,7 +3011,11 @@ def team_totals():
         label_options=label_options,
         selected_labels=selected_labels,
         trend_rows=trend_rows,
-        selected_stats=selected_stats,
+        trend_selected_stats=selected_stats,
+        trend_selected_season=trend_season_id,
+        trend_start_date=trend_start_date or '',
+        trend_end_date=trend_end_date or '',
+        trend_selected_labels=trend_selected_labels,
         active_page='team_totals',
     )
 
