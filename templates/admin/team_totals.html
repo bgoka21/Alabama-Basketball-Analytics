@@ -174,7 +174,33 @@
   </div>
   <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center">
     <div class="text-sm font-medium text-gray-500 uppercase">Adj AST/TO</div>
-    <div class="text-2xl font-bold mt-2">{{ totals.adj_assist_turnover_ratio }}</div>
+  <div class="text-2xl font-bold mt-2">{{ totals.adj_assist_turnover_ratio }}</div>
+  </div>
+</div>
+<div class="mt-8">
+  <h2 class="text-lg sm:text-xl font-semibold mb-4">Paint Touch PPP</h2>
+  <div class="overflow-x-auto">
+    <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+      <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">Paint Touches</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase">PPP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for label, value in [
+          ('0', paint_ppp.zero),
+          ('1', paint_ppp.one),
+          ('2', paint_ppp.two),
+          ('3+', paint_ppp.three)
+        ] %}
+        <tr class="odd:bg-white even:bg-gray-100">
+          <td class="px-4 py-2">{{ label }}</td>
+          <td class="px-4 py-2">{{ value|round(2) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 <div class="mt-8">

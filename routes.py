@@ -7,7 +7,7 @@ from admin.routes import (
     compute_filtered_blue,
     aggregate_stats,
 )
-from models.database import PlayerStats, Practice, BlueCollarStats
+from models.database import PlayerStats, Practice, BlueCollarStats, Possession
 from datetime import date
 from sqlalchemy import func
 from types import SimpleNamespace
@@ -220,10 +220,39 @@ def practice_team_totals():
             total_blue_collar=bc.total_blue_collar,
         )
 
+    pt_query = db.session.query(
+        func.coalesce(Possession.paint_touches, '').label('pt'),
+        func.coalesce(func.sum(Possession.points_scored), 0).label('points'),
+        func.count(Possession.id).label('poss'),
+    ).filter(Possession.practice_id != None)
+    if start_dt or end_dt:
+        pt_query = pt_query.join(Practice, Possession.practice_id == Practice.id)
+        if start_dt:
+            pt_query = pt_query.filter(Practice.date >= start_dt)
+        if end_dt:
+            pt_query = pt_query.filter(Practice.date <= end_dt)
+    pt_rows = pt_query.group_by(Possession.paint_touches).all()
+    buckets = {0: {'pts': 0, 'poss': 0}, 1: {'pts': 0, 'poss': 0}, 2: {'pts': 0, 'poss': 0}, 3: {'pts': 0, 'poss': 0}}
+    for r in pt_rows:
+        try:
+            val = int(str(r.pt).strip() or '0')
+        except ValueError:
+            continue
+        key = 3 if val >= 3 else val
+        buckets[key]['pts'] += r.points
+        buckets[key]['poss'] += r.poss
+    paint_ppp = SimpleNamespace(
+        zero=round(buckets[0]['pts'] / buckets[0]['poss'], 2) if buckets[0]['poss'] else 0.0,
+        one=round(buckets[1]['pts'] / buckets[1]['poss'], 2) if buckets[1]['poss'] else 0.0,
+        two=round(buckets[2]['pts'] / buckets[2]['poss'], 2) if buckets[2]['poss'] else 0.0,
+        three=round(buckets[3]['pts'] / buckets[3]['poss'], 2) if buckets[3]['poss'] else 0.0,
+    )
+
     return render_template(
         'admin/team_totals.html',
         totals=totals,
         blue_totals=blue_totals,
+        paint_ppp=paint_ppp,
         label_options=label_options,
         selected_labels=selected_labels,
         start_date=start_date or '',

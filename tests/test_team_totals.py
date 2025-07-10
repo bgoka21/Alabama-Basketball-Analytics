@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash
 import json
 import re
 
-from models.database import db, Season, Practice, PlayerStats, BlueCollarStats, Roster
+from models.database import db, Season, Practice, PlayerStats, BlueCollarStats, Roster, Possession
 from models.user import User
 from admin.routes import admin_bp
 from public.routes import public_bp
@@ -89,6 +89,11 @@ def app():
                                        deflection=0, steal=0, block=1,
                                        floor_dive=0, charge_taken=0,
                                        reb_tip=0, total_blue_collar=3))
+        db.session.add_all([
+            Possession(practice_id=1, season_id=1, game_id=0, paint_touches='0', points_scored=2),
+            Possession(practice_id=1, season_id=1, game_id=0, paint_touches='1', points_scored=1),
+            Possession(practice_id=1, season_id=1, game_id=0, paint_touches='3', points_scored=3),
+        ])
         db.session.commit()
     yield app
     with app.app_context():
@@ -187,3 +192,13 @@ def test_team_totals_trend_blue_collar_sum(client):
         {'date': '2024-01-02', 'total_blue_collar': 7},
         {'date': '2024-01-05', 'total_blue_collar': 0},
     ]
+
+
+def test_team_totals_paint_touch_ppp(client):
+    resp = client.get('/admin/team_totals', query_string={'season_id': 1})
+    html = resp.data.decode('utf-8')
+    assert 'Paint Touch PPP' in html
+    assert '>0<' in html  # row label presence
+    assert '2.0' in html
+    assert '1.0' in html
+    assert '3.0' in html
