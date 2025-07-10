@@ -37,6 +37,7 @@ from models.database import PageView
 from models.uploaded_file import UploadedFile
 from models.user import User
 from sqlalchemy import func, and_
+from sqlalchemy.orm import aliased
 from utils.db_helpers import array_agg_or_group_concat
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
@@ -2990,8 +2991,9 @@ def team_totals():
         if s not in computed_fields and s not in bc_fields
     ]
 
+    bc_alias = aliased(BlueCollarStats)
     bc_sql_fields = [
-        func.coalesce(func.sum(getattr(BlueCollarStats, s)), 0).label(s)
+        func.coalesce(func.sum(getattr(bc_alias, s)), 0).label(s)
         for s in (query_stats & bc_fields)
     ]
 
@@ -3001,17 +3003,18 @@ def team_totals():
             *sql_fields,
             *bc_sql_fields
         )
+        .select_from(PlayerStats)
         .join(Practice, PlayerStats.practice_id == Practice.id)
     )
     if bc_sql_fields:
         trend_query = trend_query.outerjoin(
-            BlueCollarStats, BlueCollarStats.practice_id == Practice.id
+            bc_alias, bc_alias.practice_id == Practice.id
         )
     trend_query = trend_query.filter(PlayerStats.practice_id != None)
     if trend_season_id:
         trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
         if bc_sql_fields:
-            trend_query = trend_query.filter(BlueCollarStats.season_id == trend_season_id)
+            trend_query = trend_query.filter(bc_alias.season_id == trend_season_id)
     if trend_start_dt:
         trend_query = trend_query.filter(Practice.date >= trend_start_dt)
     if trend_end_dt:
