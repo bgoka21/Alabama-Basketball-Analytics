@@ -760,15 +760,15 @@
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <div
   id="skillDevelopment"
-  class="tab-content px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8"
+  class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8"
 >
   <!-- ─── Section Title ──────────────────────────────────────────────────────── -->
-  <h2 class="text-2xl sm:text-3xl font-bold mb-6 border-b pb-2">Skill Development</h2>
+  <h2 class="text-3xl font-bold mb-6 border-b pb-2">Skill Development</h2>
 
   <!-- ─── Drill-by-Drill Entry Form (ATR / Floater / 3FG / FT) ─────────────────── -->
   {% if current_user.is_admin %}
-  <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
-    <h3 class="text-xl sm:text-2xl font-semibold mb-4">Drill-by-Drill Entry</h3>
+  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-2xl font-semibold mb-4">Drill-by-Drill Entry</h3>
     <form method="post" class="w-full">
       <div class="overflow-x-auto">
         <table class="w-full table-fixed border border-gray-200 rounded-md">
@@ -861,8 +861,8 @@
   {% if current_user.is_admin %}
 
   <!-- ─── “NBA 100” Entry Form ──────────────────────────────────────────────────── -->
-  <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
-    <h3 class="text-xl sm:text-2xl font-semibold mb-4">NBA 100 Exercise</h3>
+  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-2xl font-semibold mb-4">NBA 100 Exercise</h3>
     <form
       method="post"
       action="{{ url_for('admin.add_nba100_entry', player_name=player_name) }}"
@@ -903,10 +903,49 @@
   </div>
   {% endif %}
 
+  <!-- ─── Date-Range Filter Form ──────────────────────────────────────────────── -->
+  <div class="mb-8 bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-2xl font-semibold mb-4">Filter History</h3>
+    <form method="get" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
+      <div class="flex-1">
+        <label class="block text-sm font-medium mb-1">From</label>
+        <input
+          type="date"
+          name="start_date"
+          value="{{ start_date }}"
+          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        />
+      </div>
+      <div class="flex-1">
+        <label class="block text-sm font-medium mb-1">To</label>
+        <input
+          type="date"
+          name="end_date"
+          value="{{ end_date }}"
+          class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        />
+      </div>
+      <div class="flex items-end">
+        <button
+          type="submit"
+          class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        >
+          Apply
+        </button>
+      </div>
+      <div class="flex items-end">
+        <a
+          href="{{ url_for('admin.player_detail', player_name=player_name) }}"
+          class="text-gray-600 hover:underline text-sm font-medium"
+          >Clear</a
+        >
+      </div>
+    </form>
+  </div>
 
   <!-- ─── Drill History Table ─────────────────────────────────────────────────── -->
   <div class="mb-8">
-    <h3 class="text-xl sm:text-2xl font-semibold mb-4">Drill History</h3>
+    <h3 class="text-2xl font-semibold mb-4">Drill History</h3>
     <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
       <table class="w-full table-fixed border border-gray-200 rounded-md">
         <thead>
@@ -1013,7 +1052,7 @@
 
   <!-- ─── NBA 100 History Table ────────────────────────────────────────────────── -->
   <div class="mb-4">
-    <h3 class="text-xl sm:text-2xl font-semibold mb-4">NBA 100 History</h3>
+    <h3 class="text-2xl font-semibold mb-4">NBA 100 History</h3>
     <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
       <table class="w-full table-fixed border border-gray-200 rounded-md">
         <thead>
@@ -1034,21 +1073,6 @@
               </td>
               <td class="px-4 py-2 text-sm border-t border-gray-300">
                 {{ n.value }}/100
-                {% if current_user.is_admin %}
-                <form
-                  action="{{ url_for('admin.delete_nba100_entry', player_name=player_name, entry_id=n.id) }}"
-                  method="post"
-                  class="inline"
-                >
-                  <button
-                    type="submit"
-                    class="ml-2 text-red-600 hover:underline text-xs"
-                    onclick="return confirm('Delete this NBA 100 entry?');"
-                  >
-                    Delete
-                  </button>
-                </form>
-                {% endif %}
               </td>
             </tr>
           {% else %}
@@ -1066,6 +1090,7 @@
     </div>
   </div>
 </div>
+
 
 </div>  <!-- /.inner container -->
 </div>  <!-- /.main container -->
