@@ -34,6 +34,12 @@ from models.database import (
 )
 from models.database import PageView
 
+# Ensure compatibility if Nba100Entry model is unavailable
+try:  # pragma: no cover - legacy setups may lack this class
+    from models.database import Nba100Entry
+except ImportError:  # fallback to SkillEntry table
+    Nba100Entry = SkillEntry
+
 from models.uploaded_file import UploadedFile
 from models.user import User
 from sqlalchemy import func, and_
@@ -1870,6 +1876,12 @@ def player_detail(player_name):
 
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
 
+    # fetch entries for Skill Development tab
+    entries = SkillEntry.query.filter_by(player_id=player.id) \
+                           .order_by(SkillEntry.date.desc()).all()
+    nba100_entries = Nba100Entry.query.filter_by(player_id=player.id) \
+                                   .order_by(Nba100Entry.date.desc()).all()
+
     # ─── Handle Skill‐Development form submission ───────────────────────
     if request.method == 'POST':
         if not current_user.is_admin:
@@ -1952,7 +1964,6 @@ def player_detail(player_name):
     if end_dt:
         q = q.filter(SkillEntry.date <= end_dt)
     all_entries = q.order_by(SkillEntry.date.desc()).all()
-    nba100_entries = [e for e in all_entries if e.skill_name == "NBA 100"]
     entries_list  = [e for e in all_entries if e.skill_name != "NBA 100"]
 
     # ─── Group by date & compute totals ─────────────────────────────────
@@ -2468,6 +2479,7 @@ def player_detail(player_name):
     # ─── Finally, render template with BOTH modes & all context ─────────
     return render_template(
         'player_detail.html',
+        player                             = player,
         player_name                        = player_name,
         mode                               = mode,
         agg                                = agg,
@@ -2481,7 +2493,7 @@ def player_detail(player_name):
         stats_records                      = game_stats_records if mode=='game' else practice_stats_records,
 
         # ─── Pass the flat list of all SkillEntry rows (so template can group by date) ───
-        entries                            = entries_list,
+        entries                            = entries,
         # ─── “Drill‐by‐drill” totals for shot_map (so template can show totals row) ───
         shot_totals                        = totals,
         # ── Pass the separate NBA 100 list to the template ────────────────
@@ -2500,7 +2512,6 @@ def player_detail(player_name):
         game_details                       = game_details,
         practice_breakdown                 = practice_breakdown,
         practice_details                   = practice_details,
-        player                             = player,
         has_stats                          = has_stats,
         label_options                      = label_options,
         selected_labels                    = selected_labels,
