@@ -1081,13 +1081,22 @@ function capitalize(str) {
 function showTab(tabName) {
   ['seasonTotals','gameStats','shotType','skillDevelopment'].forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     el.classList.toggle('hidden', id !== tabName);
     el.classList.toggle('block',  id === tabName);
   });
   ['btnSeasonTotals','btnGameStats','btnShotType','btnSkillDevelopment'].forEach(btnId => {
-    document.getElementById(btnId).classList.remove('bg-[#9E1B32]','text-white');
+    const b = document.getElementById(btnId);
+    if (!b) return;
+    if (btnId.toLowerCase().endsWith(tabName.toLowerCase())) {
+      b.classList.add('bg-[#9E1B32]', 'text-white');
+      b.classList.remove('border-gray-300','bg-white','text-gray-700');
+    } else {
+      b.classList.remove('bg-[#9E1B32]', 'text-white');
+      b.classList.add('border-gray-300','bg-white','text-gray-700');
+    }
   });
-  document.getElementById('btn' + capitalize(tabName)).classList.add('bg-[#9E1B32]','text-white');
+  window.location.hash = tabName;
 
   if (tabName === 'shotType') {
     showShotTypeDetail('atr');  // default into ATR whenever you open ShotType
@@ -1120,7 +1129,7 @@ function showShotTypeDetail(detail) {
 
   // —— DOM-ready initialization ——
   document.addEventListener('DOMContentLoaded', () => {
-    const hash = window.location.hash.slice(1);
+    const hash = window.location.hash.replace('#','');
     if (['seasonTotals','gameStats','shotType','skillDevelopment'].includes(hash)) {
       showTab(hash);
     } else {
