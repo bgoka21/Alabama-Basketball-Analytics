@@ -1,7 +1,15 @@
 import json
 import pandas as pd
 from collections import defaultdict
-from models.database import db, Roster, PlayerStats, BlueCollarStats, Practice
+from models.database import (
+    db,
+    Roster,
+    PlayerStats,
+    BlueCollarStats,
+    Practice,
+    Possession,
+    PlayerPossession,
+)
 
 
 def safe_str(value):
@@ -48,6 +56,69 @@ def get_roster_id(name, season_id):
     clean_name = name.strip() if isinstance(name, str) else name
     row = Roster.query.filter_by(player_name=clean_name, season_id=season_id).first()
     return row.id if row else None
+
+
+def extract_tokens(val):
+    """Return list of comma-separated tokens from the cell value."""
+    if pd.isna(val) or not isinstance(val, str):
+        return []
+    return [t.strip() for t in val.split(',') if t.strip()]
+
+
+def process_practice_possessions(df):
+    """Parse possession information from practice DataFrame."""
+    possession_data = []
+    opponent_map = {
+        "Crimson": "White",
+        "White": "Crimson",
+        "Alabama": "Blue",
+        "Blue": "Alabama",
+    }
+
+    for _, row in df.iterrows():
+        row_type = str(row.get("Row", "")).strip()
+        if row_type not in opponent_map:
+            continue
+
+        offense_color = row_type
+        defense_color = opponent_map[row_type]
+
+        off_col = f"{offense_color.upper()} PLAYER POSSESSIONS"
+        def_col = f"{defense_color.upper()} PLAYER POSSESSIONS"
+
+        offense_players = extract_tokens(row.get(off_col, ""))
+        defense_players = extract_tokens(row.get(def_col, ""))
+
+        points_scored = 0
+        for col in df.columns:
+            if str(col).startswith("#"):
+                for token in extract_tokens(row.get(col, "")):
+                    tok = token.upper()
+                    if tok == "ATR+" or tok == "2FG+":
+                        points_scored += 2
+                    elif tok == "3FG+":
+                        points_scored += 3
+                    elif tok == "FT+":
+                        points_scored += 1
+
+        base = {
+            "possession_start": safe_str(row.get("POSSESSION START", "")),
+            "possession_type": safe_str(row.get("POSSESSION TYPE", "")),
+            "paint_touches": safe_str(row.get("PAINT TOUCHES", "")),
+            "shot_clock": safe_str(row.get("SHOT CLOCK", "")),
+            "shot_clock_pt": safe_str(row.get("SHOT CLOCK PT", "")),
+            "points_scored": points_scored,
+        }
+
+        poss_off = dict(base)
+        poss_off.update({"side": offense_color, "players_on_floor": offense_players})
+        possession_data.append(poss_off)
+
+        poss_def = dict(base)
+        poss_def.update({"side": defense_color, "players_on_floor": defense_players})
+        possession_data.append(poss_def)
+
+    return possession_data
 
 
 def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_date=None):
@@ -503,6 +574,31 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 charge_taken  = blues.get("charge_taken", 0),
             )
         )
+    db.session.commit()
+
+    # ─── Process possession data for scrimmage rows ───────────────────
+    possession_data = process_practice_possessions(df)
+    for poss in possession_data:
+        new_poss = Possession(
+            game_id=0,
+            practice_id=practice_id,
+            season_id=season_id,
+            possession_side=poss.get("side", ""),
+            possession_start=poss.get("possession_start", ""),
+            possession_type=poss.get("possession_type", ""),
+            paint_touches=poss.get("paint_touches", ""),
+            shot_clock=poss.get("shot_clock", ""),
+            shot_clock_pt=poss.get("shot_clock_pt", ""),
+            points_scored=poss.get("points_scored", 0),
+        )
+        db.session.add(new_poss)
+        db.session.flush()
+        for jersey in poss.get("players_on_floor", []):
+            roster_id = get_roster_id(jersey, season_id)
+            if roster_id is not None:
+                db.session.add(
+                    PlayerPossession(possession_id=new_poss.id, player_id=roster_id)
+                )
     db.session.commit()
     # ─────────────────────────────────────────────────────────────────
 
