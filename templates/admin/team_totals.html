@@ -645,10 +645,15 @@ document.addEventListener('DOMContentLoaded',()=>{
       const dt = new Date(d.date);
       return dt.toLocaleDateString('en-US',{month:'long', day:'numeric'});
     });
-    const datasets = trendStats.map((s,i)=>({
+    const generateColor = (idx, total) => {
+      const hue = Math.round((360 / total) * idx);
+      return `hsl(${hue}, 70%, 50%)`;
+    };
+    const datasets = trendStats.map((s, i) => ({
       label: s,
       data: trendData.map(d => d[s] || 0),
-      borderColor: ['#9E1B32','#1f77b4','#2ca02c','#ff7f0e'][i%4],
+      borderColor: generateColor(i, trendStats.length),
+      backgroundColor: generateColor(i, trendStats.length),
       fill: false
     }));
     new Chart(document.getElementById('trendChart'), {
