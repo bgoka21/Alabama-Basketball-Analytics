@@ -66,12 +66,18 @@
       </div>
       {% endif %}
       <div>
-        <label class="block text-sm font-medium mb-1" for="trend_stat">Stat</label>
-        <select name="trend_stat" id="trend_stat" multiple class="border border-gray-300 rounded px-2 py-1 text-sm">
-          {% for s in trend_stat_options %}
-            <option value="{{ s }}" {% if s in trend_selected_stats %}selected{% endif %}>{{ s }}</option>
-          {% endfor %}
-        </select>
+        <label class="block text-sm font-medium mb-1" for="trend_stat_search">Stat</label>
+        <div class="border border-gray-300 rounded px-2 py-1 text-sm">
+          <input type="text" id="trend_stat_search" placeholder="Search..." class="mb-2 w-full border border-gray-300 rounded px-1 py-0.5" oninput="filterTrendStats(this.value)">
+          <div id="trend_stat_list" class="max-h-40 overflow-y-auto">
+            {% for s in trend_stat_options %}
+              <label class="flex items-center text-sm mr-2">
+                <input type="checkbox" name="trend_stat" value="{{ s }}" {% if s in trend_selected_stats %}checked{% endif %} class="mr-1">
+                {{ s }}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
       </div>
       <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
       <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
@@ -612,6 +618,13 @@ function showShotTypeDetail(detail){
       card.classList.replace('dark:bg-gray-700','dark:bg-gray-800');
       card.classList.replace('shadow-inner','shadow-md');
     }
+  });
+}
+function filterTrendStats(query){
+  const q = query.toLowerCase();
+  document.querySelectorAll('#trend_stat_list label').forEach(lbl=>{
+    const text = lbl.textContent.toLowerCase();
+    lbl.style.display = text.includes(q) ? '' : 'none';
   });
 }
 document.addEventListener('DOMContentLoaded',()=>{
