@@ -4,6 +4,9 @@ from flask import Flask
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
+import json
+import re
+
 from models.database import db, Season, Practice, PlayerStats, BlueCollarStats, Roster
 from models.user import User
 from admin.routes import admin_bp
@@ -169,3 +172,18 @@ def test_team_totals_trend_multiple_stats(client):
     )
     html = resp.data.decode('utf-8')
     assert 'const trendStats = ["points", "assists"]' in html
+
+
+def test_team_totals_trend_blue_collar_sum(client):
+    resp = client.get(
+        '/admin/team_totals',
+        query_string={'season_id': 1, 'trend_stat': 'total_blue_collar'}
+    )
+    html = resp.data.decode('utf-8')
+    m = re.search(r"const trendData = (.*?);", html, re.S)
+    assert m, 'trendData not found'
+    trend_data = json.loads(m.group(1))
+    assert trend_data == [
+        {'date': '2024-01-02', 'total_blue_collar': 7},
+        {'date': '2024-01-05', 'total_blue_collar': 0},
+    ]
