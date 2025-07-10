@@ -26,6 +26,7 @@ class UploadedFile(db.Model):
     offensive_breakdown = db.Column(db.Text, nullable=True)
     defensive_breakdown = db.Column(db.Text, nullable=True)
     lineup_efficiencies = db.Column(db.Text, nullable=True)
+    player_on_off       = db.Column(db.Text, nullable=True)
 
     # ✅ Category filter
     category       = db.Column(db.String(50), nullable=True)

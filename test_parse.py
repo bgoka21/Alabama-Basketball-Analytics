@@ -16,8 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover
         ndarray = type('ndarray', (), {})
     np = _DummyNP()
 import sqlite3
-from itertools import combinations
-from collections import defaultdict
+from utils.lineup import compute_lineup_efficiencies
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster
 
 #print("🔥 parse_csv() function has started executing!")
@@ -588,47 +587,6 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         #print(poss)
     return possession_data, offensive_possessions, defensive_possessions
 
-
-def compute_lineup_efficiencies(possession_data, group_sizes=(2,3,4,5), min_poss=5):
-    """
-    Given possession_data (list of dicts with keys 'side','players_on_floor','points_scored'),
-    returns:
-      efficiencies[size]['offense' or 'defense'][lineup_tuple] = PPP
-    Only includes lineups with at least min_poss possessions.
-    """
-    # Step 1: tally raw counts
-    raw = {
-      size: {
-        'offense': defaultdict(lambda: {'poss':0,'pts':0}),
-        'defense': defaultdict(lambda: {'poss':0,'pts':0})
-      }
-      for size in group_sizes
-    }
-
-    for poss in possession_data:
-        side = poss['side'].lower()     # "offense" or "defense"
-        players = poss['players_on_floor']
-        pts     = poss['points_scored']
-
-        for size in group_sizes:
-            if len(players) < size:
-                continue
-            for combo in combinations(players, size):
-                key = tuple(sorted(combo))
-                raw[size][side][key]['poss'] += 1
-                raw[size][side][key]['pts']  += pts
-
-    # Step 2: compute PPP
-    efficiencies = {
-      size: {'offense':{}, 'defense':{}}
-      for size in group_sizes
-    }
-    for size in group_sizes:
-        for side in ('offense','defense'):
-            for lineup, stats in raw[size][side].items():
-                if stats['poss'] >= min_poss:
-                    efficiencies[size][side][lineup] = stats['pts'] / stats['poss']
-    return efficiencies
 
 
 def get_player_id(player_name, conn):
