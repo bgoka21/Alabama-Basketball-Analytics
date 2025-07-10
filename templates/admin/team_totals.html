@@ -611,7 +611,9 @@ function capitalize(str){return str.charAt(0).toUpperCase()+str.slice(1);}
 function showTab(tabName){
   ['seasonTotals','shotType','trends'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el){el.classList.toggle('hidden',id!==tabName);el.classList.toggle('block',id===tabName);}
+    if(!el) return;
+    el.classList.toggle('hidden',id!==tabName);
+    el.classList.toggle('block',id===tabName);
   });
   const tc=document.getElementById('trendControls');
   const mc=document.getElementById('mainControls');
@@ -619,10 +621,15 @@ function showTab(tabName){
   if(mc){mc.classList.toggle('hidden',tabName==='trends');}
   ['btnSeasonTotals','btnShotType','btnTrends'].forEach(btnId=>{
     const b=document.getElementById(btnId);
-    if(b)b.classList.remove('bg-[#9E1B32]','text-white');
+    if(!b) return;
+    if(btnId.toLowerCase().endsWith(tabName.toLowerCase())){
+      b.classList.add('bg-[#9E1B32]','text-white');
+      b.classList.remove('border-gray-300','bg-white','text-gray-700');
+    }else{
+      b.classList.remove('bg-[#9E1B32]','text-white');
+      b.classList.add('border-gray-300','bg-white','text-gray-700');
+    }
   });
-  const active=document.getElementById('btn'+capitalize(tabName));
-  if(active)active.classList.add('bg-[#9E1B32]','text-white');
   window.location.hash = tabName;
   if(tabName==='shotType'){showShotTypeDetail('atr');}
 }
@@ -654,7 +661,7 @@ function filterTrendStats(query){
   });
 }
 document.addEventListener('DOMContentLoaded',()=>{
-  const hash=window.location.hash.slice(1);
+  const hash=window.location.hash.replace('#','');
   if(['seasonTotals','shotType','trends'].includes(hash)){
     showTab(hash);
   }else{
