@@ -39,6 +39,7 @@ from models.user import User
 from sqlalchemy import func, and_
 from sqlalchemy.orm import aliased
 from utils.db_helpers import array_agg_or_group_concat
+from utils.skill_config import shot_map, label_map
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
@@ -1865,19 +1866,6 @@ def collect_practice_labels(stats_records):
 @admin_bp.route('/player/<player_name>', methods=['GET', 'POST'])
 @login_required
 def player_detail(player_name):
-    # ─── Define shot_map & label_map for both POST and GET ──────────
-    shot_map = {
-        'atr':     ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
-        'floater': ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
-        '3fg':     ['Catch & Shoot - Stationary', 'Catch & Shoot - On The Move', 'Off Dribble'],
-        'ft':      ['Free Throw']                   # ← newly added
-    }
-    label_map = {
-        'atr':     "ATR's",
-        'floater': "Floaters",
-        '3fg':     "3FG's",
-        'ft':      "Free Throws"                    # ← newly added
-    }
 
 
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
@@ -2555,19 +2543,7 @@ def delete_skill_entry(player_name, entry_date):
 @login_required
 @admin_required
 def edit_skill_entry(player_name, entry_date):
-    # Rebuild the shot_map & label_map exactly as in the template
-    shot_map = {
-        'atr':     ["Right Hand", "Left Hand", "Off 1 Foot", "Off 2 Feet"],
-        'floater': ["Right Hand", "Left Hand", "Off 1 Foot", "Off 2 Feet"],
-        '3fg':     ["Catch & Shoot", "Off Dribble"],
-        'ft':      ["Free Throw"]    # ← added Free Throws category
-    }
-    label_map = {
-        'atr':     "ATR's",
-        'floater': "FLOATER's",
-        '3fg':     "3FG's",
-        'ft':      "Free Throws"     # ← display label for the new category
-    }
+    """Edit all skill-development entries for a given date."""
 
     # Parse the date and load the roster & any existing entries
     target_date = date.fromisoformat(entry_date)
@@ -2933,19 +2909,6 @@ def skill_totals():
         start_date = date.fromisoformat(start_date)
     if end_date:
         end_date = date.fromisoformat(end_date)
-
-    shot_map = {
-        'atr':     ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
-        'floater': ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
-        '3fg':     ['Catch & Shoot - Stationary', 'Catch & Shoot - On The Move', 'Off Dribble'],
-        'ft':      ['Free Throw']
-    }
-    label_map = {
-        'atr':     "ATR's",
-        'floater': "Floaters",
-        '3fg':     "3FG's",
-        'ft':      "Free Throws"
-    }
 
     if season_id:
         roster_entries = Roster.query.filter_by(season_id=season_id).all()
