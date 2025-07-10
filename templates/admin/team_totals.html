@@ -646,13 +646,45 @@ document.addEventListener('DOMContentLoaded',()=>{
       return dt.toLocaleDateString('en-US',{month:'long', day:'numeric'});
     });
     const datasets = trendStats.map((s,i)=>({
-      label:s,
-      data: trendData.map(d=>d[s]||0),
+      label: s,
+      data: trendData.map(d => d[s] || 0),
       borderColor: ['#9E1B32','#1f77b4','#2ca02c','#ff7f0e'][i%4],
-      fill:false
+      fill: false
     }));
-    new Chart(document.getElementById('trendChart'),{
-      type:'line',data:{labels,datasets},options:{responsive:true}
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: 'nearest', intersect: false },
+        scales: {
+          x: {
+            title: { display: true, text: 'Date' },
+            grid: { color: '#e5e7eb' }
+          },
+          y: {
+            title: { display: true, text: 'Value' },
+            grid: { color: '#e5e7eb' }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+            }
+          },
+          legend: {
+            display: true,
+            onClick: (e, legendItem, legend) => {
+              const index = legendItem.datasetIndex;
+              const ci = legend.chart;
+              const meta = ci.getDatasetMeta(index);
+              meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+              ci.update();
+            }
+          }
+        }
+      }
     });
   }
 });
