@@ -2622,6 +2622,52 @@ def delete_nba100_entry(player_name, entry_id):
     return redirect(url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment')
 
 
+@admin_bp.route('/player/<player_name>/skill', methods=['GET', 'POST'])
+@login_required
+def player_skill(player_name):
+    """View and manage generic skill-development entries for a player."""
+    player = Roster.query.filter_by(player_name=player_name).first_or_404()
+
+    if request.method == 'POST':
+        if not current_user.is_admin:
+            flash('Only admins may modify skill-development entries.', 'error')
+            return redirect(url_for('admin.player_skill', player_name=player_name))
+
+        shot_date = date.fromisoformat(request.form.get('date'))
+        skill_name = request.form.get('skill_name', '').strip()
+        value_str = request.form.get('value', '').strip()
+
+        if skill_name and value_str.isdigit():
+            db.session.add(
+                SkillEntry(
+                    player_id=player.id,
+                    date=shot_date,
+                    skill_name=skill_name,
+                    value=int(value_str),
+                    shot_class=None,
+                    subcategory=None,
+                    makes=0,
+                    attempts=0,
+                )
+            )
+            db.session.commit()
+        return redirect(url_for('admin.player_skill', player_name=player_name))
+
+    q = SkillEntry.query.filter_by(player_id=player.id).order_by(SkillEntry.date.desc())
+    entries = [e for e in q.all() if not e.shot_class and e.skill_name != 'NBA 100']
+
+    totals = {}
+    for e in entries:
+        totals[e.skill_name] = totals.get(e.skill_name, 0) + e.value
+
+    return render_template(
+        'admin/player_skill.html',
+        player=player,
+        entries=entries,
+        totals=totals,
+    )
+
+
 
 @admin_bp.route('/roster', methods=['GET', 'POST'])
 @login_required

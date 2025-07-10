@@ -36,6 +36,13 @@
               >
                 View Player
               </a>
+              |
+              <a
+                href="{{ url_for('admin.player_skill', player_name=player) }}"
+                class="text-blue-600 hover:underline"
+              >
+                Skill Dev
+              </a>
             </td>
           </tr>
         {% else %}
