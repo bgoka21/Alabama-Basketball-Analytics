@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 from collections import defaultdict
+from utils.lineup import compute_lineup_efficiencies, compute_player_on_off_by_team
 from models.database import (
     db,
     Roster,
@@ -600,7 +601,20 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     PlayerPossession(possession_id=new_poss.id, player_id=roster_id)
                 )
     db.session.commit()
+    # ─── Compute lineup and on/off metrics ───────────────────────────
+    lineup_efficiencies = compute_lineup_efficiencies(
+        possession_data,
+        group_sizes=(2, 3, 4, 5),
+        min_poss=1,
+    )
+    player_on_off = compute_player_on_off_by_team(possession_data)
+
     # ─────────────────────────────────────────────────────────────────
+
+    return {
+        "lineup_efficiencies": lineup_efficiencies,
+        "player_on_off": player_on_off,
+    }
 
 
 if __name__ == "__main__":

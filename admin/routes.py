@@ -613,12 +613,24 @@ def parse_file(file_id):
                 db.session.flush()
 
             # 2b) parse into your practice tables
-            parse_practice_csv(
+            results = parse_practice_csv(
                 upload_path,
                 season_id=season_id,
                 category=uploaded_file.category,
                 file_date=file_date,
             )
+
+            raw_lineups = results.get('lineup_efficiencies', {})
+            json_lineups = {
+                size: {
+                    side: {",".join(combo): ppp for combo, ppp in sides.items()}
+                    for side, sides in raw_lineups[size].items()
+                }
+                for size in raw_lineups
+            }
+
+            uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
+            uploaded_file.player_on_off = json.dumps(results.get('player_on_off', {}))
 
             # 3) mark the upload as parsed
             uploaded_file.parse_status = 'Parsed Successfully'
