@@ -2992,6 +2992,7 @@ def team_totals():
     ]
 
     bc_alias = aliased(BlueCollarStats)
+    roster_alias = aliased(Roster)
     bc_sql_fields = [
         func.coalesce(func.sum(getattr(bc_alias, s)), 0).label(s)
         for s in (query_stats & bc_fields)
@@ -3007,14 +3008,23 @@ def team_totals():
         .join(Practice, PlayerStats.practice_id == Practice.id)
     )
     if bc_sql_fields:
-        trend_query = trend_query.outerjoin(
-            bc_alias, bc_alias.practice_id == Practice.id
+        trend_query = trend_query.join(
+            roster_alias,
+            and_(
+                roster_alias.season_id == PlayerStats.season_id,
+                roster_alias.player_name == PlayerStats.player_name,
+            ),
+        ).outerjoin(
+            bc_alias,
+            and_(
+                bc_alias.practice_id == Practice.id,
+                bc_alias.player_id == roster_alias.id,
+                bc_alias.season_id == PlayerStats.season_id,
+            ),
         )
     trend_query = trend_query.filter(PlayerStats.practice_id != None)
     if trend_season_id:
         trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
-        if bc_sql_fields:
-            trend_query = trend_query.filter(bc_alias.season_id == trend_season_id)
     if trend_start_dt:
         trend_query = trend_query.filter(Practice.date >= trend_start_dt)
     if trend_end_dt:
