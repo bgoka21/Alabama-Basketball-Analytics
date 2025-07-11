@@ -4,6 +4,7 @@ from flask import Blueprint, request, render_template, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
 from utils.db_helpers import array_agg_or_group_concat
+from utils.skill_config import shot_map, label_map
 from datetime import date
 from collections import defaultdict
 import json
@@ -27,6 +28,7 @@ from models.database import (
     Practice,
     Roster,
     PnRStats,
+    SkillEntry,
     UploadedFile,
 )
 
