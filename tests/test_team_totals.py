@@ -39,7 +39,7 @@ def app():
         db.session.add_all([r1, r2])
 
         practice1 = Practice(id=1, season_id=1, date=date(2024, 1, 2), category='Official')
-        practice2 = Practice(id=2, season_id=1, date=date(2024, 1, 5), category='Official')
+        practice2 = Practice(id=2, season_id=1, date=date(2024, 1, 5), category='Pickup')
         db.session.add_all([practice1, practice2])
 
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
@@ -192,6 +192,21 @@ def test_team_totals_trend_blue_collar_sum(client):
         {'date': '2024-01-02', 'total_blue_collar': 7},
         {'date': '2024-01-05', 'total_blue_collar': 0},
     ]
+
+
+def test_team_totals_trend_category_filter(client):
+    resp = client.get(
+        '/admin/team_totals',
+        query_string={'season_id': 1, 'trend_stat': 'points', 'trend_category': 'Pickup'}
+    )
+    html = resp.data.decode('utf-8')
+    m = re.search(r"const trendData = (.*?);", html, re.S)
+    assert m
+    data = json.loads(m.group(1))
+    assert data == [
+        {'date': '2024-01-05', 'points': 17},
+    ]
+    assert '<option value="Pickup" selected' in html
 
 
 def test_team_totals_paint_touch_ppp(client):
