@@ -52,7 +52,7 @@
     <select name="category" id="category" class="border rounded px-4 py-2 w-full">
       <option value="Game">Game</option>
       <option value="Summer Workouts">Summer Workouts</option>
-      <option value="Summer Pickup">Summer Pickup</option>
+      <option value="Pickup">Pickup</option>
       <option value="Fall Workouts">Fall Workouts</option>
       <option value="Official Practices">Official Practices</option>
     </select>
@@ -102,7 +102,7 @@
           method="post"
           class="inline"
         >
-          {% if f.category in ['Summer Workouts','Summer Pickup','Fall Workouts','Official Practices'] %}
+          {% if f.category in ['Summer Workouts','Pickup','Fall Workouts','Official Practices'] %}
             <button
               type="submit"
               class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
