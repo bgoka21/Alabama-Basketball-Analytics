@@ -1876,11 +1876,6 @@ def player_detail(player_name):
 
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
 
-    # fetch entries for Skill Development tab
-    entries = SkillEntry.query.filter_by(player_id=player.id) \
-                           .order_by(SkillEntry.date.desc()).all()
-    nba100_entries = Nba100Entry.query.filter_by(player_id=player.id) \
-                                   .order_by(Nba100Entry.date.desc()).all()
 
     # ─── Handle Skill‐Development form submission ───────────────────────
     if request.method == 'POST':
@@ -1963,8 +1958,9 @@ def player_detail(player_name):
         q = q.filter(SkillEntry.date >= start_dt)
     if end_dt:
         q = q.filter(SkillEntry.date <= end_dt)
-    all_entries = q.order_by(SkillEntry.date.desc()).all()
-    entries_list  = [e for e in all_entries if e.skill_name != "NBA 100"]
+    all_entries    = q.order_by(SkillEntry.date.desc()).all()
+    nba100_entries = [e for e in all_entries if e.skill_name == "NBA 100"]
+    entries_list   = [e for e in all_entries if e.skill_name != "NBA 100"]
 
     # ─── Group by date & compute totals ─────────────────────────────────
     # We’ll pass `entries_list` straight to Jinja and do groupby('date') there.
@@ -2493,7 +2489,7 @@ def player_detail(player_name):
         stats_records                      = game_stats_records if mode=='game' else practice_stats_records,
 
         # ─── Pass the flat list of all SkillEntry rows (so template can group by date) ───
-        entries                            = entries,
+        entries                            = entries_list,
         # ─── “Drill‐by‐drill” totals for shot_map (so template can show totals row) ───
         shot_totals                        = totals,
         # ── Pass the separate NBA 100 list to the template ────────────────
