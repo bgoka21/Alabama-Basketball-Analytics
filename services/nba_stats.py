@@ -1,7 +1,10 @@
+import logging
 import requests
 from datetime import date, timedelta
 from typing import List, Dict
 import pprint
+
+logger = logging.getLogger(__name__)
 
 # List of Alabama alum to track
 PLAYERS = [
@@ -38,9 +41,13 @@ def get_scoreboard_json(date_str: str) -> dict:
         "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/"
         f"scoreboard?seasontype=50&dates={date_str}"
     )
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    return resp.json() or {}
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return resp.json() or {}
+    except requests.RequestException as exc:
+        logger.error("Failed to fetch scoreboard for %s: %s", date_str, exc)
+        return {}
 
 def get_game_summary(game_id: str) -> dict:
     """Fetch the detailed summary JSON for a given Summer League game."""
@@ -48,9 +55,13 @@ def get_game_summary(game_id: str) -> dict:
         "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/"
         f"summary?event={game_id}"
     )
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    return resp.json() or {}
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return resp.json() or {}
+    except requests.RequestException as exc:
+        logger.error("Failed to fetch game summary %s: %s", game_id, exc)
+        return {}
 
 def _collect_athletes(team_block: dict) -> List[dict]:
     """Return a flat list of athlete dicts from a team boxscore block."""
@@ -114,12 +125,17 @@ def get_yesterdays_summer_stats(players: List[str]) -> Dict[str, Dict]:
     """Fetch Summer League box scores for the specified players from yesterday."""
     date_str = (date.today() - timedelta(days=1)).strftime("%Y%m%d")
     scoreboard = get_scoreboard_json(date_str)
+    if not scoreboard:
+        return {}
+
     final: Dict[str, Dict] = {}
     for event in scoreboard.get("events", []):
         game_id = event.get("id")
         if not game_id:
             continue
         summary = get_game_summary(game_id)
+        if not summary:
+            continue
         final.update(parse_players_from_summary(summary, players))
     return final
 
