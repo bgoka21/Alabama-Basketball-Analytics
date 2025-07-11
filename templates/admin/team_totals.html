@@ -41,7 +41,7 @@
     <form id="trendFilterForm" method="get" class="flex flex-wrap items-end gap-2">
       <div>
         <label class="font-semibold mr-2">Season:</label>
-        <select name="trend_season_id" class="border p-2 rounded">
+        <select name="trend_season_id" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">
           {% for s in seasons %}
             <option value="{{ s.id }}" {% if s.id == trend_selected_season %}selected{% endif %}>{{ s.season_name }}</option>
           {% endfor %}
@@ -49,16 +49,16 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">From</label>
-        <input type="date" name="trend_start_date" value="{{ trend_start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+        <input type="date" name="trend_start_date" value="{{ trend_start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">To</label>
-        <input type="date" name="trend_end_date" value="{{ trend_end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
+        <input type="date" name="trend_end_date" value="{{ trend_end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
       </div>
       {% if practice_categories %}
       <div>
         <label class="block text-sm font-medium mb-1">Category</label>
-        <select name="trend_category" multiple class="border border-gray-300 rounded px-2 py-1 text-sm">
+        <select name="trend_category" multiple class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">
           {% for c in practice_categories %}
             <option value="{{ c }}" {% if c in trend_selected_categories %}selected{% endif %}>{{ c }}</option>
           {% endfor %}
@@ -77,8 +77,8 @@
       {% endif %}
       <div>
         <label class="block text-sm font-medium mb-1" for="trend_stat_search">Stat</label>
-        <div class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <input type="text" id="trend_stat_search" placeholder="Search..." class="mb-2 w-full border border-gray-300 rounded px-1 py-0.5" oninput="filterTrendStats(this.value)">
+        <div class="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+          <input type="text" id="trend_stat_search" placeholder="Search..." class="mb-2 w-full border border-gray-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" oninput="filterTrendStats(this.value)">
           <div id="trend_stat_list" class="max-h-40 overflow-y-auto">
             {% for s in trend_stat_options %}
               <label class="flex items-center text-sm mr-2">
