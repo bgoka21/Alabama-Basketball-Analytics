@@ -2482,6 +2482,7 @@ def player_detail(player_name):
         entries                            = entries_list,
         # ─── “Drill‐by‐drill” totals for shot_map (so template can show totals row) ───
         shot_totals                        = totals,
+        totals                             = totals,
         # ── Pass the separate NBA 100 list to the template ────────────────
         nba100_entries                     = nba100_entries,
 
