@@ -28,6 +28,7 @@ from models.database import (
     Roster,
     PnRStats,
     UploadedFile,
+    SkillEntry,
 )
 
 
@@ -66,7 +67,7 @@ def public_bp_before_request():
     if not current_user.is_authenticated:
         return redirect(url_for('admin.login'))
     if current_user.is_player:
-        allowed = {'public.practice_homepage'}
+        allowed = {'public.practice_homepage', 'public.skill_dev', 'public.add_nba100_entry'}
         if request.endpoint not in allowed:
             flash('You do not have permission to view that page.', 'error')
             return redirect(url_for('public.practice_homepage'))
@@ -795,3 +796,54 @@ def season_leaderboard():
         category_options=category_options,
         selected_base=selected_base
     )
+
+@public_bp.route('/skill_dev')
+@login_required
+def skill_dev():
+    if not current_user.is_player:
+        flash('You do not have permission to view that page.', 'error')
+        return redirect(url_for('public.practice_homepage'))
+    roster = Roster.query.filter_by(player_name=current_user.player_name).first_or_404()
+    entries = (
+        SkillEntry.query
+        .filter_by(player_id=roster.id, skill_name='NBA 100')
+        .order_by(SkillEntry.date.desc())
+        .all()
+    )
+    return render_template('public/skill_dev.html', nba100_entries=entries)
+
+
+@public_bp.route('/nba100', methods=['POST'])
+@login_required
+def add_nba100_entry():
+    if not current_user.is_player:
+        abort(403)
+    roster = Roster.query.filter_by(player_name=current_user.player_name).first_or_404()
+    form_date = request.form.get('date')
+    makes_str = request.form.get('makes', '0')
+    try:
+        target_date = date.fromisoformat(form_date)
+    except (TypeError, ValueError):
+        flash('Invalid date for NBA 100 entry.', 'error')
+        return redirect(url_for('public.skill_dev'))
+    try:
+        makes = int(makes_str)
+        if makes < 0 or makes > 100:
+            raise ValueError()
+    except ValueError:
+        flash('"Makes" must be an integer between 0 and 100.', 'error')
+        return redirect(url_for('public.skill_dev'))
+    new_entry = SkillEntry(
+        player_id=roster.id,
+        date=target_date,
+        skill_name='NBA 100',
+        value=makes,
+        shot_class=None,
+        subcategory=None,
+        makes=0,
+        attempts=0,
+    )
+    db.session.add(new_entry)
+    db.session.commit()
+    flash(f'NBA 100 entry saved: {makes}/100 on {target_date.isoformat()}.', 'success')
+    return redirect(url_for('public.skill_dev'))
