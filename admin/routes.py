@@ -33,13 +33,6 @@ from models.database import (
     PnRStats
 )
 from models.database import PageView
-
-# Ensure compatibility if Nba100Entry model is unavailable
-try:  # pragma: no cover - legacy setups may lack this class
-    from models.database import Nba100Entry
-except ImportError:  # fallback to SkillEntry table
-    Nba100Entry = SkillEntry
-
 from models.uploaded_file import UploadedFile
 from models.user import User
 from sqlalchemy import func, and_
@@ -1876,7 +1869,6 @@ def player_detail(player_name):
 
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
 
-
     # ─── Handle Skill‐Development form submission ───────────────────────
     if request.method == 'POST':
         if not current_user.is_admin:
@@ -1958,9 +1950,9 @@ def player_detail(player_name):
         q = q.filter(SkillEntry.date >= start_dt)
     if end_dt:
         q = q.filter(SkillEntry.date <= end_dt)
-    all_entries    = q.order_by(SkillEntry.date.desc()).all()
+    all_entries = q.order_by(SkillEntry.date.desc()).all()
     nba100_entries = [e for e in all_entries if e.skill_name == "NBA 100"]
-    entries_list   = [e for e in all_entries if e.skill_name != "NBA 100"]
+    entries_list  = [e for e in all_entries if e.skill_name != "NBA 100"]
 
     # ─── Group by date & compute totals ─────────────────────────────────
     # We’ll pass `entries_list` straight to Jinja and do groupby('date') there.
@@ -2475,7 +2467,6 @@ def player_detail(player_name):
     # ─── Finally, render template with BOTH modes & all context ─────────
     return render_template(
         'player_detail.html',
-        player                             = player,
         player_name                        = player_name,
         mode                               = mode,
         agg                                = agg,
@@ -2508,6 +2499,7 @@ def player_detail(player_name):
         game_details                       = game_details,
         practice_breakdown                 = practice_breakdown,
         practice_details                   = practice_details,
+        player                             = player,
         has_stats                          = has_stats,
         label_options                      = label_options,
         selected_labels                    = selected_labels,
