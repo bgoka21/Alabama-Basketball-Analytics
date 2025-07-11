@@ -48,6 +48,12 @@
       Leaderboard
     </a>
   </li>
+  {% set summer_url = url_for('public.summer_stats') if view_exists('public.summer_stats') else '#' %}
+  <li class="nav-item{% if request.endpoint == 'public.summer_stats' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ summer_url }}">
+      Summer Stats
+    </a>
+  </li>
   {% if current_user.is_admin %}
   {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
                         'merge.merge_csv', 'admin.roster', 'admin.users_list',
