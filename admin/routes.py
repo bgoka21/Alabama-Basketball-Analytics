@@ -587,7 +587,7 @@ def parse_file(file_id):
         )
 
         # PRACTICE branch
-        if uploaded_file.category in ['Summer Workouts', 'Fall Workouts', 'Official Practices']:
+        if uploaded_file.category in ['Summer Workouts', 'Summer Pickup', 'Fall Workouts', 'Official Practices']:
             # use the file_date column (or fallback to today)
             file_date = uploaded_file.file_date or date.today()
 
@@ -714,7 +714,7 @@ def reparse_file(file_id):
             or Season.query.order_by(Season.start_date.desc()).first().id
         )
 
-        if uploaded_file.category in ['Summer Workouts', 'Fall Workouts', 'Official Practices']:
+        if uploaded_file.category in ['Summer Workouts', 'Summer Pickup', 'Fall Workouts', 'Official Practices']:
             file_date = uploaded_file.file_date or date.today()
             practice = Practice.query.filter_by(
                 season_id=season_id,
@@ -811,7 +811,7 @@ def delete_data(file_id):
 
     # Determine if this was a practice or a game
     is_practice = uploaded_file.category in [
-        'Summer Workouts', 'Fall Workouts', 'Official Practices'
+        'Summer Workouts', 'Summer Pickup', 'Fall Workouts', 'Official Practices'
     ]
 
     if is_practice:
