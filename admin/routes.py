@@ -2320,7 +2320,7 @@ def edit_skill_entry(player_name, entry_date):
         db.session.commit()
         flash('Skill‐development entries updated.', 'success')
         return redirect(
-            url_for('admin.player_detail', player_name=player_name) + '#skillDev'
+            url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
         )
 
     # GET: render the edit form, passing everything the template needs
