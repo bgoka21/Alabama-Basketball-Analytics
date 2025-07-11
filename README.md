@@ -7,3 +7,7 @@ To run tests:
 ```bash
 pytest -q
 ```
+
+### Summer League Stats
+
+After logging in, visit `/summer_stats` to view box scores for Alabama alumni from yesterday's NBA Summer League games.
