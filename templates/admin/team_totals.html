@@ -685,7 +685,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
   if(window.Chart && document.getElementById('trendChart')){
     const labels = trendData.map(d => {
-      const dt = new Date(d.date);
+      const [y,m,day] = d.date.split('-').map(Number);
+      const dt = new Date(y, m-1, day);
       return dt.toLocaleDateString('en-US',{month:'long', day:'numeric'});
     });
     const generateColor = (idx, total) => {
