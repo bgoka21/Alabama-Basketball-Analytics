@@ -35,7 +35,7 @@ from models.database import (
 from models.database import PageView
 from models.uploaded_file import UploadedFile
 from models.user import User
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import aliased
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
@@ -1443,7 +1443,6 @@ def aggregate_stats(stats_list):
 
 
 # ─── Helper: sum blue-collar stats for given PlayerStats records ──────────────
-from sqlalchemy import or_
 
 def get_blue_breakdown(stats_list, roster_id):
     """
