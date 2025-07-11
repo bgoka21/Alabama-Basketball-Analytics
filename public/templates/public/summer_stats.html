@@ -1,0 +1,36 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">Yesterday's Summer League Stats</h1>
+{% if stats %}
+<div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
+  <table class="w-full table-fixed border border-gray-200 rounded-md">
+    <thead>
+      <tr class="bg-gray-200">
+        <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Player</th>
+        <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Team</th>
+        <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Opp</th>
+        <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">MP</th>
+        <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">PTS</th>
+        <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">REB</th>
+        <th class="px-4 py-2 text-left text-sm font-medium">AST</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, stat in stats.items() %}
+      <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ name }}</td>
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ stat.team }}</td>
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ stat.opponent }}</td>
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ stat.MP or '-' }}</td>
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ stat.PTS or '-' }}</td>
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ stat.REB or '-' }}</td>
+        <td class="px-4 py-2 text-sm border-t border-gray-300">{{ stat.AST or '-' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>No Summer League games were found for yesterday.</p>
+{% endif %}
+{% endblock %}

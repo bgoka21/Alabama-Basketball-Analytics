@@ -32,6 +32,7 @@ from models.database import (
     UploadedFile,
     SkillEntry,
 )
+from services.nba_stats import PLAYERS, get_yesterdays_summer_stats
 
 
 public_bp = Blueprint(
@@ -849,3 +850,11 @@ def add_nba100_entry():
     db.session.commit()
     flash(f'NBA 100 entry saved: {makes}/100 on {target_date.isoformat()}.', 'success')
     return redirect(url_for('public.skill_dev'))
+
+
+@public_bp.route('/summer_stats')
+@login_required
+def summer_stats():
+    """Display yesterday's Summer League box scores for tracked players."""
+    stats = get_yesterdays_summer_stats(PLAYERS)
+    return render_template('public/summer_stats.html', stats=stats)
