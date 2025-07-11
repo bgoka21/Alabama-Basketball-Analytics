@@ -5,6 +5,13 @@
       Home
     </a>
   </li>
+  {% if current_user.is_player %}
+  <li class="nav-item{% if request.endpoint == 'public.skill_dev' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('public.skill_dev') }}">
+      Skill Development
+    </a>
+  </li>
+  {% endif %}
   {# Recruits page temporarily hidden #}
   {#
   {% set recruits_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
