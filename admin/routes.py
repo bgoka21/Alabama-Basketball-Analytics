@@ -2901,7 +2901,6 @@ def skill_totals():
     seasons = Season.query.order_by(Season.id.desc()).all()
     if not season_id and seasons:
         season_id = seasons[0].id
-
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     if start_date:
@@ -2956,6 +2955,9 @@ def team_totals():
     seasons = Season.query.order_by(Season.id.desc()).all()
     if not season_id and seasons:
         season_id = seasons[0].id
+    practice_categories = [
+        r[0] for r in db.session.query(Practice.category).distinct().order_by(Practice.category).all()
+    ]
 
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -2974,6 +2976,7 @@ def team_totals():
     trend_season_id = request.args.get('trend_season_id', type=int) or season_id
     trend_start_date = request.args.get('trend_start_date', start_date)
     trend_end_date = request.args.get('trend_end_date', end_date)
+    trend_selected_categories = request.args.getlist('trend_category')
     trend_start_dt = trend_end_dt = None
     if trend_start_date:
         try:
@@ -3170,6 +3173,8 @@ def team_totals():
         trend_query = trend_query.filter(Practice.date >= trend_start_dt)
     if trend_end_dt:
         trend_query = trend_query.filter(Practice.date <= trend_end_dt)
+    if trend_selected_categories:
+        trend_query = trend_query.filter(Practice.category.in_(trend_selected_categories))
     # No player-level filtering
     trend_rows = []
     for r in trend_query.group_by(Practice.date).order_by(Practice.date):
@@ -3237,6 +3242,8 @@ def team_totals():
         trend_start_date=trend_start_date or '',
         trend_end_date=trend_end_date or '',
         trend_selected_labels=trend_selected_labels,
+        practice_categories=practice_categories,
+        trend_selected_categories=trend_selected_categories,
         active_page='team_totals',
     )
 
