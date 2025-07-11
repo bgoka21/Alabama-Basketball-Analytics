@@ -4,7 +4,7 @@ shot_map = {
     'atr':     ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
     'floater': ['Right Hand', 'Left Hand', 'Off 1 Foot', 'Off 2 Feet'],
     '3fg':     ['Catch & Shoot - Stationary', 'Catch & Shoot - On The Move', 'Off Dribble'],
-    'ft':      ['Free Throw'],
+    'ft':      ['Free Throws'],
 }
 
 label_map = {

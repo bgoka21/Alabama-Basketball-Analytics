@@ -1865,8 +1865,13 @@ def collect_practice_labels(stats_records):
 @login_required
 def player_detail(player_name):
 
-
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
+
+    # Rebuild shot_map/label_map to ensure Free Throws category exists
+    local_shot_map = dict(shot_map)
+    local_shot_map.setdefault('ft', ['Free Throws'])
+    local_label_map = dict(label_map)
+    local_label_map.setdefault('ft', 'Free Throws')
 
     # ─── Handle Skill‐Development form submission ───────────────────────
     if request.method == 'POST':
@@ -1901,9 +1906,9 @@ def player_detail(player_name):
 
         # 2) Otherwise, fall back to the drill‐by‐drill loop (including 'ft')
         shot_date = date.fromisoformat(request.form.get('date'))
-        human     = {k: label_map[k] for k in shot_map}
+        human     = {k: local_label_map[k] for k in local_shot_map}
 
-        for cls, subs in shot_map.items():
+        for cls, subs in local_shot_map.items():
             for sub in subs:
                 key      = sub.replace(' ', '_')
                 makes    = int(request.form.get(f"{cls}_{key}_makes", '0') or '0')
@@ -1959,16 +1964,15 @@ def player_detail(player_name):
     for e in entries_list:
         grouped.setdefault(e.date, []).append(e)
 
-    # Build a nested dict for drill‐by‐drill totals:
-    totals = {
-        cls: { sub: {'makes': 0, 'attempts': 0} for sub in subs }
-        for cls, subs in shot_map.items()
+    # Build a nested dict for drill totals using SimpleNamespace
+    shot_totals = {
+        cls: {sub: SimpleNamespace(makes=0, attempts=0) for sub in subs}
+        for cls, subs in local_shot_map.items()
     }
     for e in entries_list:
-        # Only accumulate if it’s a drill entry (has shot_class + subcategory)
-        if e.shot_class in totals and e.subcategory in totals[e.shot_class]:
-            totals[e.shot_class][e.subcategory]['makes']    += e.makes
-            totals[e.shot_class][e.subcategory]['attempts'] += e.attempts
+        if e.shot_class in shot_totals and e.subcategory in shot_totals[e.shot_class]:
+            shot_totals[e.shot_class][e.subcategory].makes += e.makes
+            shot_totals[e.shot_class][e.subcategory].attempts += e.attempts
 
     # Build a separate “generic_totals” for any entry where shot_class is None
     generic_totals = {}
@@ -2481,13 +2485,13 @@ def player_detail(player_name):
         # ─── Pass the flat list of all SkillEntry rows (so template can group by date) ───
         entries                            = entries_list,
         # ─── “Drill‐by‐drill” totals for shot_map (so template can show totals row) ───
-        shot_totals                        = totals,
-        totals                             = totals,
+        shot_totals                        = shot_totals,
+        totals                             = shot_totals,
         # ── Pass the separate NBA 100 list to the template ────────────────
         nba100_entries                     = nba100_entries,
 
-        shot_map                           = shot_map,
-        label_map                          = label_map,
+        shot_map                           = local_shot_map,
+        label_map                          = local_label_map,
         generic_totals                     = generic_totals,   # e.g. {"Free Throws":123}
 
         # ── all your existing context for stats, shot summaries, etc. ─────────
@@ -2552,6 +2556,12 @@ def edit_skill_entry(player_name, entry_date):
         date=target_date
     ).all()
 
+    # Ensure shot_map includes Free Throws
+    local_shot_map = dict(shot_map)
+    local_shot_map.setdefault('ft', ['Free Throws'])
+    local_label_map = dict(label_map)
+    local_label_map.setdefault('ft', 'Free Throws')
+
     # If there are no entries at all for that date, flash & redirect
     if not entries:
         flash('No entries found for that date.', 'error')
@@ -2562,7 +2572,7 @@ def edit_skill_entry(player_name, entry_date):
     if request.method == 'POST':
         # Loop through every (shot_class, subcategory) in shot_map,
         # creating or updating a SkillEntry accordingly.
-        for cls, subs in shot_map.items():
+        for cls, subs in local_shot_map.items():
             for sub in subs:
                 field_key = sub.replace(' ', '_')
                 makes    = int(request.form.get(f"{cls}_{field_key}_makes", '0') or '0')
@@ -2601,8 +2611,8 @@ def edit_skill_entry(player_name, entry_date):
         player_name=player_name,
         entries=entries,
         entry_date=entry_date,
-        shot_map=shot_map,
-        label_map=label_map
+        shot_map=local_shot_map,
+        label_map=local_label_map
     )
 
 
