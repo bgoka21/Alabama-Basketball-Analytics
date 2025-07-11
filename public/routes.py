@@ -66,7 +66,7 @@ def public_bp_before_request():
     if not current_user.is_authenticated:
         return redirect(url_for('admin.login'))
     if current_user.is_player:
-        allowed = {'public.practice_homepage'}
+        allowed = {'public.practice_homepage', 'public.skill_dev'}
         if request.endpoint not in allowed:
             flash('You do not have permission to view that page.', 'error')
             return redirect(url_for('public.practice_homepage'))
@@ -722,6 +722,48 @@ def practice_homepage(active_page="practice_home"):
 def homepage():
     """Alias for practice_homepage as the main home view."""
     return practice_homepage(active_page="home")
+
+
+@public_bp.route('/player/<player_name>/skill_dev', methods=['GET', 'POST'])
+@login_required
+def skill_dev(player_name):
+    """Allow a player to submit drill-by-drill skill entries."""
+    if current_user.is_player and current_user.player_name != player_name:
+        flash('You do not have permission to view that page.', 'error')
+        return redirect(url_for('public.practice_homepage'))
+
+    player = Roster.query.filter_by(player_name=player_name).first_or_404()
+
+    if request.method == 'POST':
+        shot_date = date.fromisoformat(request.form.get('date'))
+        human = {k: label_map[k] for k in shot_map}
+        for cls, subs in shot_map.items():
+            for sub in subs:
+                key = sub.replace(' ', '_')
+                makes = int(request.form.get(f"{cls}_{key}_makes", '0') or '0')
+                attempts = int(request.form.get(f"{cls}_{key}_attempts", '0') or '0')
+                if makes or attempts:
+                    db.session.add(
+                        SkillEntry(
+                            player_id=player.id,
+                            date=shot_date,
+                            skill_name=human[cls],
+                            value=attempts,
+                            shot_class=cls,
+                            subcategory=sub,
+                            makes=makes,
+                            attempts=attempts,
+                        )
+                    )
+        db.session.commit()
+        return redirect(url_for('public.skill_dev', player_name=player_name))
+
+    return render_template(
+        'public/skill_dev.html',
+        player_name=player_name,
+        shot_map=shot_map,
+        label_map=label_map,
+    )
 
 
 @public_bp.route('/api/direct_pnr_for_player/<int:player_id>', methods=['GET'])

@@ -3,7 +3,7 @@
 <h1 class="text-3xl font-bold mb-6">Practice Leaderboards</h1>
 {% if current_user.is_player %}
   <p class="mb-4">
-    <a href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}" class="text-blue-600 underline">My Player Page</a>
+    <a href="{{ url_for('public.skill_dev', player_name=current_user.player_name) }}" class="text-blue-600 underline">My Player Page</a>
   </p>
 {% endif %}
 <div class="mb-8 bg-white rounded-lg shadow-md p-4 sm:p-6">
