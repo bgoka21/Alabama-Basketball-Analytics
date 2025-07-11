@@ -792,7 +792,7 @@ def season_leaderboard():
         selected_base = stat_key
 
     return render_template(
-        'public/leaderboard.html',
+        'leaderboard.html',
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
         rows=rows,
@@ -813,7 +813,7 @@ def skill_dev():
         .order_by(SkillEntry.date.desc())
         .all()
     )
-    return render_template('public/skill_dev.html', nba100_entries=entries)
+    return render_template('skill_dev.html', nba100_entries=entries)
 
 
 @public_bp.route('/nba100', methods=['POST'])
@@ -857,4 +857,4 @@ def add_nba100_entry():
 def summer_stats():
     """Display yesterday's Summer League box scores for tracked players."""
     stats = get_yesterdays_summer_stats(PLAYERS)
-    return render_template('public/summer_stats.html', stats=stats)
+    return render_template('summer_stats.html', stats=stats)
