@@ -37,14 +37,20 @@ def get_scoreboard_json(date_str: str) -> dict:
     dict
         Parsed JSON response.
     """
+    y = int(date_str[:4])
     url = (
-        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/"
-        f"scoreboard?seasontype=50&dates={date_str}"
+        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        f"?season={y}&seasontype=50&dates={date_str}"
     )
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
-        return resp.json() or {}
+        data = resp.json() or {}
+        events = data.get("events", [])
+        print(
+            f"DEBUG [Scoreboard]: Found {len(events)} game(s) on {date_str}: {[e['id'] for e in events]}"
+        )
+        return data
     except requests.RequestException as exc:
         logger.error("Failed to fetch scoreboard for %s: %s", date_str, exc)
         return {}
@@ -104,6 +110,7 @@ def parse_players_from_summary(summary_json: dict, players: List[str]) -> Dict[s
         for athlete in _collect_athletes(team):
             info = athlete.get("athlete", athlete)
             name = info.get("displayName") or info.get("fullName")
+            print(f"DEBUG [Athlete]: displayName = {name}")
             if name not in players:
                 continue
             stats_block = None
