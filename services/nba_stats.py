@@ -1,7 +1,11 @@
-import requests
+import logging
 from datetime import date, timedelta
 from typing import List, Dict
 import pprint
+import requests
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 # List of Alabama alum to track
@@ -36,21 +40,26 @@ def get_scoreboard_json(date_str: str) -> dict:
         Parsed JSON response.
     """
     year = int(date_str[:4])
+    season = year - 1  # use prior season for Summer League
     url = (
         "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        f"?season={year}&seasontype=50&dates={date_str}"
+        f"?season={season}&seasontype=50&dates={date_str}"
     )
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json() or {}
-        events = data.get("events", [])
-        print(
-            f"DEBUG [Scoreboard]: Found {len(events)} game(s) on {date_str}: {[e.get('id') for e in events]}"
-        )
-        return data
-    except requests.RequestException:
-        return {}
+    except requests.HTTPError as exc:
+        logger.exception("Failed to fetch scoreboard for %s", date_str)
+        return {"events": []}
+    events = data.get("events", [])
+    logger.debug(
+        "Scoreboard: %d events on %s → %s",
+        len(events),
+        date_str,
+        [e.get("id") for e in events],
+    )
+    return data
 
 def get_game_summary(game_id: str) -> dict:
     """Fetch the detailed summary JSON for a given Summer League game."""
