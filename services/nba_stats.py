@@ -1,10 +1,8 @@
-import logging
 import requests
 from datetime import date, timedelta
 from typing import List, Dict
 import pprint
 
-logger = logging.getLogger(__name__)
 
 # List of Alabama alum to track
 PLAYERS = [
@@ -37,10 +35,10 @@ def get_scoreboard_json(date_str: str) -> dict:
     dict
         Parsed JSON response.
     """
-    y = int(date_str[:4])
+    year = int(date_str[:4])
     url = (
         "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        f"?season={y}&seasontype=50&dates={date_str}"
+        f"?season={year}&seasontype=50&dates={date_str}"
     )
     try:
         resp = requests.get(url, timeout=10)
@@ -48,26 +46,21 @@ def get_scoreboard_json(date_str: str) -> dict:
         data = resp.json() or {}
         events = data.get("events", [])
         print(
-            f"DEBUG [Scoreboard]: Found {len(events)} game(s) on {date_str}: {[e['id'] for e in events]}"
+            f"DEBUG [Scoreboard]: Found {len(events)} game(s) on {date_str}: {[e.get('id') for e in events]}"
         )
         return data
-    except requests.RequestException as exc:
-        logger.error("Failed to fetch scoreboard for %s: %s", date_str, exc)
+    except requests.RequestException:
         return {}
 
 def get_game_summary(game_id: str) -> dict:
     """Fetch the detailed summary JSON for a given Summer League game."""
     url = (
-        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/"
-        f"summary?event={game_id}"
+        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+        f"?event={game_id}"
     )
-    try:
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        return resp.json() or {}
-    except requests.RequestException as exc:
-        logger.error("Failed to fetch game summary %s: %s", game_id, exc)
-        return {}
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
 
 def _collect_athletes(team_block: dict) -> List[dict]:
     """Return a flat list of athlete dicts from a team boxscore block."""
@@ -83,49 +76,30 @@ def _collect_athletes(team_block: dict) -> List[dict]:
     return athletes
 
 def parse_players_from_summary(summary_json: dict, players: List[str]) -> Dict[str, Dict]:
-    """Extract desired players' box scores from the game summary JSON.
+    """Extract desired players' box scores from the game summary JSON."""
 
-    Parameters
-    ----------
-    summary_json : dict
-        JSON from :func:`get_game_summary`.
-    players : list[str]
-        Names of players to extract.
-
-    Returns
-    -------
-    dict
-        Mapping of player name to statistics with ``team`` and ``opponent`` keys.
-    """
     results: Dict[str, Dict] = {}
     boxscore = summary_json.get("boxscore", {})
     teams = boxscore.get("players", [])
-    if not isinstance(teams, list):
-        return results
-    team_abbrevs = [t.get("team", {}).get("abbreviation", "") for t in teams]
-    for team in teams:
-        team_info = team.get("team", {})
-        team_abbrev = team_info.get("abbreviation", "")
-        opponent_abbrev = next((a for a in team_abbrevs if a != team_abbrev), "")
-        for athlete in _collect_athletes(team):
-            info = athlete.get("athlete", athlete)
-            name = info.get("displayName") or info.get("fullName")
-            print(f"DEBUG [Athlete]: displayName = {name}")
-            if name not in players:
+    # Determine all team abbreviations so we can assign opponents
+    abbrevs = [t.get("team", {}).get("abbreviation") for t in teams if t.get("team")]
+    for team_block in teams:
+        team_abbrev = team_block.get("team", {}).get("abbreviation")
+        opponent_abbrev = next((a for a in abbrevs if a != team_abbrev), "")
+        for stat_block in team_block.get("statistics", []):
+            if stat_block.get("name") != "Statistics":
                 continue
-            stats_block = None
-            for blk in athlete.get("statistics", []):
-                if blk.get("name") == "Statistics":
-                    stats_block = blk
-                    break
-            stat_map = {}
-            if stats_block:
-                labels = stats_block.get("labels", [])
-                totals = stats_block.get("totals", [])
-                stat_map = dict(zip(labels, totals))
-            stat_map["team"] = team_abbrev
-            stat_map["opponent"] = opponent_abbrev
-            results[name] = stat_map
+            labels = stat_block.get("labels", [])
+            for athlete in stat_block.get("athletes", []):
+                name = athlete.get("athlete", {}).get("displayName")
+                print(f"DEBUG [Athlete]: displayName = {name}")
+                if name not in PLAYERS:
+                    continue
+                values = athlete.get("stats", [])
+                stat_map = dict(zip(labels, values))
+                stat_map["team"] = team_abbrev
+                stat_map["opponent"] = opponent_abbrev
+                results[name] = stat_map
     return results
 
 def get_yesterdays_summer_stats(players: List[str]) -> Dict[str, Dict]:
