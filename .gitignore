@@ -9,3 +9,4 @@ templates/.DS_Store
 instance/database.db
 instance/app.db
 models/instance.db
+node_modules/
