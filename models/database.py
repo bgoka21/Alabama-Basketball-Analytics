@@ -266,6 +266,31 @@ class PageView(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     user_agent = db.Column(db.String(256), nullable=True)
 
+
+class PlayerDraftStock(db.Model):
+    __tablename__ = 'player_draft_stock'
+    id                = db.Column(db.Integer, primary_key=True)
+    coach             = db.Column(db.String(128))
+    coach_current_team= db.Column(db.String(128))
+    player            = db.Column(db.String(128))
+    player_class      = db.Column(db.String(32))
+    age               = db.Column(db.Float)
+    team              = db.Column(db.String(128))
+    conference        = db.Column(db.String(128))
+    year              = db.Column(db.Integer)
+    projected_pick    = db.Column(db.String(32))
+    actual_pick       = db.Column(db.String(32))
+    projected_money   = db.Column(db.Float)
+    actual_money      = db.Column(db.Float)
+    net               = db.Column(db.Float)
+    # ── New Bio Fields ──
+    high_school       = db.Column(db.String(128))
+    hometown_city     = db.Column(db.String(128))
+    hometown_state    = db.Column(db.String(64))
+    height            = db.Column(db.String(32))
+    weight            = db.Column(db.Float)
+    position          = db.Column(db.String(64))
+
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile
 from .recruit import Recruit
