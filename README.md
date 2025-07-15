@@ -11,3 +11,16 @@ pytest -q
 ### Summer League Stats
 
 After logging in, visit `/summer_stats` to view box scores for Alabama alumni from yesterday's NBA Summer League games.
+
+### Creating an Admin Account
+
+Administrative features require a user with admin privileges. Update the
+`create_user.py` script with your desired username and password and run it:
+
+```bash
+python create_user.py
+```
+
+The script creates an account marked as an administrator. When logged in with an
+admin account, the sidebar will include a **Draft Upload** link which is hidden
+for regular users.
