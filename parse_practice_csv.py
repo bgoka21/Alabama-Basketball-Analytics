@@ -139,7 +139,6 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             encoding="utf-8-sig",
             engine="python",
             dtype=str,
-            on_bad_lines="skip",
         )
     except Exception:
         if current_app:
