@@ -525,7 +525,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         # 1) Insert PlayerStats
         db.session.add(
             PlayerStats(
-                player_name       = Roster.query.get(roster_id).player_name,
+                player_name       = db.session.get(Roster, roster_id).player_name,
                 season_id         = season_id,
                 practice_id       = practice_id,
                 game_id           = None,

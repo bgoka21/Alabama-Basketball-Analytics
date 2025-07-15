@@ -26,7 +26,7 @@ def app(tmp_path):
 
     @lm.user_loader
     def load_user(uid):
-        return User.query.get(int(uid))
+        return db.session.get(User, int(uid))
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
     with app.app_context():

@@ -26,7 +26,7 @@ def app(tmp_path):
 
     @lm.user_loader
     def load_user(uid):
-        return User.query.get(int(uid))
+        return db.session.get(User, int(uid))
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
     with app.app_context():
@@ -63,7 +63,7 @@ def test_lineup_and_on_off(client, app):
     assert resp.status_code == 302
 
     with app.app_context():
-        uf = UploadedFile.query.get(1)
+        uf = db.session.get(UploadedFile, 1)
         lineups = json.loads(uf.lineup_efficiencies)
         on_off = json.loads(uf.player_on_off)
 
