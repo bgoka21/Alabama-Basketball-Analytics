@@ -49,9 +49,9 @@ def get_scoreboard_json(date_str: str) -> dict:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json() or {}
-    except requests.HTTPError as exc:
+    except requests.RequestException:
         logger.exception("Failed to fetch scoreboard for %s", date_str)
-        return {"events": []}
+        return {}
     events = data.get("events", [])
     logger.debug(
         "Scoreboard: %d events on %s → %s",
@@ -67,9 +67,13 @@ def get_game_summary(game_id: str) -> dict:
         "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
         f"?event={game_id}"
     )
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException:
+        logger.exception("Failed to fetch game summary for %s", game_id)
+        return {}
 
 def _collect_athletes(team_block: dict) -> List[dict]:
     """Return a flat list of athlete dicts from a team boxscore block."""
