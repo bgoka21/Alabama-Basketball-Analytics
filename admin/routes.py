@@ -368,7 +368,6 @@ def admin_bp_before_request():
         allowed = {
             'admin.player_detail',
             'admin.logout',
-            'admin.team_totals',
         }
         if request.endpoint not in allowed:
             flash("You do not have permission to view that page.", "error")
