@@ -25,3 +25,4 @@ twofourseven
 Flask-APScheduler
 APScheduler
 pdfkit
+openpyxl

@@ -2,8 +2,7 @@ import os
 import pandas as pd
 from flask import render_template, jsonify, request, current_app, make_response, abort, redirect, url_for, flash
 from werkzeug.utils import secure_filename
-from app import app, PDFKIT_CONFIG, PDF_OPTIONS
-from yourapp import db
+from app import app, db, PDFKIT_CONFIG, PDF_OPTIONS
 from sqlalchemy import func
 from models.database import PlayerDraftStock
 from admin.routes import (
@@ -285,64 +284,6 @@ def shot_type_report(shot_type):
     return render_template('shot_type.html', shot_type=shot_type, title=title, data=data)
 
 
-# —– Configuration —–
-UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
-ALLOWED_EXTENSIONS = {'xlsx'}
-
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-# —– 1. Admin Upload Handler —–
-@app.route('/admin/draft-upload', methods=['GET', 'POST'])
-@admin_required
-def draft_upload():
-    if request.method == 'POST':
-        file = request.files.get('file')
-        if not file or not allowed_file(file.filename):
-            flash('Please upload a valid .xlsx file', 'error')
-            return redirect(request.url)
-
-        fname = secure_filename(file.filename)
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-        path = os.path.join(UPLOAD_FOLDER, fname)
-        file.save(path)
-
-        df_all = pd.concat(pd.read_excel(path, sheet_name=None).values(), ignore_index=True)
-
-        PlayerDraftStock.query.delete()
-        db.session.commit()
-
-        for _, row in df_all.iterrows():
-            entry = PlayerDraftStock(
-                coach=row.get('Coach'),
-                coach_current_team=row.get('Coach Current Team'),
-                player=row.get('Player'),
-                player_class=row.get('Class'),
-                age=float(row.get('Age')) if pd.notnull(row.get('Age')) else None,
-                team=row.get('Team'),
-                conference=row.get('Player Conference') or row.get('Conference'),
-                year=int(row.get('Year')) if pd.notnull(row.get('Year')) else None,
-                projected_pick=str(row.get('Projected Pick')),
-                actual_pick=str(row.get('Actual Pick')),
-                projected_money=float(row.get('Projected Money', 0)),
-                actual_money=float(row.get('Actual Money', 0)),
-                net=float(row.get('NET', 0)),
-                high_school=row.get('High School'),
-                hometown_city=row.get('Hometown City') or row.get('City'),
-                hometown_state=row.get('Hometown State') or row.get('State'),
-                height=str(row.get('Height')) if pd.notnull(row.get('Height')) else None,
-                weight=float(row.get('Weight')) if pd.notnull(row.get('Weight')) else None,
-                position=row.get('Position'),
-            )
-            db.session.add(entry)
-        db.session.commit()
-
-        flash('Draft stock workbook uploaded & data refreshed—including bio info!', 'success')
-        return redirect(url_for('draft_upload'))
-
-    return render_template('admin/draft_upload.html')
 
 
 # —– 2. Head-to-Head NET API —–
@@ -356,3 +297,31 @@ def draft_net():
             db.session.query(func.sum(PlayerDraftStock.net)).filter_by(team=rival).scalar() or 0
         )
     return jsonify({'alabama_net': int(al_net), 'rival_net': int(rival_net)})
+
+# Configure upload folder (falls back to /uploads in your project root)
+UPLOAD_FOLDER = app.config.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'uploads'))
+ALLOWED_EXTENSIONS = {'xlsx'}
+
+def allowed_file(filename):
+    return filename and '.' in filename and filename.rsplit('.',1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/admin/draft-upload', methods=['GET', 'POST'])
+def draft_upload():
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or not allowed_file(file.filename):
+            flash('Please upload a valid .xlsx file', 'error')
+            return redirect(url_for('draft_upload'))
+
+        # Save file stub
+        filename = secure_filename(file.filename)
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        dest = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(dest)
+
+        # TODO: parse & save rows to PlayerDraftStock
+        flash('Upload endpoint is set up — implementation coming soon!', 'success')
+        return redirect(url_for('draft_upload'))
+
+    # On GET, render the form
+    return render_template('admin/draft_upload.html')
