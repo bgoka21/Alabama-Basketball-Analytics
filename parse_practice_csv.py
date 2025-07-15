@@ -132,7 +132,12 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # Use utf-8-sig to seamlessly strip any UTF-8 BOM that may be present in
     # practice CSV files exported from Excel. Without this, the first column
     # name becomes '\ufeffRow' and row types are not recognized.
-    df = pd.read_csv(practice_csv_path, encoding="utf-8-sig", engine="python")
+    df = pd.read_csv(
+        practice_csv_path,
+        encoding="utf-8-sig",
+        engine="python",
+        dtype=str,
+    )
     # Normalize column headers to avoid mismatches caused by stray whitespace
     df.columns = [str(c).strip() for c in df.columns]
     
