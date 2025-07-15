@@ -5,13 +5,6 @@
       Home
     </a>
   </li>
-  {% if current_user.is_player %}
-  <li class="nav-item{% if request.endpoint == 'public.skill_dev' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('public.skill_dev') }}">
-      Skill Development
-    </a>
-  </li>
-  {% endif %}
   {# Recruits page temporarily hidden #}
   {#
   {% set recruits_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
@@ -43,10 +36,9 @@
       Skill Totals
     </a>
   </li>
-  {% set team_totals_ep = 'admin.team_totals' %}
-  {% set has_team_totals = (view_exists(team_totals_ep) if view_exists is defined else True) %}
-  {% set team_totals_url = url_for(team_totals_ep) if has_team_totals else '#' %}
-  <li class="nav-item{% if request.endpoint == team_totals_ep %} active{% endif %}">
+  {% set has_team_totals = (view_exists('admin.team_totals') if view_exists is defined else True) %}
+  {% set team_totals_url = url_for('admin.team_totals') if has_team_totals else '#' %}
+  <li class="nav-item{% if request.endpoint == 'admin.team_totals' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ team_totals_url }}">
       Team Totals
     </a>
@@ -62,6 +54,32 @@
       Summer Stats
     </a>
   </li>
+  {% if current_user.is_admin %}
+  {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
+                        'merge.merge_csv', 'admin.roster', 'admin.users_list',
+                        'admin.usage_report', 'draft_upload'] %}
+  <li class="nav-item">
+    <details class="group" {% if mgmt_active %}open{% endif %}>
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
+        Management
+      </summary>
+      <div class="ml-4 mt-2 flex flex-col gap-2">
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.dashboard' %} active{% endif %}" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.files_view_unique' %} active{% endif %}" href="{{ url_for('admin.files_view_unique') }}">Files</a>
+        {% if view_exists('merge.merge_csv') %}
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'merge.merge_csv' %} active{% endif %}" href="{{ url_for('merge.merge_csv') }}">Merge CSV</a>
+        {% endif %}
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.roster' %} active{% endif %}" href="{{ url_for('admin.roster') }}">Roster</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.users_list' %} active{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
+        {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
+        {% if view_exists('draft_upload') %}
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'draft_upload' %} active{% endif %}" href="{{ url_for('draft_upload') }}">Draft Upload</a>
+        {% endif %}
+      </div>
+    </details>
+  </li>
+  {% endif %}
   {% if current_user.is_authenticated %}
   <li class="nav-item{% if request.endpoint == 'admin.logout' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.logout') }}">
