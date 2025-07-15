@@ -1,5 +1,6 @@
 import json
 import pandas as pd
+from flask import current_app
 from collections import defaultdict
 from utils.lineup import compute_lineup_efficiencies, compute_player_on_off_by_team
 from models.database import (
@@ -132,12 +133,20 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # Use utf-8-sig to seamlessly strip any UTF-8 BOM that may be present in
     # practice CSV files exported from Excel. Without this, the first column
     # name becomes '\ufeffRow' and row types are not recognized.
-    df = pd.read_csv(
-        practice_csv_path,
-        encoding="utf-8-sig",
-        engine="python",
-        dtype=str,
-    )
+    try:
+        df = pd.read_csv(
+            practice_csv_path,
+            encoding="utf-8-sig",
+            engine="python",
+            dtype=str,
+            on_bad_lines="skip",
+        )
+    except Exception:
+        if current_app:
+            current_app.logger.exception("Failed to read practice CSV")
+        return {
+            "error": "Unable to parse practice CSV. Please check that the file is formatted correctly."
+        }
     # Normalize column headers to avoid mismatches caused by stray whitespace
     df.columns = [str(c).strip() for c in df.columns]
     
