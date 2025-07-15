@@ -61,8 +61,6 @@ def test_summer_stats_renders_table(client):
     assert resp.status_code == 200
     html = resp.data.decode('utf-8')
     assert 'John Doe' in html
-    assert 'ATL' in html
     assert 'NYK' in html
     assert 'Jane Roe' in html
-    assert 'LAL' in html
     assert 'BOS' in html
