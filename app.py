@@ -183,6 +183,7 @@ def create_app():
     # variable first so ``routes`` can import it without a circular import.
     globals()['app'] = app
     import routes  # noqa: F401
+    from routes import draft_upload  # noqa: F401
 
     return app
 
