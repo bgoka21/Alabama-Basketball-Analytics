@@ -27,7 +27,7 @@ def app(tmp_path):
 
     @lm.user_loader
     def load_user(uid):
-        return User.query.get(int(uid))
+        return db.session.get(User, int(uid))
     app.register_blueprint(admin_bp, url_prefix='/admin')
     with app.app_context():
         db.create_all()
@@ -107,8 +107,8 @@ def test_delete_game_data(client, app):
     assert os.path.exists(path)
     client.post(f'/admin/delete-data/{file_id}')
     with app.app_context():
-        assert UploadedFile.query.get(file_id) is None
-        assert Game.query.get(game_id) is None
+        assert db.session.get(UploadedFile, file_id) is None
+        assert db.session.get(Game, game_id) is None
         assert TeamStats.query.filter_by(game_id=game_id).count() == 0
         assert PlayerStats.query.filter_by(game_id=game_id).count() == 0
         assert BlueCollarStats.query.filter_by(game_id=game_id).count() == 0
@@ -123,8 +123,8 @@ def test_delete_practice_data(client, app):
     assert os.path.exists(path)
     client.post(f'/admin/delete-data/{file_id}')
     with app.app_context():
-        assert UploadedFile.query.get(file_id) is None
-        assert Practice.query.get(practice_id) is None
+        assert db.session.get(UploadedFile, file_id) is None
+        assert db.session.get(Practice, practice_id) is None
         assert TeamStats.query.filter_by(practice_id=practice_id).count() == 0
         assert PlayerStats.query.filter_by(practice_id=practice_id).count() == 0
         assert BlueCollarStats.query.filter_by(practice_id=practice_id).count() == 0

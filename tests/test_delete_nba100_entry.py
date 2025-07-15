@@ -22,7 +22,7 @@ def app():
 
     @lm.user_loader
     def load_user(uid):
-        return User.query.get(int(uid))
+        return db.session.get(User, int(uid))
     app.register_blueprint(admin_bp, url_prefix='/admin')
     with app.app_context():
         db.create_all()
@@ -51,4 +51,4 @@ def test_delete_nba100_entry(client, app):
     resp = client.post('/admin/player/%231%20Test/nba100/1/delete')
     assert resp.status_code == 302
     with app.app_context():
-        assert SkillEntry.query.get(1) is None
+        assert db.session.get(SkillEntry, 1) is None

@@ -1993,20 +1993,20 @@ def player_detail(player_name):
             keep = True
             if start_dt:
                 if rec.practice_id:
-                    pr = Practice.query.get(rec.practice_id)
+                    pr = db.session.get(Practice, rec.practice_id)
                     if not (pr and pr.date >= start_dt):
                         keep = False
                 elif rec.game_id:
-                    gm = Game.query.get(rec.game_id)
+                    gm = db.session.get(Game, rec.game_id)
                     if not (gm and gm.game_date >= start_dt):
                         keep = False
             if end_dt and keep:
                 if rec.practice_id:
-                    pr = Practice.query.get(rec.practice_id)
+                    pr = db.session.get(Practice, rec.practice_id)
                     if not (pr and pr.date <= end_dt):
                         keep = False
                 elif rec.game_id:
-                    gm = Game.query.get(rec.game_id)
+                    gm = db.session.get(Game, rec.game_id)
                     if not (gm and gm.game_date <= end_dt):
                         keep = False
             if keep:
@@ -2759,7 +2759,7 @@ def roster():
         if name:
             db.session.add(Roster(season_id=selected_id, player_name=name))
             db.session.commit()
-            flash(f"Added {name} to {Season.query.get(selected_id).season_name}.", "success")
+            flash(f"Added {name} to {db.session.get(Season, selected_id).season_name}.", "success")
         return redirect(url_for('admin.roster', season_id=selected_id))
 
     # 4) Fetch only this season’s roster
