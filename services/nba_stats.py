@@ -40,7 +40,13 @@ def get_game_summary(game_id: str) -> Dict:
     """Fetch ESPN JSON summary for one game."""
     url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={game_id}"
     resp = requests.get(url)
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as e:
+        if resp.status_code == 404:
+            logger.warning("Summary not found for game %s", game_id)
+            return {}
+        raise
     data = resp.json()
     logger.debug("Fetched summary for game %s", game_id)
     return data
