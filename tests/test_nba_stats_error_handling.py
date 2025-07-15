@@ -21,6 +21,20 @@ def test_get_game_summary_handles_error():
             get_game_summary('123')
 
 
+def test_get_game_summary_handles_404():
+    class MockResp:
+        status_code = 404
+
+        def raise_for_status(self):
+            raise requests.HTTPError(response=self)
+
+        def json(self):
+            return {}
+
+    with patch('services.nba_stats.requests.get', return_value=MockResp()):
+        assert get_game_summary('1') == {}
+
+
 def test_get_yesterdays_summer_stats_propagates_errors():
     # scoreboard failure propagates
     with patch('services.nba_stats.get_scoreboard_html', side_effect=requests.RequestException):
