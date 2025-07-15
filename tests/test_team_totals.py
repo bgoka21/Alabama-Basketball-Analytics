@@ -150,7 +150,7 @@ def test_team_totals_access_for_players(app):
             db.session.commit()
         c.post('/admin/login', data={'username': 'player', 'password': 'pw'})
         resp = c.get('/admin/team_totals', query_string={'season_id': 1})
-        assert resp.status_code == 200
+        assert resp.status_code == 302
 
 
 def test_team_totals_access_for_staff(app):
