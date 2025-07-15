@@ -5,7 +5,7 @@
     <ul class="space-y-2">
       {% for player, stat in stats.items() %}
         <li>
-          <strong>{{ player }}</strong> vs {{ stat.opponent }}
+          <strong>{{ player }}</strong> ({{ stat.team }}) vs {{ stat.opponent }}
           — PTS: {{ stat.PTS }} | REB: {{ stat.REB }} | AST: {{ stat.AST }}
         </li>
       {% endfor %}

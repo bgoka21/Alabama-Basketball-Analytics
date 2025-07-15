@@ -5,7 +5,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_, case
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
-from datetime import date
+from datetime import date, timedelta
 from collections import defaultdict
 import json
 from types import SimpleNamespace
