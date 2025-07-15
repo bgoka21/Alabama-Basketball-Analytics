@@ -16,6 +16,7 @@ from models.database import PlayerStats, Practice, BlueCollarStats, Possession
 from datetime import date
 from types import SimpleNamespace
 from flask_login import login_required
+from utils.auth import admin_required
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
@@ -295,6 +296,7 @@ def allowed_file(filename):
 
 # —– 1. Admin Upload Handler —–
 @app.route('/admin/draft-upload', methods=['GET', 'POST'])
+@admin_required
 def draft_upload():
     if request.method == 'POST':
         file = request.files.get('file')

@@ -11,6 +11,8 @@ from flask import (
     flash,
     send_file,
 )
+from flask_login import login_required
+from utils.auth import admin_required
 
 # Blueprint replacing the standalone Flask app
 merge_bp = Blueprint("merge", __name__, template_folder="templates")
@@ -39,6 +41,8 @@ def save_merge_config(config):
 
 
 @merge_bp.route("/merge_csv", methods=["GET", "POST"])
+@login_required
+@admin_required
 def merge_csv():
     """Merge uploaded CSV files according to the saved settings."""
     if request.method == "POST":
@@ -85,6 +89,8 @@ def merge_csv():
     return render_template("merge_csv.html")
 
 @merge_bp.route("/merge_settings", methods=["GET", "POST"])
+@login_required
+@admin_required
 def merge_settings():
     """View or update merge configuration."""
     config = load_merge_config()
