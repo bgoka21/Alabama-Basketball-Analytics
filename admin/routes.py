@@ -350,6 +350,12 @@ def admin_bp_before_request():
         'admin.delete_user',
         'admin.edit_roster',
         'admin.delete_roster',
+        'admin.roster',
+        'admin.create_season',
+        'admin.usage_report',
+        'admin.user_usage_report',
+        'admin.draft_upload',
+        'draft_upload',
         # … add any other admin-only endpoints here …
     }
 
@@ -2737,7 +2743,7 @@ def player_skill(player_name):
 
 
 @admin_bp.route('/roster', methods=['GET', 'POST'])
-@login_required
+@admin_required
 def roster():
     # 1) Load seasons
     seasons = Season.query.order_by(Season.start_date.desc()).all()

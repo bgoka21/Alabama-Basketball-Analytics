@@ -4,8 +4,14 @@ import os
 
 import pytest
 from flask import Flask
+from flask_login import LoginManager
+from werkzeug.security import generate_password_hash
+
+from models.database import db
+from models.user import User
 
 from merge_app import app as merge_module
+from admin.routes import admin_bp
 
 
 @pytest.fixture
@@ -15,12 +21,31 @@ def client(tmp_path):
         json.dump({"files": {}, "on": [], "how": "inner"}, f)
 
     app = Flask(__name__)
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["TESTING"] = True
     app.secret_key = "test"
+    db.init_app(app)
+    lm = LoginManager(); lm.init_app(app)
+    lm.login_view = 'admin.login'
+
+    @lm.user_loader
+    def load_user(uid):
+        return User.query.get(int(uid))
+
     app.register_blueprint(merge_module.merge_bp, url_prefix="/merge")
+    app.register_blueprint(admin_bp, url_prefix="/admin")
+
+    with app.app_context():
+        db.create_all()
+        admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
+        db.session.add(admin)
+        db.session.commit()
 
     with app.test_client() as client:
+        client.post('/admin/login', data={'username':'admin','password':'pw'})
         yield client
+    with app.app_context():
+        db.drop_all()
 
 
 def test_multi_file_merge(client):
