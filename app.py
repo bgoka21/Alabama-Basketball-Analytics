@@ -178,11 +178,16 @@ def create_app():
     def home():
         return render_template('public/home.html')
 
+    # Register routes defined outside this factory so Flask sees them even when
+    # using ``flask --app app:create_app`` to run the app. Expose the app
+    # variable first so ``routes`` can import it without a circular import.
+    globals()['app'] = app
+    import routes  # noqa: F401
+
     return app
 
 # Create the app instance for CLI & WSGI
 app = create_app()
-import routes  # register route definitions
 
 if __name__ == "__main__":
     with app.app_context():

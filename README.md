@@ -11,6 +11,14 @@ Install the required dependencies:
 pip install -r requirements.txt
 ```
 
+### Running the Application
+
+Start the server with Python so all routes load correctly:
+
+```bash
+python app.py
+```
+
 ### Running Tests
 
 After installing dependencies, run tests:
