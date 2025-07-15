@@ -756,6 +756,7 @@
   class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8"
 >
   <!-- Drill Entry Form -->
+  {% if current_user.is_admin %}
   <div class="bg-white p-4 rounded shadow mb-6">
     <form method="post" class="space-y-4">
       <div>
@@ -791,8 +792,10 @@
       <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Save Drills</button>
     </form>
   </div>
+  {% endif %}
 
   <!-- NBA 100 Form -->
+  {% if current_user.is_admin %}
   <div class="bg-white p-4 rounded shadow mb-6">
     <form method="post" action="{{ url_for('admin.add_nba100_entry', player_name=player_name) }}" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 items-end">
       <div class="flex-1">
@@ -808,6 +811,7 @@
       </div>
     </form>
   </div>
+  {% endif %}
 
   <!-- Drill History -->
   <div class="overflow-x-auto mb-8">
