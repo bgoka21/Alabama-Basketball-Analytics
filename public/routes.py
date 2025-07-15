@@ -857,4 +857,4 @@ def add_nba100_entry():
 def summer_stats():
     stats = get_yesterdays_summer_stats(PLAYERS)
     date_str = (date.today() - timedelta(days=1)).strftime("%B %d, %Y")
-    return render_template('public/summer_stats.html', stats=stats, date_str=date_str)
+    return render_template('summer_stats.html', stats=stats, date_str=date_str)
