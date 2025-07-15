@@ -1,49 +1,35 @@
+import pytest
 import requests
 from unittest.mock import patch
 
 from services.nba_stats import (
-    get_scoreboard_json,
+    get_scoreboard_html,
     get_game_summary,
     get_yesterdays_summer_stats,
 )
 
 
-class DummyResponse:
-    def __init__(self, payload, status_code=200):
-        self._payload = payload
-        self.status_code = status_code
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise requests.HTTPError(f"status {self.status_code}")
-
-    def json(self):
-        return self._payload
-
-
-def test_get_scoreboard_json_handles_error():
+def test_get_scoreboard_html_handles_error():
     with patch('services.nba_stats.requests.get', side_effect=requests.RequestException):
-        assert get_scoreboard_json('20240101') == {}
+        with pytest.raises(requests.RequestException):
+            get_scoreboard_html('20240101')
 
 
 def test_get_game_summary_handles_error():
     with patch('services.nba_stats.requests.get', side_effect=requests.RequestException):
-        assert get_game_summary('123') == {}
+        with pytest.raises(requests.RequestException):
+            get_game_summary('123')
 
 
-def test_get_yesterdays_summer_stats_skips_failed_games():
-    scoreboard = {'events': [{'id': '1'}]}
-    # First, simulate summary request failure
-    def mock_get(url, timeout=10):
-        if 'scoreboard' in url:
-            return DummyResponse(scoreboard)
-        raise requests.RequestException
+def test_get_yesterdays_summer_stats_propagates_errors():
+    # scoreboard failure propagates
+    with patch('services.nba_stats.get_scoreboard_html', side_effect=requests.RequestException):
+        with pytest.raises(requests.RequestException):
+            get_yesterdays_summer_stats(['Foo'])
 
-    with patch('services.nba_stats.requests.get', side_effect=mock_get):
-        stats = get_yesterdays_summer_stats(['Foo'])
-        assert stats == {}
-
-    # Next, simulate scoreboard failure
-    with patch('services.nba_stats.requests.get', side_effect=requests.RequestException):
-        assert get_yesterdays_summer_stats(['Foo']) == {}
-
+    # summary failure propagates
+    sample_html = '<a href="/game/_/gameId/1/foo">Game</a>'
+    with patch('services.nba_stats.get_scoreboard_html', return_value=sample_html), \
+         patch('services.nba_stats.get_game_summary', side_effect=requests.RequestException):
+        with pytest.raises(requests.RequestException):
+            get_yesterdays_summer_stats(['Foo'])

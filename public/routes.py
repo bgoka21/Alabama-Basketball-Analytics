@@ -32,7 +32,7 @@ from models.database import (
     UploadedFile,
     SkillEntry,
 )
-from services.nba_stats import PLAYERS, get_yesterdays_summer_stats
+from services.nba_stats import get_yesterdays_summer_stats, PLAYERS
 
 
 public_bp = Blueprint(
@@ -855,7 +855,6 @@ def add_nba100_entry():
 @public_bp.route('/summer_stats')
 @login_required
 def summer_stats():
-    """Display yesterday's Summer League box scores for tracked players."""
     stats = get_yesterdays_summer_stats(PLAYERS)
-    date_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    date_str = (date.today() - timedelta(days=1)).strftime("%B %d, %Y")
     return render_template('public/summer_stats.html', stats=stats, date_str=date_str)
