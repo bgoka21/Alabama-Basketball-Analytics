@@ -3091,7 +3091,7 @@ def team_totals():
     buckets = {0: {'pts': 0, 'poss': 0}, 1: {'pts': 0, 'poss': 0}, 2: {'pts': 0, 'poss': 0}, 3: {'pts': 0, 'poss': 0}}
     for r in pt_rows:
         try:
-            val = int(str(r.pt).strip() or '0')
+            val = int(float(str(r.pt).strip() or '0'))
         except ValueError:
             continue
         key = 3 if val >= 3 else val

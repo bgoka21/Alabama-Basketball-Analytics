@@ -217,3 +217,18 @@ def test_team_totals_paint_touch_ppp(client):
     assert '2.0' in html
     assert '1.0' in html
     assert '3.0' in html
+
+
+def test_team_totals_paint_touch_ppp_floats(client, app):
+    """Paint touch PPP should handle float-like strings."""
+    with app.app_context():
+        for poss in Possession.query.all():
+            poss.paint_touches = f"{poss.paint_touches}.0"
+        db.session.commit()
+
+    resp = client.get('/admin/team_totals', query_string={'season_id': 1})
+    html = resp.data.decode('utf-8')
+    assert 'Paint Touch PPP' in html
+    assert '2.0' in html
+    assert '1.0' in html
+    assert '3.0' in html
