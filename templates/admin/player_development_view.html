@@ -1,6 +1,22 @@
 {% extends 'admin/base.html' %}
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">{{ player_name }}</h1>
+
+<div class="flex flex-wrap items-end gap-4 mb-4 no-print">
+  <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game') }}"
+     class="px-4 py-2 rounded bg-gray-200 text-black">
+    Game
+  </a>
+  <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice') }}"
+     class="px-4 py-2 rounded bg-gray-200 text-black">
+    Practice
+  </a>
+  <a href="{{ url_for('admin.player_development_view', player_name=player_name) }}"
+     class="px-4 py-2 rounded bg-[#9E1B32] text-white">
+    Development
+  </a>
+</div>
+
 {% with plan=plan, player_stats=player_stats %}
   {% include 'admin/_dev_plan.html' %}
 {% endwith %}
