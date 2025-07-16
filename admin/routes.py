@@ -2979,11 +2979,22 @@ def nba100_scores():
             target_date = None
 
     if best:
-        scores_q = (
-            db.session.query(Roster.player_name, func.max(SkillEntry.value))
-            .join(Roster, SkillEntry.player_id == Roster.id)
+        ranked = (
+            db.session.query(
+                SkillEntry.player_id,
+                SkillEntry.value,
+                SkillEntry.date,
+                func.row_number().over(
+                    partition_by=SkillEntry.player_id,
+                    order_by=(SkillEntry.value.desc(), SkillEntry.date.asc())
+                ).label("rnk"),
+            )
             .filter(SkillEntry.skill_name == 'NBA 100')
-            .group_by(Roster.player_name)
+        ).subquery()
+        scores_q = (
+            db.session.query(Roster.player_name, ranked.c.value, ranked.c.date)
+            .join(ranked, Roster.id == ranked.c.player_id)
+            .filter(ranked.c.rnk == 1)
             .order_by(Roster.player_name)
         )
     else:
@@ -2999,12 +3010,15 @@ def nba100_scores():
     scores = scores_q.all()
     player_names = [s[0] for s in scores]
     player_scores = [s[1] for s in scores]
+    player_dates = [s[2].isoformat() for s in scores] if best else []
 
     return render_template(
         'admin/nba100_scores.html',
         target_date=date_str or '',
         player_names=player_names,
         player_scores=player_scores,
+        player_dates=player_dates,
+        best=bool(best),
         active_page='skill_totals'
     )
 
