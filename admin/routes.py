@@ -2967,33 +2967,53 @@ def skill_totals():
 @admin_bp.route('/nba100_scores')
 @login_required
 def nba100_scores():
-    """Display NBA 100 scores for all players on a specific date."""
+    """Display NBA 100 scores for all players on a specific date or each player's best."""
+    best = request.args.get('best')
     date_str = request.args.get('date')
     target_date = None
-    if date_str:
+
+    if not best and date_str:
         try:
             target_date = date.fromisoformat(date_str)
         except ValueError:
             target_date = None
 
-    scores_q = (
-        db.session.query(Roster.player_name, SkillEntry.value)
-        .join(Roster, SkillEntry.player_id == Roster.id)
-        .filter(SkillEntry.skill_name == 'NBA 100')
-    )
-    if target_date:
-        scores_q = scores_q.filter(SkillEntry.date == target_date)
-    scores_q = scores_q.order_by(Roster.player_name)
+    if best:
+        rows = (
+            db.session.query(Roster.player_name, SkillEntry.value, SkillEntry.date)
+            .join(Roster, SkillEntry.player_id == Roster.id)
+            .filter(SkillEntry.skill_name == 'NBA 100')
+            .order_by(Roster.player_name, SkillEntry.date)
+            .all()
+        )
+        best_map = {}
+        for name, val, dt in rows:
+            if name not in best_map or val > best_map[name][1]:
+                best_map[name] = (dt, val)
+        player_names = sorted(best_map)
+        player_scores = [best_map[n][1] for n in player_names]
+        player_dates = [best_map[n][0].isoformat() for n in player_names]
+    else:
+        scores_q = (
+            db.session.query(Roster.player_name, SkillEntry.value)
+            .join(Roster, SkillEntry.player_id == Roster.id)
+            .filter(SkillEntry.skill_name == 'NBA 100')
+        )
+        if target_date:
+            scores_q = scores_q.filter(SkillEntry.date == target_date)
+        scores_q = scores_q.order_by(Roster.player_name)
 
-    scores = scores_q.all()
-    player_names = [s.player_name for s in scores]
-    player_scores = [s.value for s in scores]
+        scores = scores_q.all()
+        player_names = [s[0] for s in scores]
+        player_scores = [s[1] for s in scores]
+        player_dates = []
 
     return render_template(
         'admin/nba100_scores.html',
         target_date=date_str or '',
         player_names=player_names,
         player_scores=player_scores,
+        player_dates=player_dates,
         active_page='skill_totals'
     )
 

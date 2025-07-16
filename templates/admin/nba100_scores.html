@@ -9,6 +9,9 @@
   <div>
     <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Apply</button>
   </div>
+  <div>
+    <button type="submit" name="best" value="1" class="bg-gray-700 text-white px-4 py-2 rounded">Best Scores</button>
+  </div>
 </form>
 {% endblock %}
 
@@ -19,8 +22,30 @@
 <script>
 const playerNames = {{ player_names|tojson }};
 const playerScores = {{ player_scores|tojson }};
+const playerDates = {{ player_dates|tojson }};
 if (playerNames.length) {
-  new Chart(document.getElementById('nba100Chart'), {
+  const dateLabelPlugin = {
+    id: 'dateLabelPlugin',
+    afterDatasetsDraw(chart, args, opts) {
+      const dates = opts.dates || [];
+      const {ctx} = chart;
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((bar, i) => {
+        const date = dates[i];
+        if (!date) return;
+        const {x, y, base} = bar.getProps(['x','y','base'], true);
+        const centerY = y + (base - y) / 2;
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(date, x, centerY);
+        ctx.restore();
+      });
+    }
+  };
+  const chartOpts = {
     type: 'bar',
     data: {
       labels: playerNames,
@@ -35,9 +60,16 @@ if (playerNames.length) {
     options: {
       scales: {
         y: { beginAtZero: true, max: 100 }
-      }
-    }
-  });
+      },
+      plugins: {}
+    },
+    plugins: []
+  };
+  if (playerDates.length) {
+    chartOpts.plugins.push(dateLabelPlugin);
+    chartOpts.options.plugins.dateLabelPlugin = { dates: playerDates };
+  }
+  new Chart(document.getElementById('nba100Chart'), chartOpts);
 }
 </script>
 {% endblock %}

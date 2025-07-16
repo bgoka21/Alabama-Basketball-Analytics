@@ -39,6 +39,8 @@ def app():
         db.session.add_all([
             SkillEntry(player_id=1, date=date(2024,1,5), skill_name='NBA 100', value=80),
             SkillEntry(player_id=2, date=date(2024,1,5), skill_name='NBA 100', value=75),
+            SkillEntry(player_id=1, date=date(2024,1,6), skill_name='NBA 100', value=90),
+            SkillEntry(player_id=2, date=date(2024,1,6), skill_name='NBA 100', value=70),
         ])
         db.session.commit()
     yield app
@@ -59,3 +61,13 @@ def test_nba100_scores_route(client):
     html = resp.data.decode('utf-8')
     assert '#1 A' in html
     assert '80' in html
+
+
+def test_nba100_best_scores(client):
+    resp = client.get('/admin/nba100_scores', query_string={'best':'1'})
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    assert '#1 A' in html and '90' in html
+    assert '#2 B' in html and '75' in html
+    assert '2024-01-06' in html and '2024-01-05' in html
+
