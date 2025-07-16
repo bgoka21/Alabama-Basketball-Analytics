@@ -1,0 +1,43 @@
+{% extends 'admin/base.html' %}
+
+{% block page_controls %}
+<form method="get" class="mb-4 flex items-end gap-2">
+  <div>
+    <label class="font-semibold mr-2">Date:</label>
+    <input type="date" name="date" value="{{ target_date }}" class="border p-2 rounded" />
+  </div>
+  <div>
+    <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Apply</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">NBA 100 Scores</h1>
+<canvas id="nba100Chart" class="w-full h-64"></canvas>
+<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+<script>
+const playerNames = {{ player_names|tojson }};
+const playerScores = {{ player_scores|tojson }};
+if (playerNames.length) {
+  new Chart(document.getElementById('nba100Chart'), {
+    type: 'bar',
+    data: {
+      labels: playerNames,
+      datasets: [{
+        label: 'Score',
+        data: playerScores,
+        backgroundColor: 'rgba(158,27,50,0.6)',
+        borderColor: 'rgba(158,27,50,1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true, max: 100 }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}
