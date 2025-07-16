@@ -57,6 +57,14 @@ if (playerNames.length) {
     },
     options: {
       scales: {
+        x: {
+          ticks: {
+            autoSkip: false,
+            maxRotation: 45,
+            minRotation: 45,
+            font: { size: 14 }
+          }
+        },
         y: { beginAtZero: true, max: 100 }
       }
     }
