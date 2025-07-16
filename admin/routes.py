@@ -2800,6 +2800,39 @@ def player_development(player_name):
     return render_template('admin/player_development.html', plan=plan, player_name=player_name)
 
 
+@admin_bp.route('/player/<player_name>/development')
+@login_required
+def player_development_view(player_name):
+    """Display a player's development plan with current season stats."""
+    player = Roster.query.filter_by(player_name=player_name).first_or_404()
+    current_season = Season.query.order_by(Season.start_date.desc()).first()
+
+    plan = None
+    if current_season:
+        plan = (
+            PlayerDevelopmentPlan.query
+            .filter_by(player_name=player_name, season_id=current_season.id)
+            .first()
+        )
+        stats_records = (
+            PlayerStats.query
+            .filter_by(player_name=player_name, season_id=current_season.id)
+            .all()
+        )
+    else:
+        stats_records = []
+
+    agg = aggregate_stats(stats_records)
+    player_stats_map = agg.__dict__ if hasattr(agg, '__dict__') else dict(agg)
+
+    return render_template(
+        'admin/player_development_view.html',
+        player_name=player_name,
+        plan=plan,
+        player_stats=player_stats_map,
+    )
+
+
 
 @admin_bp.route('/roster', methods=['GET', 'POST'])
 @admin_required

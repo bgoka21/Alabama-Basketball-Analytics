@@ -27,6 +27,10 @@
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
       Practice
     </a>
+    <a href="{{ url_for('admin.player_development_view', player_name=player_name) }}"
+       class="px-4 py-2 rounded bg-gray-200 text-black">
+      Development
+    </a>
     <form id="filterForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-wrap items-end gap-2">
       <input type="hidden" name="mode" value="{{ mode }}">
       <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
@@ -1017,11 +1021,5 @@ function showShotTypeDetail(detail) {
   }
 });
 </script>
-
-{% with plan=development_plan, player_stats=player_stats %}
-  {% include 'admin/_dev_plan.html' %}
-{% endwith %}
-
-
 
 {% endblock %}
