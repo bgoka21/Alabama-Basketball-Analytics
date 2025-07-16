@@ -209,6 +209,21 @@ def test_team_totals_trend_category_filter(client):
     assert '<option value="Pickup" selected' in html
 
 
+def test_team_totals_trend_window(client):
+    resp = client.get(
+        '/admin/team_totals',
+        query_string={'season_id': 1, 'trend_stat': 'points', 'trend_window': 2}
+    )
+    html = resp.data.decode('utf-8')
+    m = re.search(r"const trendData = (.*?);", html, re.S)
+    assert m
+    data = json.loads(m.group(1))
+    assert data == [
+        {'date': '2024-01-02', 'points': 22},
+        {'date': '2024-01-05', 'points': 19.5},
+    ]
+
+
 def test_team_totals_paint_touch_ppp(client):
     resp = client.get('/admin/team_totals', query_string={'season_id': 1})
     html = resp.data.decode('utf-8')
