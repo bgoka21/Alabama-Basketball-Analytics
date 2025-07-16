@@ -1018,6 +1018,10 @@ function showShotTypeDetail(detail) {
 });
 </script>
 
+{% with plan=development_plan, player_stats=player_stats %}
+  {% include 'admin/_dev_plan.html' %}
+{% endwith %}
+
 
 
 {% endblock %}

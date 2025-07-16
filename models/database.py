@@ -291,6 +291,25 @@ class PlayerDraftStock(db.Model):
     weight            = db.Column(db.Float)
     position          = db.Column(db.String(64))
 
+
+class PlayerDevelopmentPlan(db.Model):
+    __tablename__ = 'player_development_plan'
+
+    id = db.Column(db.Integer, primary_key=True)
+    player_name = db.Column(db.String(100), nullable=False)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'))
+
+    stat_1_name = db.Column(db.String(64))
+    stat_1_goal = db.Column(db.Float)
+    stat_2_name = db.Column(db.String(64))
+    stat_2_goal = db.Column(db.Float)
+    stat_3_name = db.Column(db.String(64))
+    stat_3_goal = db.Column(db.Float)
+
+    note_1 = db.Column(db.Text)
+    note_2 = db.Column(db.Text)
+    note_3 = db.Column(db.Text)
+
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile
 from .recruit import Recruit

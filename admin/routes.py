@@ -30,7 +30,8 @@ from models.database import (
     Roster,
     Practice,
     SkillEntry,
-    PnRStats
+    PnRStats,
+    PlayerDevelopmentPlan
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -1874,6 +1875,15 @@ def player_detail(player_name):
 
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
 
+    current_season = Season.query.order_by(Season.start_date.desc()).first()
+    development_plan = None
+    if current_season:
+        development_plan = (
+            PlayerDevelopmentPlan.query
+            .filter_by(player_name=player_name, season_id=current_season.id)
+            .first()
+        )
+
     # Rebuild shot_map/label_map to ensure Free Throws category exists
     local_shot_map = dict(shot_map)
     local_shot_map.setdefault('ft', ['Free Throws'])
@@ -2155,6 +2165,8 @@ def player_detail(player_name):
         else:
             agg  = aggregated_practice
             blue = player_blue_breakdown_practice
+
+    player_stats_map = agg.__dict__ if hasattr(agg, '__dict__') else dict(agg)
 
 
 
@@ -2514,7 +2526,9 @@ def player_detail(player_name):
         has_stats                          = has_stats,
         label_options                      = label_options,
         selected_labels                    = selected_labels,
-        pnr_totals                         = pnr_totals
+        pnr_totals                         = pnr_totals,
+        development_plan                   = development_plan,
+        player_stats                       = player_stats_map
     )
 
 
@@ -2740,6 +2754,50 @@ def player_skill(player_name):
         entries=entries,
         totals=totals,
     )
+
+
+@admin_bp.route('/admin/player_development/<player_name>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def player_development(player_name):
+    """Create or edit a player's development plan for the current season."""
+    current_season = Season.query.order_by(Season.start_date.desc()).first()
+    if not current_season:
+        flash('No seasons found.', 'error')
+        return redirect(url_for('admin.player_detail', player_name=player_name))
+
+    plan = (
+        PlayerDevelopmentPlan.query
+        .filter_by(player_name=player_name, season_id=current_season.id)
+        .first()
+    )
+
+    if request.method == 'POST':
+        if not plan:
+            plan = PlayerDevelopmentPlan(
+                player_name=player_name,
+                season_id=current_season.id,
+            )
+            db.session.add(plan)
+
+        plan.stat_1_name = request.form.get('stat_1_name') or None
+        plan.stat_1_goal = request.form.get('stat_1_goal') or None
+        plan.stat_2_name = request.form.get('stat_2_name') or None
+        plan.stat_2_goal = request.form.get('stat_2_goal') or None
+        plan.stat_3_name = request.form.get('stat_3_name') or None
+        plan.stat_3_goal = request.form.get('stat_3_goal') or None
+        plan.note_1 = request.form.get('note_1') or None
+        plan.note_2 = request.form.get('note_2') or None
+        plan.note_3 = request.form.get('note_3') or None
+
+        db.session.commit()
+        flash('Development plan saved.', 'success')
+        return redirect(url_for('admin.player_detail', player_name=player_name))
+
+    if not plan:
+        plan = PlayerDevelopmentPlan(player_name=player_name, season_id=current_season.id)
+
+    return render_template('admin/player_development.html', plan=plan, player_name=player_name)
 
 
 

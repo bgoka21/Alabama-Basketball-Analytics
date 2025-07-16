@@ -1,0 +1,53 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+{% if current_user.is_admin %}
+<form method="post" class="space-y-4 p-6 bg-white rounded shadow">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Stat 1 Name</label>
+      <input type="text" name="stat_1_name" value="{{ plan.stat_1_name or '' }}" class="w-full border rounded p-2" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Goal</label>
+      <input type="number" step="any" name="stat_1_goal" value="{{ plan.stat_1_goal or '' }}" class="w-full border rounded p-2" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Note</label>
+      <textarea name="note_1" class="w-full border rounded p-2">{{ plan.note_1 or '' }}</textarea>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Stat 2 Name</label>
+      <input type="text" name="stat_2_name" value="{{ plan.stat_2_name or '' }}" class="w-full border rounded p-2" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Goal</label>
+      <input type="number" step="any" name="stat_2_goal" value="{{ plan.stat_2_goal or '' }}" class="w-full border rounded p-2" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Note</label>
+      <textarea name="note_2" class="w-full border rounded p-2">{{ plan.note_2 or '' }}</textarea>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Stat 3 Name</label>
+      <input type="text" name="stat_3_name" value="{{ plan.stat_3_name or '' }}" class="w-full border rounded p-2" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Goal</label>
+      <input type="number" step="any" name="stat_3_goal" value="{{ plan.stat_3_goal or '' }}" class="w-full border rounded p-2" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Note</label>
+      <textarea name="note_3" class="w-full border rounded p-2">{{ plan.note_3 or '' }}</textarea>
+    </div>
+  </div>
+  <div class="flex space-x-4">
+    <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Save</button>
+    <a href="{{ url_for('admin.player_detail', player_name=player_name) }}" class="px-4 py-2 border rounded">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

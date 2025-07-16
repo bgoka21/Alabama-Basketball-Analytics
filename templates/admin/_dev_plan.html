@@ -1,0 +1,71 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dev_plan.css') }}">
+<div class="dev-plan-card p-4 bg-white rounded shadow mt-6">
+  <div class="flex items-center space-x-4">
+    <img src="{{ url_for('static', filename='images/tide_infinity.jpg') }}" class="w-16 h-16 rounded-full" alt="avatar">
+    <h3 class="text-xl font-semibold">Development Plan</h3>
+    {% if current_user.is_admin %}
+      <button id="editDevPlanBtn" class="ml-auto px-2 py-1 border rounded">🛠️ Edit Goals</button>
+    {% endif %}
+  </div>
+
+  <div id="devPlanView" class="mt-4">
+    {% set rows = [
+        (plan.stat_1_name, plan.stat_1_goal),
+        (plan.stat_2_name, plan.stat_2_goal),
+        (plan.stat_3_name, plan.stat_3_goal)
+    ] %}
+    <table class="min-w-full mb-4">
+      <thead>
+        <tr><th class="text-left">Stat</th><th class="text-right">Current</th><th class="text-right">Goal</th></tr>
+      </thead>
+      <tbody>
+        {% for stat, goal in rows if stat %}
+          {% set cur = player_stats.get(stat) %}
+          {% set pct = (cur / goal) if goal and cur is not none else 0 %}
+          <tr>
+            <td class="py-1">{{ stat }}</td>
+            <td class="py-1 text-right">{{ cur if cur is not none else '-' }}</td>
+            <td class="py-1 text-right">{{ goal if goal is not none else '-' }}</td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <div class="progress h-2 bg-gray-200 rounded">
+                <div class="progress-fill {{ 'green' if pct>=1 else 'yellow' if pct>=0.8 else 'red' }}" style="width:{{ (pct if pct<=1 else 1)*100 }}%"></div>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <ul class="list-disc pl-5">
+      {% for note in [plan.note_1, plan.note_2, plan.note_3] if note %}
+        <li>{{ note }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {% if current_user.is_admin %}
+  <form id="devPlanForm" method="post" class="space-y-4 mt-4 hidden">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <input type="text" name="stat_1_name" placeholder="Stat 1" value="{{ plan.stat_1_name or '' }}" class="border p-2 rounded" />
+      <input type="number" step="any" name="stat_1_goal" placeholder="Goal" value="{{ plan.stat_1_goal or '' }}" class="border p-2 rounded" />
+      <textarea name="note_1" class="border p-2 rounded" placeholder="Note">{{ plan.note_1 or '' }}</textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <input type="text" name="stat_2_name" placeholder="Stat 2" value="{{ plan.stat_2_name or '' }}" class="border p-2 rounded" />
+      <input type="number" step="any" name="stat_2_goal" placeholder="Goal" value="{{ plan.stat_2_goal or '' }}" class="border p-2 rounded" />
+      <textarea name="note_2" class="border p-2 rounded" placeholder="Note">{{ plan.note_2 or '' }}</textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <input type="text" name="stat_3_name" placeholder="Stat 3" value="{{ plan.stat_3_name or '' }}" class="border p-2 rounded" />
+      <input type="number" step="any" name="stat_3_goal" placeholder="Goal" value="{{ plan.stat_3_goal or '' }}" class="border p-2 rounded" />
+      <textarea name="note_3" class="border p-2 rounded" placeholder="Note">{{ plan.note_3 or '' }}</textarea>
+    </div>
+    <div class="flex space-x-2">
+      <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded">Save</button>
+      <button type="button" id="cancelDevPlan" class="px-3 py-1 border rounded">Cancel</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='js/dev_plan_toggle.js') }}"></script>
