@@ -43,3 +43,7 @@ python create_user.py
 The script creates an account marked as an administrator. When logged in with an
 admin account, the sidebar will include a **Draft Upload** link which is hidden
 for regular users.
+
+### Development Plan View
+
+Visit `/admin/player/<player name>/development` to view a player's current season development plan alongside season stats.
