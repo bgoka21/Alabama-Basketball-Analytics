@@ -23,6 +23,7 @@
 const playerNames = {{ player_names|tojson }};
 const playerScores = {{ player_scores|tojson }};
 const playerDates = {{ player_dates|tojson }};
+const showNames = {{ 'true' if not best else 'false' }};
 if (playerNames.length) {
   const dateLabelPlugin = {
     id: 'dateLabelPlugin',
@@ -61,7 +62,11 @@ if (playerNames.length) {
       ctx.restore();
     }
   };
-  Chart.register(dateLabelPlugin, playerNamePlugin);
+  if (showNames) {
+    Chart.register(dateLabelPlugin, playerNamePlugin);
+  } else {
+    Chart.register(dateLabelPlugin);
+  }
   new Chart(document.getElementById('nba100Chart'), {
     type: 'bar',
     data: {
