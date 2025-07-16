@@ -1,0 +1,7 @@
+.dev-plan-card {max-width:600px;margin:auto;}
+.progress {height:0.5rem;background:#e5e7eb;border-radius:0.25rem;overflow:hidden;}
+.progress-fill {height:100%;}
+.progress-fill.green {background:#16a34a;}
+.progress-fill.yellow {background:#facc15;}
+.progress-fill.red {background:#dc2626;}
+@media (min-width:640px){.dev-plan-card{display:flex;flex-direction:column;}}
