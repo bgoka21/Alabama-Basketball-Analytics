@@ -69,5 +69,5 @@ def test_nba100_best_scores(client):
     html = resp.data.decode('utf-8')
     assert '#1 A' in html and '90' in html
     assert '#2 B' in html and '75' in html
-    assert 'Jan 06' in html and 'Jan 05' in html
+    assert 'Jan 06' not in html and 'Jan 05' not in html
 

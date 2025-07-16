@@ -22,23 +22,23 @@
 <script>
 const playerNames = {{ player_names|tojson }};
 const playerScores = {{ player_scores|tojson }};
-const playerDates = {{ player_dates|tojson }};
 const showNames = {{ 'true' if not best else 'false' }};
 if (playerNames.length) {
-  const dateLabelPlugin = {
-    id: 'dateLabelPlugin',
-    afterDatasetsDraw(chart, args, options) {
+  const scoreLabelPlugin = {
+    id: 'scoreLabelPlugin',
+    afterDatasetsDraw(chart) {
       const {ctx} = chart;
       ctx.save();
       const meta = chart.getDatasetMeta(0);
       meta.data.forEach((bar, idx) => {
-        if (playerDates[idx]) {
+        const score = playerScores[idx];
+        if (score !== undefined && score !== null) {
           const centerY = bar.y + (bar.base - bar.y) / 2;
           ctx.fillStyle = '#fff';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.font = '12px sans-serif';
-          ctx.fillText(playerDates[idx], bar.x, centerY);
+          ctx.fillText(score, bar.x, centerY);
         }
       });
     }
@@ -63,9 +63,9 @@ if (playerNames.length) {
     }
   };
   if (showNames) {
-    Chart.register(dateLabelPlugin, playerNamePlugin);
+    Chart.register(scoreLabelPlugin, playerNamePlugin);
   } else {
-    Chart.register(dateLabelPlugin);
+    Chart.register(scoreLabelPlugin);
   }
   new Chart(document.getElementById('nba100Chart'), {
     type: 'bar',
