@@ -29,6 +29,7 @@
       <tr class="border-t">
         <td class="px-4 py-2">{{ entry.player_name }}</td>
         <td class="px-4 py-2">
+          <a href="{{ url_for('admin.upload_headshot', player_name=entry.player_name) }}" class="text-blue-600 hover:underline mr-2">Headshot</a>
           <form method="post" action="{{ url_for('admin.delete_roster', id=entry.id) }}" class="inline">
             <button type="submit" class="text-red-600 hover:underline" onclick="return confirm('Remove {{ entry.player_name }}?');">
               Delete
