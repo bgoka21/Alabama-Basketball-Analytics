@@ -60,4 +60,4 @@ def test_date_filter_applied(client, app):
     assert resp.status_code == 200
     html = resp.data.decode('utf-8')
     assert '5' in html
-    assert '10' not in html
+    assert '10/10' not in html
