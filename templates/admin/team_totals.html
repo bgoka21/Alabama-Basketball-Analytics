@@ -55,6 +55,10 @@
         <label class="block text-sm font-medium mb-1">To</label>
         <input type="date" name="trend_end_date" value="{{ trend_end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
       </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Window</label>
+        <input type="number" name="trend_window" min="1" value="{{ trend_window }}" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
+      </div>
       {% if practice_categories %}
       <div>
         <label class="block text-sm font-medium mb-1">Category</label>

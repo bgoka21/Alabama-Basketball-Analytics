@@ -271,7 +271,9 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
 
     return cfg, leaderboard
 
-admin_bp = Blueprint('admin', __name__, template_folder='../templates/admin')
+# Use the top-level templates folder so references like 'admin/base.html'
+# resolve correctly when the blueprint is used in isolation (e.g. tests).
+admin_bp = Blueprint('admin', __name__, template_folder='../templates')
 
 @admin_bp.record
 def register_filters(setup_state):
@@ -2474,7 +2476,7 @@ def player_detail(player_name):
 
     # ─── Finally, render template with BOTH modes & all context ─────────
     return render_template(
-        'player_detail.html',
+        'admin/player_detail.html',
         player_name                        = player_name,
         mode                               = mode,
         agg                                = agg,
@@ -2950,7 +2952,7 @@ def skill_totals():
         summary.append({'player_name': r.player_name, 'totals': totals, 'total_shots': total_shots})
 
     return render_template(
-        'skill_totals.html',
+        'admin/skill_totals.html',
         players_summary=summary,
         seasons=seasons,
         selected_season=season_id,
@@ -2991,6 +2993,7 @@ def team_totals():
     trend_season_id = request.args.get('trend_season_id', type=int) or season_id
     trend_start_date = request.args.get('trend_start_date', start_date)
     trend_end_date = request.args.get('trend_end_date', end_date)
+    trend_window = request.args.get('trend_window', type=int)
     trend_selected_categories = request.args.getlist('trend_category')
     trend_start_dt = trend_end_dt = None
     if trend_start_date:
@@ -3237,8 +3240,19 @@ def team_totals():
             base['adj_assist_turnover_ratio'] = round(total_ast/tos,2) if tos else 0.0
         trend_rows.append({'date': r.dt.isoformat(), **{s: base.get(s, 0) for s in selected_stats}})
 
+    if trend_window and trend_window > 1:
+        aggregated = []
+        for i in range(len(trend_rows)):
+            subset = trend_rows[max(0, i - trend_window + 1) : i + 1]
+            row = {'date': trend_rows[i]['date']}
+            for stat in selected_stats:
+                vals = [d.get(stat, 0) for d in subset]
+                row[stat] = round(sum(vals) / len(subset), 2)
+            aggregated.append(row)
+        trend_rows = aggregated
+
     return render_template(
-        'team_totals.html',
+        'admin/team_totals.html',
         totals=totals,
         blue_totals=blue_totals,
         paint_ppp=paint_ppp,
@@ -3256,6 +3270,7 @@ def team_totals():
         trend_selected_season=trend_season_id,
         trend_start_date=trend_start_date or '',
         trend_end_date=trend_end_date or '',
+        trend_window=trend_window,
         trend_selected_labels=trend_selected_labels,
         practice_categories=practice_categories,
         trend_selected_categories=trend_selected_categories,
