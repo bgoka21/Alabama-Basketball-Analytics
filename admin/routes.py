@@ -3010,14 +3010,12 @@ def nba100_scores():
     scores = scores_q.all()
     player_names = [s[0] for s in scores]
     player_scores = [s[1] for s in scores]
-    player_dates = [s[2].strftime('%b %d') for s in scores] if best else []
 
     return render_template(
         'admin/nba100_scores.html',
         target_date=date_str or '',
         player_names=player_names,
         player_scores=player_scores,
-        player_dates=player_dates,
         best=bool(best),
         active_page='skill_totals'
     )
