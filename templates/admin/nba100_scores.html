@@ -42,7 +42,26 @@ if (playerNames.length) {
       });
     }
   };
-  Chart.register(dateLabelPlugin);
+  const playerNamePlugin = {
+    id: 'playerNamePlugin',
+    afterDatasetsDraw(chart) {
+      const {ctx} = chart;
+      ctx.save();
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((bar, idx) => {
+        const name = playerNames[idx];
+        if (name) {
+          ctx.fillStyle = '#000';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.font = '10px sans-serif';
+          ctx.fillText(name, bar.x, bar.y - 6);
+        }
+      });
+      ctx.restore();
+    }
+  };
+  Chart.register(dateLabelPlugin, playerNamePlugin);
   new Chart(document.getElementById('nba100Chart'), {
     type: 'bar',
     data: {
