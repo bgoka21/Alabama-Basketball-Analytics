@@ -58,6 +58,7 @@ def create_app():
     upload_folder = os.path.join(basedir, 'data', 'uploads')
     app.config['UPLOAD_FOLDER'] = upload_folder
     os.makedirs(upload_folder, exist_ok=True)
+    os.makedirs(os.path.join(upload_folder, 'headshots'), exist_ok=True)
 
     # --- Initialize Extensions ---
     db.init_app(app)

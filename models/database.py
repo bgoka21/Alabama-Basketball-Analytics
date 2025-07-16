@@ -241,6 +241,7 @@ class Roster(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
     season_id    = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
     player_name  = db.Column(db.String(100), nullable=False)
+    headshot_filename = db.Column(db.String(255))
 
     __table_args__ = (
         db.UniqueConstraint('season_id', 'player_name', name='_season_player_uc'),

@@ -359,6 +359,7 @@ def admin_bp_before_request():
         'admin.user_usage_report',
         'admin.draft_upload',
         'draft_upload',
+        'admin.upload_headshot',
         # … add any other admin-only endpoints here …
     }
 
@@ -2830,7 +2831,33 @@ def player_development_view(player_name):
         player_name=player_name,
         plan=plan,
         player_stats=player_stats_map,
+        player=player,
     )
+
+
+@admin_bp.route('/player/<player_name>/headshot', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def upload_headshot(player_name):
+    """Upload a headshot image for a player."""
+    roster_entry = Roster.query.filter_by(player_name=player_name).first_or_404()
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(request.url)
+
+        filename = secure_filename(file.filename)
+        folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'headshots')
+        os.makedirs(folder, exist_ok=True)
+        file.save(os.path.join(folder, filename))
+
+        roster_entry.headshot_filename = filename
+        db.session.commit()
+        flash('Headshot uploaded.', 'success')
+        return redirect(url_for('admin.player_detail', player_name=player_name))
+
+    return render_template('admin/upload_headshot.html', player=roster_entry)
 
 
 

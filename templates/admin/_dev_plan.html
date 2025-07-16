@@ -1,7 +1,11 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dev_plan.css') }}">
 <div class="dev-plan-card p-4 bg-white rounded shadow mt-6">
   <div class="flex items-center space-x-4">
-    <img src="{{ url_for('static', filename='images/tide_infinity.jpg') }}" class="w-16 h-16 rounded-full" alt="avatar">
+    {% if player.headshot_filename %}
+      <img src="{{ url_for('static', filename='headshots/' ~ player.headshot_filename) }}" class="w-16 h-16 rounded-full" alt="avatar">
+    {% else %}
+      <img src="{{ url_for('static', filename='images/tide_infinity.jpg') }}" class="w-16 h-16 rounded-full" alt="avatar">
+    {% endif %}
     <h3 class="text-xl font-semibold">Development Plan</h3>
     {% if current_user.is_admin %}
       <button id="editDevPlanBtn" class="ml-auto px-2 py-1 border rounded">🛠️ Edit Goals</button>
