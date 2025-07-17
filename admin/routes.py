@@ -423,6 +423,8 @@ def admin_bp_before_request():
         allowed = {
             'admin.player_detail',
             'admin.logout',
+            'admin.edit_skill_entry',
+            'admin.delete_skill_entry',
         }
         if request.endpoint not in allowed:
             flash("You do not have permission to view that page.", "error")
@@ -1955,8 +1957,8 @@ def player_detail(player_name):
 
     # ─── Handle Skill‐Development form submission ───────────────────────
     if request.method == 'POST':
-        if not current_user.is_admin:
-            flash('Only admins may modify skill-development entries.', 'error')
+        if not (current_user.is_admin or current_user.player_name == player_name):
+            flash('Only admins or the player may modify skill-development entries.', 'error')
             return redirect(
                 url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
             )
@@ -2607,8 +2609,9 @@ def player_detail(player_name):
     methods=['POST']
 )
 @login_required
-@admin_required
 def delete_skill_entry(player_name, entry_date):
+    if not (current_user.is_admin or current_user.player_name == player_name):
+        abort(403)
     # parse the incoming date
     target_date = date.fromisoformat(entry_date)
     # delete every SkillEntry for that player on that date
@@ -2628,8 +2631,9 @@ def delete_skill_entry(player_name, entry_date):
     methods=['GET', 'POST']
 )
 @login_required
-@admin_required
 def edit_skill_entry(player_name, entry_date):
+    if not (current_user.is_admin or current_user.player_name == player_name):
+        abort(403)
     """Edit all skill-development entries for a given date."""
 
     # Parse the date and load the roster & any existing entries
