@@ -41,11 +41,11 @@ def app():
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
         shots = [
-            {"shot_class": "atr", "result": "made", "POSSESSION TYPE": "total"},
-            {"shot_class": "atr", "result": "miss", "POSSESSION TYPE": "total"},
-            {"shot_class": "fg2", "result": "made", "POSSESSION TYPE": "total"},
-            {"shot_class": "fg2", "result": "made", "POSSESSION TYPE": "total"},
-            {"shot_class": "fg3", "result": "made", "POSSESSION TYPE": "total"},
+            {"shot_class": "atr", "result": "made", "possession_type": "total"},
+            {"shot_class": "atr", "result": "miss", "possession_type": "total"},
+            {"shot_class": "2fg", "result": "made", "possession_type": "total"},
+            {"shot_class": "2fg", "result": "made", "possession_type": "total"},
+            {"shot_class": "3fg", "result": "made", "possession_type": "total"},
         ]
         db.session.add(PlayerStats(
             practice_id=1,
