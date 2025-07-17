@@ -20,7 +20,14 @@
     <tr class="bg-gray-100">
       <th class="px-4 py-2 text-center">#</th>
       <th class="px-4 py-2 text-left sortable">Player</th>
-      {% if selected.key.endswith('_fg_pct') %}
+      {% if selected.key == 'assist_summary' %}
+        <th class="px-4 py-2 text-center sortable">Ast</th>
+        <th class="px-4 py-2 text-center sortable">Pot Ast</th>
+        <th class="px-4 py-2 text-center sortable">2nd Ast</th>
+        <th class="px-4 py-2 text-center sortable">TO</th>
+        <th class="px-4 py-2 text-center sortable">AST/TO</th>
+        <th class="px-4 py-2 text-center sortable">Adj AST/TO</th>
+      {% elif selected.key.endswith('_fg_pct') %}
         <th class="px-4 py-2 text-center sortable">FG</th>
         <th class="px-4 py-2 text-center sortable">FG%</th>
         <th class="px-4 py-2 text-center sortable">Freq</th>
@@ -33,7 +40,16 @@
     {% for row in rows %}
       <tr class="even:bg-gray-50">
         <td class="px-4 py-2 text-center">{{ loop.index }}</td>
-        {% if selected.key.endswith('_fg_pct') %}
+        {% if selected.key == 'assist_summary' %}
+          {% set player, ast, pot, sec, tos, ratio, adj = row %}
+          <td class="px-4 py-2 text-left">{{ player }}</td>
+          <td class="px-4 py-2 text-center">{{ ast }}</td>
+          <td class="px-4 py-2 text-center">{{ pot }}</td>
+          <td class="px-4 py-2 text-center">{{ sec }}</td>
+          <td class="px-4 py-2 text-center">{{ tos }}</td>
+          <td class="px-4 py-2 text-center">{{ ratio }}</td>
+          <td class="px-4 py-2 text-center">{{ adj }}</td>
+        {% elif selected.key.endswith('_fg_pct') %}
           {% set player, makes, attempts, pct, freq = row %}
           <td class="px-4 py-2 text-left">{{ player }}</td>
           <td class="px-4 py-2 text-center">{{ makes }}-{{ attempts }}</td>

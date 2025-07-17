@@ -284,7 +284,22 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
 
     all_players = set(core_rows) | set(shot_details)
     leaderboard = []
-    if stat_key.endswith('_fg_pct'):
+    if stat_key == 'assist_summary':
+        for player in all_players:
+            base = core_rows.get(player, {})
+            leaderboard.append(
+                (
+                    player,
+                    base.get('assists', 0),
+                    base.get('pot_assists', 0),
+                    base.get('second_assists', 0),
+                    base.get('turnovers', 0),
+                    base.get('assist_turnover_ratio', 0.0),
+                    base.get('adj_assist_turnover_ratio', 0.0),
+                )
+            )
+        leaderboard.sort(key=lambda x: x[1], reverse=True)
+    elif stat_key.endswith('_fg_pct'):
         for player in all_players:
             details = shot_details.get(player, {})
             pct = details.get(stat_key, 0)
