@@ -130,49 +130,58 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         labels = [t.strip().upper() for t in drill_str.split(",") if t.strip()]
 
         # ─── Possession parsing ─────────────────────────────────────────
-        team = row_type
+        team = row['Row']  # 'Crimson' or 'White'
         if team in ("Crimson", "White"):
+            offense_label = 'Offense'
+            defense_label = 'Defense'
             offense_team = team
-            defense_team = "White" if team == "Crimson" else "Crimson"
+            defense_team = 'White' if team == 'Crimson' else 'Crimson'
 
-            ps_col  = "POSSESSION START"
-            pt_col  = "POSSESSION TYPE"
-            pc_col  = "PAINT TOUCHES"
-            sc_col  = "SHOT CLOCK"
-            scp_col = "SHOT CLOCK PT"
+            ps_col  = 'POSSESSION START'
+            pt_col  = 'POSSESSION TYPE'
+            pc_col  = 'PAINT TOUCHES'
+            sc_col  = 'SHOT CLOCK'
+            scp_col = 'SHOT CLOCK PT'
             off_col = f"{offense_team.upper()} PLAYER POSSESSIONS"
             def_col = f"{defense_team.upper()} PLAYER POSSESSIONS"
 
+            p_start    = row.get(ps_col, '')
+            p_type     = row.get(pt_col, '')
+            p_paint    = row.get(pc_col, '')
+            p_clock    = row.get(sc_col, '')
+            p_clock_pt = row.get(scp_col, '')
 
-            # compute points scored for lineup metrics
-            points_scored = 0
-            for col in player_columns:
-                for token in extract_tokens(row.get(col, "")):
-                    tok = token.upper()
-                    if tok in ("ATR+", "2FG+"):
-                        points_scored += 2
-                    elif tok == "3FG+":
-                        points_scored += 3
-                    elif tok == "FT+":
-                        points_scored += 1
+            row_text = ' '.join(safe_str(val) for val in row.values)
+
+            def compute_points(text, team_name):
+                pts = text.count('ATR+') * 2
+                pts += text.count('2FG+') * 2
+                pts += text.count('3FG+') * 3
+                pts += text.count('FT+') * 1
+                if f"{team_name} Fouled +1" in text:
+                    pts += 1
+                return pts
+
+            points_scored = compute_points(row_text, offense_team)
 
             poss_off = Possession(
-                practice_id    = current_practice.id,
-                season_id      = season_id,
-                game_id        = 0,
-                possession_side= offense_team,
-                possession_start = row.get(ps_col, ""),
-                possession_type  = row.get(pt_col, ""),
-                paint_touches    = row.get(pc_col, ""),
-                shot_clock       = row.get(sc_col, ""),
-                shot_clock_pt    = row.get(scp_col, ""),
-                points_scored    = points_scored,
+                practice_id     = current_practice.id,
+                season_id       = season_id,
+                game_id         = 0,
+                possession_side = offense_team,
+                time_segment    = offense_label,
+                possession_start= p_start,
+                possession_type = p_type,
+                paint_touches   = p_paint,
+                shot_clock      = p_clock,
+                shot_clock_pt   = p_clock_pt,
+                points_scored   = points_scored,
             )
             db.session.add(poss_off)
             db.session.flush()
 
             off_players = []
-            for cell in str(row.get(off_col, "") or "").split(','):
+            for cell in str(row.get(off_col, '') or '').split(','):
                 name = cell.strip()
                 if not name:
                     continue
@@ -181,17 +190,35 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     db.session.add(PossessionPlayer(possession_id=poss_off.id, player_id=pid))
                     off_players.append(name)
 
+            def persist_events(poss_id, text):
+                for ev in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-','FT+','Turnover','Fouled','Off Rebound']:
+                    cnt = text.count(ev)
+                    for _ in range(cnt):
+                        db.session.add(ShotDetail(
+                            possession_id=poss_id,
+                            event_type=ev
+                        ))
+                fp1 = f"{offense_team} Fouled +1"
+                if fp1 in text:
+                    db.session.add(ShotDetail(
+                        possession_id=poss_id,
+                        event_type='FT+'
+                    ))
+
+            persist_events(poss_off.id, row_text)
+
             poss_def = Possession(
-                practice_id    = current_practice.id,
-                season_id      = season_id,
-                game_id        = 0,
-                possession_side= defense_team,
-                possession_start = row.get(ps_col, ""),
-                possession_type  = row.get(pt_col, ""),
-                paint_touches    = row.get(pc_col, ""),
-                shot_clock       = row.get(sc_col, ""),
-                shot_clock_pt    = row.get(scp_col, ""),
-                points_scored    = points_scored,
+                practice_id     = current_practice.id,
+                season_id       = season_id,
+                game_id         = 0,
+                possession_side = defense_team,
+                time_segment    = defense_label,
+                possession_start= p_start,
+                possession_type = p_type,
+                paint_touches   = p_paint,
+                shot_clock      = p_clock,
+                shot_clock_pt   = p_clock_pt,
+                points_scored   = points_scored,
             )
             db.session.add(poss_def)
             db.session.flush()
@@ -199,7 +226,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             def_players = []
             off_events = []
             def_events = []
-            for cell in str(row.get(def_col, "") or "").split(','):
+            for cell in str(row.get(def_col, '') or '').split(','):
                 name = cell.strip()
                 if not name:
                     continue
@@ -208,21 +235,23 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     db.session.add(PossessionPlayer(possession_id=poss_def.id, player_id=pid))
                     def_players.append(name)
 
+            persist_events(poss_def.id, row_text)
+
             base = {
-                "possession_start": safe_str(row.get(ps_col, "")),
-                "possession_type": safe_str(row.get(pt_col, "")),
-                "paint_touches": safe_str(row.get(pc_col, "")),
-                "shot_clock": safe_str(row.get(sc_col, "")),
-                "shot_clock_pt": safe_str(row.get(scp_col, "")),
-                "points_scored": points_scored,
+                'possession_start': safe_str(p_start),
+                'possession_type':  safe_str(p_type),
+                'paint_touches':   safe_str(p_paint),
+                'shot_clock':      safe_str(p_clock),
+                'shot_clock_pt':   safe_str(p_clock_pt),
+                'points_scored':   points_scored,
             }
 
             poss_data_off = dict(base)
-            poss_data_off.update({"side": offense_team, "players_on_floor": off_players})
+            poss_data_off.update({'side': offense_team, 'players_on_floor': off_players})
             possession_data.append(poss_data_off)
 
             poss_data_def = dict(base)
-            poss_data_def.update({"side": defense_team, "players_on_floor": def_players})
+            poss_data_def.update({'side': defense_team, 'players_on_floor': def_players})
             possession_data.append(poss_data_def)
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
