@@ -2,9 +2,9 @@
 {% block content %}
   <div class="max-w-md mx-auto mt-8 p-6 bg-white rounded shadow">
     <h1 class="text-2xl font-bold mb-4">Upload Draft Stock Workbook</h1>
-    {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% with msgs = get_flashed_messages(with_categories=true, category_filter=['draft-success', 'draft-error']) %}
       {% for cat, msg in msgs %}
-        <div class="mb-3 p-3 rounded {{ 'bg-red-200' if cat=='error' else 'bg-green-200' }}">{{ msg }}</div>
+        <div class="mb-3 p-3 rounded {{ 'bg-red-200' if 'error' in cat else 'bg-green-200' }}">{{ msg }}</div>
       {% endfor %}
     {% endwith %}
     <form method="post" enctype="multipart/form-data">

@@ -3661,7 +3661,7 @@ def draft_upload():
     if request.method == 'POST':
         file = request.files.get('file')
         if not file or not allowed_draft_file(file.filename):
-            flash('Please upload a valid .xlsx file', 'error')
+            flash('Please upload a valid .xlsx file', 'draft-error')
             return redirect(url_for('admin.draft_upload'))
 
         filename = secure_filename(file.filename)
@@ -3670,7 +3670,7 @@ def draft_upload():
         file.save(dest)
 
         # TODO: parse & save rows to PlayerDraftStock
-        flash('File received! (parsing logic coming next)', 'success')
+        flash('File received! (parsing logic coming next)', 'draft-success')
         return redirect(url_for('admin.draft_upload'))
 
     return render_template('admin/draft_upload.html')
