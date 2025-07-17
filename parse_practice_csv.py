@@ -9,9 +9,8 @@ from models.database import (
     PlayerStats,
     BlueCollarStats,
     Practice,
-    Possession,
-    PlayerPossession,
 )
+from models import Possession, PossessionPlayer
 
 
 def safe_str(value):
@@ -67,60 +66,6 @@ def extract_tokens(val):
     return [t.strip() for t in val.split(',') if t.strip()]
 
 
-def process_practice_possessions(df):
-    """Parse possession information from practice DataFrame."""
-    possession_data = []
-    opponent_map = {
-        "Crimson": "White",
-        "White": "Crimson",
-        "Alabama": "Blue",
-        "Blue": "Alabama",
-    }
-
-    for _, row in df.iterrows():
-        row_type = str(row.get("Row", "")).strip()
-        if row_type not in opponent_map:
-            continue
-
-        offense_color = row_type
-        defense_color = opponent_map[row_type]
-
-        off_col = f"{offense_color.upper()} PLAYER POSSESSIONS"
-        def_col = f"{defense_color.upper()} PLAYER POSSESSIONS"
-
-        offense_players = extract_tokens(row.get(off_col, ""))
-        defense_players = extract_tokens(row.get(def_col, ""))
-
-        points_scored = 0
-        for col in df.columns:
-            if str(col).startswith("#"):
-                for token in extract_tokens(row.get(col, "")):
-                    tok = token.upper()
-                    if tok == "ATR+" or tok == "2FG+":
-                        points_scored += 2
-                    elif tok == "3FG+":
-                        points_scored += 3
-                    elif tok == "FT+":
-                        points_scored += 1
-
-        base = {
-            "possession_start": safe_str(row.get("POSSESSION START", "")),
-            "possession_type": safe_str(row.get("POSSESSION TYPE", "")),
-            "paint_touches": safe_str(row.get("PAINT TOUCHES", "")),
-            "shot_clock": safe_str(row.get("SHOT CLOCK", "")),
-            "shot_clock_pt": safe_str(row.get("SHOT CLOCK PT", "")),
-            "points_scored": points_scored,
-        }
-
-        poss_off = dict(base)
-        poss_off.update({"side": offense_color, "players_on_floor": offense_players})
-        possession_data.append(poss_off)
-
-        poss_def = dict(base)
-        poss_def.update({"side": defense_color, "players_on_floor": defense_players})
-        possession_data.append(poss_def)
-
-    return possession_data
 
 
 def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_date=None):
@@ -149,11 +94,25 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # Normalize column headers to avoid mismatches caused by stray whitespace
     df.columns = [str(c).strip() for c in df.columns]
     
+    # ─── Locate the Practice row ───────────────────────────────────
+    current_practice = (
+        Practice.query
+        .filter_by(season_id=season_id, category=category, date=file_date)
+        .first()
+    )
+    if current_practice is None:
+        raise RuntimeError(
+            f"Could not find existing Practice row for season={season_id}, "
+            f"category='{category}', date={file_date}"
+        )
+    practice_id = current_practice.id
+
     # ─── Step A: Initialize accumulators ─────────────────────────────
     player_stats_dict   = defaultdict(lambda: defaultdict(int))
     player_blue_dict    = defaultdict(lambda: defaultdict(int))
     player_shot_list    = defaultdict(list)
     player_detail_list  = defaultdict(list)
+    possession_data     = []
     # ── Find all columns beginning with "#" to use for player tokens
     player_columns = [c for c in df.columns if str(c).strip().startswith("#")]
     # ─────────────────────────────────────────────────────────────────────
@@ -167,7 +126,102 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         else:
             drill_str = str(drill_val)
 
+
         labels = [t.strip().upper() for t in drill_str.split(",") if t.strip()]
+
+        # ─── Possession parsing ─────────────────────────────────────────
+        team = row_type
+        if team in ("Crimson", "White"):
+            offense_team = team
+            defense_team = "White" if team == "Crimson" else "Crimson"
+
+            ps_col  = "POSSESSION START"
+            pt_col  = "POSSESSION TYPE"
+            pc_col  = "PAINT TOUCHES"
+            sc_col  = "SHOT CLOCK"
+            scp_col = "SHOT CLOCK PT"
+            off_col = f"{offense_team.upper()} PLAYER POSSESSIONS"
+            def_col = f"{defense_team.upper()} PLAYER POSSESSIONS"
+
+
+            # compute points scored for lineup metrics
+            points_scored = 0
+            for col in player_columns:
+                for token in extract_tokens(row.get(col, "")):
+                    tok = token.upper()
+                    if tok in ("ATR+", "2FG+"):
+                        points_scored += 2
+                    elif tok == "3FG+":
+                        points_scored += 3
+                    elif tok == "FT+":
+                        points_scored += 1
+
+            poss_off = Possession(
+                practice_id    = current_practice.id,
+                season_id      = season_id,
+                game_id        = 0,
+                possession_side= offense_team,
+                possession_start = row.get(ps_col, ""),
+                possession_type  = row.get(pt_col, ""),
+                paint_touches    = row.get(pc_col, ""),
+                shot_clock       = row.get(sc_col, ""),
+                shot_clock_pt    = row.get(scp_col, ""),
+                points_scored    = points_scored,
+            )
+            db.session.add(poss_off)
+            db.session.flush()
+
+            off_players = []
+            for cell in str(row.get(off_col, "") or "").split(','):
+                name = cell.strip()
+                if not name:
+                    continue
+                pid = get_roster_id(name, season_id)
+                if pid is not None:
+                    db.session.add(PossessionPlayer(possession_id=poss_off.id, player_id=pid))
+                    off_players.append(name)
+
+            poss_def = Possession(
+                practice_id    = current_practice.id,
+                season_id      = season_id,
+                game_id        = 0,
+                possession_side= defense_team,
+                possession_start = row.get(ps_col, ""),
+                possession_type  = row.get(pt_col, ""),
+                paint_touches    = row.get(pc_col, ""),
+                shot_clock       = row.get(sc_col, ""),
+                shot_clock_pt    = row.get(scp_col, ""),
+                points_scored    = points_scored,
+            )
+            db.session.add(poss_def)
+            db.session.flush()
+
+            def_players = []
+            for cell in str(row.get(def_col, "") or "").split(','):
+                name = cell.strip()
+                if not name:
+                    continue
+                pid = get_roster_id(name, season_id)
+                if pid is not None:
+                    db.session.add(PossessionPlayer(possession_id=poss_def.id, player_id=pid))
+                    def_players.append(name)
+
+            base = {
+                "possession_start": safe_str(row.get(ps_col, "")),
+                "possession_type": safe_str(row.get(pt_col, "")),
+                "paint_touches": safe_str(row.get(pc_col, "")),
+                "shot_clock": safe_str(row.get(sc_col, "")),
+                "shot_clock_pt": safe_str(row.get(scp_col, "")),
+                "points_scored": points_scored,
+            }
+
+            poss_data_off = dict(base)
+            poss_data_off.update({"side": offense_team, "players_on_floor": off_players})
+            possession_data.append(poss_data_off)
+
+            poss_data_def = dict(base)
+            poss_data_def.update({"side": defense_team, "players_on_floor": def_players})
+            possession_data.append(poss_data_def)
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":
@@ -501,18 +555,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
         # (Any rows we don’t explicitly parse just fall through.)
 
-    # ─── Step C: After looping all rows, find existing Practice and write to DB ───────
-    practice = (
-        Practice.query
-        .filter_by(season_id=season_id, category=category, date=file_date)
-        .first()
-    )
-    if practice is None:
-        raise RuntimeError(
-            f"Could not find existing Practice row for season={season_id}, "
-            f"category='{category}', date={file_date}"
-        )
-    practice_id = practice.id
+    # ─── Step C: After looping all rows, write aggregated stats ───────
 
     # Now insert each player’s aggregated stats + blue collar
     for roster_id in set(player_stats_dict) | set(player_blue_dict):
@@ -590,30 +633,6 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         )
     db.session.commit()
 
-    # ─── Process possession data for scrimmage rows ───────────────────
-    possession_data = process_practice_possessions(df)
-    for poss in possession_data:
-        new_poss = Possession(
-            game_id=0,
-            practice_id=practice_id,
-            season_id=season_id,
-            possession_side=poss.get("side", ""),
-            possession_start=poss.get("possession_start", ""),
-            possession_type=poss.get("possession_type", ""),
-            paint_touches=poss.get("paint_touches", ""),
-            shot_clock=poss.get("shot_clock", ""),
-            shot_clock_pt=poss.get("shot_clock_pt", ""),
-            points_scored=poss.get("points_scored", 0),
-        )
-        db.session.add(new_poss)
-        db.session.flush()
-        for jersey in poss.get("players_on_floor", []):
-            roster_id = get_roster_id(jersey, season_id)
-            if roster_id is not None:
-                db.session.add(
-                    PlayerPossession(possession_id=new_poss.id, player_id=roster_id)
-                )
-    db.session.commit()
     # ─── Compute lineup and on/off metrics ───────────────────────────
     lineup_efficiencies = compute_lineup_efficiencies(
         possession_data,
