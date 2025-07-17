@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">{{ player.player_name }}</h1>
+
+<h3>On-Court Offensive Possessions & Efficiency</h3>
+<table class="table-auto w-full">
+  <tr><td>Possessions</td><td>{{ offensive_possessions }}</td></tr>
+  <tr><td>PPP (On-court)</td><td>{{ ppp_on }}</td></tr>
+  <tr><td>PPP (Off-court)</td><td>{{ ppp_off }}</td></tr>
+  <tr><td>EFG%</td><td>{{ efg_on }}%</td></tr>
+  <tr><td>ATR%</td><td>{{ atr_pct }}%</td></tr>
+  <tr><td>2FG%</td><td>{{ two_fg_pct }}%</td></tr>
+  <tr><td>3FG%</td><td>{{ three_fg_pct }}%</td></tr>
+  <tr><td>Turnover Rate</td><td>{{ turnover_rate }}%</td></tr>
+  <tr><td>Off-Reb Rate</td><td>{{ off_reb_rate }}%</td></tr>
+  <tr><td>Fouls-Drawn Rate</td><td>{{ fouls_drawn_rate }}%</td></tr>
+</table>
+{% endblock %}

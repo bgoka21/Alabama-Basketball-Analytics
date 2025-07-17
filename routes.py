@@ -4,6 +4,7 @@ from flask import render_template, jsonify, request, current_app, make_response,
 from werkzeug.utils import secure_filename
 from app import app, db, PDFKIT_CONFIG, PDF_OPTIONS
 from sqlalchemy import func
+from models import Possession, PossessionPlayer, ShotDetail
 from models.database import PlayerDraftStock
 from admin.routes import (
     collect_practice_labels,
@@ -11,7 +12,7 @@ from admin.routes import (
     compute_filtered_blue,
     aggregate_stats,
 )
-from models.database import PlayerStats, Practice, BlueCollarStats, Possession
+from models.database import PlayerStats, Practice, BlueCollarStats
 from datetime import date
 from types import SimpleNamespace
 from flask_login import login_required
@@ -282,6 +283,79 @@ def shot_type_report(shot_type):
     data = get_shot_data(shot_type)
     title = valid[shot_type] + ' Shot Type Report'
     return render_template('shot_type.html', shot_type=shot_type, title=title, data=data)
+
+
+@app.route('/player/<player_name>')
+def player_view(player_name):
+    """Public-facing player page with on-court offensive metrics."""
+    from models.database import Roster
+    player = Roster.query.filter_by(player_name=player_name).first_or_404()
+
+    # 1. On-court offensive possessions & points
+    ON_poss, ON_pts = db.session.query(
+        func.count(PossessionPlayer.id),
+        func.coalesce(func.sum(Possession.points_scored), 0)
+    ).join(Possession, PossessionPlayer.possession_id==Possession.id).filter(
+        PossessionPlayer.player_id == player.id,
+        Possession.possession_side == 'Offense'
+    ).one()
+
+    # 2. Team totals (all offense)
+    TEAM_poss, TEAM_pts = db.session.query(
+        func.count(Possession.id),
+        func.coalesce(func.sum(Possession.points_scored), 0)
+    ).filter(
+        Possession.possession_side == 'Offense'
+    ).one()
+
+    # 3. Off-court
+    OFF_poss = TEAM_poss - ON_poss
+    OFF_pts  = TEAM_pts - ON_pts
+
+    # 4. PPP calculations
+    PPP_ON  = ON_pts  / ON_poss if ON_poss else 0
+    PPP_OFF = OFF_pts / OFF_poss if OFF_poss else 0
+
+    # helper to count shot/event details on-court
+    def count_event(ev_type):
+        return db.session.query(func.count(ShotDetail.id)) \
+          .join(Possession, ShotDetail.possession_id==Possession.id) \
+          .join(PossessionPlayer, Possession.id==PossessionPlayer.possession_id) \
+          .filter(
+             PossessionPlayer.player_id == player.id,
+             Possession.possession_side == 'Offense',
+             ShotDetail.event_type == ev_type
+          ).scalar() or 0
+
+    # 5. Shooting splits
+    FGM2_ON = count_event('ATR+') + count_event('2FG+')
+    FGM3_ON = count_event('3FG+')
+    FGA_ON  = sum(count_event(e) for e in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-'])
+    EFG_ON  = (FGM2_ON + 1.5 * FGM3_ON) / FGA_ON if FGA_ON else 0
+    ATR_pct = count_event('ATR+') / (count_event('ATR+') + count_event('ATR-')) if (count_event('ATR+') + count_event('ATR-')) else 0
+    FG2_pct = count_event('2FG+') / (count_event('2FG+') + count_event('2FG-')) if (count_event('2FG+') + count_event('2FG-')) else 0
+    FG3_pct = count_event('3FG+') / (count_event('3FG+') + count_event('3FG-')) if (count_event('3FG+') + count_event('3FG-')) else 0
+
+    # 6. Rate metrics
+    turnover_rate     = count_event('Turnover') / ON_poss if ON_poss else 0
+    off_reb_rate      = count_event('Off Rebound') / ON_poss if ON_poss else 0
+    fouls_drawn_rate  = count_event('Fouled') / ON_poss if ON_poss else 0
+
+    # 7. Pass into template context
+    return render_template(
+        'player_view.html',
+        player=player,
+        offensive_possessions = ON_poss,
+        ppp_on               = round(PPP_ON,2),
+        ppp_off              = round(PPP_OFF,2),
+        efg_on               = round(EFG_ON*100,1),
+        atr_pct              = round(ATR_pct*100,1),
+        two_fg_pct           = round(FG2_pct*100,1),
+        three_fg_pct         = round(FG3_pct*100,1),
+        turnover_rate        = round(turnover_rate*100,1),
+        off_reb_rate         = round(off_reb_rate*100,1),
+        fouls_drawn_rate     = round(fouls_drawn_rate*100,1),
+    )
 
 
 

@@ -220,6 +220,13 @@ class PlayerPossession(db.Model):
     player_id      = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False, index=True)
 
 
+class ShotDetail(db.Model):
+    """Detailed event or shot occurring within a possession."""
+    id            = db.Column(db.Integer, primary_key=True)
+    possession_id = db.Column(db.Integer, db.ForeignKey('possession.id'), nullable=False, index=True)
+    event_type    = db.Column(db.String(64), nullable=False)
+
+
 class PnRStats(db.Model):
     __tablename__ = 'pnr_stats'
     id                = db.Column(db.Integer, primary_key=True)
