@@ -241,6 +241,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
             totals_by_sc[sc]['attempts'] += a
             totals_by_sc[sc]['makes'] += m
 
+        total_attempts = sum(t['attempts'] for t in totals_by_sc.values()) or 0
         for sc, t in totals_by_sc.items():
             a = t['attempts']
             m = t['makes']
@@ -249,6 +250,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
             flat[f"{sc}_makes"] = m
             flat[f"{sc}_fg_pct"] = (m / a * 100 if a else 0)
             flat[f"{sc}_pps"] = (pts * m / a if a else 0)
+            flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
 
         shot_details[player] = flat
 
@@ -1436,9 +1438,13 @@ def aggregate_stats(stats_list):
         efg = (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots
         agg["efg_pct"]         = round(efg * 100, 1)
         agg["points_per_shot"] = round(efg * 2, 2)
+        agg["atr_freq_pct"]   = round(agg["atr_attempts"] / total_shots * 100, 1)
+        agg["fg3_freq_pct"]   = round(agg["fg3_attempts"] / total_shots * 100, 1)
     else:
         agg["efg_pct"] = 0.0
         agg["points_per_shot"] = 0.0
+        agg["atr_freq_pct"] = 0.0
+        agg["fg3_freq_pct"] = 0.0
 
     # shot percentages
     agg["atr_pct"] = round(agg["atr_makes"] / agg["atr_attempts"] * 100, 1) if agg["atr_attempts"] else 0.0
@@ -1647,9 +1653,13 @@ def compute_filtered_totals(stats_records, label_set):
         ) / total_shots
         totals["efg_pct"] = round(efg * 100, 1)
         totals["points_per_shot"] = round(efg * 2, 2)
+        totals["atr_freq_pct"] = round(totals["atr_attempts"] / total_shots * 100, 1)
+        totals["fg3_freq_pct"] = round(totals["fg3_attempts"] / total_shots * 100, 1)
     else:
         totals["efg_pct"] = 0.0
         totals["points_per_shot"] = 0.0
+        totals["atr_freq_pct"] = 0.0
+        totals["fg3_freq_pct"] = 0.0
 
     totals["atr_pct"] = round(totals["atr_makes"] / totals["atr_attempts"] * 100, 1) if totals["atr_attempts"] else 0.0
     totals["fg3_pct"] = round(totals["fg3_makes"] / totals["fg3_attempts"] * 100, 1) if totals["fg3_attempts"] else 0.0
@@ -3303,6 +3313,7 @@ def team_totals():
     allowed_stats = {
         'points','assists','turnovers','atr_makes','atr_attempts','fg2_makes',
         'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta','atr_pct','fg3_pct',
+        'atr_freq_pct','fg3_freq_pct',
         'efg_pct','points_per_shot','assist_turnover_ratio','adj_assist_turnover_ratio',
         'second_assists','pot_assists','ft_pct','fg_pct','fg2_pct',
         'total_blue_collar','deflection','steal','block'
@@ -3317,6 +3328,8 @@ def team_totals():
         query_stats.update({'atr_makes','atr_attempts'})
     if 'fg3_pct' in query_stats:
         query_stats.update({'fg3_makes','fg3_attempts'})
+    if query_stats & {'atr_freq_pct','fg3_freq_pct'}:
+        query_stats.update({'atr_attempts','fg2_attempts','fg3_attempts'})
     if query_stats & {'efg_pct','points_per_shot','fg_pct','fg2_pct'}:
         query_stats.update({'atr_makes','atr_attempts','fg2_makes','fg2_attempts','fg3_makes','fg3_attempts'})
     if 'ft_pct' in query_stats:
@@ -3326,7 +3339,8 @@ def team_totals():
 
     bc_fields = {'total_blue_collar','deflection','steal','block'}
     computed_fields = {
-        'atr_pct','fg3_pct','efg_pct','points_per_shot','assist_turnover_ratio',
+        'atr_pct','fg3_pct','atr_freq_pct','fg3_freq_pct',
+        'efg_pct','points_per_shot','assist_turnover_ratio',
         'adj_assist_turnover_ratio','fg_pct','fg2_pct','ft_pct'
     }
 
@@ -3403,6 +3417,11 @@ def team_totals():
                 if 'fg_pct' in selected_stats:
                     fg = (base.get('atr_makes',0)+base.get('fg2_makes',0)+base.get('fg3_makes',0))/total_shots
                     base['fg_pct'] = round(fg*100,1)
+                if selected_set & {'atr_freq_pct','fg3_freq_pct'}:
+                    if 'atr_freq_pct' in selected_stats:
+                        base['atr_freq_pct'] = round(base.get('atr_attempts',0)/total_shots*100,1)
+                    if 'fg3_freq_pct' in selected_stats:
+                        base['fg3_freq_pct'] = round(base.get('fg3_attempts',0)/total_shots*100,1)
             else:
                 if 'efg_pct' in selected_stats:
                     base['efg_pct'] = 0.0
@@ -3410,6 +3429,10 @@ def team_totals():
                     base['points_per_shot'] = 0.0
                 if 'fg_pct' in selected_stats:
                     base['fg_pct'] = 0.0
+                if 'atr_freq_pct' in selected_stats:
+                    base['atr_freq_pct'] = 0.0
+                if 'fg3_freq_pct' in selected_stats:
+                    base['fg3_freq_pct'] = 0.0
         if 'fg2_pct' in selected_stats:
             att = base.get('fg2_attempts',0)
             pct = round(base.get('fg2_makes',0)/att*100,1) if att else 0.0
@@ -3493,8 +3516,12 @@ def leaderboard():
     categories_map = defaultdict(list)
     for s in LEADERBOARD_STATS:
         if s.get('hidden'):
-            sc = s['key'].split('_')[0]
-            categories_map[sc].append({'key': s['key'], 'label': s['label']})
+            # hidden stats should not appear in dropdowns
+            continue
+        sc = s['key'].split('_')[0]
+        if s['key'] != f'{sc}_fg_pct':
+            continue
+        # No additional categories at this time
 
     selected_base = stat_key
     category_options = None

@@ -772,8 +772,11 @@ def season_leaderboard():
     categories_map = defaultdict(list)
     for s in LEADERBOARD_STATS:
         if s.get('hidden'):
-            sc = s['key'].split('_')[0]
-            categories_map[sc].append({'key': s['key'], 'label': s['label']})
+            # hidden stats should not appear in dropdowns
+            continue
+        sc = s['key'].split('_')[0]
+        if s['key'] != f'{sc}_fg_pct':
+            continue
 
     selected_base = stat_key
     category_options = None
