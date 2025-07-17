@@ -324,9 +324,13 @@ except ImportError:
     AUTH_EXISTS = False
 
 ALLOWED_EXTENSIONS = {'csv'}
+IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_image(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in IMAGE_EXTENSIONS
 
 @admin_bp.before_request
 def admin_bp_before_request():
@@ -2848,7 +2852,11 @@ def upload_headshot(player_name):
             return redirect(request.url)
 
         filename = secure_filename(file.filename)
-        folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'headshots')
+        if not allowed_image(filename):
+            flash('Please upload a .png or .jpg image.', 'error')
+            return redirect(request.url)
+
+        folder = os.path.join(current_app.static_folder, 'headshots')
         os.makedirs(folder, exist_ok=True)
         file.save(os.path.join(folder, filename))
 

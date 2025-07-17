@@ -47,3 +47,8 @@ for regular users.
 ### Development Plan View
 
 Visit `/admin/player/<player name>/development` to view a player's current season development plan alongside season stats.
+
+### Player Headshots
+
+Administrators can upload player headshots from the roster management page. The
+app accepts `.png` and `.jpg` images and stores them in `static/headshots/`.
