@@ -292,21 +292,29 @@ def player_view(player_name):
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
 
     # 1. On-court offensive possessions & points
-    ON_poss, ON_pts = db.session.query(
-        func.count(PossessionPlayer.id),
-        func.coalesce(func.sum(Possession.points_scored), 0)
-    ).join(Possession, PossessionPlayer.possession_id==Possession.id).filter(
-        PossessionPlayer.player_id == player.id,
-        Possession.possession_side == 'Offense'
-    ).one()
+    offense_sides = ('Offense', 'Crimson', 'White')
+    ON_poss, ON_pts = (
+        db.session.query(
+            func.count(PossessionPlayer.id),
+            func.coalesce(func.sum(Possession.points_scored), 0),
+        )
+        .join(Possession, PossessionPlayer.possession_id == Possession.id)
+        .filter(
+            PossessionPlayer.player_id == player.id,
+            Possession.possession_side.in_(offense_sides),
+        )
+        .one()
+    )
 
     # 2. Team totals (all offense)
-    TEAM_poss, TEAM_pts = db.session.query(
-        func.count(Possession.id),
-        func.coalesce(func.sum(Possession.points_scored), 0)
-    ).filter(
-        Possession.possession_side == 'Offense'
-    ).one()
+    TEAM_poss, TEAM_pts = (
+        db.session.query(
+            func.count(Possession.id),
+            func.coalesce(func.sum(Possession.points_scored), 0),
+        )
+        .filter(Possession.possession_side.in_(offense_sides))
+        .one()
+    )
 
     # 3. Off-court
     OFF_poss = TEAM_poss - ON_poss
@@ -318,14 +326,18 @@ def player_view(player_name):
 
     # helper to count shot/event details on-court
     def count_event(ev_type):
-        return db.session.query(func.count(ShotDetail.id)) \
-          .join(Possession, ShotDetail.possession_id==Possession.id) \
-          .join(PossessionPlayer, Possession.id==PossessionPlayer.possession_id) \
-          .filter(
-             PossessionPlayer.player_id == player.id,
-             Possession.possession_side == 'Offense',
-             ShotDetail.event_type == ev_type
-          ).scalar() or 0
+        return (
+            db.session.query(func.count(ShotDetail.id))
+            .join(Possession, ShotDetail.possession_id == Possession.id)
+            .join(PossessionPlayer, Possession.id == PossessionPlayer.possession_id)
+            .filter(
+                PossessionPlayer.player_id == player.id,
+                Possession.possession_side.in_(offense_sides),
+                ShotDetail.event_type == ev_type,
+            )
+            .scalar()
+            or 0
+        )
 
     # 5. Shooting splits
     FGM2_ON = count_event('ATR+') + count_event('2FG+')
