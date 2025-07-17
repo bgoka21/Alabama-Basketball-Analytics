@@ -290,9 +290,11 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
             pct = details.get(stat_key, 0)
             att_key = stat_key.replace('_fg_pct', '_attempts')
             make_key = stat_key.replace('_fg_pct', '_makes')
+            freq_key = stat_key.replace('_fg_pct', '_freq_pct')
             attempts = details.get(att_key, 0)
             makes = details.get(make_key, 0)
-            leaderboard.append((player, makes, attempts, pct))
+            freq = details.get(freq_key, 0)
+            leaderboard.append((player, makes, attempts, pct, freq))
         leaderboard.sort(key=lambda x: x[3], reverse=True)
     else:
         for player in all_players:
