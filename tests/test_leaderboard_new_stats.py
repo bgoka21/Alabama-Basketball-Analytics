@@ -82,3 +82,10 @@ def test_leaderboard_shows_frequency_stats(client):
     html = resp.data.decode('utf-8')
     assert '3FG Frequency' in html
     assert '20.0%' in html
+
+
+def test_fg_pct_table_includes_frequency(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'atr_fg_pct'})
+    html = resp.data.decode('utf-8')
+    assert 'Freq' in html
+    assert '40.0%' in html

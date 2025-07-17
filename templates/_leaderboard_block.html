@@ -26,12 +26,13 @@
   <thead>
     <tr class="bg-gray-100">
       <th class="px-4 py-2">#</th>
-      <th class="px-4 py-2">Player</th>
+      <th class="px-4 py-2 sortable">Player</th>
       {% if selected.key.endswith('_fg_pct') %}
-        <th class="px-4 py-2">FG</th>
-        <th class="px-4 py-2">FG%</th>
+        <th class="px-4 py-2 sortable">FG</th>
+        <th class="px-4 py-2 sortable">FG%</th>
+        <th class="px-4 py-2 sortable">Freq</th>
       {% else %}
-        <th class="px-4 py-2">{{ selected.label }}</th>
+        <th class="px-4 py-2 sortable">{{ selected.label }}</th>
       {% endif %}
     </tr>
   </thead>
@@ -40,10 +41,11 @@
       <tr class="border-t">
         <td class="px-4 py-2">{{ loop.index }}</td>
         {% if selected.key.endswith('_fg_pct') %}
-          {% set player, makes, attempts, pct = row %}
+          {% set player, makes, attempts, pct, freq = row %}
           <td class="px-4 py-2">{{ player }}</td>
           <td class="px-4 py-2">{{ makes }}-{{ attempts }}</td>
           <td class="px-4 py-2">{{ pct|round(1) }}%</td>
+          <td class="px-4 py-2">{{ freq|round(1) }}%</td>
         {% else %}
           {% set player, val = row %}
           <td class="px-4 py-2">{{ player }}</td>
@@ -69,4 +71,29 @@
       }
     });
   }
+
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const table = th.closest('table');
+      const tbody = table.querySelector('tbody');
+      const idx = Array.from(th.parentNode.children).indexOf(th);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const desc = th.dataset.order !== 'desc';
+      rows.sort((a,b) => {
+        const aText = a.children[idx].textContent.trim();
+        const bText = b.children[idx].textContent.trim();
+        const aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return desc ? bNum - aNum : aNum - bNum;
+        }
+        return desc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+      });
+      rows.forEach((row,i) => {
+        row.children[0].textContent = i + 1;
+        tbody.appendChild(row);
+      });
+      th.dataset.order = desc ? 'desc' : 'asc';
+    });
+  });
 </script>
