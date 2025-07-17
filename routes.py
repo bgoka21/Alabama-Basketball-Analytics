@@ -298,12 +298,12 @@ def draft_net():
         )
     return jsonify({'alabama_net': int(al_net), 'rival_net': int(rival_net)})
 
-# Configure upload folder (falls back to /uploads in your project root)
+# ── Draft Upload Page ──
 UPLOAD_FOLDER = app.config.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'uploads'))
 ALLOWED_EXTENSIONS = {'xlsx'}
 
-def allowed_file(filename):
-    return filename and '.' in filename and filename.rsplit('.',1)[1].lower() in ALLOWED_EXTENSIONS
+def allowed_file(fname):
+    return fname and '.' in fname and fname.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/admin/draft-upload', methods=['GET', 'POST'])
 def draft_upload():
@@ -320,7 +320,7 @@ def draft_upload():
         file.save(dest)
 
         # TODO: parse & save rows to PlayerDraftStock
-        flash('Upload endpoint is set up — implementation coming soon!', 'success')
+        flash('File received! (parsing logic coming next)', 'success')
         return redirect(url_for('draft_upload'))
 
     # On GET, render the form

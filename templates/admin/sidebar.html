@@ -74,7 +74,9 @@
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
         {% if view_exists('draft_upload') %}
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'draft_upload' %} active{% endif %}" href="{{ url_for('draft_upload') }}">Draft Upload</a>
+        <a class="nav-link" href="{{ url_for('draft_upload') }}">
+          <i class="icon-upload"></i> Draft Upload
+        </a>
         {% endif %}
       </div>
     </details>
