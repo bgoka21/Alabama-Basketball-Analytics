@@ -13,8 +13,8 @@ LEADERBOARD_STATS = [
 
 # ─── Extra Leaderboard Metrics ──────────────────────────────────────────────
 LEADERBOARD_STATS.extend([
-    {"key": "atr_pct", "label": "ATR%", "format": "pct"},
-    {"key": "fg3_pct", "label": "3FG%", "format": "pct"},
+    {"key": "atr_pct", "label": "ATR%", "format": "pct", "hidden": True},
+    {"key": "fg3_pct", "label": "3FG%", "format": "pct", "hidden": True},
     {"key": "atr_freq_pct", "label": "ATR Frequency", "format": "pct"},
     {"key": "fg3_freq_pct", "label": "3FG Frequency", "format": "pct"},
     {"key": "assist_turnover_ratio", "label": "AST/TO Ratio"},
