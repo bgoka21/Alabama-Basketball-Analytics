@@ -769,38 +769,11 @@ def season_leaderboard():
     sid = get_current_season_id()
     cfg, rows = compute_leaderboard(stat_key, sid)
 
-    categories_map = defaultdict(list)
-    for s in LEADERBOARD_STATS:
-        if s.get('hidden'):
-            # hidden stats should not appear in dropdowns
-            continue
-        sc = s['key'].split('_')[0]
-        if s['key'] != f'{sc}_fg_pct':
-            continue
-
-    selected_base = stat_key
-    category_options = None
-    for sc in ['atr', 'fg2', 'fg3']:
-        if stat_key.startswith(f'{sc}_') and stat_key != f'{sc}_fg_pct':
-            selected_base = f'{sc}_fg_pct'
-            category_options = categories_map.get(sc)
-            break
-        elif stat_key == f'{sc}_fg_pct':
-            selected_base = stat_key
-            category_options = categories_map.get(sc)
-            break
-
-    if stat_key not in [c['key'] for c in LEADERBOARD_STATS]:
-        category_options = None
-        selected_base = stat_key
-
     return render_template(
         'leaderboard.html',
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
-        rows=rows,
-        category_options=category_options,
-        selected_base=selected_base
+        rows=rows
     )
 
 @public_bp.route('/skill_dev')

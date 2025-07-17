@@ -3545,33 +3545,6 @@ def leaderboard():
         stat_key = LEADERBOARD_STATS[0]['key']
     cfg, rows = compute_leaderboard(stat_key, sid, start_dt, end_dt)
 
-    # Build category dropdown options for simple shot types
-    categories_map = defaultdict(list)
-    for s in LEADERBOARD_STATS:
-        if s.get('hidden'):
-            # hidden stats should not appear in dropdowns
-            continue
-        sc = s['key'].split('_')[0]
-        if s['key'] != f'{sc}_fg_pct':
-            continue
-        # No additional categories at this time
-
-    selected_base = stat_key
-    category_options = None
-    for sc in ['atr', 'fg2', 'fg3']:
-        if stat_key.startswith(f'{sc}_') and stat_key != f'{sc}_fg_pct':
-            selected_base = f'{sc}_fg_pct'
-            category_options = categories_map.get(sc)
-            break
-        elif stat_key == f'{sc}_fg_pct':
-            selected_base = stat_key
-            category_options = categories_map.get(sc)
-            break
-
-    if stat_key not in [c['key'] for c in LEADERBOARD_STATS]:
-        category_options = None
-        selected_base = stat_key
-
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
     return render_template(
@@ -3583,8 +3556,6 @@ def leaderboard():
         rows=rows,
         start_date=start_date or '',
         end_date=end_date or '',
-        category_options=category_options,
-        selected_base=selected_base,
         active_page='leaderboard'
     )
 
