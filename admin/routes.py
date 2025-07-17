@@ -3619,3 +3619,35 @@ def user_usage_report(user_id):
         end=end,
         active_page='usage'
     )
+
+
+# --- Draft Upload ---
+ALLOWED_DRAFT_EXTENSIONS = {'xlsx'}
+
+def allowed_draft_file(fname):
+    return fname and '.' in fname and fname.rsplit('.', 1)[1].lower() in ALLOWED_DRAFT_EXTENSIONS
+
+
+@admin_bp.route('/draft-upload', methods=['GET', 'POST'])
+@admin_required
+def draft_upload():
+    """Simple admin interface for uploading draft data spreadsheets."""
+    upload_folder = current_app.config.get(
+        'UPLOAD_FOLDER', os.path.join(current_app.root_path, 'uploads')
+    )
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or not allowed_draft_file(file.filename):
+            flash('Please upload a valid .xlsx file', 'error')
+            return redirect(url_for('admin.draft_upload'))
+
+        filename = secure_filename(file.filename)
+        os.makedirs(upload_folder, exist_ok=True)
+        dest = os.path.join(upload_folder, filename)
+        file.save(dest)
+
+        # TODO: parse & save rows to PlayerDraftStock
+        flash('File received! (parsing logic coming next)', 'success')
+        return redirect(url_for('admin.draft_upload'))
+
+    return render_template('admin/draft_upload.html')

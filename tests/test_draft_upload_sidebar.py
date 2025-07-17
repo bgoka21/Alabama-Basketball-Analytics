@@ -26,9 +26,6 @@ def app():
         return db.session.get(User, int(uid))
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
-    def dummy():
-        return 'ok'
-    app.add_url_rule('/admin/draft-upload', endpoint='draft_upload', view_func=dummy)
     app.jinja_env.globals['view_exists'] = lambda n: n in app.view_functions
 
     with app.app_context():

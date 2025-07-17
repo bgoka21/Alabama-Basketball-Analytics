@@ -298,30 +298,4 @@ def draft_net():
         )
     return jsonify({'alabama_net': int(al_net), 'rival_net': int(rival_net)})
 
-# ── Draft Upload Page ──
-UPLOAD_FOLDER = app.config.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'uploads'))
-ALLOWED_EXTENSIONS = {'xlsx'}
 
-def allowed_file(fname):
-    return fname and '.' in fname and fname.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@app.route('/admin/draft-upload', methods=['GET', 'POST'])
-def draft_upload():
-    if request.method == 'POST':
-        file = request.files.get('file')
-        if not file or not allowed_file(file.filename):
-            flash('Please upload a valid .xlsx file', 'error')
-            return redirect(url_for('draft_upload'))
-
-        # Save file stub
-        filename = secure_filename(file.filename)
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-        dest = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(dest)
-
-        # TODO: parse & save rows to PlayerDraftStock
-        flash('File received! (parsing logic coming next)', 'success')
-        return redirect(url_for('draft_upload'))
-
-    # On GET, render the form
-    return render_template('admin/draft_upload.html')

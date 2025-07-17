@@ -57,7 +57,7 @@
   {% if current_user.is_admin %}
   {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
                         'merge.merge_csv', 'admin.roster', 'admin.users_list',
-                        'admin.usage_report', 'draft_upload'] %}
+                        'admin.usage_report', 'admin.draft_upload'] %}
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
       <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
@@ -73,8 +73,8 @@
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.users_list' %} active{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
-        {% if view_exists('draft_upload') %}
-        <a class="nav-link" href="{{ url_for('draft_upload') }}">
+        {% if view_exists('admin.draft_upload') %}
+        <a class="nav-link" href="{{ url_for('admin.draft_upload') }}">
           <i class="icon-upload"></i> Draft Upload
         </a>
         {% endif %}
