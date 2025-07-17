@@ -10,7 +10,7 @@ from models.database import (
     BlueCollarStats,
     Practice,
 )
-from models import Possession, PossessionPlayer
+from models import Possession, PossessionPlayer, ShotDetail
 
 
 def safe_str(value):
@@ -197,6 +197,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             db.session.flush()
 
             def_players = []
+            off_events = []
+            def_events = []
             for cell in str(row.get(def_col, "") or "").split(','):
                 name = cell.strip()
                 if not name:
@@ -336,6 +338,11 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             "event": key,
                             "drill_labels": labels,
                         })
+                        if row_type in ("Crimson", "White"):
+                            if col in off_players:
+                                off_events.append(token)
+                            elif col in def_players:
+                                def_events.append(token)
         # allow offensive parsing to run as well for the same row
         # ───────────────────────────────────────────────────────────────────
 
@@ -366,6 +373,11 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 # ───────────────────────────────────────────────────────────────────
 
                 for token in tokens:
+                    if row_type in ("Crimson", "White"):
+                        if col in off_players:
+                            off_events.append(token)
+                        elif col in def_players:
+                            def_events.append(token)
                     cls = None
                     result = None
 
@@ -508,6 +520,11 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         continue
 
                 # done processing tokens for this player in this offense row
+            if row_type in ("Crimson", "White"):
+                for tok in off_events:
+                    db.session.add(ShotDetail(possession_id=poss_off.id, event_type=tok))
+                for tok in def_events:
+                    db.session.add(ShotDetail(possession_id=poss_def.id, event_type=tok))
             continue
         # ───────────────────────────────────────────────────────────────────────────
 

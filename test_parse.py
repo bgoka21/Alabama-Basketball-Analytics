@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover
     np = _DummyNP()
 import sqlite3
 from utils.lineup import compute_lineup_efficiencies
-from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster
+from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
 
 #print("🔥 parse_csv() function has started executing!")
 
@@ -541,11 +541,13 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
 
         is_neutral = "Neutral" in str(row.get("TEAM", ""))
         points_scored = 0
+        events = []
         if row_type == "Offense":
             for col in df.columns:
                 if col.startswith("#"):
                     tokens = extract_tokens(row.get(col, ""))
                     for token in tokens:
+                        events.append(token)
                         token = token.upper()
                         if token == "ATR+":
                             points_scored += 2
@@ -558,6 +560,7 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         elif row_type == "Defense":
             tokens = extract_tokens(row.get("OPP STATS", ""))
             for token in tokens:
+                events.append(token)
                 token = token.upper()
                 if token == "ATR+":
                     points_scored += 2
@@ -579,7 +582,8 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
             "shot_clock_pt": safe_str(row.get("SHOT CLOCK PT", "")),
             "players_on_floor": extract_tokens(row.get("PLAYER POSSESSIONS", "")),
             "points_scored": points_scored,
-            "is_neutral": is_neutral
+            "is_neutral": is_neutral,
+            "events": events
         }
         possession_data.append(poss)
     #print("\n📝 Detailed Possession Data:")
@@ -1147,6 +1151,9 @@ def parse_csv(file_path, game_id, season_id):
                     possession_id=new_poss.id,
                     player_id=pid
                 ))
+
+            for tok in poss.get("events", []):
+                db.session.add(ShotDetail(possession_id=new_poss.id, event_type=tok))
 
         db.session.commit()
 
