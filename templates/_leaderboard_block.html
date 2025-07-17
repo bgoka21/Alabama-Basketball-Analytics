@@ -22,7 +22,8 @@
   <input type="hidden" name="end_date" value="{{ end_date }}">
 </form>
 
-<table class="min-w-full bg-white rounded-lg shadow">
+<div class="overflow-x-auto">
+<table class="min-w-full bg-white rounded-lg shadow border">
   <thead>
     <tr class="bg-gray-100">
       <th class="px-4 py-2">#</th>
@@ -36,9 +37,9 @@
       {% endif %}
     </tr>
   </thead>
-  <tbody>
+  <tbody class="divide-y divide-gray-200">
     {% for row in rows %}
-      <tr class="border-t">
+      <tr class="even:bg-gray-50">
         <td class="px-4 py-2">{{ loop.index }}</td>
         {% if selected.key.endswith('_fg_pct') %}
           {% set player, makes, attempts, pct, freq = row %}
@@ -59,8 +60,9 @@
         {% endif %}
       </tr>
     {% endfor %}
-  </tbody>
+</tbody>
 </table>
+</div>
 <script>
   const statSelect = document.getElementById('stat-select');
   if (statSelect) {
