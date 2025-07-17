@@ -239,10 +239,17 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
     for player, shot_list in new_shot_rows:
         detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
         for shot in shot_list:
-            sc = shot.get('shot_class', '').lower()
+            raw_sc = shot.get('shot_class', '').lower()
+            sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
             label = 'Assisted' if shot.get('Assisted') else 'Non-Assisted'
-            ctx = shot.get('POSSESSION TYPE', '').lower()
-            if sc not in ['atr','fg2','fg3'] or ctx not in ['transition','halfcourt','total']:
+            raw_ctx = shot.get('possession_type', '').strip().lower()
+            if 'trans' in raw_ctx:
+                ctx = 'transition'
+            elif 'half' in raw_ctx:
+                ctx = 'halfcourt'
+            else:
+                ctx = 'total'
+            if sc not in ['atr', 'fg2', 'fg3']:
                 continue
             bucket = detail_counts[(sc, label, ctx)]
             bucket['attempts'] += 1
