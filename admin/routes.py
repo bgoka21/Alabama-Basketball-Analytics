@@ -151,7 +151,28 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
 
     core_rows = {}
     for player in set(ps_rows) | set(bc_rows):
-        core_rows[player] = {**ps_rows.get(player, {}), **bc_rows.get(player, {})}
+        base = {**ps_rows.get(player, {}), **bc_rows.get(player, {})}
+        # derive additional shooting percentages
+        atr_a = base.get('atr_attempts', 0)
+        atr_m = base.get('atr_makes', 0)
+        fg3_a = base.get('fg3_attempts', 0)
+        fg3_m = base.get('fg3_makes', 0)
+        base['atr_pct'] = (atr_m / atr_a * 100) if atr_a else 0
+        base['fg3_pct'] = (fg3_m / fg3_a * 100) if fg3_a else 0
+
+        # assist/turnover ratios
+        to = base.get('turnovers', 0)
+        ast = base.get('assists', 0)
+        sec_ast = base.get('second_assists', 0)
+        pot_ast = base.get('pot_assists', 0)
+        if to:
+            base['assist_turnover_ratio'] = round(ast / to, 2)
+            base['adj_assist_turnover_ratio'] = round((ast + sec_ast + pot_ast) / to, 2)
+        else:
+            base['assist_turnover_ratio'] = 0.0
+            base['adj_assist_turnover_ratio'] = 0.0
+
+        core_rows[player] = base
 
     shot_rows = (
         Roster.query
