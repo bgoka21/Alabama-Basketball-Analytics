@@ -26,6 +26,7 @@ from models.database import (
     OpponentBlueCollarStats,
     Possession,
     PlayerPossession,
+    ShotDetail,
     Season,
     Roster,
     Practice,
@@ -2138,6 +2139,59 @@ def player_detail(player_name):
         direct_pnr_assists=direct_assists,
     )
 
+    # ─── On-court offensive metrics (replicated from player_view) ──────────
+    ON_poss, ON_pts = (
+        db.session.query(
+            func.count(PlayerPossession.id),
+            func.coalesce(func.sum(Possession.points_scored), 0)
+        )
+        .join(Possession, PlayerPossession.possession_id == Possession.id)
+        .filter(
+            PlayerPossession.player_id == player.id,
+            Possession.possession_side == 'Offense'
+        ).one()
+    )
+
+    TEAM_poss, TEAM_pts = (
+        db.session.query(
+            func.count(Possession.id),
+            func.coalesce(func.sum(Possession.points_scored), 0)
+        )
+        .filter(Possession.possession_side == 'Offense').one()
+    )
+
+    OFF_poss = TEAM_poss - ON_poss
+    OFF_pts  = TEAM_pts - ON_pts
+
+    PPP_ON  = ON_pts / ON_poss if ON_poss else 0
+    PPP_OFF = OFF_pts / OFF_poss if OFF_poss else 0
+
+    def count_event(ev_type):
+        return (
+            db.session.query(func.count(ShotDetail.id))
+            .join(Possession, ShotDetail.possession_id == Possession.id)
+            .join(PlayerPossession, Possession.id == PlayerPossession.possession_id)
+            .filter(
+                PlayerPossession.player_id == player.id,
+                Possession.possession_side == 'Offense',
+                ShotDetail.event_type == ev_type,
+            )
+            .scalar()
+            or 0
+        )
+
+    FGM2_ON = count_event('ATR+') + count_event('2FG+')
+    FGM3_ON = count_event('3FG+')
+    FGA_ON  = sum(count_event(e) for e in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-'])
+    EFG_ON  = (FGM2_ON + 1.5 * FGM3_ON) / FGA_ON if FGA_ON else 0
+    ATR_pct = count_event('ATR+') / (count_event('ATR+') + count_event('ATR-')) if (count_event('ATR+') + count_event('ATR-')) else 0
+    FG2_pct = count_event('2FG+') / (count_event('2FG+') + count_event('2FG-')) if (count_event('2FG+') + count_event('2FG-')) else 0
+    FG3_pct = count_event('3FG+') / (count_event('3FG+') + count_event('3FG-')) if (count_event('3FG+') + count_event('3FG-')) else 0
+
+    turnover_rate    = count_event('Turnover') / ON_poss if ON_poss else 0
+    off_reb_rate     = count_event('Off Rebound') / ON_poss if ON_poss else 0
+    fouls_drawn_rate = count_event('Fouled') / ON_poss if ON_poss else 0
+
     # ─── Drill label filtering (practice mode only) ─────────────────────
     label_options = collect_practice_labels(practice_stats_records)
     selected_labels = [
@@ -2593,7 +2647,18 @@ def player_detail(player_name):
         selected_labels                    = selected_labels,
         pnr_totals                         = pnr_totals,
         development_plan                   = development_plan,
-        player_stats                       = player_stats_map
+        player_stats                       = player_stats_map,
+
+        offensive_possessions              = ON_poss,
+        ppp_on                             = round(PPP_ON,2),
+        ppp_off                            = round(PPP_OFF,2),
+        efg_on                             = round(EFG_ON*100,1),
+        atr_pct                            = round(ATR_pct*100,1),
+        two_fg_pct                         = round(FG2_pct*100,1),
+        three_fg_pct                       = round(FG3_pct*100,1),
+        turnover_rate                      = round(turnover_rate*100,1),
+        off_reb_rate                       = round(off_reb_rate*100,1),
+        fouls_drawn_rate                   = round(fouls_drawn_rate*100,1)
     )
 
 
