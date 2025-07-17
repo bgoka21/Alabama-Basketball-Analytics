@@ -44,14 +44,14 @@ def test_practice_possession_records(app, tmp_path):
         poss = Possession.query.order_by(Possession.id).all()
         assert len(poss) == 2
         sides = {p.possession_side for p in poss}
-        assert sides == {'Crimson', 'White'}
+        assert sides == {'Offense', 'Defense'}
         pts = {p.possession_side: p.points_scored for p in poss}
-        assert pts['Crimson'] == 2
-        assert pts['White'] == 2
+        assert pts['Offense'] == 2
+        assert pts['Defense'] == 2
         pp_counts = PlayerPossession.query.count()
         assert pp_counts == 2
-        crimson_poss = next(p for p in poss if p.possession_side == 'Crimson')
-        white_poss = next(p for p in poss if p.possession_side == 'White')
+        crimson_poss = next(p for p in poss if p.possession_side == 'Offense')
+        white_poss = next(p for p in poss if p.possession_side == 'Defense')
         crimson_pp = PlayerPossession.query.filter_by(possession_id=crimson_poss.id).first()
         white_pp = PlayerPossession.query.filter_by(possession_id=white_poss.id).first()
         assert crimson_pp.player_id == r1_id

@@ -41,8 +41,8 @@ def test_practice_shot_details(practice_app, tmp_path):
 
     with practice_app.app_context():
         parse_practice_csv(str(csv_path), season_id=1, category='Official Practices', file_date=practice_date)
-        off_poss = Possession.query.filter_by(possession_side='Crimson').first()
-        def_poss = Possession.query.filter_by(possession_side='White').first()
+        off_poss = Possession.query.filter_by(possession_side='Offense').first()
+        def_poss = Possession.query.filter_by(possession_side='Defense').first()
         off_events = [d.event_type for d in ShotDetail.query.filter_by(possession_id=off_poss.id)]
         def_events = [d.event_type for d in ShotDetail.query.filter_by(possession_id=def_poss.id)]
         assert '2FG+' in off_events
