@@ -1438,11 +1438,14 @@ def aggregate_stats(stats_list):
         efg = (agg["atr_makes"] + agg["fg2_makes"] + 1.5 * agg["fg3_makes"]) / total_shots
         agg["efg_pct"]         = round(efg * 100, 1)
         agg["points_per_shot"] = round(efg * 2, 2)
-        agg["atr_freq_pct"]   = round(agg["atr_attempts"] / total_shots * 100, 1)
-        agg["fg3_freq_pct"]   = round(agg["fg3_attempts"] / total_shots * 100, 1)
     else:
         agg["efg_pct"] = 0.0
         agg["points_per_shot"] = 0.0
+
+    if total_shots:
+        agg["atr_freq_pct"] = round(100 * agg["atr_attempts"] / total_shots, 1)
+        agg["fg3_freq_pct"] = round(100 * agg["fg3_attempts"] / total_shots, 1)
+    else:
         agg["atr_freq_pct"] = 0.0
         agg["fg3_freq_pct"] = 0.0
 
