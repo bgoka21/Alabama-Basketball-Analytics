@@ -89,3 +89,10 @@ def test_fg_pct_table_includes_frequency(client):
     html = resp.data.decode('utf-8')
     assert 'Freq' in html
     assert '40.0%' in html
+
+
+def test_assist_summary_table(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'assist_summary'})
+    html = resp.data.decode('utf-8')
+    assert 'Assist/TO Stats' in html
+    assert 'Adj AST/TO' in html

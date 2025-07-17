@@ -19,6 +19,7 @@ LEADERBOARD_STATS.extend([
     {"key": "fg3_freq_pct", "label": "3FG Frequency", "format": "pct"},
     {"key": "assist_turnover_ratio", "label": "AST/TO Ratio"},
     {"key": "adj_assist_turnover_ratio", "label": "Adj AST/TO"},
+    {"key": "assist_summary", "label": "Assist/TO Stats"},
 ])
 
 # ─── Simple Shot Type FG% Categories ─────────────────────────────────────────
