@@ -15,33 +15,33 @@
 </form>
 
 <div class="overflow-x-auto">
-<table class="min-w-full bg-white rounded-lg shadow border">
+<table class="min-w-full bg-white rounded-lg shadow border text-center">
   <thead>
     <tr class="bg-gray-100">
-      <th class="px-4 py-2">#</th>
-      <th class="px-4 py-2 sortable">Player</th>
+      <th class="px-4 py-2 text-center">#</th>
+      <th class="px-4 py-2 text-left sortable">Player</th>
       {% if selected.key.endswith('_fg_pct') %}
-        <th class="px-4 py-2 sortable">FG</th>
-        <th class="px-4 py-2 sortable">FG%</th>
-        <th class="px-4 py-2 sortable">Freq</th>
+        <th class="px-4 py-2 text-center sortable">FG</th>
+        <th class="px-4 py-2 text-center sortable">FG%</th>
+        <th class="px-4 py-2 text-center sortable">Freq</th>
       {% else %}
-        <th class="px-4 py-2 sortable">{{ selected.label }}</th>
+        <th class="px-4 py-2 text-center sortable">{{ selected.label }}</th>
       {% endif %}
     </tr>
   </thead>
   <tbody class="divide-y divide-gray-200">
     {% for row in rows %}
       <tr class="even:bg-gray-50">
-        <td class="px-4 py-2">{{ loop.index }}</td>
+        <td class="px-4 py-2 text-center">{{ loop.index }}</td>
         {% if selected.key.endswith('_fg_pct') %}
           {% set player, makes, attempts, pct, freq = row %}
-          <td class="px-4 py-2">{{ player }}</td>
-          <td class="px-4 py-2">{{ makes }}-{{ attempts }}</td>
-          <td class="px-4 py-2">{{ pct|round(1) }}%</td>
-          <td class="px-4 py-2">{{ freq|round(1) }}%</td>
+          <td class="px-4 py-2 text-left">{{ player }}</td>
+          <td class="px-4 py-2 text-center">{{ makes }}-{{ attempts }}</td>
+          <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
+          <td class="px-4 py-2 text-center">{{ freq|round(1) }}%</td>
         {% else %}
           {% set player, val = row %}
-          <td class="px-4 py-2">{{ player }}</td>
+          <td class="px-4 py-2 text-left">{{ player }}</td>
           <td class="px-4 py-2">
             {% if selected.format=='pct' %}
               {{ val|round(1) }}%
