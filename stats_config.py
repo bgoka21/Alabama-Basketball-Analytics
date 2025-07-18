@@ -20,6 +20,7 @@ LEADERBOARD_STATS.extend([
     {"key": "assist_turnover_ratio", "label": "AST/TO Ratio", "hidden": True},
     {"key": "adj_assist_turnover_ratio", "label": "Adj AST/TO", "hidden": True},
     {"key": "assist_summary", "label": "Assist/TO Stats"},
+    {"key": "offense_summary", "label": "Offense Stats"},
     {"key": "offensive_possessions", "label": "Off Poss", "format": "int", "hidden": True},
     {"key": "ppp_on", "label": "PPP On", "hidden": True},
     {"key": "ppp_off", "label": "PPP Off", "hidden": True},

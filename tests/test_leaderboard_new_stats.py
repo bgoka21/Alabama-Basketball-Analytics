@@ -126,3 +126,10 @@ def test_on_court_offensive_metrics(client):
     html = resp.data.decode('utf-8')
     assert 'EFG%' in html
     assert '150.0%' in html
+
+
+def test_offense_summary_table(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'offense_summary'})
+    html = resp.data.decode('utf-8')
+    assert 'Offense Stats' in html
+    assert 'PPP On' in html

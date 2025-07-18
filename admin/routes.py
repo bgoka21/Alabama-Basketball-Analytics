@@ -449,6 +449,24 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
                 )
             )
         leaderboard.sort(key=lambda x: x[1], reverse=True)
+    elif stat_key == 'offense_summary':
+        for player in all_players:
+            base = core_rows.get(player, {})
+            leaderboard.append(
+                (
+                    player,
+                    base.get('offensive_possessions', 0),
+                    base.get('ppp_on', 0.0),
+                    base.get('ppp_off', 0.0),
+                    base.get('efg_on', 0.0),
+                    base.get('two_fg_pct', 0.0),
+                    base.get('three_fg_pct', 0.0),
+                    base.get('turnover_rate', 0.0),
+                    base.get('off_reb_rate', 0.0),
+                    base.get('fouls_drawn_rate', 0.0),
+                )
+            )
+        leaderboard.sort(key=lambda x: x[2], reverse=True)
     elif stat_key.endswith('_fg_pct'):
         for player in all_players:
             details = shot_details.get(player, {})
