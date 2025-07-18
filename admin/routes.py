@@ -926,6 +926,62 @@ def parse_file(file_id):
         return redirect(url_for('admin.files_view_unique'))
 
 
+def _reparse_uploaded_practice(uploaded_file, upload_path):
+    """Helper to re-parse a practice file for bulk operations."""
+    season_id = (
+        uploaded_file.season_id
+        or Season.query.order_by(Season.start_date.desc()).first().id
+    )
+    file_date = uploaded_file.file_date or date.today()
+
+    practice = Practice.query.filter_by(
+        season_id=season_id,
+        date=file_date,
+        category=uploaded_file.category,
+    ).first()
+    if not practice:
+        practice = Practice(
+            season_id=season_id,
+            date=file_date,
+            category=uploaded_file.category,
+        )
+        db.session.add(practice)
+        db.session.flush()
+    else:
+        PlayerStats.query.filter_by(practice_id=practice.id).delete()
+        BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
+        poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
+        if poss_ids:
+            PlayerPossession.query.filter(
+                PlayerPossession.possession_id.in_(poss_ids)
+            ).delete(synchronize_session=False)
+        Possession.query.filter_by(practice_id=practice.id).delete()
+        db.session.flush()
+
+    results = parse_practice_csv(
+        upload_path,
+        season_id=season_id,
+        category=uploaded_file.category,
+        file_date=file_date,
+    )
+
+    raw_lineups = results.get("lineup_efficiencies", {})
+    json_lineups = {
+        size: {
+            side: {",".join(combo): ppp for combo, ppp in sides.items()}
+            for side, sides in raw_lineups[size].items()
+        }
+        for size in raw_lineups
+    }
+
+    uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
+    uploaded_file.player_on_off = json.dumps(results.get("player_on_off", {}))
+    uploaded_file.parse_status = "Parsed Successfully"
+    uploaded_file.last_parsed = datetime.utcnow()
+    db.session.commit()
+    return practice.id, season_id
+
+
 @admin_bp.route('/reparse/<int:file_id>', methods=['POST'])
 @admin_required
 def reparse_file(file_id):
@@ -939,61 +995,11 @@ def reparse_file(file_id):
         return redirect(url_for('admin.files_view_unique'))
 
     try:
-        season_id = (
-            uploaded_file.season_id
-            or Season.query.order_by(Season.start_date.desc()).first().id
-        )
-
         if uploaded_file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
-            file_date = uploaded_file.file_date or date.today()
-            practice = Practice.query.filter_by(
-                season_id=season_id,
-                date=file_date,
-                category=uploaded_file.category,
-            ).first()
-            if not practice:
-                practice = Practice(
-                    season_id=season_id,
-                    date=file_date,
-                    category=uploaded_file.category,
-                )
-                db.session.add(practice)
-                db.session.flush()
-            else:
-                PlayerStats.query.filter_by(practice_id=practice.id).delete()
-                BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
-                poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
-                if poss_ids:
-                    PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
-                Possession.query.filter_by(practice_id=practice.id).delete()
-                db.session.flush()
-
-            results = parse_practice_csv(
-                upload_path,
-                season_id=season_id,
-                category=uploaded_file.category,
-                file_date=file_date,
-            )
-
-            raw_lineups = results.get('lineup_efficiencies', {})
-            json_lineups = {
-                size: {
-                    side: {",".join(combo): ppp for combo, ppp in sides.items()}
-                    for side, sides in raw_lineups[size].items()
-                }
-                for size in raw_lineups
-            }
-
-            uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
-            uploaded_file.player_on_off = json.dumps(results.get('player_on_off', {}))
-
-            uploaded_file.parse_status = 'Parsed Successfully'
-            uploaded_file.last_parsed = datetime.utcnow()
-            db.session.commit()
-
+            practice_id, season_id = _reparse_uploaded_practice(uploaded_file, upload_path)
             flash("Practice re-parsed successfully!", "success")
             return redirect(
-                url_for('admin.edit_practice', practice_id=practice.id, season_id=season_id)
+                url_for('admin.edit_practice', practice_id=practice_id, season_id=season_id)
             )
 
         flash('Reparse not supported for this file type.', 'error')
@@ -1113,6 +1119,14 @@ def bulk_action_view():
                     zf.write(file_path, arcname=file.filename)
         memory_file.seek(0)
         return send_file(memory_file, download_name="downloaded_files.zip", as_attachment=True)
+    elif action == 'reparse':
+        count = 0
+        for file in files:
+            path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
+            if os.path.exists(path) and file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
+                _reparse_uploaded_practice(file, path)
+                count += 1
+        flash(f"Re-parsed {count} files.", "success")
 
     return redirect(url_for('admin.files_view_unique'))
 
