@@ -64,7 +64,7 @@ def extract_tokens(text):
     tokens = text.replace(',', ' ').split()
     return tokens
 
-def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
+def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
     """Return (config, rows) for the leaderboard.
 
     Optional ``start_dt`` and ``end_dt`` parameters limit the stats to a
@@ -92,6 +92,13 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
         )
         .filter(PlayerStats.season_id == season_id)
     )
+    if label_set:
+        clauses = []
+        for lbl in label_set:
+            pattern = f"%{lbl}%"
+            clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+            clauses.append(PlayerStats.stat_details.ilike(pattern))
+        ps_q = ps_q.filter(or_(*clauses))
     if start_dt or end_dt:
         ps_q = (
             ps_q
@@ -127,6 +134,22 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
         .join(Roster, BlueCollarStats.player_id == Roster.id)
         .filter(BlueCollarStats.season_id == season_id)
     )
+    if label_set:
+        bc_q = bc_q.join(
+            PlayerStats,
+            and_(
+                PlayerStats.season_id == season_id,
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.practice_id == BlueCollarStats.practice_id,
+                PlayerStats.game_id == BlueCollarStats.game_id,
+            ),
+        )
+        bc_clauses = []
+        for lbl in label_set:
+            pattern = f"%{lbl}%"
+            bc_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+            bc_clauses.append(PlayerStats.stat_details.ilike(pattern))
+        bc_q = bc_q.filter(or_(*bc_clauses))
     if start_dt or end_dt:
         bc_q = (
             bc_q
@@ -331,6 +354,13 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
                    PlayerStats.season_id == Roster.season_id))
         .filter(PlayerStats.season_id == season_id)
     )
+    if label_set:
+        s_clauses = []
+        for lbl in label_set:
+            pattern = f"%{lbl}%"
+            s_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+            s_clauses.append(PlayerStats.stat_details.ilike(pattern))
+        shot_rows = shot_rows.filter(or_(*s_clauses))
     if start_dt or end_dt:
         shot_rows = (
             shot_rows
@@ -3808,7 +3838,31 @@ def leaderboard():
     stat_key = request.args.get('stat') or request.args.get('base_stat')
     if not stat_key:
         stat_key = LEADERBOARD_STATS[0]['key']
-    cfg, rows = compute_leaderboard(stat_key, sid, start_dt, end_dt)
+
+    q = PlayerStats.query.filter(PlayerStats.season_id == sid)
+    if start_dt or end_dt:
+        q = q.outerjoin(Game, PlayerStats.game_id == Game.id).outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+        if start_dt:
+            q = q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            q = q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    stats_list = q.all()
+
+    label_options = collect_practice_labels(stats_list)
+    selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
+    label_set = {lbl.upper() for lbl in selected_labels}
+
+    cfg, rows = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
@@ -3821,6 +3875,8 @@ def leaderboard():
         rows=rows,
         start_date=start_date or '',
         end_date=end_date or '',
+        label_options=label_options,
+        selected_labels=selected_labels,
         active_page='leaderboard'
     )
 

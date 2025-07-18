@@ -767,13 +767,21 @@ def season_leaderboard():
     if not stat_key:
         stat_key = LEADERBOARD_STATS[0]['key']
     sid = get_current_season_id()
-    cfg, rows = compute_leaderboard(stat_key, sid)
+    q = PlayerStats.query.filter(PlayerStats.season_id == sid)
+    stats_list = q.all()
+    label_options = collect_practice_labels(stats_list)
+    selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
+    label_set = {lbl.upper() for lbl in selected_labels}
+
+    cfg, rows = compute_leaderboard(stat_key, sid, label_set=label_set if label_set else None)
 
     return render_template(
         'leaderboard.html',
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
-        rows=rows
+        rows=rows,
+        label_options=label_options,
+        selected_labels=selected_labels
     )
 
 @public_bp.route('/skill_dev')
