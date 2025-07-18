@@ -20,6 +20,15 @@ LEADERBOARD_STATS.extend([
     {"key": "assist_turnover_ratio", "label": "AST/TO Ratio", "hidden": True},
     {"key": "adj_assist_turnover_ratio", "label": "Adj AST/TO", "hidden": True},
     {"key": "assist_summary", "label": "Assist/TO Stats"},
+    {"key": "offensive_possessions", "label": "Off Poss", "format": "int", "hidden": True},
+    {"key": "ppp_on", "label": "PPP On", "hidden": True},
+    {"key": "ppp_off", "label": "PPP Off", "hidden": True},
+    {"key": "efg_on", "label": "EFG%", "format": "pct", "hidden": True},
+    {"key": "two_fg_pct", "label": "2FG%", "format": "pct", "hidden": True},
+    {"key": "three_fg_pct", "label": "3FG%", "format": "pct", "hidden": True},
+    {"key": "turnover_rate", "label": "Turnover Rate", "format": "pct", "hidden": True},
+    {"key": "off_reb_rate", "label": "Off Reb Rate", "format": "pct", "hidden": True},
+    {"key": "fouls_drawn_rate", "label": "Fouls Drawn Rate", "format": "pct", "hidden": True},
 ])
 
 # ─── Simple Shot Type FG% Categories ─────────────────────────────────────────

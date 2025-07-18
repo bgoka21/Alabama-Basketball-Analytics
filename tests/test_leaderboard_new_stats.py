@@ -6,7 +6,10 @@ from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 import json
 
-from models.database import db, Season, Practice, PlayerStats, Roster
+from models.database import (
+    db, Season, Practice, PlayerStats, Roster,
+    Possession, PlayerPossession, ShotDetail
+)
 from models.user import User
 from admin.routes import admin_bp
 
@@ -37,7 +40,8 @@ def app():
         practice = Practice(id=1, season_id=1, date=date(2024, 1, 2), category='Official')
         db.session.add(practice)
         roster = Roster(id=1, season_id=1, player_name='#1 Test')
-        db.session.add(roster)
+        other = Roster(id=2, season_id=1, player_name='#2 Other')
+        db.session.add_all([roster, other])
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
         shots = [
@@ -59,6 +63,20 @@ def app():
             fg3_makes=1,
             shot_type_details=json.dumps(shots),
         ))
+
+        poss1 = Possession(id=1, practice_id=1, season_id=1, game_id=0,
+                           possession_side='Offense', points_scored=3)
+        db.session.add(poss1)
+        db.session.add(PlayerPossession(possession_id=1, player_id=1))
+        db.session.add(ShotDetail(possession_id=1, event_type='3FG+'))
+        db.session.add(ShotDetail(possession_id=1, event_type='Off Rebound'))
+
+        poss2 = Possession(id=2, practice_id=1, season_id=1, game_id=0,
+                           possession_side='Offense', points_scored=2)
+        db.session.add(poss2)
+        db.session.add(PlayerPossession(possession_id=2, player_id=2))
+        db.session.add(ShotDetail(possession_id=2, event_type='2FG+'))
+
         db.session.commit()
     yield app
     with app.app_context():
@@ -96,3 +114,15 @@ def test_assist_summary_table(client):
     html = resp.data.decode('utf-8')
     assert 'Assist/TO Stats' in html
     assert 'Adj AST/TO' in html
+
+
+def test_on_court_offensive_metrics(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'ppp_on'})
+    html = resp.data.decode('utf-8')
+    assert 'PPP On' in html
+    assert '3.0' in html
+
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'efg_on'})
+    html = resp.data.decode('utf-8')
+    assert 'EFG%' in html
+    assert '150.0%' in html
