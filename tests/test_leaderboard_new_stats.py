@@ -45,11 +45,11 @@ def app():
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
         shots = [
-            {"shot_class": "atr", "result": "made", "possession_type": "total"},
-            {"shot_class": "atr", "result": "miss", "possession_type": "total"},
-            {"shot_class": "2fg", "result": "made", "possession_type": "total"},
-            {"shot_class": "2fg", "result": "made", "possession_type": "total"},
-            {"shot_class": "3fg", "result": "made", "possession_type": "total"},
+            {"shot_class": "atr", "result": "made", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
+            {"shot_class": "atr", "result": "miss", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
+            {"shot_class": "2fg", "result": "made", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
+            {"shot_class": "2fg", "result": "made", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
+            {"shot_class": "3fg", "result": "made", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
         ]
         db.session.add(PlayerStats(
             practice_id=1,
@@ -65,17 +65,25 @@ def app():
         ))
 
         poss1 = Possession(id=1, practice_id=1, season_id=1, game_id=0,
-                           possession_side='Offense', points_scored=3)
+                           possession_side='Offense', points_scored=3,
+                           drill_labels='4V4 DRILLS')
         db.session.add(poss1)
         db.session.add(PlayerPossession(possession_id=1, player_id=1))
         db.session.add(ShotDetail(possession_id=1, event_type='3FG+'))
         db.session.add(ShotDetail(possession_id=1, event_type='Off Rebound'))
 
         poss2 = Possession(id=2, practice_id=1, season_id=1, game_id=0,
-                           possession_side='Offense', points_scored=2)
+                           possession_side='Offense', points_scored=2,
+                           drill_labels='4V4 DRILLS')
         db.session.add(poss2)
         db.session.add(PlayerPossession(possession_id=2, player_id=2))
         db.session.add(ShotDetail(possession_id=2, event_type='2FG+'))
+
+        poss3 = Possession(id=3, practice_id=1, season_id=1, game_id=0,
+                           possession_side='Offense', points_scored=2)
+        db.session.add(poss3)
+        db.session.add(PlayerPossession(possession_id=3, player_id=1))
+        db.session.add(ShotDetail(possession_id=3, event_type='2FG+'))
 
         db.session.commit()
     yield app
@@ -120,12 +128,12 @@ def test_on_court_offensive_metrics(client):
     resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'ppp_on'})
     html = resp.data.decode('utf-8')
     assert 'PPP On' in html
-    assert '3.0' in html
+    assert '2.5' in html
 
     resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'efg_on'})
     html = resp.data.decode('utf-8')
     assert 'EFG%' in html
-    assert '150.0%' in html
+    assert '125.0%' in html
 
 
 def test_offense_summary_table(client):
@@ -133,3 +141,13 @@ def test_offense_summary_table(client):
     html = resp.data.decode('utf-8')
     assert 'Offense Stats' in html
     assert 'PPP On' in html
+
+
+def test_offensive_metrics_filter(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'ppp_on'})
+    html = resp.data.decode('utf-8')
+    assert '2.5' in html  # total PPP On without filter
+
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'ppp_on', 'label': '4V4 DRILLS'})
+    html = resp.data.decode('utf-8')
+    assert '3.0' in html  # filtered PPP On only scrimmage possessions

@@ -212,6 +212,7 @@ class Possession(db.Model):
     shot_clock          = db.Column(db.String(10))
     shot_clock_pt       = db.Column(db.String(10))
     points_scored       = db.Column(db.Integer, default=0)
+    drill_labels       = db.Column(db.String(255))
 
 
 class PlayerPossession(db.Model):
