@@ -151,7 +151,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             p_clock    = row.get(sc_col, '')
             p_clock_pt = row.get(scp_col, '')
 
-            row_text = ' '.join(safe_str(val) for val in row.values)
+            row_text = ' '.join(safe_str(val) for val in row.to_dict().values())
 
             def compute_points(text, team_name):
                 pts = text.count('ATR+') * 2
@@ -168,7 +168,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 practice_id     = current_practice.id,
                 season_id       = season_id,
                 game_id         = 0,
-                possession_side = offense_team,
+                possession_side = offense_label,
                 time_segment    = offense_label,
                 possession_start= p_start,
                 possession_type = p_type,
@@ -211,7 +211,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 practice_id     = current_practice.id,
                 season_id       = season_id,
                 game_id         = 0,
-                possession_side = defense_team,
+                possession_side = defense_label,
                 time_segment    = defense_label,
                 possession_start= p_start,
                 possession_type = p_type,
