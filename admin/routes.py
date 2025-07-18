@@ -188,6 +188,9 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             Possession.possession_side == 'Offense'
         )
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        poss_q = poss_q.filter(or_(*clauses))
     if start_dt or end_dt:
         poss_q = (
             poss_q
@@ -221,6 +224,9 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             Possession.possession_side == 'Offense'
         )
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        team_q = team_q.filter(or_(*clauses))
     if start_dt or end_dt:
         team_q = (
             team_q
@@ -268,6 +274,9 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             Possession.possession_side == 'Offense'
         )
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        events_q = events_q.filter(or_(*clauses))
     if start_dt or end_dt:
         events_q = (
             events_q

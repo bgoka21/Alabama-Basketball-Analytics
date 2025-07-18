@@ -188,6 +188,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     shot_clock      = p_clock,
                     shot_clock_pt   = p_clock_pt,
                     points_scored   = points_scored,
+                    drill_labels    = ",".join(labels) if labels else None,
                 )
                 db.session.add(poss_off)
                 db.session.flush()
@@ -230,6 +231,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     shot_clock      = p_clock,
                     shot_clock_pt   = p_clock_pt,
                     points_scored   = points_scored,
+                    drill_labels    = ",".join(labels) if labels else None,
                 )
                 db.session.add(poss_def)
                 db.session.flush()
