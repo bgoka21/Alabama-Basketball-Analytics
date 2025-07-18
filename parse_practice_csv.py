@@ -153,6 +153,12 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
             row_text = ' '.join(safe_str(val) for val in row.to_dict().values())
 
+            upper_text = row_text.upper()
+            skip_possession = (
+                'OFF REBOUND' in upper_text or
+                'NEUTRAL' in upper_text
+            )
+
             def compute_points(text, team_name):
                 pts = text.count('ATR+') * 2
                 pts += text.count('2FG+') * 2
@@ -164,95 +170,97 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
             points_scored = compute_points(row_text, offense_team)
 
-            poss_off = Possession(
-                practice_id     = current_practice.id,
-                season_id       = season_id,
-                game_id         = 0,
-                possession_side = offense_label,
-                time_segment    = offense_label,
-                possession_start= p_start,
-                possession_type = p_type,
-                paint_touches   = p_paint,
-                shot_clock      = p_clock,
-                shot_clock_pt   = p_clock_pt,
-                points_scored   = points_scored,
-            )
-            db.session.add(poss_off)
-            db.session.flush()
-
             off_players = []
-            for cell in str(row.get(off_col, '') or '').split(','):
-                name = cell.strip()
-                if not name:
-                    continue
-                pid = get_roster_id(name, season_id)
-                if pid is not None:
-                    db.session.add(PossessionPlayer(possession_id=poss_off.id, player_id=pid))
-                    off_players.append(name)
-
-            def persist_events(poss_id, text):
-                for ev in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-','FT+','Turnover','Fouled','Off Rebound']:
-                    cnt = text.count(ev)
-                    for _ in range(cnt):
-                        db.session.add(ShotDetail(
-                            possession_id=poss_id,
-                            event_type=ev
-                        ))
-                fp1 = f"{offense_team} Fouled +1"
-                if fp1 in text:
-                    db.session.add(ShotDetail(
-                        possession_id=poss_id,
-                        event_type='FT+'
-                    ))
-
-            persist_events(poss_off.id, row_text)
-
-            poss_def = Possession(
-                practice_id     = current_practice.id,
-                season_id       = season_id,
-                game_id         = 0,
-                possession_side = defense_label,
-                time_segment    = defense_label,
-                possession_start= p_start,
-                possession_type = p_type,
-                paint_touches   = p_paint,
-                shot_clock      = p_clock,
-                shot_clock_pt   = p_clock_pt,
-                points_scored   = points_scored,
-            )
-            db.session.add(poss_def)
-            db.session.flush()
-
             def_players = []
             off_events = []
             def_events = []
-            for cell in str(row.get(def_col, '') or '').split(','):
-                name = cell.strip()
-                if not name:
-                    continue
-                pid = get_roster_id(name, season_id)
-                if pid is not None:
-                    db.session.add(PossessionPlayer(possession_id=poss_def.id, player_id=pid))
-                    def_players.append(name)
 
-            persist_events(poss_def.id, row_text)
+            if not skip_possession:
+                poss_off = Possession(
+                    practice_id     = current_practice.id,
+                    season_id       = season_id,
+                    game_id         = 0,
+                    possession_side = offense_label,
+                    time_segment    = offense_label,
+                    possession_start= p_start,
+                    possession_type = p_type,
+                    paint_touches   = p_paint,
+                    shot_clock      = p_clock,
+                    shot_clock_pt   = p_clock_pt,
+                    points_scored   = points_scored,
+                )
+                db.session.add(poss_off)
+                db.session.flush()
 
-            base = {
-                'possession_start': safe_str(p_start),
-                'possession_type':  safe_str(p_type),
-                'paint_touches':   safe_str(p_paint),
-                'shot_clock':      safe_str(p_clock),
-                'shot_clock_pt':   safe_str(p_clock_pt),
-                'points_scored':   points_scored,
-            }
+                for cell in str(row.get(off_col, '') or '').split(','):
+                    name = cell.strip()
+                    if not name:
+                        continue
+                    pid = get_roster_id(name, season_id)
+                    if pid is not None:
+                        db.session.add(PossessionPlayer(possession_id=poss_off.id, player_id=pid))
+                        off_players.append(name)
 
-            poss_data_off = dict(base)
-            poss_data_off.update({'side': offense_team, 'players_on_floor': off_players})
-            possession_data.append(poss_data_off)
+                def persist_events(poss_id, text):
+                    for ev in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-','FT+','Turnover','Fouled','Off Rebound']:
+                        cnt = text.count(ev)
+                        for _ in range(cnt):
+                            db.session.add(ShotDetail(
+                                possession_id=poss_id,
+                                event_type=ev
+                            ))
+                    fp1 = f"{offense_team} Fouled +1"
+                    if fp1 in text:
+                        db.session.add(ShotDetail(
+                            possession_id=poss_id,
+                            event_type='FT+'
+                        ))
 
-            poss_data_def = dict(base)
-            poss_data_def.update({'side': defense_team, 'players_on_floor': def_players})
-            possession_data.append(poss_data_def)
+                persist_events(poss_off.id, row_text)
+
+                poss_def = Possession(
+                    practice_id     = current_practice.id,
+                    season_id       = season_id,
+                    game_id         = 0,
+                    possession_side = defense_label,
+                    time_segment    = defense_label,
+                    possession_start= p_start,
+                    possession_type = p_type,
+                    paint_touches   = p_paint,
+                    shot_clock      = p_clock,
+                    shot_clock_pt   = p_clock_pt,
+                    points_scored   = points_scored,
+                )
+                db.session.add(poss_def)
+                db.session.flush()
+
+                for cell in str(row.get(def_col, '') or '').split(','):
+                    name = cell.strip()
+                    if not name:
+                        continue
+                    pid = get_roster_id(name, season_id)
+                    if pid is not None:
+                        db.session.add(PossessionPlayer(possession_id=poss_def.id, player_id=pid))
+                        def_players.append(name)
+
+                persist_events(poss_def.id, row_text)
+
+                base = {
+                    'possession_start': safe_str(p_start),
+                    'possession_type':  safe_str(p_type),
+                    'paint_touches':   safe_str(p_paint),
+                    'shot_clock':      safe_str(p_clock),
+                    'shot_clock_pt':   safe_str(p_clock_pt),
+                    'points_scored':   points_scored,
+                }
+
+                poss_data_off = dict(base)
+                poss_data_off.update({'side': offense_team, 'players_on_floor': off_players})
+                possession_data.append(poss_data_off)
+
+                poss_data_def = dict(base)
+                poss_data_def.update({'side': defense_team, 'players_on_floor': def_players})
+                possession_data.append(poss_data_def)
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":
@@ -549,7 +557,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         continue
 
                 # done processing tokens for this player in this offense row
-            if row_type in ("Crimson", "White"):
+            if row_type in ("Crimson", "White") and not skip_possession:
                 for tok in off_events:
                     db.session.add(ShotDetail(possession_id=poss_off.id, event_type=tok))
                 for tok in def_events:
