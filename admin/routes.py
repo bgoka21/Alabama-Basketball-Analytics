@@ -37,7 +37,7 @@ from models.database import (
 from models.database import PageView
 from models.uploaded_file import UploadedFile
 from models.user import User
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, case
 from sqlalchemy.orm import aliased
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
@@ -150,9 +150,158 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None):
     bc_q = bc_q.group_by(Roster.player_name)
     bc_rows = {r.player: r._asdict() for r in bc_q.all()}
 
+    # ─── On-court offensive metrics ──────────────────────────────────────
+    poss_q = (
+        db.session.query(
+            Roster.player_name.label('player'),
+            func.count(PlayerPossession.id).label('on_poss'),
+            func.coalesce(func.sum(Possession.points_scored), 0).label('on_pts')
+        )
+        .join(PlayerPossession, Roster.id == PlayerPossession.player_id)
+        .join(Possession, PlayerPossession.possession_id == Possession.id)
+        .filter(
+            Roster.season_id == season_id,
+            Possession.season_id == season_id,
+            Possession.possession_side == 'Offense'
+        )
+    )
+    if start_dt or end_dt:
+        poss_q = (
+            poss_q
+            .outerjoin(Game, Possession.game_id == Game.id)
+            .outerjoin(Practice, Possession.practice_id == Practice.id)
+        )
+        if start_dt:
+            poss_q = poss_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date >= start_dt),
+                    and_(Possession.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            poss_q = poss_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date <= end_dt),
+                    and_(Possession.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    poss_q = poss_q.group_by(Roster.player_name)
+    poss_rows = {r.player: {'offensive_possessions': r.on_poss, 'on_pts': r.on_pts} for r in poss_q.all()}
+
+    team_q = (
+        db.session.query(
+            func.count(Possession.id),
+            func.coalesce(func.sum(Possession.points_scored), 0)
+        )
+        .filter(
+            Possession.season_id == season_id,
+            Possession.possession_side == 'Offense'
+        )
+    )
+    if start_dt or end_dt:
+        team_q = (
+            team_q
+            .outerjoin(Game, Possession.game_id == Game.id)
+            .outerjoin(Practice, Possession.practice_id == Practice.id)
+        )
+        if start_dt:
+            team_q = team_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date >= start_dt),
+                    and_(Possession.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            team_q = team_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date <= end_dt),
+                    and_(Possession.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    TEAM_poss, TEAM_pts = team_q.one()
+
+    events_q = (
+        db.session.query(
+            Roster.player_name.label('player'),
+            func.sum(case((ShotDetail.event_type.in_(['ATR+','2FG+']), 1), else_=0)).label('fgm2'),
+            func.sum(case((ShotDetail.event_type=='3FG+', 1), else_=0)).label('fgm3'),
+            func.sum(case((ShotDetail.event_type.in_(['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-']), 1), else_=0)).label('fga'),
+            func.sum(case((ShotDetail.event_type=='ATR+', 1), else_=0)).label('atr_makes'),
+            func.sum(case((ShotDetail.event_type.in_(['ATR+','ATR-']), 1), else_=0)).label('atr_attempts'),
+            func.sum(case((ShotDetail.event_type=='2FG+', 1), else_=0)).label('fg2_makes'),
+            func.sum(case((ShotDetail.event_type.in_(['2FG+','2FG-']), 1), else_=0)).label('fg2_attempts'),
+            func.sum(case((ShotDetail.event_type=='3FG+', 1), else_=0)).label('fg3_makes'),
+            func.sum(case((ShotDetail.event_type.in_(['3FG+','3FG-']), 1), else_=0)).label('fg3_attempts'),
+            func.sum(case((ShotDetail.event_type=='Turnover', 1), else_=0)).label('turnovers_on'),
+            func.sum(case((ShotDetail.event_type=='Off Rebound', 1), else_=0)).label('off_reb_on'),
+            func.sum(case((ShotDetail.event_type=='Fouled', 1), else_=0)).label('fouls_on')
+        )
+        .join(PlayerPossession, Roster.id == PlayerPossession.player_id)
+        .join(Possession, PlayerPossession.possession_id == Possession.id)
+        .join(ShotDetail, ShotDetail.possession_id == Possession.id)
+        .filter(
+            Roster.season_id == season_id,
+            Possession.season_id == season_id,
+            Possession.possession_side == 'Offense'
+        )
+    )
+    if start_dt or end_dt:
+        events_q = (
+            events_q
+            .outerjoin(Game, Possession.game_id == Game.id)
+            .outerjoin(Practice, Possession.practice_id == Practice.id)
+        )
+        if start_dt:
+            events_q = events_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date >= start_dt),
+                    and_(Possession.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            events_q = events_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date <= end_dt),
+                    and_(Possession.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    events_q = events_q.group_by(Roster.player_name)
+    event_rows = {r.player: r._asdict() for r in events_q.all()}
+
+    extra_rows = {}
+    for player in set(poss_rows) | set(event_rows):
+        poss = poss_rows.get(player, {})
+        events = event_rows.get(player, {})
+        on_poss = poss.get('offensive_possessions', 0)
+        on_pts = poss.get('on_pts', 0)
+        ppp_on = on_pts / on_poss if on_poss else 0
+        off_poss = TEAM_poss - on_poss
+        off_pts = TEAM_pts - on_pts
+        ppp_off = off_pts / off_poss if off_poss else 0
+        fgm2 = events.get('fgm2', 0)
+        fgm3 = events.get('fgm3', 0)
+        fga = events.get('fga', 0)
+        efg = (fgm2 + 1.5 * fgm3) / fga if fga else 0
+        fg2_pct = events.get('fg2_makes', 0) / events.get('fg2_attempts', 0) if events.get('fg2_attempts', 0) else 0
+        fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
+        turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
+        off_reb_rate = events.get('off_reb_on', 0) / on_poss if on_poss else 0
+        fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
+        extra_rows[player] = {
+            'offensive_possessions': on_poss,
+            'ppp_on': round(ppp_on, 2),
+            'ppp_off': round(ppp_off, 2),
+            'efg_on': round(efg * 100, 1),
+            'two_fg_pct': round(fg2_pct * 100, 1),
+            'three_fg_pct': round(fg3_pct * 100, 1),
+            'turnover_rate': round(turnover_rate * 100, 1),
+            'off_reb_rate': round(off_reb_rate * 100, 1),
+            'fouls_drawn_rate': round(fouls_rate * 100, 1),
+        }
+
     core_rows = {}
-    for player in set(ps_rows) | set(bc_rows):
-        base = {**ps_rows.get(player, {}), **bc_rows.get(player, {})}
+    for player in set(ps_rows) | set(bc_rows) | set(extra_rows):
+        base = {**ps_rows.get(player, {}), **bc_rows.get(player, {}), **extra_rows.get(player, {})}
         # derive additional shooting percentages
         atr_a = base.get('atr_attempts', 0)
         atr_m = base.get('atr_makes', 0)
