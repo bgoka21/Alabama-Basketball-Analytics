@@ -203,12 +203,23 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         off_players.append(name)
 
                 def persist_events(poss_id, text):
-                    for ev in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-','FT+','Turnover','Fouled','Off Rebound']:
-                        cnt = text.count(ev)
-                        for _ in range(cnt):
+                    # List Hudl’s exact event labels (case-sensitive)
+                    hudl_labels = [
+                        'ATR+', 'ATR-', '2FG+', '2FG-', '3FG+', '3FG-',
+                        'FT+',
+                        'Turnover',       # turnover events
+                        'Foul',           # non-shooting foul
+                        'Off Reb',        # individual offensive rebound
+                        'TEAM Off Reb'    # team offensive rebound
+                    ]
+
+                    # Count and persist each event exactly as labeled
+                    for label in hudl_labels:
+                        count = text.count(label)
+                        for _ in range(count):
                             db.session.add(ShotDetail(
                                 possession_id=poss_id,
-                                event_type=ev
+                                event_type=label
                             ))
                     fp1 = f"{offense_team} Fouled +1"
                     if fp1 in text:
