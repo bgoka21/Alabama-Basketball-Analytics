@@ -267,13 +267,27 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     'points_scored':   points_scored,
                 }
 
+                # 1) Offense possession with its events
                 poss_data_off = dict(base)
-                poss_data_off.update({'side': offense_team, 'players_on_floor': off_players})
+                poss_data_off.update({
+                    'side': offense_team,
+                    'players_on_floor': off_players,
+                    'events': off_events.copy(),
+                })
                 possession_data.append(poss_data_off)
 
+                # 2) Defense possession with its events
                 poss_data_def = dict(base)
-                poss_data_def.update({'side': defense_team, 'players_on_floor': def_players})
+                poss_data_def.update({
+                    'side': defense_team,
+                    'players_on_floor': def_players,
+                    'events': def_events.copy(),
+                })
                 possession_data.append(poss_data_def)
+
+                # 3) Reset event lists for the next row
+                off_events.clear()
+                def_events.clear()
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":
