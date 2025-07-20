@@ -3,7 +3,7 @@ import pandas as pd
 from flask import render_template, jsonify, request, current_app, make_response, abort, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 from app import app, db, PDFKIT_CONFIG, PDF_OPTIONS
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from models import Possession, PossessionPlayer, ShotDetail
 from models.database import PlayerDraftStock
 from admin.routes import (
@@ -291,9 +291,15 @@ def player_view(player_name):
     from models.database import Roster
     player = Roster.query.filter_by(player_name=player_name).first_or_404()
 
+    label_options = collect_practice_labels([])
+    selected_labels = [
+        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+    ]
+    label_set = {lbl.upper() for lbl in selected_labels}
+
     # 1. On-court offensive possessions & points
     offense_sides = ('Offense', 'Crimson', 'White')
-    ON_poss, ON_pts = (
+    on_q = (
         db.session.query(
             func.count(PossessionPlayer.id),
             func.coalesce(func.sum(Possession.points_scored), 0),
@@ -303,18 +309,24 @@ def player_view(player_name):
             PossessionPlayer.player_id == player.id,
             Possession.possession_side.in_(offense_sides),
         )
-        .one()
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        on_q = on_q.filter(or_(*clauses))
+    ON_poss, ON_pts = on_q.one()
 
     # 2. Team totals (all offense)
-    TEAM_poss, TEAM_pts = (
+    team_q = (
         db.session.query(
             func.count(Possession.id),
             func.coalesce(func.sum(Possession.points_scored), 0),
         )
         .filter(Possession.possession_side.in_(offense_sides))
-        .one()
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        team_q = team_q.filter(or_(*clauses))
+    TEAM_poss, TEAM_pts = team_q.one()
 
     # 3. Off-court
     OFF_poss = TEAM_poss - ON_poss
@@ -326,7 +338,7 @@ def player_view(player_name):
 
     # helper to count shot/event details on-court
     def count_event(ev_type):
-        return (
+        q = (
             db.session.query(func.count(ShotDetail.id))
             .join(Possession, ShotDetail.possession_id == Possession.id)
             .join(PossessionPlayer, Possession.id == PossessionPlayer.possession_id)
@@ -335,9 +347,11 @@ def player_view(player_name):
                 Possession.possession_side.in_(offense_sides),
                 ShotDetail.event_type == ev_type,
             )
-            .scalar()
-            or 0
         )
+        if label_set:
+            clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+            q = q.filter(or_(*clauses))
+        return q.scalar() or 0
 
     # 5. Shooting splits
     FGM2_ON = count_event('ATR+') + count_event('2FG+')

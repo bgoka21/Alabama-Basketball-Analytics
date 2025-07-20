@@ -2336,6 +2336,12 @@ def player_detail(player_name):
     aggregated_game     = aggregate_stats(game_stats_records)
     aggregated_practice = aggregate_stats(practice_stats_records)
 
+    label_options = collect_practice_labels(practice_stats_records)
+    selected_labels = [
+        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+    ]
+    label_set = {lbl.upper() for lbl in selected_labels}
+
     # ─── Direct PnR totals for this player ─────────────────────────────
     pnrs = PnRStats.query.filter_by(player_id=player.id).all()
     total_pnrs = len(pnrs)
@@ -2360,7 +2366,7 @@ def player_detail(player_name):
     )
 
     # ─── On-court offensive metrics (replicated from player_view) ──────────
-    ON_poss, ON_pts = (
+    on_q = (
         db.session.query(
             func.count(PlayerPossession.id),
             func.coalesce(func.sum(Possession.points_scored), 0)
@@ -2369,16 +2375,24 @@ def player_detail(player_name):
         .filter(
             PlayerPossession.player_id == player.id,
             Possession.possession_side == 'Offense'
-        ).one()
+        )
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        on_q = on_q.filter(or_(*clauses))
+    ON_poss, ON_pts = on_q.one()
 
-    TEAM_poss, TEAM_pts = (
+    team_q = (
         db.session.query(
             func.count(Possession.id),
             func.coalesce(func.sum(Possession.points_scored), 0)
         )
-        .filter(Possession.possession_side == 'Offense').one()
+        .filter(Possession.possession_side == 'Offense')
     )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        team_q = team_q.filter(or_(*clauses))
+    TEAM_poss, TEAM_pts = team_q.one()
 
     OFF_poss = TEAM_poss - ON_poss
     OFF_pts  = TEAM_pts - ON_pts
@@ -2387,7 +2401,7 @@ def player_detail(player_name):
     PPP_OFF = OFF_pts / OFF_poss if OFF_poss else 0
 
     def count_event(ev_type):
-        return (
+        q = (
             db.session.query(func.count(ShotDetail.id))
             .join(Possession, ShotDetail.possession_id == Possession.id)
             .join(PlayerPossession, Possession.id == PlayerPossession.possession_id)
@@ -2396,9 +2410,11 @@ def player_detail(player_name):
                 Possession.possession_side == 'Offense',
                 ShotDetail.event_type == ev_type,
             )
-            .scalar()
-            or 0
         )
+        if label_set:
+            clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+            q = q.filter(or_(*clauses))
+        return q.scalar() or 0
 
     FGM2_ON = count_event('ATR+') + count_event('2FG+')
     FGM3_ON = count_event('3FG+')
@@ -2412,12 +2428,6 @@ def player_detail(player_name):
     off_reb_rate     = count_event('Off Rebound') / ON_poss if ON_poss else 0
     fouls_drawn_rate = count_event('Fouled') / ON_poss if ON_poss else 0
 
-    # ─── Drill label filtering (practice mode only) ─────────────────────
-    label_options = collect_practice_labels(practice_stats_records)
-    selected_labels = [
-        lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
-    ]
-    label_set = {lbl.upper() for lbl in selected_labels}
 
     # ─── Compute blue‐collar via raw SQL (instead of get_blue_breakdown) ───
     zero_blue = SimpleNamespace(
