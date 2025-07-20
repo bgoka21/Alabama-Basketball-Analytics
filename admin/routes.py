@@ -262,8 +262,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             func.sum(case((ShotDetail.event_type=='3FG+', 1), else_=0)).label('fg3_makes'),
             func.sum(case((ShotDetail.event_type.in_(['3FG+','3FG-']), 1), else_=0)).label('fg3_attempts'),
             func.sum(case((ShotDetail.event_type=='Turnover', 1), else_=0)).label('turnovers_on'),
-            func.sum(case((ShotDetail.event_type=='Off Rebound', 1), else_=0)).label('off_reb_on'),
-            func.sum(case((ShotDetail.event_type=='Fouled', 1), else_=0)).label('fouls_on')
+            func.sum(case((ShotDetail.event_type=='Off Reb', 1), else_=0)).label('off_reb_on'),
+            func.sum(case((ShotDetail.event_type=='Foul', 1), else_=0)).label('fouls_on')
         )
         .join(PlayerPossession, Roster.id == PlayerPossession.player_id)
         .join(Possession, PlayerPossession.possession_id == Possession.id)
