@@ -331,7 +331,13 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             func.sum(case((ShotDetail.event_type.in_(['3FG+','3FG-']), 1), else_=0)).label('fg3_attempts'),
             func.sum(case((ShotDetail.event_type=='Turnover', 1), else_=0)).label('turnovers_on'),
             func.sum(case((ShotDetail.event_type=='Off Reb', 1), else_=0)).label('off_reb_on'),
-            func.sum(case((ShotDetail.event_type=='Foul', 1), else_=0)).label('fouls_on')
+            func.sum(case((ShotDetail.event_type=='Foul', 1), else_=0)).label('fouls_on'),
+            func.sum(
+                case(
+                    (ShotDetail.event_type.in_(['ATR-','2FG-','3FG-']), 1),
+                    else_=0
+                )
+            ).label('fg_misses')
         )
         .join(PlayerPossession, Roster.id == PlayerPossession.player_id)
         .join(Possession, PlayerPossession.possession_id == Possession.id)
@@ -386,8 +392,9 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
         turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
         individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
-        off_reb_rate = events.get('off_reb_on', 0) / on_poss if on_poss else 0
-        ind_off_reb_rate = person_off_rebs.get(player, 0) / on_poss if on_poss else 0
+        misses = events.get('fg_misses', 0)
+        off_reb_rate = events.get('off_reb_on', 0) / misses if misses else 0
+        ind_off_reb_rate = person_off_rebs.get(player, 0) / misses if misses else 0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         extra_rows[player] = {
             'offensive_possessions': on_poss,
@@ -563,6 +570,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     elif stat_key == 'offense_summary':
         for player in all_players:
             base = core_rows.get(player, {})
+            off_reb_rate = base.get('off_reb_rate', 0.0)
             leaderboard.append(
                 (
                     player,
@@ -574,7 +582,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     base.get('three_fg_pct', 0.0),
                     base.get('turnover_rate', 0.0),
                     base.get('individual_turnover_rate', 0.0),
-                    base.get('off_reb_rate', 0.0),
+                    off_reb_rate,
                     base.get('individual_off_reb_rate', 0.0),
                     base.get('fouls_drawn_rate', 0.0),
                 )
