@@ -572,7 +572,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         "Turnover":    "turnovers",
                         "Pot. Assist": "pot_assists",
                         "2nd Assist":  "second_assists",
-                        "Fouled":      "foul_by"
+                        "Fouled":      "foul_by",
+                        "Foul":        "foul_by",
                     }
                     if token in stat_mapping:
                         key = stat_mapping[token]
