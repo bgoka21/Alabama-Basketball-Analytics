@@ -584,11 +584,6 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         continue
 
                 # done processing tokens for this player in this offense row
-            if row_type in ("Crimson", "White") and not skip_possession:
-                for tok in off_events:
-                    db.session.add(ShotDetail(possession_id=poss_off.id, event_type=tok))
-                for tok in def_events:
-                    db.session.add(ShotDetail(possession_id=poss_def.id, event_type=tok))
             continue
         # ───────────────────────────────────────────────────────────────────────────
 
