@@ -317,6 +317,20 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         for pid, count in personal_offreb_q
     }
 
+    personal_fouls_q = (
+        db.session.query(
+            PlayerStats.player_name.label('player'),
+            func.coalesce(func.sum(PlayerStats.foul_by), 0).label('personal_fouls')
+        )
+        .filter(
+            PlayerStats.season_id == season_id,
+            PlayerStats.practice_id.in_(practice_ids)    # same filter as possessions
+        )
+        .group_by(PlayerStats.player_name)
+        .all()
+    )
+    personal_fouls = {r.player: r.personal_fouls for r in personal_fouls_q}
+
     events_q = (
         db.session.query(
             Roster.player_name.label('player'),
@@ -396,6 +410,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         off_reb_rate = events.get('off_reb_on', 0) / misses if misses else 0
         ind_off_reb_rate = person_off_rebs.get(player, 0) / misses if misses else 0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
+        foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
         extra_rows[player] = {
             'offensive_possessions': on_poss,
             'ppp_on': round(ppp_on, 2),
@@ -408,6 +423,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             'individual_turnover_rate': round(individual_turnover_rate * 100, 1),
             'individual_off_reb_rate': round(ind_off_reb_rate * 100, 1),
             'fouls_drawn_rate': round(fouls_rate * 100, 1),
+            'individual_foul_rate': round(foul_rate_ind * 100, 1),
         }
 
     core_rows = {}
@@ -581,10 +597,11 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     base.get('two_fg_pct', 0.0),
                     base.get('three_fg_pct', 0.0),
                     base.get('turnover_rate', 0.0),
-                    base.get('individual_turnover_rate', 0.0),
                     off_reb_rate,
-                    base.get('individual_off_reb_rate', 0.0),
                     base.get('fouls_drawn_rate', 0.0),
+                    base.get('individual_turnover_rate', 0.0),
+                    base.get('individual_off_reb_rate', 0.0),
+                    base.get('individual_foul_rate', 0.0),
                 )
             )
         leaderboard.sort(key=lambda x: x[2], reverse=True)
