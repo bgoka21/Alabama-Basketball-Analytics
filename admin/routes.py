@@ -323,8 +323,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             func.coalesce(func.sum(PlayerStats.foul_by), 0).label('personal_fouls')
         )
         .filter(
-            PlayerStats.season_id == season_id,
-            PlayerStats.practice_id.in_(practice_ids)    # same filter as possessions
+            PlayerStats.season_id == season_id
         )
         .group_by(PlayerStats.player_name)
         .all()
