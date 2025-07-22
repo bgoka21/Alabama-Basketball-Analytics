@@ -573,10 +573,10 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     base.get('two_fg_pct', 0.0),
                     base.get('three_fg_pct', 0.0),
                     base.get('turnover_rate', 0.0),
-                    base.get('off_reb_rate', 0.0),
-                    base.get('fouls_drawn_rate', 0.0),
                     base.get('individual_turnover_rate', 0.0),
+                    base.get('off_reb_rate', 0.0),
                     base.get('individual_off_reb_rate', 0.0),
+                    base.get('fouls_drawn_rate', 0.0),
                 )
             )
         leaderboard.sort(key=lambda x: x[2], reverse=True)

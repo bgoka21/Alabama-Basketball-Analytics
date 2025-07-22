@@ -38,10 +38,10 @@
         <th class="px-4 py-2 text-center sortable">2FG%</th>
         <th class="px-4 py-2 text-center sortable">3FG%</th>
         <th class="px-4 py-2 text-center sortable">TO Rate</th>
-        <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
-        <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
         <th class="sortable">Ind TO Rate</th>
+        <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
         <th class="sortable">Ind Off Reb%</th>
+        <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
       {% elif selected.key.endswith('_fg_pct') %}
         <th class="px-4 py-2 text-center sortable">FG</th>
         <th class="px-4 py-2 text-center sortable">FG%</th>
@@ -65,7 +65,7 @@
           <td class="px-4 py-2 text-center">{{ ratio }}</td>
           <td class="px-4 py-2 text-center">{{ adj }}</td>
         {% elif selected.key == 'offense_summary' %}
-          {% set player, poss, ppp_on, ppp_off, efg, two_fg, three_fg, tor, off_reb, foul, ind_to, ind_off_reb = row %}
+          {% set player, poss, ppp_on, ppp_off, efg, two_fg, three_fg, tor, ind_to, off_reb, ind_off_reb, foul = row %}
           <td class="px-4 py-2 text-left">{{ player }}</td>
           <td class="px-4 py-2 text-center">{{ poss }}</td>
           <td class="px-4 py-2 text-center">{{ ppp_on }}</td>
@@ -74,10 +74,10 @@
           <td class="px-4 py-2 text-center">{{ two_fg }}</td>
           <td class="px-4 py-2 text-center">{{ three_fg }}</td>
           <td class="px-4 py-2 text-center">{{ tor }}</td>
-          <td class="px-4 py-2 text-center">{{ off_reb }}</td>
-          <td class="px-4 py-2 text-center">{{ foul }}</td>
           <td>{{ ind_to }}</td>
+          <td class="px-4 py-2 text-center">{{ off_reb }}</td>
           <td>{{ ind_off_reb }}</td>
+          <td class="px-4 py-2 text-center">{{ foul }}</td>
         {% elif selected.key.endswith('_fg_pct') %}
           {% set player, makes, attempts, pct, freq = row %}
           <td class="px-4 py-2 text-left">{{ player }}</td>
