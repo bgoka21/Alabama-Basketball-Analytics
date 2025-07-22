@@ -249,6 +249,74 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             )
     TEAM_poss, TEAM_pts = team_q.one()
 
+    # gather practice/game ids for the same filters (used for personal stats)
+    id_q = (
+        db.session.query(Possession.practice_id, Possession.game_id)
+        .filter(
+            Possession.season_id == season_id,
+            Possession.possession_side == 'Offense'
+        )
+    )
+    if label_set:
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        id_q = id_q.filter(or_(*clauses))
+    if start_dt or end_dt:
+        id_q = (
+            id_q
+            .outerjoin(Game, Possession.game_id == Game.id)
+            .outerjoin(Practice, Possession.practice_id == Practice.id)
+        )
+        if start_dt:
+            id_q = id_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date >= start_dt),
+                    and_(Possession.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            id_q = id_q.filter(
+                or_(
+                    and_(Possession.game_id != None, Game.game_date <= end_dt),
+                    and_(Possession.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    id_rows = id_q.distinct().all()
+    practice_ids = [pid for pid, gid in id_rows if pid]
+    game_ids = [gid for pid, gid in id_rows if gid]
+
+    # personal turnover counts for the same practices/games
+    personal_to_q = (
+        db.session.query(
+            PlayerStats.player_name.label('player'),
+            func.coalesce(func.sum(PlayerStats.turnovers), 0).label('personal_turnovers')
+        )
+        .filter(PlayerStats.season_id == season_id)
+    )
+    if practice_ids:
+        personal_to_q = personal_to_q.filter(PlayerStats.practice_id.in_(practice_ids))
+    if game_ids:
+        personal_to_q = personal_to_q.filter(PlayerStats.game_id.in_(game_ids))
+    personal_to_q = personal_to_q.group_by(PlayerStats.player_name).all()
+    person_turnovers = {name: val for name, val in personal_to_q}
+
+    # personal offensive rebounds counts
+    personal_offreb_q = (
+        db.session.query(
+            BlueCollarStats.player_id.label('player_id'),
+            func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('personal_off_rebs')
+        )
+        .filter(BlueCollarStats.season_id == season_id)
+    )
+    if practice_ids:
+        personal_offreb_q = personal_offreb_q.filter(BlueCollarStats.practice_id.in_(practice_ids))
+    if game_ids:
+        personal_offreb_q = personal_offreb_q.filter(BlueCollarStats.game_id.in_(game_ids))
+    personal_offreb_q = personal_offreb_q.group_by(BlueCollarStats.player_id).all()
+    person_off_rebs = {
+        db.session.get(Roster, pid).player_name: count
+        for pid, count in personal_offreb_q
+    }
+
     events_q = (
         db.session.query(
             Roster.player_name.label('player'),
@@ -317,7 +385,9 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         fg2_pct = events.get('fg2_makes', 0) / events.get('fg2_attempts', 0) if events.get('fg2_attempts', 0) else 0
         fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
         turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
+        individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
         off_reb_rate = events.get('off_reb_on', 0) / on_poss if on_poss else 0
+        ind_off_reb_rate = person_off_rebs.get(player, 0) / on_poss if on_poss else 0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         extra_rows[player] = {
             'offensive_possessions': on_poss,
@@ -328,6 +398,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             'three_fg_pct': round(fg3_pct * 100, 1),
             'turnover_rate': round(turnover_rate * 100, 1),
             'off_reb_rate': round(off_reb_rate * 100, 1),
+            'individual_turnover_rate': round(individual_turnover_rate * 100, 1),
+            'individual_off_reb_rate': round(ind_off_reb_rate * 100, 1),
             'fouls_drawn_rate': round(fouls_rate * 100, 1),
         }
 
@@ -503,6 +575,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     base.get('turnover_rate', 0.0),
                     base.get('off_reb_rate', 0.0),
                     base.get('fouls_drawn_rate', 0.0),
+                    base.get('individual_turnover_rate', 0.0),
+                    base.get('individual_off_reb_rate', 0.0),
                 )
             )
         leaderboard.sort(key=lambda x: x[2], reverse=True)
