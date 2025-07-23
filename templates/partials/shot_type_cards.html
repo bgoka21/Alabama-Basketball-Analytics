@@ -1,0 +1,17 @@
+<div class="grid grid-cols-3 gap-4 shot-cards-container">
+  <div class="shot-card p-4 text-center" style="{{ totals.atr.pct | grade_atr2fg_pct(totals.atr.attempts) }}">
+    <div class="text-sm font-medium uppercase">ATR</div>
+    <div class="text-2xl font-bold">{{ totals.atr.pct|round(1) }}%</div>
+    <div class="text-xs">{{ totals.atr.makes }}/{{ totals.atr.attempts }}</div>
+  </div>
+  <div class="shot-card p-4 text-center" style="{{ totals.fg2.pct | grade_atr2fg_pct(totals.fg2.attempts) }}">
+    <div class="text-sm font-medium uppercase">2FG</div>
+    <div class="text-2xl font-bold">{{ totals.fg2.pct|round(1) }}%</div>
+    <div class="text-xs">{{ totals.fg2.makes }}/{{ totals.fg2.attempts }}</div>
+  </div>
+  <div class="shot-card p-4 text-center" style="{{ totals.fg3.pct | grade_3fg_pct(totals.fg3.attempts) }}">
+    <div class="text-sm font-medium uppercase">3FG</div>
+    <div class="text-2xl font-bold">{{ totals.fg3.pct|round(1) }}%</div>
+    <div class="text-xs">{{ totals.fg3.makes }}/{{ totals.fg3.attempts }}</div>
+  </div>
+</div>

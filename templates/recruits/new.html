@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New Recruit</h1>
+<form method="post">
+  <input name="name" placeholder="Name" required><br>
+  <input name="graduation_year" placeholder="Graduation Year"><br>
+  <input name="position" placeholder="Position"><br>
+  <input name="height" placeholder="Height"><br>
+  <input name="weight" placeholder="Weight" type="number"><br>
+  <input name="high_school" placeholder="High School"><br>
+  <input name="hometown" placeholder="Hometown"><br>
+  <input name="rating" placeholder="Rating" type="number"><br>
+  <input name="ranking" placeholder="Ranking" type="number"><br>
+  <textarea name="camp_performance" placeholder="Camp Performance"></textarea><br>
+  <input name="offer_status" placeholder="Offer Status"><br>
+  <input name="offer_date" placeholder="Offer Date" type="date"><br>
+  <input name="commit_date" placeholder="Commit Date" type="date"><br>
+  <input name="email" placeholder="Email"><br>
+  <input name="phone" placeholder="Phone"><br>
+  <input name="profile_image_url" placeholder="Profile Image URL"><br>
+  <textarea name="notes" placeholder="Notes"></textarea><br>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

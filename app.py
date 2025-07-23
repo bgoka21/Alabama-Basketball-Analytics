@@ -140,6 +140,9 @@ def create_app():
     from public.routes import public_bp
     app.register_blueprint(public_bp)
 
+    from recruits import recruits_bp
+    app.register_blueprint(recruits_bp, url_prefix='/recruits')
+
     app.register_blueprint(admin_bp, url_prefix='/admin')
 
     # Register merge tool blueprint under /merge
