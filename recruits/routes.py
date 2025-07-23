@@ -97,6 +97,7 @@ def detail_recruit(id):
     }
     if latest_stat:
         shot_data = json.loads(latest_stat.shot_type_details)
+        atr_data, fg2_data, fg3_data = [], [], []
         for s in shot_data:
             cls = s.get('shot_class')
             if cls not in totals:
@@ -104,12 +105,29 @@ def detail_recruit(id):
             totals[cls]['attempts'] += 1
             if s.get('result') == 'made':
                 totals[cls]['makes'] += 1
+            if cls == 'atr':
+                atr_data.append(s)
+            elif cls == '2fg':
+                fg2_data.append(s)
+            elif cls == '3fg':
+                fg3_data.append(s)
+    else:
+        atr_data, fg2_data, fg3_data = [], [], []
     for v in totals.values():
         if v['attempts']:
             v['pct'] = v['makes'] / v['attempts'] * 100
         else:
             v['pct'] = 0
-    return render_template('recruits/detail.html', recruit=r, stat=latest_stat, shot_data=shot_data, totals=totals)
+    return render_template(
+        'recruits/detail.html',
+        recruit=r,
+        stat=latest_stat,
+        shot_data=shot_data,
+        totals=totals,
+        shot_data_atr=atr_data,
+        shot_data_fg2=fg2_data,
+        shot_data_fg3=fg3_data,
+    )
 
 
 

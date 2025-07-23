@@ -42,4 +42,31 @@
     <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Add School</button>
   </form>
 
+  <script>
+    function showShotTypeDetail(detail) {
+      ['atr','fg2','fg3'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.toggle('hidden', id !== detail);
+          el.classList.toggle('block', id === detail);
+        }
+      });
+      const map = { atr:'ATR', fg2:'FG2', fg3:'FG3' };
+      Object.entries(map).forEach(([type,suf]) => {
+        const card = document.getElementById('card' + suf);
+        if (!card) return;
+        if (type === detail) {
+          card.classList.replace('bg-white','bg-gray-100');
+          card.classList.replace('shadow-md','shadow-inner');
+        } else {
+          card.classList.replace('bg-gray-100','bg-white');
+          card.classList.replace('shadow-inner','shadow-md');
+        }
+      });
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      showShotTypeDetail('atr');
+    });
+  </script>
+
 {% endblock %}

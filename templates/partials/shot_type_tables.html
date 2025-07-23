@@ -1,24 +1,76 @@
 <div class="mt-4">
-  <table class="min-w-full text-sm full-table">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-2 py-1">Class</th>
-        <th class="px-2 py-1">Result</th>
-        <th class="px-2 py-1">Location</th>
-        <th class="px-2 py-1">Possession</th>
-        <th class="px-2 py-1">Assisted</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in shot_data %}
-      <tr>
-        <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
-        <td class="px-2 py-1 text-center">{{ s.result }}</td>
-        <td class="px-2 py-1">{{ s.shot_location }}</td>
-        <td class="px-2 py-1">{{ s.possession_type }}</td>
-        <td class="px-2 py-1">{{ s.assisted }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div id="atr" class="detail-content hidden">
+    <table class="min-w-full text-sm full-table">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-2 py-1">Class</th>
+          <th class="px-2 py-1">Result</th>
+          <th class="px-2 py-1">Location</th>
+          <th class="px-2 py-1">Possession</th>
+          <th class="px-2 py-1">Assisted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in shot_data_atr %}
+        <tr>
+          <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
+          <td class="px-2 py-1 text-center">{{ s.result }}</td>
+          <td class="px-2 py-1">{{ s.shot_location }}</td>
+          <td class="px-2 py-1">{{ s.possession_type }}</td>
+          <td class="px-2 py-1">{{ s.assisted }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="fg2" class="detail-content hidden">
+    <table class="min-w-full text-sm full-table">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-2 py-1">Class</th>
+          <th class="px-2 py-1">Result</th>
+          <th class="px-2 py-1">Location</th>
+          <th class="px-2 py-1">Possession</th>
+          <th class="px-2 py-1">Assisted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in shot_data_fg2 %}
+        <tr>
+          <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
+          <td class="px-2 py-1 text-center">{{ s.result }}</td>
+          <td class="px-2 py-1">{{ s.shot_location }}</td>
+          <td class="px-2 py-1">{{ s.possession_type }}</td>
+          <td class="px-2 py-1">{{ s.assisted }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="fg3" class="detail-content hidden">
+    <table class="min-w-full text-sm full-table">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-2 py-1">Class</th>
+          <th class="px-2 py-1">Result</th>
+          <th class="px-2 py-1">Location</th>
+          <th class="px-2 py-1">Possession</th>
+          <th class="px-2 py-1">Assisted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in shot_data_fg3 %}
+        <tr>
+          <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
+          <td class="px-2 py-1 text-center">{{ s.result }}</td>
+          <td class="px-2 py-1">{{ s.shot_location }}</td>
+          <td class="px-2 py-1">{{ s.possession_type }}</td>
+          <td class="px-2 py-1">{{ s.assisted }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
