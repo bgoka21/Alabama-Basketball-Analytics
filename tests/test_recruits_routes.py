@@ -64,3 +64,21 @@ def test_create_upload_and_delete_school(client, app, tmp_path):
     assert resp.status_code == 302
     with app.app_context():
         assert RecruitTopSchool.query.get(sid) is None
+
+
+def test_blank_numeric_fields(client, app):
+    resp = client.post('/recruits/new', data={
+        'name': 'Jane Doe',
+        'graduation_year': '',
+        'weight': '',
+        'rating': '',
+        'ranking': '',
+    })
+    assert resp.status_code == 302
+    with app.app_context():
+        recruit = Recruit.query.filter_by(name='Jane Doe').first()
+        assert recruit is not None
+        assert recruit.graduation_year is None
+        assert recruit.weight is None
+        assert recruit.rating is None
+        assert recruit.ranking is None
