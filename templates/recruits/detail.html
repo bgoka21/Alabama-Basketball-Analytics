@@ -21,7 +21,8 @@
     {% if recruit.ranking %}<div><span class="font-semibold">Ranking:</span> {{ recruit.ranking }}</div>{% endif %}
   </div>
 
-  {% include "partials/shot_type_cards.html" with context %}
+  {# Use the shot type tables partial which already contains the
+     overview cards acting as tabs. #}
   {% include "partials/shot_type_tables.html" with context %}
 
 
@@ -90,7 +91,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    showShotTypeDetail('atr');
+    // Display the shot type section by default so clicking the
+    // overview cards reveals their respective detail tables just
+    // like on the player detail page.
+    showTab('shotType');
   });
   </script>
 
