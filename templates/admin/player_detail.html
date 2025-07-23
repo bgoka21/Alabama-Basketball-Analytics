@@ -401,6 +401,7 @@
 
   <!-- Shot Type Section -->
   <div id="shotType" class="tab-content hidden">
+  <div class="hidden sm:block">
   <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Type Overview</h2>
 
   <!-- Season Aggregates as big cards -->
@@ -785,6 +786,27 @@
     </div>
     </div>
   </div>
+  </div>
+  <div class="sm:hidden" x-data="shotTypeMobile()">
+    <!-- exactly the snippet above, including the two <select>s and mini-table -->
+  </div>
+  <script>
+  function shotTypeMobile(){
+    return {
+      top: 'atr',
+      sub: Object.keys(shot_summaries.atr.cats)[0],
+      data: {
+        atr: {{ shot_summaries['atr'].cats | tojson }},
+        fg2: {{ shot_summaries['fg2'].cats | tojson }},
+        fg3: {{ shot_summaries['fg3'].cats | tojson }},
+      },
+      format(obj) {
+        let pct = (obj.fg_pct*100).toFixed(1)+'%';
+        return `${obj.makes}-${obj.attempts} • ${pct} • ${obj.pps.toFixed(2)} • ${(obj.attempts / shot_type_totals[this.top].attempts*100).toFixed(1)}%`;
+      }
+    }
+  }
+  </script>
 </div>  <!-- closes <div id="shotType"> -->
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <!-- 4) Skill Development                                                           -->

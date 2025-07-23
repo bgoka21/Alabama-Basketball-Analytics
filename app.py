@@ -1,5 +1,7 @@
 import os
 from flask import Flask, redirect, url_for, render_template, request, flash
+from flask.json.provider import DefaultJSONProvider
+from types import SimpleNamespace
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
@@ -12,6 +14,14 @@ from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
+
+# Allow JSON serialization of SimpleNamespace values across all Flask apps
+_orig_json_default = DefaultJSONProvider.default
+def _ns_default(self, obj):
+    if isinstance(obj, SimpleNamespace):
+        return obj.__dict__
+    return _orig_json_default(self, obj)
+DefaultJSONProvider.default = _ns_default
 
 scheduler = APScheduler()
 
@@ -39,6 +49,15 @@ except ImportError:
 
 def create_app():
     app = Flask(__name__)
+
+    # Allow JSON serialization of SimpleNamespace objects
+    from types import SimpleNamespace
+    _json_default = app.json.default
+    def _default(obj):
+        if isinstance(obj, SimpleNamespace):
+            return obj.__dict__
+        return _json_default(obj)
+    app.json.default = _default
 
     # --- Basic Configuration ---
     app.config['SECRET_KEY'] = 'your_secret_key_here'
