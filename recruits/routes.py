@@ -1,8 +1,9 @@
 import os
-import json
 from flask import render_template, request, redirect, url_for, flash, current_app
 from datetime import date
 from flask_login import current_user
+from types import SimpleNamespace
+from admin.routes import compute_team_shot_details
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from . import recruits_bp
@@ -81,52 +82,42 @@ def new_recruit():
     return render_template('recruits/new.html')
 
 
-@recruits_bp.route('/<int:id>')
-def detail_recruit(id):
-    r = Recruit.query.get_or_404(id)
-    latest_stat = (
-        RecruitShotTypeStat.query.filter_by(recruit_id=id)
+def compute_shot_type_totals_for_recruit(recruit):
+    latest = (
+        RecruitShotTypeStat.query.filter_by(recruit_id=recruit.id)
         .order_by(RecruitShotTypeStat.created_at.desc())
         .first()
     )
-    shot_data = []
-    totals = {
-        'atr': {'makes': 0, 'attempts': 0},
-        'fg2': {'makes': 0, 'attempts': 0},
-        'fg3': {'makes': 0, 'attempts': 0},
-    }
-    if latest_stat:
-        shot_data = json.loads(latest_stat.shot_type_details)
-        atr_data, fg2_data, fg3_data = [], [], []
-        for s in shot_data:
-            cls = s.get('shot_class')
-            if cls not in totals:
-                continue
-            totals[cls]['attempts'] += 1
-            if s.get('result') == 'made':
-                totals[cls]['makes'] += 1
-            if cls == 'atr':
-                atr_data.append(s)
-            elif cls == '2fg':
-                fg2_data.append(s)
-            elif cls == '3fg':
-                fg3_data.append(s)
-    else:
-        atr_data, fg2_data, fg3_data = [], [], []
-    for v in totals.values():
-        if v['attempts']:
-            v['pct'] = v['makes'] / v['attempts'] * 100
-        else:
-            v['pct'] = 0
+    records = []
+    if latest:
+        records = [SimpleNamespace(shot_type_details=latest.shot_type_details)]
+    totals, _ = compute_team_shot_details(records, set())
+    return totals
+
+
+def compute_shot_summaries_for_recruit(recruit):
+    latest = (
+        RecruitShotTypeStat.query.filter_by(recruit_id=recruit.id)
+        .order_by(RecruitShotTypeStat.created_at.desc())
+        .first()
+    )
+    records = []
+    if latest:
+        records = [SimpleNamespace(shot_type_details=latest.shot_type_details)]
+    _, summaries = compute_team_shot_details(records, set())
+    return summaries
+
+
+@recruits_bp.route('/<int:id>')
+def detail_recruit(id):
+    r = Recruit.query.get_or_404(id)
+    shot_type_totals = compute_shot_type_totals_for_recruit(r)
+    shot_summaries = compute_shot_summaries_for_recruit(r)
     return render_template(
         'recruits/detail.html',
         recruit=r,
-        stat=latest_stat,
-        shot_data=shot_data,
-        totals=totals,
-        shot_data_atr=atr_data,
-        shot_data_fg2=fg2_data,
-        shot_data_fg3=fg3_data,
+        shot_type_totals=shot_type_totals,
+        shot_summaries=shot_summaries,
     )
 
 

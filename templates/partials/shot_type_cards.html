@@ -1,17 +1,48 @@
-<div class="grid grid-cols-3 gap-4 shot-cards-container">
-  <div id="cardATR" onclick="showShotTypeDetail('atr')" class="shot-card p-4 text-center cursor-pointer" style="{{ totals.atr.pct | grade_atr2fg_pct(totals.atr.attempts) }}">
-    <div class="text-sm font-medium uppercase">ATR</div>
-    <div class="text-2xl font-bold">{{ totals.atr.pct|round(1) }}%</div>
-    <div class="text-xs">{{ totals.atr.makes }}/{{ totals.atr.attempts }}</div>
-  </div>
-  <div id="cardFG2" onclick="showShotTypeDetail('fg2')" class="shot-card p-4 text-center cursor-pointer" style="{{ totals.fg2.pct | grade_atr2fg_pct(totals.fg2.attempts) }}">
-    <div class="text-sm font-medium uppercase">2FG</div>
-    <div class="text-2xl font-bold">{{ totals.fg2.pct|round(1) }}%</div>
-    <div class="text-xs">{{ totals.fg2.makes }}/{{ totals.fg2.attempts }}</div>
-  </div>
-  <div id="cardFG3" onclick="showShotTypeDetail('fg3')" class="shot-card p-4 text-center cursor-pointer" style="{{ totals.fg3.pct | grade_3fg_pct(totals.fg3.attempts) }}">
-    <div class="text-sm font-medium uppercase">3FG</div>
-    <div class="text-2xl font-bold">{{ totals.fg3.pct|round(1) }}%</div>
-    <div class="text-xs">{{ totals.fg3.makes }}/{{ totals.fg3.attempts }}</div>
+{# templates/partials/shot_type_cards.html #}
+<div class="hidden sm:block">
+  <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Type Overview</h2>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <!-- ATR Season -->
+    <div
+      id="cardATR"
+      onclick="showShotTypeDetail('atr')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.atr.fg_pct | grade_atr2fg_pct(shot_type_totals.atr.attempts) }}"
+    >
+      <div class="text-sm font-medium text-black uppercase">ATR Season</div>
+      <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.atr.fg_pct|round(1) }}%</div>
+      <div class="text-xs text-black">{{ shot_type_totals.atr.makes }}/{{ shot_type_totals.atr.attempts }}</div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.atr.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.atr.freq|round(1) }}%</div>
+    </div>
+
+    <!-- 2FG Season -->
+    <div
+      id="cardFG2"
+      onclick="showShotTypeDetail('fg2')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.fg2.fg_pct | grade_atr2fg_pct(shot_type_totals.fg2.attempts) }}"
+    >
+      <div class="text-sm font-medium text-black uppercase">2FG Season</div>
+      <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.fg2.fg_pct|round(1) }}%</div>
+      <div class="text-xs text-black">{{ shot_type_totals.fg2.makes }}/{{ shot_type_totals.fg2.attempts }}</div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.fg2.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg2.freq|round(1) }}%</div>
+    </div>
+
+    <!-- 3FG Season -->
+    <div
+      id="cardFG3"
+      onclick="showShotTypeDetail('fg3')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.fg3.fg_pct | grade_3fg_pct(shot_type_totals.fg3.attempts) }}"
+    >
+      <div class="text-sm font-medium text-black uppercase">3FG Season</div>
+      <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.fg3.fg_pct|round(1) }}%</div>
+      <div class="text-xs text-black">{{ shot_type_totals.fg3.makes }}/{{ shot_type_totals.fg3.attempts }}</div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.fg3.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg3.freq|round(1) }}%</div>
+    </div>
   </div>
 </div>
