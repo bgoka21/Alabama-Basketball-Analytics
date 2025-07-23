@@ -6,7 +6,7 @@
 
   <!-- Shot Type Section -->
   <div id="shotType" class="tab-content hidden">
-  <div class="hidden sm:block">
+  <div>
   <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Type Overview</h2>
 
   <!-- Season Aggregates as big cards -->
@@ -391,41 +391,5 @@
     </div>
     </div>
   </div>
-  </div>
-  <!-- MOBILE Shot-Type tables (phones only) -->
-  <div class="sm:hidden space-y-6">
-    <h2 class="text-lg font-semibold mb-4">Shot Type Overview</h2>
-    {% for type, summary in shot_summaries.items() %}
-      <div>
-        <h3 class="text-base font-semibold uppercase mb-2">{{ type|upper }}</h3>
-        {% for group_name, d in summary.cats.items() %}
-          <div class="mb-4 border rounded-lg p-3 bg-white">
-            <h4 class="font-medium mb-1">{{ group_name }}</h4>
-            <table class="w-full text-sm">
-              <tbody>
-                <tr class="border-t">
-                  <th class="text-left py-1 px-2">Total</th>
-                  <td class="text-right py-1 px-2">
-                    {{ d.total.makes }}-{{ d.total.attempts }} ({{ (d.total.fg_pct*100)|round(1) }}%) • PPS: {{ d.total.pps|round(2) }} • Freq: {{ (d.total.attempts/shot_type_totals[type].attempts*100)|round(1) }}%
-                  </td>
-                </tr>
-                <tr class="border-t">
-                  <th class="text-left py-1 px-2">Transition</th>
-                  <td class="text-right py-1 px-2">
-                    {{ d.transition.makes }}-{{ d.transition.attempts }} ({{ (d.transition.fg_pct*100)|round(1) }}%) • PPS: {{ d.transition.pps|round(2) }} • Freq: {{ (d.transition.attempts/shot_type_totals[type].attempts*100)|round(1) }}%
-                  </td>
-                </tr>
-                <tr class="border-t">
-                  <th class="text-left py-1 px-2">Half-Court</th>
-                  <td class="text-right py-1 px-2">
-                    {{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }} ({{ (d.halfcourt.fg_pct*100)|round(1) }}%) • PPS: {{ d.halfcourt.pps|round(2) }} • Freq: {{ (d.halfcourt.attempts/shot_type_totals[type].attempts*100)|round(1) }}%
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        {% endfor %}
-      </div>
-    {% endfor %}
   </div>
 </div>  <!-- closes <div id="shotType"> -->
