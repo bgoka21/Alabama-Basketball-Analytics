@@ -1,15 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Recruits</h1>
-<a href="{{ url_for('recruits.new_recruit') }}" class="btn">Add Recruit</a>
-<table>
-  <tr><th>Name</th><th>Grad Year</th><th>Position</th></tr>
-  {% for r in recruits %}
-    <tr>
-      <td><a href="{{ url_for('recruits.detail_recruit', id=r.id) }}">{{ r.name }}</a></td>
-      <td>{{ r.graduation_year }}</td>
-      <td>{{ r.position }}</td>
-    </tr>
-  {% endfor %}
-</table>
+  <h1 class="text-2xl font-bold mb-4">Recruits</h1>
+  <div class="mb-4">
+    <a href="{{ url_for('recruits.new_recruit') }}" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Add Recruit</a>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Grad Year</th>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Position</th>
+          <th class="px-6 py-3 text-center text-xs font-medium uppercase">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        {% for r in recruits %}
+        <tr>
+          <td class="px-6 py-4">
+            <a href="{{ url_for('recruits.detail_recruit', id=r.id) }}" class="text-blue-600 hover:underline">{{ r.name }}</a>
+          </td>
+          <td class="px-6 py-4">{{ r.graduation_year }}</td>
+          <td class="px-6 py-4">{{ r.position }}</td>
+          <td class="px-6 py-4 text-center">
+            <a href="{{ url_for('recruits.edit_recruit', id=r.id) }}" class="text-blue-600 hover:underline mr-2">Edit</a>
+            <form action="{{ url_for('recruits.delete_recruit', id=r.id) }}" method="post" class="inline">
+              <button type="submit" class="text-red-600 hover:underline" onclick="return confirm('Delete {{ r.name }}?');">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="px-6 py-4 text-center">No recruits found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% endblock %}
