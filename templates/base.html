@@ -2,7 +2,7 @@
 <html lang="en" class="bg-white text-black">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alabama Basketball</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}">
@@ -27,10 +27,10 @@
 <body class="min-h-screen flex">
 
   <!-- Mobile menu button -->
-  <button id="mobile-menu-btn" class="md:hidden w-11 h-11 p-2 text-2xl">&#9776;</button>
+  <button id="mobile-menu-button" class="md:hidden p-2">&#9776;</button>
 
   <!-- Sidebar -->
-  <aside id="sidebar" class="hidden md:flex w-72 bg-[#9E1B32] text-white flex-col px-3 py-4 sm:px-5 sm:py-6">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 transform -translate-x-full md:translate-x-0 transition-transform z-50 bg-[#9E1B32] text-white flex flex-col px-3 py-4 sm:px-5 sm:py-6">
     <h1 class="text-xl sm:text-2xl font-bold mb-8">Alabama Basketball</h1>
 
     <nav>
@@ -42,20 +42,22 @@
   </aside>
 
 <!-- Main content -->
-<main class="flex-1 p-4 sm:p-6 overflow-y-auto bg-white text-black">
-  {# ── Page-specific controls (e.g. season dropdown) ── #}
-  {% block page_controls %}{% endblock %}
+<main class="flex-1 overflow-y-auto bg-white text-black">
+  <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
+    {# ── Page-specific controls (e.g. season dropdown) ── #}
+    {% block page_controls %}{% endblock %}
 
-  {# ── Main page content ── #}
-  {% block content %}{% endblock %}
+    {# ── Main page content ── #}
+    {% block content %}{% endblock %}
+  </div>
 </main>
 
 
   <script>
-    const btn = document.getElementById('mobile-menu-btn');
+    const btn = document.getElementById('mobile-menu-button');
     const sidebar = document.getElementById('sidebar');
     btn.addEventListener('click', () => {
-      sidebar.classList.toggle('hidden');
+      sidebar.classList.toggle('-translate-x-full');
     });
   </script>
 

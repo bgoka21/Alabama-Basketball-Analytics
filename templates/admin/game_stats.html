@@ -2,6 +2,7 @@
 {% extends 'admin/base.html' %}
 
 {% block content %}
+  <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
   <h1 class="text-2xl font-bold mb-4">Game Stats</h1>
 
   <!-- Tab Buttons -->
@@ -13,7 +14,7 @@
   <!-- OFFENSE TAB -->
   <div id="offenseContent">
 <!-- Offense Cards Redesigned -->
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
   <!-- Shooting Splits -->
   {% set total_shots = team_stats.total_atr_attempts + team_stats.total_fg2_attempts + team_stats.total_fg3_attempts %}
     {% for label, makes, attempts, extra in [
@@ -149,6 +150,7 @@
         <h2 class="text-2xl font-semibold mb-4">Possession Breakdown</h2>
         <div>
           <h3 class="text-xl font-semibold mb-2">Offense</h3>
+          <div class="overflow-x-auto">
           <table class="w-full table-auto border-collapse mb-4">
             <thead class="bg-white border-b-2 border-[#9E1B32]">
               <tr>
@@ -183,6 +185,7 @@
               {% endfor %}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -212,6 +215,7 @@
             </p>
           {% else %}
             <h4 class="font-semibold mb-2">Best Offense</h4>
+            <div class="overflow-x-auto">
             <table class="w-full table-auto border-collapse mb-4">
               <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
                 <tr>
@@ -228,8 +232,10 @@
                 {% endfor %}
               </tbody>
             </table>
+            </div>
 
             <h4 class="font-semibold mb-2">Worst Offense</h4>
+            <div class="overflow-x-auto">
             <table class="w-full table-auto border-collapse">
               <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
                 <tr>
@@ -246,6 +252,7 @@
                 {% endfor %}
               </tbody>
             </table>
+            </div>
           {% endif %}
         </div>
         {% endfor %}
@@ -259,7 +266,7 @@
   <!-- DEFENSE TAB -->
   <div id="defenseContent" class="hidden">
 <!-- Defense Cards Redesigned (matching Offense order) -->
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
   <!-- Opponent Shooting Splits -->
   {% set opp_total_shots = opponent_stats.total_atr_attempts
                          + opponent_stats.total_fg2_attempts
@@ -392,6 +399,7 @@
         <h2 class="text-2xl font-semibold mb-4">Possession Breakdown</h2>
         <div>
           <h3 class="text-xl font-semibold mb-2">Defense</h3>
+          <div class="overflow-x-auto">
           <table class="w-full table-auto border-collapse">
             <thead class="bg-white border-b-2 border-[#9E1B32]">
               <tr>
@@ -426,6 +434,7 @@
               {% endfor %}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -455,6 +464,7 @@
             </p>
           {% else %}
             <h4 class="font-semibold mb-2">Best Defense</h4>
+            <div class="overflow-x-auto">
             <table class="w-full table-auto border-collapse mb-4">
               <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
                 <tr>
@@ -471,8 +481,10 @@
                 {% endfor %}
               </tbody>
             </table>
+            </div>
 
             <h4 class="font-semibold mb-2">Worst Defense</h4>
+            <div class="overflow-x-auto">
             <table class="w-full table-auto border-collapse">
               <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
                 <tr>
@@ -489,6 +501,7 @@
                 {% endfor %}
               </tbody>
             </table>
+            </div>
           {% endif %}
         </div>
         {% endfor %}
@@ -562,5 +575,6 @@
       if (defBtns.length) defBtns[0].click();
     });
   </script>
-  
+
+  </div>
 {% endblock %}

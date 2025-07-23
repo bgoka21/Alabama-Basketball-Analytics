@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto">
+<div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
   <h1 class="text-3xl font-bold mb-6 text-center">Uploaded Files</h1>
 
   <!-- Category Filter -->
@@ -16,7 +16,7 @@
 
   <!-- Bulk Actions Form -->
   <form method="POST" action="{{ url_for('admin.bulk_action') }}">
-    <div class="mb-3 flex justify-between items-center">
+    <div class="mb-3 flex flex-col space-y-3 sm:flex-row sm:space-x-3 sm:space-y-0 sm:items-center sm:justify-between">
       <div>
         <button name="action" value="download" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Download Selected</button>
         <button name="action" value="delete" type="submit" onclick="return confirm('Delete selected files?')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded ml-2">Delete Selected</button>
