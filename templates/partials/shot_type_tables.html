@@ -1,76 +1,458 @@
-<div class="mt-4">
-  <div id="atr" class="detail-content hidden">
-    <table class="min-w-full text-sm full-table">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="px-2 py-1">Class</th>
-          <th class="px-2 py-1">Result</th>
-          <th class="px-2 py-1">Location</th>
-          <th class="px-2 py-1">Possession</th>
-          <th class="px-2 py-1">Assisted</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in shot_data_atr %}
-        <tr>
-          <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
-          <td class="px-2 py-1 text-center">{{ s.result }}</td>
-          <td class="px-2 py-1">{{ s.shot_location }}</td>
-          <td class="px-2 py-1">{{ s.possession_type }}</td>
-          <td class="px-2 py-1">{{ s.assisted }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{% set empty_group = namespace(
+  total=namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0),
+  transition=namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0),
+  halfcourt=namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0)
+) %}
+
+  <!-- Shot Type Section -->
+  <div id="shotType" class="tab-content hidden">
+  <div class="hidden sm:block">
+  <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Type Overview</h2>
+
+  <!-- Season Aggregates as big cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <!-- ATR Season -->
+    <div
+      id="cardATR"
+      onclick="showShotTypeDetail('atr')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.atr.fg_pct
+                |grade_atr2fg_pct(shot_type_totals.atr.attempts) }}"
+    >
+      <div class="text-sm font-medium text-black uppercase">ATR Season</div>
+      <div class="text-2xl font-bold mt-2 text-black">
+        {{ shot_type_totals.atr.fg_pct|round(1) }}%
+      </div>
+      <div class="text-xs text-black">
+        {{ shot_type_totals.atr.makes }}/{{ shot_type_totals.atr.attempts }}
+      </div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.atr.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.atr.freq|round(1) }}%</div>
+    </div>
+
+    <!-- 2FG Season -->
+    <div
+      id="cardFG2"
+      onclick="showShotTypeDetail('fg2')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.fg2.fg_pct
+                |grade_atr2fg_pct(shot_type_totals.fg2.attempts) }}"
+    >
+      <div class="text-sm font-medium text-black uppercase">2FG Season</div>
+      <div class="text-2xl font-bold mt-2 text-black">
+        {{ shot_type_totals.fg2.fg_pct|round(1) }}%
+      </div>
+      <div class="text-xs text-black">
+        {{ shot_type_totals.fg2.makes }}/{{ shot_type_totals.fg2.attempts }}
+      </div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.fg2.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg2.freq|round(1) }}%</div>
+    </div>
+
+    <!-- 3FG Season -->
+    <div
+      id="cardFG3"
+      onclick="showShotTypeDetail('fg3')"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
+      style="{{ shot_type_totals.fg3.fg_pct
+                |grade_3fg_pct(shot_type_totals.fg3.attempts) }}"
+    >
+      <div class="text-sm font-medium text-black uppercase">3FG Season</div>
+      <div class="text-2xl font-bold mt-2 text-black">
+        {{ shot_type_totals.fg3.fg_pct|round(1) }}%
+      </div>
+      <div class="text-xs text-black">
+        {{ shot_type_totals.fg3.makes }}/{{ shot_type_totals.fg3.attempts }}
+      </div>
+      <div class="text-base font-semibold text-black">PPS: {{ shot_type_totals.fg3.pps|round(2) }}</div>
+      <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg3.freq|round(1) }}%</div>
+    </div>
   </div>
 
-  <div id="fg2" class="detail-content hidden">
-    <table class="min-w-full text-sm full-table">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="px-2 py-1">Class</th>
-          <th class="px-2 py-1">Result</th>
-          <th class="px-2 py-1">Location</th>
-          <th class="px-2 py-1">Possession</th>
-          <th class="px-2 py-1">Assisted</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in shot_data_fg2 %}
-        <tr>
-          <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
-          <td class="px-2 py-1 text-center">{{ s.result }}</td>
-          <td class="px-2 py-1">{{ s.shot_location }}</td>
-          <td class="px-2 py-1">{{ s.possession_type }}</td>
-          <td class="px-2 py-1">{{ s.assisted }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <!-- (no more small buttons here—click the big cards above!) -->
+
+
+    {# pull in our three namespaces from the route #}
+    {% set atr_summary = shot_summaries['atr'] %}
+    {% set fg2_summary = shot_summaries['fg2'] %}
+    {% set fg3_summary = shot_summaries['fg3'] %}
+
+    <div class="shot-report-container">
+
+    {# ── ATR Detail Table ── #}
+    {% set atr_groups = [
+      ('Assisted',        ['Assisted','Non-Assisted']),
+      ('Dribble',      ['Dribble','No Dribble']),
+      ('RA',           ['Restricted Area','Non Restricted Area']),
+      ('Feet',         ['Off 1 Foot','Off 2 Feet']),
+      ('Hands',        ['Left Hand Finish','Right Hand Finish','Hands To Rim','Hands Away From Rim']),
+      ('PA',           ['Play Action','No Play Action']),
+      ('Defenders',    ['Primary Defender','Secondary Defender','Multiple Defenders','Unguarded']),
+      ('Type',         ['Dunk','Catch','Floater','Layup','Pull Up','Step Back']),
+      ('Other',        ['Blocked']),
+      ('Scheme – Drive',  ['Middle Drive','Baseline Drive','Slot Drive','Drive Right','Drive Left']),
+      ('Scheme – Attack', ['Beast / Post','DHO / Get','Iso','PnR Handler','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Pass',   [
+        'Swing','Check Down','Off Screen','1 More','Lift','PnR Pocket','Post Entry','Drift','PnR Lob','Post Pass Out','Kickdown',
+        'PnR Late Roll','Dump Off','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Slash / Cut','Reshape',
+        'Shake','Skip','Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
+      ])
+    ] %}
+    
+    <div class="shot-section">
+      <div id="atr" class="detail-content hidden">
+      <table class="min-w-full divide-y divide-gray-200 mb-6">
+        <thead class="bg-gray-100">
+          <tr>
+            <th rowspan="2" class="px-4 py-2 text-left">Category</th>
+            <th colspan="4" class="px-4 py-2 text-center">Total</th>
+            <th colspan="4" class="px-4 py-2 text-center">Transition</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half-Court</th>
+          </tr>
+          <tr>
+            {% for _ in range(3) %}
+              <th class="px-2 py-1 text-center">FGA</th>
+              <th class="px-2 py-1 text-center">FG%</th>
+              <th class="px-2 py-1 text-center">PPS</th>
+              <th class="px-2 py-1 text-center">Freq%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for _group_name, cats in atr_groups %}
+            {# crimson divider between groups #}
+            <tr>
+              <td colspan="13" class="p-0">
+                <div class="h-[2px] bg-[#9E1B32]"></div>
+              </td>
+            </tr>
+    
+            {# actual data rows with zebra stripes #}
+            {% for category in cats %}
+              {% set d = atr_summary.cats.get(category, empty_group) %}
+              <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
+                <td class="px-4 py-2">{{ category }}</td>
+    
+                {# Totals #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.total.makes }}-{{ d.total.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.total.fg_pct*100)|grade_atr2fg_pct(d.total.attempts) }}"
+                >
+                  {{ (d.total.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">
+                  {{ d.total.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.atr.attempts > 0 %}
+                    {{ (d.total.attempts / shot_type_totals.atr.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
+                </td>
+    
+                {# Transition #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.transition.makes }}-{{ d.transition.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.transition.fg_pct*100)|grade_atr2fg_pct(d.transition.attempts) }}"
+                >
+                  {{ (d.transition.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">
+                  {{ d.transition.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.atr.attempts > 0 %}
+                    {{ (d.transition.attempts / shot_type_totals.atr.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
+                </td>
+    
+                {# Half-Court #}
+                <td class="px-2 py-1 text-center">
+                  {{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}
+                </td>
+                <td
+                  class="px-2 py-1 text-center"
+                  style="{{ (d.halfcourt.fg_pct*100)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
+                >
+                  {{ (d.halfcourt.fg_pct*100)|round(1) }}%
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">
+                  {{ d.halfcourt.pps|round(2) }}
+                </td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.atr.attempts > 0 %}
+                    {{ (d.halfcourt.attempts / shot_type_totals.atr.attempts * 100) | round(1) }}%
+                  {% else %}
+                    0.0%
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+
+    {# ── 2FG Detail Table ── #}
+    {% set fg2_groups = [
+      ('Assisted',        ['Assisted','Non-Assisted']),
+      ('Dribble',         ['Dribble','No Dribble']),
+      ('RA',              ['Restricted Area','Non Restricted Area']),
+      ('Feet',            ['Off 1 Foot','Off 2 Feet']),
+      ('Hands',           ['Left Hand Finish','Right Hand Finish','Hands To Rim','Hands Away From Rim']),
+      ('PA',              ['Play Action','No Play Action']),
+      ('Defenders',       ['Primary Defender','Secondary Defender','Multiple Defenders','Unguarded']),
+      ('Type',            ['Dunk','Catch','Floater','Layup','Pull Up','Step Back']),
+      ('Other',           ['Blocked']),
+      ('Scheme – Drive',  ['Middle Drive','Baseline Drive','Slot Drive','Drive Right','Drive Left']),
+      ('Scheme – Attack', ['Beast / Post','DHO / Get','Iso','PnR Handler','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Pass',   [
+        'Swing','Check Down','Off Screen','1 More','Lift','PnR Pocket','Post Entry','Drift','PnR Lob','Post Pass Out','Kickdown',
+        'PnR Late Roll','Dump Off','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Slash / Cut','Reshape',
+        'Shake','Skip','Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
+      ])
+    ] %}
+    
+    <div class="shot-section">
+    <div id="fg2" class="detail-content hidden">
+      <table class="min-w-full divide-y divide-gray-200 mb-6">
+        <thead class="bg-gray-100">
+          <tr>
+            <th rowspan="2" class="px-4 py-2 text-left">Category</th>
+            <th colspan="4" class="px-4 py-2 text-center">Total</th>
+            <th colspan="4" class="px-4 py-2 text-center">Transition</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half-Court</th>
+          </tr>
+          <tr>
+            {% for _ in range(3) %}
+              <th class="px-2 py-1 text-center">FGA</th>
+              <th class="px-2 py-1 text-center">FG%</th>
+              <th class="px-2 py-1 text-center">PPS</th>
+              <th class="px-2 py-1 text-center">Freq%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for _group_name, cats in fg2_groups %}
+            <tr>
+              <td colspan="13" class="p-0">
+                <div class="h-[2px] bg-[#9E1B32]"></div>
+              </td>
+            </tr>
+            {% for category in cats %}
+              {% set d = fg2_summary.cats.get(category, empty_group) %}
+              <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
+                <td class="px-4 py-2">{{ category }}</td>
+    
+                {# Totals #}
+                <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | grade_atr2fg_pct(d.total.attempts) }}"{% endif %}>
+                  {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg2.attempts > 0 %}
+                    {{ (d.total.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
+                </td>
+    
+                {# Transition #}
+                <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | grade_atr2fg_pct(d.transition.attempts) }}"{% endif %}>
+                  {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg2.attempts > 0 %}
+                    {{ (d.transition.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
+                </td>
+    
+                {# Half-Court #}
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_atr2fg_pct(d.halfcourt.attempts) }}"{% endif %}>
+                  {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg2.attempts > 0 %}
+                    {{ (d.halfcourt.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+
+    {# ── 3FG Detail Table ── #}
+    {% set fg3_groups = [
+      ('Assisted',        ['Assisted','Non-Assisted']),
+      ('Type',            ['Catch and Shoot','Pull Up','Step Back','Catch and Hold','Slide Dribble']),
+      ('Line',            ['On The Line','Off The Line']),
+      ('Pocket',          ['Shot Pocket','Non-Shot Pocket']),
+      ('Move',            ['Stationary','On Move']),
+      ('Contested',       ['Contested','Uncontested','Late Contest','Blocked']),
+      ('Footwork',        ['WTN Left-Right','WTN Right-Left','Left-Right','Right-Left','Hop']),
+      ('Good/Bad',        ['Good','Bad','Neutral Three']),
+      ('Shrink',          ['Shrink','Non-Shrink']),
+      ('Scheme – Attack', ['Beast / Post','DHO / Get','PnR Handler','Iso','Off Closeout','PnR Sneak','Transition Push','OREB Putback']),
+      ('Scheme – Drive',  ['Drive Right','Drive Left','Dip']),
+      ('Scheme – Pass',   [
+        'Swing','Checkdown','Off Screen','1 More','Lift','Drift','Post Entry','Post Pass Out',
+        'Kickdown','Slot Skip','Pocket Extra','Lob','Nail Pitch','DHO / Get','PnR Pop','Reshape','Shake','Skip',
+        'Pull Behind','Outlet','Press Break','Cross Court','Under OB','Kick Ahead','Dagger','Side / Press OB'
+      ])
+    ] %}
+    
+    <div class="shot-section">
+    <div id="fg3" class="detail-content hidden">
+      <table class="min-w-full divide-y divide-gray-200 mb-6">
+        <thead class="bg-gray-100">
+          <tr>
+            <th rowspan="2" class="px-4 py-2 text-left">Category</th>
+            <th colspan="4" class="px-4 py-2 text-center">Total</th>
+            <th colspan="4" class="px-4 py-2 text-center">Transition</th>
+            <th colspan="4" class="px-4 py-2 text-center">Half-Court</th>
+          </tr>
+          <tr>
+            {% for _ in range(3) %}
+              <th class="px-2 py-1 text-center">FGA</th>
+              <th class="px-2 py-1 text-center">FG%</th>
+              <th class="px-2 py-1 text-center">PPS</th>
+              <th class="px-2 py-1 text-center">Freq%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for _group_name, cats in fg3_groups %}
+            <tr>
+              <td colspan="13" class="p-0">
+                <div class="h-[2px] bg-[#9E1B32]"></div>
+              </td>
+            </tr>
+            {% for category in cats %}
+              {% set d = fg3_summary.cats.get(category, empty_group) %}
+              <tr class="{{ loop.cycle('', 'bg-gray-100') }}">
+                <td class="px-4 py-2">{{ category }}</td>
+    
+                {# Totals #}
+                <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | grade_3fg_pct(d.total.attempts) }}"{% endif %}>
+                  {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg3.attempts > 0 %}
+                    {{ (d.total.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
+                </td>
+    
+                {# Transition #}
+                <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | grade_3fg_pct(d.transition.attempts) }}"{% endif %}>
+                  {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg3.attempts > 0 %}
+                    {{ (d.transition.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
+                </td>
+    
+                {# Half-Court #}
+                <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
+                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_3fg_pct(d.halfcourt.attempts) }}"{% endif %}>
+                  {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                </td>
+                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center">
+                  {% if shot_type_totals.fg3.attempts > 0 %}
+                    {{ (d.halfcourt.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
+                  {% else %}0.0%{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </div>
+  </div>
+  <!-- MOBILE SHOT-TYPE PICKER (phones only) -->
+  <div class="sm:hidden" x-data="shotTypeMobile()">
+    <!-- 1️⃣ Top-Level selector -->
+    <div class="mb-3">
+      <select x-model="top" class="w-full border rounded p-2">
+        <option value="atr">ATR</option>
+        <option value="fg2">2FG</option>
+        <option value="fg3">3FG</option>
+      </select>
+    </div>
+
+    <!-- 2️⃣ Sub-Category selector -->
+    <div class="mb-4">
+      <select x-model="sub" class="w-full border rounded p-2">
+        <template x-for="(cats, key) in data" :key="key">
+          <template x-if="key === top">
+            <template x-for="(obj, name) in cats" :key="name">
+              <option :value="name" x-text="name"></option>
+            </template>
+          </template>
+        </template>
+      </select>
+    </div>
+
+    <!-- 3️⃣ Mini-Table for the chosen sub-category -->
+    <div class="border rounded bg-white p-3">
+      <div class="font-medium mb-2" x-text="sub"></div>
+      <table class="w-full text-sm">
+        <tbody>
+          <tr class="border-t">
+            <th class="text-left py-1 px-2">Total</th>
+            <td class="text-right py-1 px-2" x-text="format(data[top][sub].total)"></td>
+          </tr>
+          <tr class="border-t">
+            <th class="text-left py-1 px-2">Transition</th>
+            <td class="text-right py-1 px-2" x-text="format(data[top][sub].transition)"></td>
+          </tr>
+          <tr class="border-t">
+            <th class="text-left py-1 px-2">Half-Court</th>
+            <td class="text-right py-1 px-2" x-text="format(data[top][sub].halfcourt)"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div id="fg3" class="detail-content hidden">
-    <table class="min-w-full text-sm full-table">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="px-2 py-1">Class</th>
-          <th class="px-2 py-1">Result</th>
-          <th class="px-2 py-1">Location</th>
-          <th class="px-2 py-1">Possession</th>
-          <th class="px-2 py-1">Assisted</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in shot_data_fg3 %}
-        <tr>
-          <td class="px-2 py-1 text-center">{{ s.shot_class }}</td>
-          <td class="px-2 py-1 text-center">{{ s.result }}</td>
-          <td class="px-2 py-1">{{ s.shot_location }}</td>
-          <td class="px-2 py-1">{{ s.possession_type }}</td>
-          <td class="px-2 py-1">{{ s.assisted }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+  <script>
+  function shotTypeMobile(){
+    return {
+      top: 'atr',
+      sub: Object.keys(shot_summaries.atr.cats)[0],
+      data: {
+        atr: {{ shot_summaries['atr'].cats | tojson }},
+        fg2: {{ shot_summaries['fg2'].cats | tojson }},
+        fg3: {{ shot_summaries['fg3'].cats | tojson }},
+      },
+      format(obj) {
+        let pct = (obj.fg_pct*100).toFixed(1) + '%';
+        return `${obj.makes}-${obj.attempts} • ${pct} • ${obj.pps.toFixed(2)} • ${(obj.attempts/ shot_type_totals[this.top].attempts*100).toFixed(1)}%`;
+      }
+    }
+  }
+  </script>
+</div>  <!-- closes <div id="shotType"> -->
