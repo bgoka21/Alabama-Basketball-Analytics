@@ -26,6 +26,12 @@ class Recruit(db.Model):
     notes             = Column(Text)
     created_at        = Column(DateTime, default=datetime.utcnow)
     updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_updated      = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
     shot_type_stats = relationship(
         "RecruitShotTypeStat",
