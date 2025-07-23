@@ -2,11 +2,9 @@ import os
 import json
 from flask import render_template, request, redirect, url_for, flash, current_app
 from datetime import date
-from werkzeug.utils import secure_filename
 from flask_login import current_user
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
-from parse_recruits_csv import parse_recruits_csv
 from . import recruits_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from flask import current_app
@@ -114,16 +112,6 @@ def detail_recruit(id):
     return render_template('recruits/detail.html', recruit=r, stat=latest_stat, shot_data=shot_data, totals=totals)
 
 
-@recruits_bp.route('/<int:id>/upload', methods=['POST'])
-def upload_csv(id):
-    file = request.files['csv_file']
-    filename = secure_filename(file.filename)
-    path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'recruits', filename)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    file.save(path)
-    parse_recruits_csv(path, id)
-    flash('Shot-type CSV parsed and saved.', 'success')
-    return redirect(url_for('recruits.detail_recruit', id=id))
 
 
 @recruits_bp.route('/<int:id>/top_schools', methods=['POST'])

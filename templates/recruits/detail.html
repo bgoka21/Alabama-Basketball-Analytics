@@ -24,11 +24,6 @@
   {% include "partials/shot_type_cards.html" with context %}
   {% include "partials/shot_type_tables.html" with context %}
 
-  <h3 class="text-xl font-semibold mt-8 mb-2">Upload Shot-Type CSV</h3>
-  <form action="{{ url_for('recruits.upload_csv', id=recruit.id) }}" method="post" enctype="multipart/form-data" class="mb-6 space-y-2">
-    <input type="file" name="csv_file" accept=".csv" required class="block">
-    <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Upload</button>
-  </form>
 
   <h3 class="text-xl font-semibold mb-2">Top Schools</h3>
   <ul class="mb-4 space-y-1">
