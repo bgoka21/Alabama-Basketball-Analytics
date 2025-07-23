@@ -1,6 +1,7 @@
 import os
 import json
 from flask import render_template, request, redirect, url_for, flash, current_app
+from datetime import date
 from werkzeug.utils import secure_filename
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
@@ -17,24 +18,26 @@ def list_recruits():
 @recruits_bp.route('/new', methods=['GET', 'POST'])
 def new_recruit():
     if request.method == 'POST':
+        offer_date_str = request.form.get("offer_date")
+        commit_date_str = request.form.get("commit_date")
         r = Recruit(
-            name=request.form['name'],
-            graduation_year=request.form.get('graduation_year'),
-            position=request.form.get('position'),
-            height=request.form.get('height'),
-            weight=request.form.get('weight'),
-            high_school=request.form.get('high_school'),
-            hometown=request.form.get('hometown'),
-            rating=request.form.get('rating'),
-            ranking=request.form.get('ranking'),
-            camp_performance=request.form.get('camp_performance'),
-            offer_status=request.form.get('offer_status'),
-            offer_date=request.form.get('offer_date'),
-            commit_date=request.form.get('commit_date'),
-            email=request.form.get('email'),
-            phone=request.form.get('phone'),
-            profile_image_url=request.form.get('profile_image_url'),
-            notes=request.form.get('notes'),
+            name=request.form["name"],
+            graduation_year=request.form.get("graduation_year"),
+            position=request.form.get("position"),
+            height=request.form.get("height"),
+            weight=request.form.get("weight"),
+            high_school=request.form.get("high_school"),
+            hometown=request.form.get("hometown"),
+            rating=request.form.get("rating"),
+            ranking=request.form.get("ranking"),
+            camp_performance=request.form.get("camp_performance"),
+            offer_status=request.form.get("offer_status"),
+            offer_date=date.fromisoformat(offer_date_str) if offer_date_str else None,
+            commit_date=date.fromisoformat(commit_date_str) if commit_date_str else None,
+            email=request.form.get("email"),
+            phone=request.form.get("phone"),
+            profile_image_url=request.form.get("profile_image_url"),
+            notes=request.form.get("notes"),
         )
         db.session.add(r)
         db.session.commit()
