@@ -6,7 +6,7 @@ from .database import db
 class Recruit(db.Model):
     __tablename__ = "recruit"
     id                = Column(Integer, primary_key=True)
-    school            = Column(String(128), nullable=False, default="")
+    school            = Column(String(128), nullable=True, default="")  # legacy, ignored by form
     name              = Column(String(128), nullable=False)
     graduation_year   = Column(Integer)
     position          = Column(String(32))

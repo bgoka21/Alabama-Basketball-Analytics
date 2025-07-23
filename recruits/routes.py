@@ -46,7 +46,6 @@ def new_recruit():
                 return None
 
         r = Recruit(
-            school=request.form.get("school", ""),
             name=request.form["name"],
             graduation_year=_parse_int("graduation_year"),
             position=request.form.get("position"),
@@ -66,6 +65,19 @@ def new_recruit():
             notes=request.form.get("notes"),
         )
         db.session.add(r)
+        db.session.flush()
+
+        for idx, school_name in enumerate(request.form.getlist('top_schools'), start=1):
+            school_name = school_name.strip()
+            if not school_name:
+                continue
+            ts = RecruitTopSchool(
+                recruit_id=r.id,
+                school_name=school_name,
+                rank=idx
+            )
+            db.session.add(ts)
+
         db.session.commit()
         return redirect(url_for('recruits.list_recruits'))
     return render_template('recruits/new.html')
