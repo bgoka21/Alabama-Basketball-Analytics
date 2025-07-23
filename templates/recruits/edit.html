@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Edit Recruit</h1>
+<form method="post">
+  <input name="name" placeholder="Name" value="{{ recruit.name }}" required><br>
+  <input name="graduation_year" placeholder="Graduation Year" value="{{ recruit.graduation_year or '' }}"><br>
+  <input name="position" placeholder="Position" value="{{ recruit.position or '' }}"><br>
+  <input name="height" placeholder="Height" value="{{ recruit.height or '' }}"><br>
+  <input name="weight" placeholder="Weight" type="number" value="{{ recruit.weight or '' }}"><br>
+  <input name="high_school" placeholder="High School" value="{{ recruit.high_school or '' }}"><br>
+  <input name="hometown" placeholder="Hometown" value="{{ recruit.hometown or '' }}"><br>
+  <input name="rating" placeholder="Rating" type="number" value="{{ recruit.rating or '' }}"><br>
+  <input name="ranking" placeholder="Ranking" type="number" value="{{ recruit.ranking or '' }}"><br>
+  <textarea name="camp_performance" placeholder="Camp Performance">{{ recruit.camp_performance or '' }}</textarea><br>
+  <input name="offer_status" placeholder="Offer Status" value="{{ recruit.offer_status or '' }}"><br>
+  <input name="offer_date" placeholder="Offer Date" type="date" value="{{ recruit.offer_date or '' }}"><br>
+  <input name="commit_date" placeholder="Commit Date" type="date" value="{{ recruit.commit_date or '' }}"><br>
+  <input name="email" placeholder="Email" value="{{ recruit.email or '' }}"><br>
+  <input name="phone" placeholder="Phone" value="{{ recruit.phone or '' }}"><br>
+  <input name="profile_image_url" placeholder="Profile Image URL" value="{{ recruit.profile_image_url or '' }}"><br>
+  <textarea name="notes" placeholder="Notes">{{ recruit.notes or '' }}</textarea><br>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

@@ -128,3 +128,47 @@ def delete_school(id, school_id):
     db.session.delete(s)
     db.session.commit()
     return redirect(url_for('recruits.detail_recruit', id=id))
+
+@recruits_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+def edit_recruit(id):
+    r = Recruit.query.get_or_404(id)
+    if request.method == 'POST':
+        offer_date_str = request.form.get("offer_date")
+        commit_date_str = request.form.get("commit_date")
+
+        def _parse_int(field_name):
+            value = request.form.get(field_name)
+            try:
+                return int(value) if value not in (None, "") else None
+            except ValueError:
+                return None
+
+        r.name = request.form.get("name", r.name)
+        r.graduation_year = _parse_int("graduation_year")
+        r.position = request.form.get("position")
+        r.height = request.form.get("height")
+        r.weight = _parse_int("weight")
+        r.high_school = request.form.get("high_school")
+        r.hometown = request.form.get("hometown")
+        r.rating = _parse_int("rating")
+        r.ranking = _parse_int("ranking")
+        r.camp_performance = request.form.get("camp_performance")
+        r.offer_status = request.form.get("offer_status")
+        r.offer_date = date.fromisoformat(offer_date_str) if offer_date_str else None
+        r.commit_date = date.fromisoformat(commit_date_str) if commit_date_str else None
+        r.email = request.form.get("email")
+        r.phone = request.form.get("phone")
+        r.profile_image_url = request.form.get("profile_image_url")
+        r.notes = request.form.get("notes")
+        db.session.commit()
+        return redirect(url_for('recruits.detail_recruit', id=id))
+    return render_template('recruits/edit.html', recruit=r)
+
+
+@recruits_bp.route('/<int:id>/delete', methods=['POST'])
+def delete_recruit(id):
+    r = Recruit.query.get_or_404(id)
+    db.session.delete(r)
+    db.session.commit()
+    flash('Recruit deleted.', 'success')
+    return redirect(url_for('recruits.list_recruits'))
