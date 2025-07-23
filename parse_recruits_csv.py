@@ -33,7 +33,7 @@ def parse_recruits_csv(csv_path, recruit_id):
                     continue
 
                 # core fields
-                shot_key = m.group(1).lower().replace("2fg","fg2").replace("3fg","fg3")
+                shot_key = m.group(1).lower()
                 shot = {
                     "event":           "shot_attempt",
                     "shot_class":      shot_key,
