@@ -1,5 +1,5 @@
 import os
-from flask import Flask, redirect, url_for, render_template, request
+from flask import Flask, redirect, url_for, render_template, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
@@ -11,6 +11,7 @@ from models.database import db, PageView
 from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
+from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 
 scheduler = APScheduler()
 
@@ -158,6 +159,15 @@ def create_app():
     # Ensure all tables exist when the application starts
     with app.app_context():
         db.create_all()
+
+    @app.before_request
+    def restrict_player_routes():
+        if request.endpoint in ('static', None):
+            return
+        if current_user.is_authenticated and current_user.is_player:
+            if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
+                flash('You do not have permission to view that page.', 'error')
+                return redirect(url_for('public.homepage'))
 
     @app.before_request
     def log_page_view():
