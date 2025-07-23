@@ -6,9 +6,11 @@ from flask_login import LoginManager
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from models.database import db
+from models.database import db, Season
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
+from models.uploaded_file import UploadedFile
 from models.user import User
+from werkzeug.security import generate_password_hash
 from recruits import recruits_bp
 from admin.routes import admin_bp
 
@@ -39,6 +41,10 @@ def app(tmp_path):
     app.jinja_env.globals['current_user'] = DummyUser()
     with app.app_context():
         db.create_all()
+        season = Season(id=1, season_name='2024')
+        admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
+        db.session.add_all([season, admin])
+        db.session.commit()
     yield app
     with app.app_context():
         db.drop_all()
@@ -46,7 +52,9 @@ def app(tmp_path):
 
 @pytest.fixture
 def client(app):
-    return app.test_client()
+    with app.test_client() as client:
+        client.post('/admin/login', data={'username': 'admin', 'password': 'pw'})
+        yield client
 
 
 def test_create_upload_and_delete_school(client, app, tmp_path):
@@ -57,12 +65,22 @@ def test_create_upload_and_delete_school(client, app, tmp_path):
         recruit = Recruit.query.filter_by(name='John Doe').first()
         rid = recruit.id
 
-    # upload csv
+    # upload csv via admin dashboard
     csv_path = tmp_path / 'r.csv'
     csv_path.write_text('Row,POSSESSION TYPE,Shot Location,John Doe\nJohn Doe,Halfcourt,Wing,"ATR+"\n')
     with csv_path.open('rb') as f:
-        resp = client.post(f'/recruits/{rid}/upload', data={'csv_file': (f, 'r.csv')})
+        resp = client.post('/admin/upload', data={
+            'file': (f, 'r.csv'),
+            'file_date': '2024-01-01',
+            'category': 'Recruit',
+            'season_id': 1,
+            'recruit_id': rid
+        })
     assert resp.status_code == 302
+    with app.app_context():
+        uf = UploadedFile.query.filter_by(filename='r.csv').first()
+        fid = uf.id
+    client.post(f'/admin/parse/{fid}')
     with app.app_context():
         stat = RecruitShotTypeStat.query.filter_by(recruit_id=rid).first()
         assert stat is not None

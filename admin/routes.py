@@ -36,6 +36,7 @@ from models.database import (
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
+from models.recruit import Recruit, RecruitShotTypeStat
 from models.user import User
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.orm import aliased
@@ -44,6 +45,7 @@ from utils.skill_config import shot_map, label_map
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
+from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 
 # --- Helper Functions at the top ---
@@ -767,6 +769,8 @@ def dashboard():
         .all()
     )
 
+    recruits = Recruit.query.order_by(Recruit.name).all()
+
     # 1c) fetch seasons for dropdown
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
@@ -775,6 +779,7 @@ def dashboard():
         uploaded_files  = uploaded_files,
         all_seasons     = all_seasons,
         selected_season = sid,
+        recruits        = recruits,
         active_page     = 'dashboard'
     )
 
@@ -887,8 +892,13 @@ def upload_file():
         return redirect(url_for('admin.dashboard'))
 
     category     = request.form.get('category')
+    recruit_id   = request.form.get('recruit_id', type=int)
     season_id    = request.form.get('season_id', type=int)
     file_date_str = request.form.get('file_date')   # <-- new
+
+    if category == 'Recruit' and not recruit_id:
+        flash('Please select a recruit for this file.', 'error')
+        return redirect(url_for('admin.dashboard', season_id=season_id))
 
     # parse the incoming YYYY-MM-DD string into a date object
     try:
@@ -908,7 +918,8 @@ def upload_file():
                 parse_status = 'Not Parsed',
                 category     = category,
                 season_id    = season_id,
-                file_date    = file_date    # <-- newly stored
+                file_date    = file_date,
+                recruit_id   = recruit_id if category == 'Recruit' else None
             )
             db.session.add(new_upload)
 
@@ -994,6 +1005,16 @@ def parse_file(file_id):
                         practice_id=practice.id,
                         season_id=season_id)
             )
+
+        # RECRUIT branch
+        elif uploaded_file.category == 'Recruit':
+            parse_recruits_csv(upload_path, uploaded_file.recruit_id)
+            uploaded_file.parse_status = 'Parsed Successfully'
+            uploaded_file.last_parsed = datetime.utcnow()
+            db.session.commit()
+
+            flash('Recruit file parsed successfully!', 'success')
+            return redirect(url_for('recruits.detail_recruit', id=uploaded_file.recruit_id))
 
         # GAME branch
         else:
@@ -1103,6 +1124,14 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     return practice.id, season_id
 
 
+def _reparse_uploaded_recruit(uploaded_file, upload_path):
+    parse_recruits_csv(upload_path, uploaded_file.recruit_id)
+    uploaded_file.parse_status = 'Parsed Successfully'
+    uploaded_file.last_parsed = datetime.utcnow()
+    db.session.commit()
+    return uploaded_file.recruit_id
+
+
 @admin_bp.route('/reparse/<int:file_id>', methods=['POST'])
 @admin_required
 def reparse_file(file_id):
@@ -1122,6 +1151,11 @@ def reparse_file(file_id):
             return redirect(
                 url_for('admin.edit_practice', practice_id=practice_id, season_id=season_id)
             )
+
+        if uploaded_file.category == 'Recruit':
+            rid = _reparse_uploaded_recruit(uploaded_file, upload_path)
+            flash('Recruit file re-parsed successfully!', 'success')
+            return redirect(url_for('recruits.detail_recruit', id=rid))
 
         flash('Reparse not supported for this file type.', 'error')
         return redirect(url_for('admin.files_view_unique'))
@@ -1166,10 +1200,11 @@ def delete_data(file_id):
     uploaded_file = UploadedFile.query.get_or_404(file_id)
     filename = uploaded_file.filename
 
-    # Determine if this was a practice or a game
+    # Determine if this was a practice, recruit, or a game
     is_practice = uploaded_file.category in [
         'Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices'
     ]
+    is_recruit = uploaded_file.category == 'Recruit'
 
     if is_practice:
         practice = Practice.query.filter_by(
@@ -1187,6 +1222,8 @@ def delete_data(file_id):
                 PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
             Possession.query.filter_by(practice_id=practice.id).delete()
             db.session.delete(practice)
+    elif is_recruit:
+        RecruitShotTypeStat.query.filter_by(recruit_id=uploaded_file.recruit_id).delete()
     else:
         game = Game.query.filter_by(csv_filename=filename).first()
         if game:
@@ -1244,9 +1281,13 @@ def bulk_action_view():
         count = 0
         for file in files:
             path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
-            if os.path.exists(path) and file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
-                _reparse_uploaded_practice(file, path)
-                count += 1
+            if os.path.exists(path):
+                if file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
+                    _reparse_uploaded_practice(file, path)
+                    count += 1
+                elif file.category == 'Recruit':
+                    _reparse_uploaded_recruit(file, path)
+                    count += 1
         flash(f"Re-parsed {count} files.", "success")
 
     return redirect(url_for('admin.files_view_unique'))

@@ -7,6 +7,7 @@ class UploadedFile(db.Model):
 
     id             = db.Column(db.Integer, primary_key=True)
     season_id      = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
+    recruit_id     = db.Column(db.Integer, db.ForeignKey('recruit.id'), nullable=True)
     filename       = db.Column(db.String(255), nullable=False)
     upload_date    = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -21,6 +22,7 @@ class UploadedFile(db.Model):
 
     # relationship back to Season
     season         = db.relationship('Season', backref=db.backref('uploaded_files', lazy=True))
+    recruit        = db.relationship('Recruit', backref=db.backref('uploaded_files', lazy=True))
 
     # Breakdown data stored as JSON strings
     offensive_breakdown = db.Column(db.Text, nullable=True)
