@@ -740,7 +740,7 @@ def login():
                 return redirect(url_for('admin.dashboard'))
             elif user.is_player:
                 if user.player_name:
-                    return redirect(url_for('player_view', player_name=user.player_name))
+                    return redirect(url_for('admin.player_detail', player_name=user.player_name))
                 return redirect(url_for('public.homepage'))
             else:
                 return redirect(url_for('public.root'))

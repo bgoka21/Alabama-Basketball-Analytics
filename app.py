@@ -168,7 +168,7 @@ def create_app():
             if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
                 flash('You do not have permission to view that page.', 'error')
                 if current_user.player_name:
-                    target = url_for('player_view', player_name=current_user.player_name)
+                    target = url_for('admin.player_detail', player_name=current_user.player_name)
                 else:
                     target = url_for('public.homepage')
                 return redirect(target)
