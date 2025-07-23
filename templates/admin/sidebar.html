@@ -5,15 +5,6 @@
       Home
     </a>
   </li>
-  {# Recruits page temporarily hidden #}
-  {#
-  {% set recruits_url = url_for('synergy_stats_page') if view_exists('synergy_stats_page') else '#' %}
-  <li class="nav-item{% if request.endpoint == 'synergy_stats_page' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ recruits_url }}">
-      Recruits
-    </a>
-  </li>
-  #}
   {% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports'] %}
   <li class="nav-item">
     <details class="group" {% if reports_active %}open{% endif %}>
