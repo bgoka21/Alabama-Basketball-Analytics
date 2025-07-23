@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import pytest
 from flask import Flask
+from flask_login import LoginManager
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -9,6 +10,7 @@ from models.database import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from models.user import User
 from recruits import recruits_bp
+from admin.routes import admin_bp
 
 
 @pytest.fixture
@@ -20,7 +22,21 @@ def app(tmp_path):
     app.config['TESTING'] = True
     app.config['UPLOAD_FOLDER'] = str(tmp_path)
     db.init_app(app)
+    lm = LoginManager()
+    lm.init_app(app)
+    lm.login_view = 'admin.login'
+
+    @lm.user_loader
+    def load_user(uid):
+        return db.session.get(User, int(uid))
+
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(recruits_bp, url_prefix='/recruits')
+    app.jinja_env.globals['view_exists'] = lambda n: n in app.view_functions
+    class DummyUser:
+        is_authenticated = False
+        is_player = False
+    app.jinja_env.globals['current_user'] = DummyUser()
     with app.app_context():
         db.create_all()
     yield app
@@ -82,3 +98,29 @@ def test_blank_numeric_fields(client, app):
         assert recruit.weight is None
         assert recruit.rating is None
         assert recruit.ranking is None
+
+def test_edit_and_delete_recruit(client, app):
+    # create recruit
+    resp = client.post('/recruits/new', data={'name': 'Edit Me', 'graduation_year': '2024'})
+    assert resp.status_code == 302
+    with app.app_context():
+        rec = Recruit.query.filter_by(name='Edit Me').first()
+        rid = rec.id
+
+    # GET edit form
+    resp = client.get(f'/recruits/{rid}/edit')
+    assert resp.status_code == 200
+
+    # POST edit
+    resp = client.post(f'/recruits/{rid}/edit', data={'name': 'Edited', 'graduation_year': '2025'})
+    assert resp.status_code == 302
+    with app.app_context():
+        rec = Recruit.query.get(rid)
+        assert rec.name == 'Edited'
+        assert rec.graduation_year == 2025
+
+    # delete
+    resp = client.post(f'/recruits/{rid}/delete')
+    assert resp.status_code == 302
+    with app.app_context():
+        assert Recruit.query.get(rid) is None
