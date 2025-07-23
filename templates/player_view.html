@@ -6,19 +6,50 @@
   </div>
 
   <h3 class="mt-6">On-Court Offensive Possessions &amp; Efficiency</h3>
-  <div class="overflow-x-auto">
-  <table class="table-auto w-full">
-  <tr><td>Possessions</td><td>{{ offensive_possessions }}</td></tr>
-  <tr><td>PPP (On-court)</td><td>{{ ppp_on }}</td></tr>
-  <tr><td>PPP (Off-court)</td><td>{{ ppp_off }}</td></tr>
-  <tr><td>EFG%</td><td>{{ efg_on }}%</td></tr>
-  <tr><td>ATR%</td><td>{{ atr_pct }}%</td></tr>
-  <tr><td>2FG%</td><td>{{ two_fg_pct }}%</td></tr>
-  <tr><td>3FG%</td><td>{{ three_fg_pct }}%</td></tr>
-  <tr><td>Turnover Rate</td><td>{{ turnover_rate }}%</td></tr>
-  <tr><td>Off-Reb Rate</td><td>{{ off_reb_rate }}%</td></tr>
-  <tr><td>Fouls-Drawn Rate</td><td>{{ fouls_drawn_rate }}%</td></tr>
-  </table>
+
+  <div class="sm:hidden space-y-6">
+    {% for category in shot_type_categories %}
+      <div class="border rounded-lg p-4 bg-white">
+        <h4 class="text-lg font-semibold mb-2">{{ category.name }}</h4>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr class="border-t border-gray-200">
+              <th class="text-left py-2 px-3">Total</th>
+              <td class="text-right py-2 px-3">
+                {{ category.total.fga }} ● {{ category.total.fg_pct }} ● {{ category.total.pps }} ● {{ category.total.freq_pct }}
+              </td>
+            </tr>
+            <tr class="border-t border-gray-200">
+              <th class="text-left py-2 px-3">Transition</th>
+              <td class="text-right py-2 px-3">
+                {{ category.transition.fga }} ● {{ category.transition.fg_pct }} ● {{ category.transition.pps }} ● {{ category.transition.freq_pct }}
+              </td>
+            </tr>
+            <tr class="border-t border-gray-200">
+              <th class="text-left py-2 px-3">Half-Court</th>
+              <td class="text-right py-2 px-3">
+                {{ category.half_court.fga }} ● {{ category.half_court.fg_pct }} ● {{ category.half_court.pps }} ● {{ category.half_court.freq_pct }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="hidden sm:block overflow-x-auto">
+    <table class="table-auto w-full">
+    <tr><td>Possessions</td><td>{{ offensive_possessions }}</td></tr>
+    <tr><td>PPP (On-court)</td><td>{{ ppp_on }}</td></tr>
+    <tr><td>PPP (Off-court)</td><td>{{ ppp_off }}</td></tr>
+    <tr><td>EFG%</td><td>{{ efg_on }}%</td></tr>
+    <tr><td>ATR%</td><td>{{ atr_pct }}%</td></tr>
+    <tr><td>2FG%</td><td>{{ two_fg_pct }}%</td></tr>
+    <tr><td>3FG%</td><td>{{ three_fg_pct }}%</td></tr>
+    <tr><td>Turnover Rate</td><td>{{ turnover_rate }}%</td></tr>
+    <tr><td>Off-Reb Rate</td><td>{{ off_reb_rate }}%</td></tr>
+    <tr><td>Fouls-Drawn Rate</td><td>{{ fouls_drawn_rate }}%</td></tr>
+    </table>
   </div>
 </div>
 {% endblock %}
