@@ -787,9 +787,52 @@
     </div>
   </div>
   </div>
+  <!-- MOBILE SHOT-TYPE PICKER (phones only) -->
   <div class="sm:hidden" x-data="shotTypeMobile()">
-    <!-- exactly the snippet above, including the two <select>s and mini-table -->
+    <!-- 1️⃣ Top-Level selector -->
+    <div class="mb-3">
+      <select x-model="top" class="w-full border rounded p-2">
+        <option value="atr">ATR</option>
+        <option value="fg2">2FG</option>
+        <option value="fg3">3FG</option>
+      </select>
+    </div>
+
+    <!-- 2️⃣ Sub-Category selector -->
+    <div class="mb-4">
+      <select x-model="sub" class="w-full border rounded p-2">
+        <template x-for="(cats, key) in data" :key="key">
+          <template x-if="key === top">
+            <template x-for="(obj, name) in cats" :key="name">
+              <option :value="name" x-text="name"></option>
+            </template>
+          </template>
+        </template>
+      </select>
+    </div>
+
+    <!-- 3️⃣ Mini-Table for the chosen sub-category -->
+    <div class="border rounded bg-white p-3">
+      <div class="font-medium mb-2" x-text="sub"></div>
+      <table class="w-full text-sm">
+        <tbody>
+          <tr class="border-t">
+            <th class="text-left py-1 px-2">Total</th>
+            <td class="text-right py-1 px-2" x-text="format(data[top][sub].total)"></td>
+          </tr>
+          <tr class="border-t">
+            <th class="text-left py-1 px-2">Transition</th>
+            <td class="text-right py-1 px-2" x-text="format(data[top][sub].transition)"></td>
+          </tr>
+          <tr class="border-t">
+            <th class="text-left py-1 px-2">Half-Court</th>
+            <td class="text-right py-1 px-2" x-text="format(data[top][sub].halfcourt)"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
+
   <script>
   function shotTypeMobile(){
     return {
@@ -801,8 +844,8 @@
         fg3: {{ shot_summaries['fg3'].cats | tojson }},
       },
       format(obj) {
-        let pct = (obj.fg_pct*100).toFixed(1)+'%';
-        return `${obj.makes}-${obj.attempts} • ${pct} • ${obj.pps.toFixed(2)} • ${(obj.attempts / shot_type_totals[this.top].attempts*100).toFixed(1)}%`;
+        let pct = (obj.fg_pct*100).toFixed(1) + '%';
+        return `${obj.makes}-${obj.attempts} • ${pct} • ${obj.pps.toFixed(2)} • ${(obj.attempts/ shot_type_totals[this.top].attempts*100).toFixed(1)}%`;
       }
     }
   }
