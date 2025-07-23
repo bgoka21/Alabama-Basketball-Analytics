@@ -20,16 +20,24 @@ def new_recruit():
     if request.method == 'POST':
         offer_date_str = request.form.get("offer_date")
         commit_date_str = request.form.get("commit_date")
+
+        def _parse_int(field_name):
+            value = request.form.get(field_name)
+            try:
+                return int(value) if value not in (None, "") else None
+            except ValueError:
+                return None
+
         r = Recruit(
             name=request.form["name"],
-            graduation_year=request.form.get("graduation_year"),
+            graduation_year=_parse_int("graduation_year"),
             position=request.form.get("position"),
             height=request.form.get("height"),
-            weight=request.form.get("weight"),
+            weight=_parse_int("weight"),
             high_school=request.form.get("high_school"),
             hometown=request.form.get("hometown"),
-            rating=request.form.get("rating"),
-            ranking=request.form.get("ranking"),
+            rating=_parse_int("rating"),
+            ranking=_parse_int("ranking"),
             camp_performance=request.form.get("camp_performance"),
             offer_status=request.form.get("offer_status"),
             offer_date=date.fromisoformat(offer_date_str) if offer_date_str else None,
