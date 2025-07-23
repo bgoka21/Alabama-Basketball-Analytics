@@ -1,14 +1,17 @@
+import pytest
 from datetime import date
 from pathlib import Path
-import pytest
-from flask import Flask
-from flask_login import LoginManager
+from flask import Flask, request, redirect, url_for
+from flask_login import LoginManager, current_user
 from werkzeug.security import generate_password_hash
 
-from models.database import db, Season, Roster, SkillEntry
+from models.database import db, Season, Roster
 from models.user import User
-from public.routes import public_bp
 from admin.routes import admin_bp
+from public.routes import public_bp
+from recruits import recruits_bp
+from utils.auth import PLAYER_ALLOWED_ENDPOINTS
+
 
 @pytest.fixture
 def app():
@@ -27,9 +30,7 @@ def app():
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(public_bp)
-    from utils.auth import PLAYER_ALLOWED_ENDPOINTS
-    from flask import request, redirect, url_for
-    from flask_login import current_user
+    app.register_blueprint(recruits_bp, url_prefix='/recruits')
 
     @app.before_request
     def restrict_player():
@@ -42,9 +43,8 @@ def app():
     with app.app_context():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024,1,1))
-        db.session.add(season)
         roster = Roster(id=1, season_id=1, player_name='Test Player')
-        db.session.add(roster)
+        db.session.add_all([season, roster])
         player = User(username='player', password_hash=generate_password_hash('pw'), is_player=True, player_name='Test Player')
         db.session.add(player)
         db.session.commit()
@@ -52,15 +52,19 @@ def app():
     with app.app_context():
         db.drop_all()
 
+
 @pytest.fixture
 def client(app):
     with app.test_client() as c:
-        c.post('/admin/login', data={'username':'player','password':'pw'})
+        c.post('/admin/login', data={'username': 'player', 'password': 'pw'})
         yield c
 
-def test_player_adds_nba100_entry(client, app):
-    resp = client.post('/nba100', data={'date':'2024-01-10','makes':'80'})
+
+def test_recruit_routes_blocked(client):
+    resp = client.get('/recruits/')
     assert resp.status_code == 302
-    with app.app_context():
-        entry = SkillEntry.query.filter_by(skill_name='NBA 100', value=80).first()
-        assert entry is None
+
+
+def test_other_route_blocked(client):
+    resp = client.get('/admin/dashboard')
+    assert resp.status_code == 302

@@ -3,10 +3,23 @@ import json
 from flask import render_template, request, redirect, url_for, flash, current_app
 from datetime import date
 from werkzeug.utils import secure_filename
+from flask_login import current_user
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from parse_recruits_csv import parse_recruits_csv
 from . import recruits_bp
+from utils.auth import PLAYER_ALLOWED_ENDPOINTS
+from flask import current_app
+
+
+@recruits_bp.before_request
+def recruits_before_request():
+    if not hasattr(current_app, 'login_manager'):
+        return
+    if current_user.is_authenticated and current_user.is_player:
+        if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
+            flash('You do not have permission to view that page.', 'error')
+            return redirect(url_for('public.homepage'))
 
 
 @recruits_bp.route('/')

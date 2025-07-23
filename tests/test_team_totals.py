@@ -30,6 +30,17 @@ def app():
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(public_bp)
+    from utils.auth import PLAYER_ALLOWED_ENDPOINTS
+    from flask import request, redirect, url_for
+    from flask_login import current_user
+
+    @app.before_request
+    def restrict_player():
+        if request.endpoint in ('static', None):
+            return
+        if current_user.is_authenticated and current_user.is_player:
+            if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
+                return redirect(url_for('public.homepage'))
     with app.app_context():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024, 1, 1))

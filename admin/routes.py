@@ -720,23 +720,6 @@ def admin_bp_before_request():
         flash("You do not have permission to view that page.", "error")
         return redirect(url_for('admin.login'))
 
-    # Limit players to their own page and logout
-    if current_user.is_player:
-        allowed = {
-            'admin.player_detail',
-            'admin.logout',
-            'admin.edit_skill_entry',
-            'admin.delete_skill_entry',
-        }
-        if request.endpoint not in allowed:
-            flash("You do not have permission to view that page.", "error")
-            return redirect(url_for('public.practice_homepage'))
-        if request.endpoint == 'admin.player_detail':
-            player_name = request.view_args.get('player_name') if request.view_args else None
-            if player_name != current_user.player_name:
-                flash("You do not have permission to view that page.", "error")
-                return redirect(url_for('public.practice_homepage'))
-
     # Everything else under admin_bp (e.g. game_reports, game_stats, players_list, player_shot_type, etc.)
     # is now only gated by login_required (via this before_request), not by admin status.
 

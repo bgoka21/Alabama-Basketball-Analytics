@@ -69,11 +69,6 @@ def public_bp_before_request():
         return
     if not current_user.is_authenticated:
         return redirect(url_for('admin.login'))
-    if current_user.is_player:
-        allowed = {'public.practice_homepage', 'public.homepage'}
-        if request.endpoint not in allowed:
-            flash('You do not have permission to view that page.', 'error')
-            return redirect(url_for('public.homepage'))
 
 
 # ───────────────────────────────────────────────
