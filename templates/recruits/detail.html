@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ recruit.name }} (Class of {{ recruit.graduation_year }})</h1>
+
+{% include "partials/shot_type_cards.html" with context %}
+{% include "partials/shot_type_tables.html" with context %}
+
+<h3>Upload Shot-Type CSV</h3>
+<form action="{{ url_for('recruits.upload_csv', id=recruit.id) }}" method="post" enctype="multipart/form-data">
+  <input type="file" name="csv_file" accept=".csv" required>
+  <button type="submit">Upload</button>
+</form>
+
+<h3>Top Schools</h3>
+<ul>
+  {% for s in recruit.top_schools %}
+    <li>{{ s.rank }}. {{ s.school_name }}
+      <form action="{{ url_for('recruits.delete_school', id=recruit.id, school_id=s.id) }}" method="post" style="display:inline;">
+        <button type="submit">×</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+<form action="{{ url_for('recruits.add_school', id=recruit.id) }}" method="post">
+  <input name="school_name" placeholder="New School" required>
+  <input name="rank" type="number" placeholder="Rank" min="1">
+  <button type="submit">Add School</button>
+</form>
+
+{% endblock %}

@@ -29,6 +29,12 @@
       Players
     </a>
   </li>
+  {% set recruit_url = url_for('recruits.list_recruits') if view_exists('recruits.list_recruits') else '#' %}
+  <li class="nav-item{% if request.endpoint and request.endpoint.startswith('recruits.') %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ recruit_url }}">
+      Recruits
+    </a>
+  </li>
   <li class="nav-item{% if request.endpoint == 'admin.skill_totals' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.skill_totals') }}">
       Skill Totals

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Recruits</h1>
+<a href="{{ url_for('recruits.new_recruit') }}" class="btn">Add Recruit</a>
+<table>
+  <tr><th>Name</th><th>Grad Year</th><th>Position</th></tr>
+  {% for r in recruits %}
+    <tr>
+      <td><a href="{{ url_for('recruits.detail_recruit', id=r.id) }}">{{ r.name }}</a></td>
+      <td>{{ r.graduation_year }}</td>
+      <td>{{ r.position }}</td>
+    </tr>
+  {% endfor %}
+</table>
+{% endblock %}
