@@ -392,67 +392,40 @@
     </div>
   </div>
   </div>
-  <!-- MOBILE SHOT-TYPE PICKER (phones only) -->
-  <div class="sm:hidden" x-data="shotTypeMobile()">
-    <!-- 1️⃣ Top-Level selector -->
-    <div class="mb-3">
-      <select x-model="top" class="w-full border rounded p-2">
-        <option value="atr">ATR</option>
-        <option value="fg2">2FG</option>
-        <option value="fg3">3FG</option>
-      </select>
-    </div>
-
-    <!-- 2️⃣ Sub-Category selector -->
-    <div class="mb-4">
-      <select x-model="sub" class="w-full border rounded p-2">
-        <template x-for="(cats, key) in data" :key="key">
-          <template x-if="key === top">
-            <template x-for="(obj, name) in cats" :key="name">
-              <option :value="name" x-text="name"></option>
-            </template>
-          </template>
-        </template>
-      </select>
-    </div>
-
-    <!-- 3️⃣ Mini-Table for the chosen sub-category -->
-    <div class="border rounded bg-white p-3">
-      <div class="font-medium mb-2" x-text="sub"></div>
-      <table class="w-full text-sm">
-        <tbody>
-          <tr class="border-t">
-            <th class="text-left py-1 px-2">Total</th>
-            <td class="text-right py-1 px-2" x-text="format(data[top][sub].total)"></td>
-          </tr>
-          <tr class="border-t">
-            <th class="text-left py-1 px-2">Transition</th>
-            <td class="text-right py-1 px-2" x-text="format(data[top][sub].transition)"></td>
-          </tr>
-          <tr class="border-t">
-            <th class="text-left py-1 px-2">Half-Court</th>
-            <td class="text-right py-1 px-2" x-text="format(data[top][sub].halfcourt)"></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+  <!-- MOBILE Shot-Type tables (phones only) -->
+  <div class="sm:hidden space-y-6">
+    <h2 class="text-lg font-semibold mb-4">Shot Type Overview</h2>
+    {% for type, summary in shot_summaries.items() %}
+      <div>
+        <h3 class="text-base font-semibold uppercase mb-2">{{ type|upper }}</h3>
+        {% for group_name, d in summary.cats.items() %}
+          <div class="mb-4 border rounded-lg p-3 bg-white">
+            <h4 class="font-medium mb-1">{{ group_name }}</h4>
+            <table class="w-full text-sm">
+              <tbody>
+                <tr class="border-t">
+                  <th class="text-left py-1 px-2">Total</th>
+                  <td class="text-right py-1 px-2">
+                    {{ d.total.makes }}-{{ d.total.attempts }} ({{ (d.total.fg_pct*100)|round(1) }}%) • PPS: {{ d.total.pps|round(2) }} • Freq: {{ (d.total.attempts/shot_type_totals[type].attempts*100)|round(1) }}%
+                  </td>
+                </tr>
+                <tr class="border-t">
+                  <th class="text-left py-1 px-2">Transition</th>
+                  <td class="text-right py-1 px-2">
+                    {{ d.transition.makes }}-{{ d.transition.attempts }} ({{ (d.transition.fg_pct*100)|round(1) }}%) • PPS: {{ d.transition.pps|round(2) }} • Freq: {{ (d.transition.attempts/shot_type_totals[type].attempts*100)|round(1) }}%
+                  </td>
+                </tr>
+                <tr class="border-t">
+                  <th class="text-left py-1 px-2">Half-Court</th>
+                  <td class="text-right py-1 px-2">
+                    {{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }} ({{ (d.halfcourt.fg_pct*100)|round(1) }}%) • PPS: {{ d.halfcourt.pps|round(2) }} • Freq: {{ (d.halfcourt.attempts/shot_type_totals[type].attempts*100)|round(1) }}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
   </div>
-
-  <script>
-  function shotTypeMobile(){
-    return {
-      top: 'atr',
-      sub: Object.keys(shot_summaries.atr.cats)[0],
-      data: {
-        atr: {{ shot_summaries['atr'].cats | tojson }},
-        fg2: {{ shot_summaries['fg2'].cats | tojson }},
-        fg3: {{ shot_summaries['fg3'].cats | tojson }},
-      },
-      format(obj) {
-        let pct = (obj.fg_pct*100).toFixed(1) + '%';
-        return `${obj.makes}-${obj.attempts} • ${pct} • ${obj.pps.toFixed(2)} • ${(obj.attempts/ shot_type_totals[this.top].attempts*100).toFixed(1)}%`;
-      }
-    }
-  }
-  </script>
 </div>  <!-- closes <div id="shotType"> -->
