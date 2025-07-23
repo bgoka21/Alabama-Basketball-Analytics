@@ -11,6 +11,7 @@ from admin.routes import (
     compute_filtered_totals,
     compute_filtered_blue,
     aggregate_stats,
+    compute_team_shot_details,
 )
 from models.database import PlayerStats, Practice, BlueCollarStats
 from datetime import date
@@ -337,7 +338,32 @@ def player_view(player_name):
     off_reb_rate      = count_event('Off Rebound') / ON_poss if ON_poss else 0
     fouls_drawn_rate  = count_event('Fouled') / ON_poss if ON_poss else 0
 
-    # 7. Pass into template context
+    # 7. Shot type breakdown for mobile tables
+    stats_records = PlayerStats.query.filter_by(player_name=player.player_name).all()
+    raw_totals, shot_summaries = compute_team_shot_details(stats_records, label_set)
+    shot_type_categories = []
+    for key, label in [('atr', 'ATR'), ('fg2', '2FG'), ('fg3', '3FG')]:
+        summary = shot_summaries.get(key)
+        if not summary:
+            continue
+        tot_att = summary.total.attempts or 0
+        def fmt(ctx):
+            return SimpleNamespace(
+                fga=ctx.attempts,
+                fg_pct=f"{(ctx.fg_pct*100 if ctx.fg_pct <= 1 else ctx.fg_pct):.1f}%",
+                pps=f"{ctx.pps:.2f}",
+                freq_pct=f"{(ctx.attempts / tot_att * 100) if tot_att else 0:.1f}%",
+            )
+        shot_type_categories.append(
+            SimpleNamespace(
+                name=label,
+                total=fmt(summary.total),
+                transition=fmt(summary.transition),
+                half_court=fmt(summary.halfcourt),
+            )
+        )
+
+    # 8. Pass into template context
     return render_template(
         'player_view.html',
         player=player,
@@ -351,6 +377,7 @@ def player_view(player_name):
         turnover_rate        = round(turnover_rate*100,1),
         off_reb_rate         = round(off_reb_rate*100,1),
         fouls_drawn_rate     = round(fouls_drawn_rate*100,1),
+        shot_type_categories = shot_type_categories,
     )
 
 
