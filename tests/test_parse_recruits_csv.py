@@ -40,4 +40,4 @@ def test_parse_recruits_csv(app, tmp_path):
         data = json.loads(stat.shot_type_details)
         assert len(data) == 2
         classes = {d['shot_class'] for d in data}
-        assert {'atr', 'fg3'} <= classes
+        assert {'atr', '3fg'} <= classes
