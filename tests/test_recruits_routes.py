@@ -142,3 +142,28 @@ def test_edit_and_delete_recruit(client, app):
     assert resp.status_code == 302
     with app.app_context():
         assert Recruit.query.get(rid) is None
+
+
+def test_detail_page_renders_shot_type_js(client, app):
+    with app.app_context():
+        r = Recruit(name='JS Recruit')
+        db.session.add(r)
+        db.session.commit()
+        data = [
+            {"shot_class": "atr", "result": "made", "shot_location": "Wing", "possession_type": "Halfcourt", "assisted": "Yes"},
+            {"shot_class": "2fg", "result": "miss", "shot_location": "Paint", "possession_type": "Halfcourt", "assisted": "No"},
+            {"shot_class": "3fg", "result": "made", "shot_location": "Corner", "possession_type": "Halfcourt", "assisted": "Yes"},
+        ]
+        stat = RecruitShotTypeStat(recruit_id=r.id, shot_type_details=json.dumps(data))
+        db.session.add(stat)
+        db.session.commit()
+        rid = r.id
+
+    resp = client.get(f'/recruits/{rid}')
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    assert 'id="cardATR"' in html
+    assert 'id="cardFG2"' in html
+    assert 'id="cardFG3"' in html
+    assert "showShotTypeDetail('atr')" in html
+    assert 'document.addEventListener' in html
