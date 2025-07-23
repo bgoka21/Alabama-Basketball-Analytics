@@ -1,34 +1,50 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ recruit.name }} (Class of {{ recruit.graduation_year }})</h1>
-<a href="{{ url_for('recruits.edit_recruit', id=recruit.id) }}">Edit</a>
-<form action="{{ url_for('recruits.delete_recruit', id=recruit.id) }}" method="post" style="display:inline;">
-  <button type="submit">Delete</button>
-</form>
+  <h1 class="text-2xl font-bold mb-4">
+    {{ recruit.name }}{% if recruit.graduation_year %} (Class of {{ recruit.graduation_year }}){% endif %}
+  </h1>
 
-{% include "partials/shot_type_cards.html" with context %}
-{% include "partials/shot_type_tables.html" with context %}
+  <div class="flex items-center gap-4 mb-6">
+    <a href="{{ url_for('recruits.edit_recruit', id=recruit.id) }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500">Edit</a>
+    <form action="{{ url_for('recruits.delete_recruit', id=recruit.id) }}" method="post" onsubmit="return confirm('Delete this recruit?');">
+      <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-500">Delete</button>
+    </form>
+  </div>
 
-<h3>Upload Shot-Type CSV</h3>
-<form action="{{ url_for('recruits.upload_csv', id=recruit.id) }}" method="post" enctype="multipart/form-data">
-  <input type="file" name="csv_file" accept=".csv" required>
-  <button type="submit">Upload</button>
-</form>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+    {% if recruit.position %}<div><span class="font-semibold">Position:</span> {{ recruit.position }}</div>{% endif %}
+    {% if recruit.height %}<div><span class="font-semibold">Height:</span> {{ recruit.height }}</div>{% endif %}
+    {% if recruit.weight %}<div><span class="font-semibold">Weight:</span> {{ recruit.weight }}</div>{% endif %}
+    {% if recruit.high_school %}<div><span class="font-semibold">High School:</span> {{ recruit.high_school }}</div>{% endif %}
+    {% if recruit.hometown %}<div><span class="font-semibold">Hometown:</span> {{ recruit.hometown }}</div>{% endif %}
+    {% if recruit.rating %}<div><span class="font-semibold">Rating:</span> {{ recruit.rating }}</div>{% endif %}
+    {% if recruit.ranking %}<div><span class="font-semibold">Ranking:</span> {{ recruit.ranking }}</div>{% endif %}
+  </div>
 
-<h3>Top Schools</h3>
-<ul>
-  {% for s in recruit.top_schools %}
-    <li>{{ s.rank }}. {{ s.school_name }}
-      <form action="{{ url_for('recruits.delete_school', id=recruit.id, school_id=s.id) }}" method="post" style="display:inline;">
-        <button type="submit">×</button>
-      </form>
-    </li>
-  {% endfor %}
-</ul>
-<form action="{{ url_for('recruits.add_school', id=recruit.id) }}" method="post">
-  <input name="school_name" placeholder="New School" required>
-  <input name="rank" type="number" placeholder="Rank" min="1">
-  <button type="submit">Add School</button>
-</form>
+  {% include "partials/shot_type_cards.html" with context %}
+  {% include "partials/shot_type_tables.html" with context %}
+
+  <h3 class="text-xl font-semibold mt-8 mb-2">Upload Shot-Type CSV</h3>
+  <form action="{{ url_for('recruits.upload_csv', id=recruit.id) }}" method="post" enctype="multipart/form-data" class="mb-6 space-y-2">
+    <input type="file" name="csv_file" accept=".csv" required class="block">
+    <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Upload</button>
+  </form>
+
+  <h3 class="text-xl font-semibold mb-2">Top Schools</h3>
+  <ul class="mb-4 space-y-1">
+    {% for s in recruit.top_schools %}
+      <li>
+        {{ s.rank }}. {{ s.school_name }}
+        <form action="{{ url_for('recruits.delete_school', id=recruit.id, school_id=s.id) }}" method="post" class="inline">
+          <button type="submit" class="text-red-600 hover:underline ml-2">×</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+  <form action="{{ url_for('recruits.add_school', id=recruit.id) }}" method="post" class="flex flex-wrap items-end gap-2">
+    <input name="school_name" placeholder="New School" required class="border p-2 rounded">
+    <input name="rank" type="number" placeholder="Rank" min="1" class="border p-2 rounded w-24">
+    <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Add School</button>
+  </form>
 
 {% endblock %}

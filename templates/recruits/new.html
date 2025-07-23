@@ -1,24 +1,78 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>New Recruit</h1>
-<form method="post">
-  <input name="name" placeholder="Name" required><br>
-  <input name="graduation_year" placeholder="Graduation Year"><br>
-  <input name="position" placeholder="Position"><br>
-  <input name="height" placeholder="Height"><br>
-  <input name="weight" placeholder="Weight" type="number"><br>
-  <input name="high_school" placeholder="High School"><br>
-  <input name="hometown" placeholder="Hometown"><br>
-  <input name="rating" placeholder="Rating" type="number"><br>
-  <input name="ranking" placeholder="Ranking" type="number"><br>
-  <textarea name="camp_performance" placeholder="Camp Performance"></textarea><br>
-  <input name="offer_status" placeholder="Offer Status"><br>
-  <input name="offer_date" placeholder="Offer Date" type="date"><br>
-  <input name="commit_date" placeholder="Commit Date" type="date"><br>
-  <input name="email" placeholder="Email"><br>
-  <input name="phone" placeholder="Phone"><br>
-  <input name="profile_image_url" placeholder="Profile Image URL"><br>
-  <textarea name="notes" placeholder="Notes"></textarea><br>
-  <button type="submit">Save</button>
-</form>
+  <h1 class="text-2xl font-bold mb-4">New Recruit</h1>
+  <form method="post" class="max-w-xl bg-white p-6 rounded shadow space-y-4">
+    <div>
+      <label class="block mb-1 font-medium">Name</label>
+      <input name="name" required class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Graduation Year</label>
+      <input name="graduation_year" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Position</label>
+      <input name="position" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Height</label>
+      <input name="height" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Weight</label>
+      <input name="weight" type="number" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">High School</label>
+      <input name="high_school" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Hometown</label>
+      <input name="hometown" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Rating</label>
+      <input name="rating" type="number" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Ranking</label>
+      <input name="ranking" type="number" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Camp Performance</label>
+      <textarea name="camp_performance" class="w-full border rounded px-3 py-2"></textarea>
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Offer Status</label>
+      <input name="offer_status" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Offer Date</label>
+      <input name="offer_date" type="date" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Commit Date</label>
+      <input name="commit_date" type="date" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Email</label>
+      <input name="email" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Phone</label>
+      <input name="phone" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Profile Image URL</label>
+      <input name="profile_image_url" class="w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block mb-1 font-medium">Notes</label>
+      <textarea name="notes" class="w-full border rounded px-3 py-2"></textarea>
+    </div>
+    <div class="flex items-center space-x-4">
+      <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Save</button>
+      <a href="{{ url_for('recruits.list_recruits') }}" class="text-gray-600 hover:underline">Cancel</a>
+    </div>
+  </form>
 {% endblock %}
