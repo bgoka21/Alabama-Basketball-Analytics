@@ -32,13 +32,21 @@ def app():
     app.register_blueprint(public_bp)
     app.register_blueprint(recruits_bp, url_prefix='/recruits')
 
+    @app.route('/player/<player_name>')
+    def player_view(player_name):
+        return ''
+
     @app.before_request
     def restrict_player():
         if request.endpoint in ('static', None):
             return
         if current_user.is_authenticated and current_user.is_player:
             if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
-                return redirect(url_for('public.homepage'))
+                target = (
+                    url_for('player_view', player_name=current_user.player_name)
+                    if current_user.player_name else url_for('public.homepage')
+                )
+                return redirect(target)
 
     with app.app_context():
         db.create_all()

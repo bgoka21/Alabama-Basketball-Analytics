@@ -738,6 +738,10 @@ def login():
             # Send admins to the dashboard, everyone else to the cover page
             if user.is_admin:
                 return redirect(url_for('admin.dashboard'))
+            elif user.is_player:
+                if user.player_name:
+                    return redirect(url_for('player_view', player_name=user.player_name))
+                return redirect(url_for('public.homepage'))
             else:
                 return redirect(url_for('public.root'))
 

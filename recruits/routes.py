@@ -19,7 +19,11 @@ def recruits_before_request():
     if current_user.is_authenticated and current_user.is_player:
         if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
             flash('You do not have permission to view that page.', 'error')
-            return redirect(url_for('public.homepage'))
+            if current_user.player_name:
+                target = url_for('player_view', player_name=current_user.player_name)
+            else:
+                target = url_for('public.homepage')
+            return redirect(target)
 
 
 @recruits_bp.route('/')
