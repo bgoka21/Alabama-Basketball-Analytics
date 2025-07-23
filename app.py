@@ -11,7 +11,6 @@ from models.database import db, PageView
 from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
-from scraping.recruit_scraper import run_full_refresh
 
 scheduler = APScheduler()
 
@@ -149,11 +148,6 @@ def create_app():
     if scheduler.state == 0:
         scheduler.init_app(app)
         scheduler.start()
-        scheduler.add_job(
-            id='refresh_recruits',
-            func=lambda: run_full_refresh(years=[2025, 2024]),
-            trigger='cron', hour=3, minute=0
-        )
 
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')

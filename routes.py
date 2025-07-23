@@ -20,14 +20,8 @@ from utils.auth import admin_required
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
-from models.recruit import Recruit
 from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 
-
-@app.route('/recruits')
-def recruits_view():
-    recs = Recruit.query.order_by(Recruit.last_updated.desc()).all()
-    return render_template('recruits.html', recruits=recs)
 
 
 @app.route('/draft-impact')
@@ -133,30 +127,6 @@ def api_player_stats():
     stats = synergy_api.get_player_stats(player_id)
     return jsonify(stats)
 
-
-@app.route('/api/players', methods=['GET'])
-def api_players():
-    q = request.args.get('query', '').strip()
-    if not q:
-        return jsonify([])
-    results = Recruit.query.filter(Recruit.name.ilike(f'%{q}%')).limit(10).all()
-    return jsonify([{'id': r.id, 'name': r.name} for r in results])
-
-
-# ------------------------------------------------------------------
-#  Simple page to query Synergy player stats
-# ------------------------------------------------------------------
-
-@app.route('/recruits/synergy_player')
-def synergy_player_page():
-    """Render the player stats search page."""
-    return render_template('synergy_player.html')
-
-
-@app.route('/recruits/synergy_stats')
-def synergy_stats_page():
-    """Render the competition stats page."""
-    return render_template('synergy_stats.html')
 
 
 @app.route('/practice/team_totals')

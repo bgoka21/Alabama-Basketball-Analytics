@@ -321,4 +321,3 @@ class PlayerDevelopmentPlan(db.Model):
 
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile
-from .recruit import Recruit
