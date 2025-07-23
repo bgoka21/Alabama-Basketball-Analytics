@@ -1,4 +1,16 @@
 <ul class="flex flex-col gap-2">
+  {% if current_user.is_player %}
+  <li class="nav-item{% if request.endpoint == 'admin.player_detail' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}">
+      My Page
+    </a>
+  </li>
+  <li class="nav-item{% if request.endpoint == 'admin.logout' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.logout') }}">
+      Logout
+    </a>
+  </li>
+  {% else %}
   {% set home_url = url_for('public.homepage') if view_exists('public.homepage') else '#' %}
   <li class="nav-item{% if request.endpoint == 'public.homepage' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ home_url }}">
@@ -91,5 +103,6 @@
       Login
     </a>
   </li>
+  {% endif %}
   {% endif %}
 </ul>
