@@ -46,6 +46,7 @@ def new_recruit():
                 return None
 
         r = Recruit(
+            school=request.form.get("school", ""),
             name=request.form["name"],
             graduation_year=_parse_int("graduation_year"),
             position=request.form.get("position"),
