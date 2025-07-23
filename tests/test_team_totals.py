@@ -30,6 +30,10 @@ def app():
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(public_bp)
+
+    @app.route('/player/<player_name>')
+    def player_view(player_name):
+        return ''
     from utils.auth import PLAYER_ALLOWED_ENDPOINTS
     from flask import request, redirect, url_for
     from flask_login import current_user
@@ -40,7 +44,11 @@ def app():
             return
         if current_user.is_authenticated and current_user.is_player:
             if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
-                return redirect(url_for('public.homepage'))
+                target = (
+                    url_for('player_view', player_name=current_user.player_name)
+                    if current_user.player_name else url_for('public.homepage')
+                )
+                return redirect(target)
     with app.app_context():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024, 1, 1))

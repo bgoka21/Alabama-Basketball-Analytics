@@ -36,6 +36,10 @@ def app():
 
     app.register_blueprint(public_bp)
 
+    @app.route('/player/<player_name>')
+    def player_view(player_name):
+        return ''
+
     with app.app_context():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024, 1, 1))
