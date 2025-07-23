@@ -2100,10 +2100,24 @@ def compute_team_shot_details(stats_records, label_set):
 
     makes_atr = sum(1 for s in all_details if s.get("shot_class", "").lower() == "atr" and s.get("result") == "made")
     att_atr   = sum(1 for s in all_details if s.get("shot_class", "").lower() == "atr")
-    makes_fg2 = sum(1 for s in all_details if s.get("shot_class", "").lower() == "2fg" and s.get("result") == "made")
-    att_fg2   = sum(1 for s in all_details if s.get("shot_class", "").lower() == "2fg")
-    makes_fg3 = sum(1 for s in all_details if s.get("shot_class", "").lower() == "3fg" and s.get("result") == "made")
-    att_fg3   = sum(1 for s in all_details if s.get("shot_class", "").lower() == "3fg")
+    makes_fg2 = sum(
+        1
+        for s in all_details
+        if s.get("shot_class", "").lower() in ("2fg", "fg2")
+        and s.get("result") == "made"
+    )
+    att_fg2 = sum(
+        1 for s in all_details if s.get("shot_class", "").lower() in ("2fg", "fg2")
+    )
+    makes_fg3 = sum(
+        1
+        for s in all_details
+        if s.get("shot_class", "").lower() in ("3fg", "fg3")
+        and s.get("result") == "made"
+    )
+    att_fg3 = sum(
+        1 for s in all_details if s.get("shot_class", "").lower() in ("3fg", "fg3")
+    )
 
     total_att = att_atr + att_fg2 + att_fg3
     raw_totals = SimpleNamespace(
@@ -2131,7 +2145,13 @@ def compute_team_shot_details(stats_records, label_set):
     )
 
     detail_counts = {"atr": {}, "fg2": {}, "fg3": {}}
-    cls_map = {"atr": "atr", "2fg": "fg2", "3fg": "fg3"}
+    cls_map = {
+        "atr": "atr",
+        "2fg": "fg2",
+        "fg2": "fg2",
+        "3fg": "fg3",
+        "fg3": "fg3",
+    }
 
     for shot in all_details:
         sc = shot.get("shot_class", "").lower()
@@ -2734,7 +2754,7 @@ def player_detail(player_name):
             labels_for_this_shot.append('Non-Assisted')
 
         # b) All HUDL suffix fields for this shot
-        if sc in ('atr', '2fg'):
+        if sc in ('atr', '2fg', 'fg2'):
             # The parser stored all ATR & 2FG subfields under "2FG (...)" columns,
             # with prefix "2fg_" in JSON. So we look up keys under "2fg_*"
             suffix_keys = ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]
@@ -2881,8 +2901,18 @@ def player_detail(player_name):
 
         # count makes for each class
         made_atr  = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
-        made_fg2  = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg' and shot.get('result') == 'made')
-        made_fg3  = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg' and shot.get('result') == 'made')
+        made_fg2  = sum(
+            1
+            for shot in js
+            if shot.get('shot_class','').lower() in ('2fg','fg2')
+            and shot.get('result') == 'made'
+        )
+        made_fg3  = sum(
+            1
+            for shot in js
+            if shot.get('shot_class','').lower() in ('3fg','fg3')
+            and shot.get('result') == 'made'
+        )
 
         # free throws made
         ft_made   = s.ftm or 0
@@ -2892,8 +2922,8 @@ def player_detail(player_name):
 
         # count attempts from JSON
         att_atr   = sum(1 for shot in js if shot.get('shot_class','').lower() == 'atr')
-        att_fg2   = sum(1 for shot in js if shot.get('shot_class','').lower() == '2fg')
-        att_fg3   = sum(1 for shot in js if shot.get('shot_class','').lower() == '3fg')
+        att_fg2   = sum(1 for shot in js if shot.get('shot_class','').lower() in ('2fg','fg2'))
+        att_fg3   = sum(1 for shot in js if shot.get('shot_class','').lower() in ('3fg','fg3'))
 
         # build the row
         game_breakdown[gid] = {
