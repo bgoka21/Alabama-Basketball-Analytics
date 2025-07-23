@@ -56,6 +56,17 @@
       <option value="Pickup">Pickup</option>
       <option value="Fall Workouts">Fall Workouts</option>
       <option value="Official Practices">Official Practices</option>
+      <option value="Recruit">Recruit</option>
+    </select>
+  </div>
+
+  <!-- Recruit select -->
+  <div id="recruit-select" style="display:none;">
+    <label for="recruit_id" class="block font-semibold mb-1">Recruit:</label>
+    <select name="recruit_id" id="recruit_id" class="border rounded px-4 py-2 w-full">
+      {% for r in recruits %}
+        <option value="{{ r.id }}">{{ r.name }}</option>
+      {% endfor %}
     </select>
   </div>
 
@@ -181,4 +192,17 @@
 </div>
 
 </div>
+<script>
+  const catSel = document.getElementById('category');
+  const recDiv = document.getElementById('recruit-select');
+  function toggleRecruit() {
+    if (catSel.value === 'Recruit') {
+      recDiv.style.display = 'block';
+    } else {
+      recDiv.style.display = 'none';
+    }
+  }
+  catSel.addEventListener('change', toggleRecruit);
+  toggleRecruit();
+</script>
 {% endblock %}
