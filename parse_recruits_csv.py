@@ -30,7 +30,7 @@ def parse_recruits_csv(csv_path, recruit_id):
     shot_list = []
     with open(csv_path, newline='') as f:
         reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames or []
+        fieldnames = [str(h).strip() for h in (reader.fieldnames or [])]
 
         # 2. Identify the column matching recruit.name
         col_name = next((h for h in fieldnames if h.strip() == recruit.name), None)
@@ -86,37 +86,60 @@ def parse_recruits_csv(csv_path, recruit_id):
                         'shot_location': safe_str(row.get('Shot Location', '')),
                     }
 
-                    # Copy every detail column matching "ATR/2FG/3FG (<Detail>)"
-                    for detail_col in fieldnames:
-                        detail_match = re.match(
-                            rf"^{m.group(1)} \((.+)\)$",
-                            detail_col,
-                            re.IGNORECASE,
-                        )
-                        if detail_match:
-                            suffix = (
-                                detail_match.group(1)
-                                .lower()
-                                .replace('/', '_')
-                                .replace(' ', '_')
-                            )
-                            suffix = re.sub(r"_+", "_", suffix).strip('_')
-                            shot_obj[f"{shot_key}_{suffix}"] = safe_str(
-                                row.get(detail_col, "")
-                            )
+                    if shot_key in ("2fg", "atr"):
+                        for detail_col in fieldnames:
+                            detail_match = re.match(r"^2FG \((.+)\)$", detail_col, re.IGNORECASE)
+                            if detail_match:
+                                suffix = (
+                                    detail_match.group(1)
+                                    .lower()
+                                    .replace(' ', '_')
+                                    .replace('/', '_')
+                                )
+                                suffix = re.sub(r"_+", "_", suffix).strip('_')
+                                key_2fg = f"2fg_{suffix}"
+                                shot_obj[key_2fg] = safe_str(row.get(detail_col, ""))
+                                if shot_key == "atr":
+                                    shot_obj[f"atr_{suffix}"] = safe_str(row.get(detail_col, ""))
 
-                    # Copy every scheme column like "ATR/2FG/3FG Scheme (Attack)"
-                    for scheme_col in fieldnames:
-                        if re.match(rf"^{m.group(1)} Scheme \((Attack|Drive|Pass)\)$", scheme_col):
-                            base = (
-                                scheme_col.lower()
-                                .replace(' ', '_')
-                                .replace('(', '')
-                                .replace(')', '')
-                            )
-                            val = safe_str(row.get(scheme_col, "")).strip()
-                            if val:
-                                shot_obj[base] = val
+                        for scheme_col in fieldnames:
+                            if re.match(r"^2FG Scheme \((Attack|Drive|Pass)\)$", scheme_col):
+                                base = (
+                                    scheme_col.lower()
+                                    .replace(' ', '_')
+                                    .replace('(', '')
+                                    .replace(')', '')
+                                )
+                                val = safe_str(row.get(scheme_col, "")).strip()
+                                if val:
+                                    shot_obj[base] = val
+                                    if shot_key == "atr":
+                                        shot_obj[base.replace("2fg", "atr", 1)] = val
+
+                    elif shot_key == "3fg":
+                        for detail_col in fieldnames:
+                            detail_match = re.match(r"^3FG \((.+)\)$", detail_col, re.IGNORECASE)
+                            if detail_match:
+                                suffix = (
+                                    detail_match.group(1)
+                                    .lower()
+                                    .replace(' ', '_')
+                                    .replace('/', '_')
+                                )
+                                suffix = re.sub(r"_+", "_", suffix).strip('_')
+                                shot_obj[f"3fg_{suffix}"] = safe_str(row.get(detail_col, ""))
+
+                        for scheme_col in fieldnames:
+                            if re.match(r"^3FG Scheme \((Attack|Drive|Pass)\)$", scheme_col):
+                                base = (
+                                    scheme_col.lower()
+                                    .replace(' ', '_')
+                                    .replace('(', '')
+                                    .replace(')', '')
+                                )
+                                val = safe_str(row.get(scheme_col, "")).strip()
+                                if val:
+                                    shot_obj[base] = val
 
                     shot_list.append(shot_obj)
                     continue
