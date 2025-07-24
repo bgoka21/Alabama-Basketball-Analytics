@@ -9,6 +9,7 @@ from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from . import recruits_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from flask import current_app
+from admin.routes import compute_team_shot_details
 
 
 @recruits_bp.before_request
@@ -93,28 +94,8 @@ def compute_shot_type_totals_for_recruit(recruit):
     if latest:
         records = [SimpleNamespace(shot_type_details=latest.shot_type_details)]
 
-    # flatten JSON into list of shot dicts
-    shots = []
-    for rec in records:
-        try:
-            shots.extend(json.loads(rec.shot_type_details))
-        except Exception:
-            continue
-
-    if not shots:
-        return {}
-
-    # find all shot classes present
-    shot_classes = sorted({s.get('shot_class') for s in shots if s.get('shot_class')})
-
-    totals = {}
-    for cls in shot_classes:
-        cls_shots = [s for s in shots if s.get('shot_class') == cls]
-        sample = cls_shots[0] if cls_shots else {}
-        prefix = f"{cls}_"
-        subkeys = sorted(k for k in sample.keys() if k.startswith(prefix))
-        # count each subkey
-        totals[cls] = {key: sum(1 for s in cls_shots if s.get(key)) for key in subkeys}
+    # Delegate to admin.routes.compute_team_shot_details for full sub-category support
+    totals, _ = compute_team_shot_details(records, set())
     return totals
 
 
@@ -129,30 +110,8 @@ def compute_shot_summaries_for_recruit(recruit):
     if latest:
         records = [SimpleNamespace(shot_type_details=latest.shot_type_details)]
 
-    shots = []
-    for rec in records:
-        try:
-            shots.extend(json.loads(rec.shot_type_details))
-        except Exception:
-            continue
-
-    if not shots:
-        return {}
-
-    shot_classes = sorted({s.get('shot_class') for s in shots if s.get('shot_class')})
-
-    summaries = {}
-    for cls in shot_classes:
-        cls_shots = [s for s in shots if s.get('shot_class') == cls]
-        count_cls = len(cls_shots)
-        sample = cls_shots[0] if cls_shots else {}
-        prefix = f"{cls}_"
-        subkeys = sorted(k for k in sample.keys() if k.startswith(prefix))
-        # percentage for each subkey
-        summaries[cls] = {
-            key: (sum(1 for s in cls_shots if s.get(key)) / count_cls * 100) if count_cls else 0
-            for key in subkeys
-        }
+    # Delegate to admin.routes.compute_team_shot_details for full sub-category support
+    _, summaries = compute_team_shot_details(records, set())
     return summaries
 
 
