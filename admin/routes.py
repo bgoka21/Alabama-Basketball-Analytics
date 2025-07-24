@@ -346,11 +346,11 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             func.sum(case((ShotDetail.event_type.in_(['3FG+','3FG-']), 1), else_=0)).label('fg3_attempts'),
             func.sum(case((ShotDetail.event_type=='Turnover', 1), else_=0)).label('turnovers_on'),
             func.sum(
-                case(
-                    (ShotDetail.event_type.in_(['Off Reb','TEAM Off Reb']), 1),
-                    else_=0
-                )
+                case((ShotDetail.event_type=='Off Reb', 1), else_=0)
             ).label('off_reb_on'),
+            func.sum(
+                case((ShotDetail.event_type=='TEAM Off Reb', 1), else_=0)
+            ).label('team_off_reb_on'),
             func.sum(case((ShotDetail.event_type=='Foul', 1), else_=0)).label('fouls_on'),
             func.sum(
                 case(
@@ -413,8 +413,10 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
         individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
         misses = events.get('fg_misses', 0)
-        off_reb_rate = events.get('off_reb_on', 0) / misses if misses else 0
-        ind_off_reb_rate = person_off_rebs.get(player, 0) / misses if misses else 0
+        individual_off_reb_rate = person_off_rebs.get(player, 0) / misses if misses else 0
+        # combine individual + team rebounds for the team rate
+        team_rebs    = events.get('off_reb_on', 0) + events.get('team_off_reb_on', 0)
+        off_reb_rate = team_rebs / misses if misses else 0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
         extra_rows[player] = {
@@ -427,7 +429,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             'turnover_rate': round(turnover_rate * 100, 1),
             'off_reb_rate': round(off_reb_rate * 100, 1),
             'individual_turnover_rate': round(individual_turnover_rate * 100, 1),
-            'individual_off_reb_rate': round(ind_off_reb_rate * 100, 1),
+            'individual_off_reb_rate': round(individual_off_reb_rate * 100, 1),
             'fouls_drawn_rate': round(fouls_rate * 100, 1),
             'individual_foul_rate': round(foul_rate_ind * 100, 1),
         }
