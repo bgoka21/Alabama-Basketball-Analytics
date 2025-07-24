@@ -3,6 +3,8 @@ import json
 import re
 import sys
 
+import pandas as pd
+
 from models.recruit import Recruit, RecruitShotTypeStat
 from yourapp import db
 
@@ -10,6 +12,13 @@ from yourapp import db
 def safe_str(value):
     """Safely convert a value to a string, returning an empty string for None."""
     return "" if value is None else str(value)
+
+
+def extract_tokens(val):
+    """Return list of comma-separated tokens from the cell value."""
+    if pd.isna(val) or not isinstance(val, str):
+        return []
+    return [t.strip() for t in val.split(',') if t.strip()]
 
 
 def parse_recruits_csv(csv_path, recruit_id):
@@ -49,9 +58,6 @@ def parse_recruits_csv(csv_path, recruit_id):
                     break
 
             for token in tokens:
-                cls = None
-                result = None
-
                 if token in ('ATR+', 'ATR-'):
                     cls = 'atr'
                     result = 'made' if token == 'ATR+' else 'miss'
@@ -61,6 +67,8 @@ def parse_recruits_csv(csv_path, recruit_id):
                 elif token in ('3FG+', '3FG-'):
                     cls = '3fg'
                     result = 'made' if token == '3FG+' else 'miss'
+                else:
+                    cls = None
 
                 if cls:
                     poss_val = row.get('POSSESSION TYPE', '')
@@ -79,39 +87,39 @@ def parse_recruits_csv(csv_path, recruit_id):
                     shot_obj['shot_location'] = shot_location
 
                     if cls in ('2fg', 'atr'):
+                        # copy every 2FG/ATR detail column
                         for detail_col in fieldnames:
                             if detail_col.startswith('2FG (') and detail_col.endswith(')'):
                                 suffix = detail_col[len('2FG ('):-1].lower().replace(' ', '_').replace('/', '_')
-                                key_2fg = f'2fg_{suffix}'
-                                shot_obj[key_2fg] = row.get(detail_col, '')
+                                shot_obj[f'2fg_{suffix}'] = safe_str(row.get(detail_col, ''))
                                 if cls == 'atr':
-                                    key_atr = f'atr_{suffix}'
-                                    shot_obj[key_atr] = row.get(detail_col, '')
+                                    shot_obj[f'atr_{suffix}'] = safe_str(row.get(detail_col, ''))
+
+                        # copy every 2FG Scheme column
                         for scheme_col in ('2FG Scheme (Attack)', '2FG Scheme (Drive)', '2FG Scheme (Pass)'):
                             if scheme_col in fieldnames:
-                                val = str(row.get(scheme_col, '') or '').strip()
+                                val = safe_str(row.get(scheme_col, ''))
                                 if val:
-                                    shot_obj_key_2fg = scheme_col.lower().replace(' ', '_').replace('(', '').replace(')', '')
-                                    shot_obj[shot_obj_key_2fg] = val
-                                    if cls == 'atr':
-                                        key_atr_scheme = shot_obj_key_2fg.replace('2fg', 'atr')
-                                        shot_obj[key_atr_scheme] = val
+                                    key = scheme_col.lower().replace(' ', '_').replace('(', '').replace(')', '')
+                                    shot_obj[key] = val
 
-                    elif cls == '3fg':
-                        for suffix in ('Contest', 'Footwork', 'Good/Bad', 'Line', 'Move', 'Pocket', 'Shrink', 'Type'):
-                            col_name = f'3FG ({suffix})'
-                            if col_name in fieldnames:
-                                json_key = f"3fg_{suffix.lower().replace('/', '_').replace(' ', '_')}"
-                                shot_obj[json_key] = row.get(col_name, '')
-                        for scheme_col in ('3FG Scheme (Attack)', '3FG Scheme (Drive)', '3FG Scheme (Pass)'):
+                    else:  # cls == '3fg'
+                        # copy every 3FG detail column
+                        for suffix in ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]:
+                            col_name = f"3FG ({suffix})"
+                            json_key = f"3fg_{suffix.lower().replace('/', '_').replace(' ', '_')}"
+                            shot_obj[json_key] = safe_str(row.get(col_name, ""))
+
+                        # copy every 3FG Scheme column
+                        for scheme_col in ("3FG Scheme (Attack)", "3FG Scheme (Drive)", "3FG Scheme (Pass)"):
                             if scheme_col in fieldnames:
-                                val = str(row.get(scheme_col, '') or '').strip()
-                                if val:
-                                    shot_obj_key = scheme_col.lower().replace(' ', '_').replace('(', '').replace(')', '')
-                                    shot_obj[shot_obj_key] = val
+                                for tok in extract_tokens(row.get(scheme_col, "")):
+                                    key = scheme_col.lower().replace(' ', '_').replace('(', '').replace(')', '')
+                                    shot_obj[f"{key}_{tok.replace(' ', '_').lower()}"] = tok
 
                     shot_list.append(shot_obj)
 
+                # now handle free throws exactly the same way:
                 if token == 'FT+':
                     ft_obj = {
                         'event':       'shot_attempt',
@@ -119,8 +127,7 @@ def parse_recruits_csv(csv_path, recruit_id):
                         'result':      'made',
                         'drill_labels': labels,
                     }
-                    shot_location = safe_str(row.get('Shot Location', ''))
-                    ft_obj['shot_location'] = shot_location
+                    ft_obj['shot_location'] = safe_str(row.get('Shot Location', ''))
                     shot_list.append(ft_obj)
                     continue
                 elif token == 'FT-':
@@ -130,8 +137,7 @@ def parse_recruits_csv(csv_path, recruit_id):
                         'result':      'miss',
                         'drill_labels': labels,
                     }
-                    shot_location = safe_str(row.get('Shot Location', ''))
-                    ft_obj['shot_location'] = shot_location
+                    ft_obj['shot_location'] = safe_str(row.get('Shot Location', ''))
                     shot_list.append(ft_obj)
                     continue
 
