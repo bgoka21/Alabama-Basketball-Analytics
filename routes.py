@@ -378,6 +378,8 @@ def player_view(player_name):
         off_reb_rate         = round(off_reb_rate*100,1),
         fouls_drawn_rate     = round(fouls_drawn_rate*100,1),
         shot_type_categories = shot_type_categories,
+        shot_type_totals     = raw_totals,
+        shot_summaries       = shot_summaries,
     )
 
 

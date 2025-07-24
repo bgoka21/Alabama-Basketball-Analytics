@@ -51,5 +51,63 @@
     <tr><td>Fouls-Drawn Rate</td><td>{{ fouls_drawn_rate }}%</td></tr>
     </table>
   </div>
+
+  {# Include shot type tables with sticky headers #}
+  {% include "partials/shot_type_tables.html" with context %}
 </div>
+
+<script>
+function showTab(tabName) {
+  ['seasonTotals','gameStats','shotType','skillDevelopment'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('hidden', id !== tabName);
+    el.classList.toggle('block',  id === tabName);
+  });
+  ['btnSeasonTotals','btnGameStats','btnShotType','btnSkillDevelopment'].forEach(btnId => {
+    const b = document.getElementById(btnId);
+    if (!b) return;
+    if (btnId.toLowerCase().endsWith(tabName.toLowerCase())) {
+      b.classList.add('bg-[#9E1B32]', 'text-white');
+      b.classList.remove('border-gray-300','bg-white','text-gray-700');
+    } else {
+      b.classList.remove('bg-[#9E1B32]', 'text-white');
+      b.classList.add('border-gray-300','bg-white','text-gray-700');
+    }
+  });
+  window.location.hash = tabName;
+  if (tabName === 'shotType') {
+    showShotTypeDetail('atr');
+  }
+}
+
+function showShotTypeDetail(detail) {
+  ['atr','fg2','fg3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.toggle('hidden', id !== detail);
+      el.classList.toggle('block',  id === detail);
+    }
+  });
+  const map = { atr:'ATR', fg2:'FG2', fg3:'FG3' };
+  Object.entries(map).forEach(([type,suf]) => {
+    const card = document.getElementById('card' + suf);
+    if (!card) return;
+    if (type === detail) {
+      card.classList.replace('bg-white','bg-gray-100');
+      card.classList.replace('dark:bg-gray-800','dark:bg-gray-700');
+      card.classList.replace('shadow-md','shadow-inner');
+    } else {
+      card.classList.replace('bg-gray-100','bg-white');
+      card.classList.replace('dark:bg-gray-700','dark:bg-gray-800');
+      card.classList.replace('shadow-inner','shadow-md');
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  showTab('shotType');
+});
+</script>
+
 {% endblock %}
