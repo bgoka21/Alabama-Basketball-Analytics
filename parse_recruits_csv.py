@@ -89,31 +89,34 @@ def parse_recruits_csv(csv_path, recruit_id):
                     # Copy every detail column matching "ATR/2FG/3FG (<Detail>)"
                     for detail_col in fieldnames:
                         detail_match = re.match(
-                            rf'^{re.escape(m.group(1))} \((.+)\)$',
+                            rf"^{m.group(1)} \((.+)\)$",
                             detail_col,
+                            re.IGNORECASE,
                         )
                         if detail_match:
                             suffix = (
                                 detail_match.group(1)
                                 .lower()
-                                .replace(' ', '_')
                                 .replace('/', '_')
+                                .replace(' ', '_')
                             )
+                            suffix = re.sub(r"_+", "_", suffix).strip('_')
                             shot_obj[f"{shot_key}_{suffix}"] = safe_str(
-                                row.get(detail_col, '')
+                                row.get(detail_col, "")
                             )
 
-                    # Copy every scheme column like "ATR/2FG/3FG Scheme (<Type>)"
+                    # Copy every scheme column like "ATR/2FG/3FG Scheme (Attack)"
                     for scheme_col in fieldnames:
-                        if scheme_col.startswith(f"{m.group(1)} Scheme"):
-                            base_key = (
+                        if re.match(rf"^{m.group(1)} Scheme \((Attack|Drive|Pass)\)$", scheme_col):
+                            base = (
                                 scheme_col.lower()
                                 .replace(' ', '_')
                                 .replace('(', '')
                                 .replace(')', '')
                             )
-                            for tok in extract_tokens(row.get(scheme_col, '') or ''):
-                                shot_obj[f"{base_key}_{tok.replace(' ', '_').lower()}"] = tok
+                            val = safe_str(row.get(scheme_col, "")).strip()
+                            if val:
+                                shot_obj[base] = val
 
                     shot_list.append(shot_obj)
                     continue
