@@ -1,9 +1,9 @@
 import os
+import json
 from flask import render_template, request, redirect, url_for, flash, current_app
 from datetime import date
 from flask_login import current_user
 from types import SimpleNamespace
-from admin.routes import compute_team_shot_details
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from . import recruits_bp
@@ -84,27 +84,75 @@ def new_recruit():
 
 def compute_shot_type_totals_for_recruit(recruit):
     latest = (
-        RecruitShotTypeStat.query.filter_by(recruit_id=recruit.id)
+        RecruitShotTypeStat.query
+        .filter_by(recruit_id=recruit.id)
         .order_by(RecruitShotTypeStat.created_at.desc())
         .first()
     )
     records = []
     if latest:
         records = [SimpleNamespace(shot_type_details=latest.shot_type_details)]
-    totals, _ = compute_team_shot_details(records, set())
+
+    # flatten JSON into list of shot dicts
+    shots = []
+    for rec in records:
+        try:
+            shots.extend(json.loads(rec.shot_type_details))
+        except Exception:
+            continue
+
+    if not shots:
+        return {}
+
+    # find all shot classes present
+    shot_classes = sorted({s.get('shot_class') for s in shots if s.get('shot_class')})
+
+    totals = {}
+    for cls in shot_classes:
+        cls_shots = [s for s in shots if s.get('shot_class') == cls]
+        sample = cls_shots[0] if cls_shots else {}
+        prefix = f"{cls}_"
+        subkeys = sorted(k for k in sample.keys() if k.startswith(prefix))
+        # count each subkey
+        totals[cls] = {key: sum(1 for s in cls_shots if s.get(key)) for key in subkeys}
     return totals
 
 
 def compute_shot_summaries_for_recruit(recruit):
     latest = (
-        RecruitShotTypeStat.query.filter_by(recruit_id=recruit.id)
+        RecruitShotTypeStat.query
+        .filter_by(recruit_id=recruit.id)
         .order_by(RecruitShotTypeStat.created_at.desc())
         .first()
     )
     records = []
     if latest:
         records = [SimpleNamespace(shot_type_details=latest.shot_type_details)]
-    _, summaries = compute_team_shot_details(records, set())
+
+    shots = []
+    for rec in records:
+        try:
+            shots.extend(json.loads(rec.shot_type_details))
+        except Exception:
+            continue
+
+    if not shots:
+        return {}
+
+    shot_classes = sorted({s.get('shot_class') for s in shots if s.get('shot_class')})
+
+    summaries = {}
+    for cls in shot_classes:
+        cls_shots = [s for s in shots if s.get('shot_class') == cls]
+        count_cls = len(cls_shots)
+        sample = cls_shots[0] if cls_shots else {}
+        prefix = f"{cls}_"
+        subkeys = sorted(k for k in sample.keys() if k.startswith(prefix))
+        # percentage for each subkey
+        summaries[cls] = {
+            key: (sum(1 for s in cls_shots if s.get(key)) / count_cls * 100) if count_cls else 0
+            for key in subkeys
+        }
     return summaries
 
 
