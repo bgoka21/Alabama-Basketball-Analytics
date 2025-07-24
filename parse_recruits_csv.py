@@ -10,18 +10,19 @@ from yourapp import db
 
 
 def safe_str(value):
-    """Safely convert a value to a string, returning an empty string for None."""
+    """Return empty string if None, else str(value)."""
     return "" if value is None else str(value)
 
 
 def extract_tokens(val):
-    """Return list of comma-separated tokens from the cell value."""
+    """Split a cell value on commas, strip whitespace, return list; return [] for NaN/non-str."""
     if pd.isna(val) or not isinstance(val, str):
         return []
     return [t.strip() for t in val.split(',') if t.strip()]
 
 
 def parse_recruits_csv(csv_path, recruit_id):
+    # 1. Load the recruit record
     recruit = db.session.get(Recruit, recruit_id)
     if not recruit:
         raise ValueError(f"No recruit with id={recruit_id}")
@@ -30,118 +31,110 @@ def parse_recruits_csv(csv_path, recruit_id):
     with open(csv_path, newline='') as f:
         reader = csv.DictReader(f)
         fieldnames = reader.fieldnames or []
+
+        # 2. Identify the column matching recruit.name
         col_name = next((h for h in fieldnames if h.strip() == recruit.name), None)
         if not col_name:
             raise ValueError(f"Column for recruit '{recruit.name}' not found")
 
         for row in reader:
+            # 3. Only rows where Row == recruit.name
             if str(row.get('Row', '')).strip() != recruit.name:
                 continue
 
-            drill_val = row.get('DRILL TYPE')
-            drill_str = '' if drill_val is None else str(drill_val)
-            labels = [t.strip().upper() for t in drill_str.split(',') if t.strip()]
+            # 4. Drill labels from 'Flags' column
+            drill_val = row.get('Flags', '') or ''
+            labels = [t.strip() for t in drill_val.split(',') if t.strip()]
 
+            # 5. Extract the recruit's shot tokens
             cell = str(row.get(col_name, '') or '').strip()
             if not cell:
                 continue
-            tokens = [t.strip() for t in cell.split(',') if t.strip()]
+            tokens = extract_tokens(cell)
 
-            assisted_flag = False
-            for other_col in fieldnames:
-                assist_cell = str(row.get(other_col, '') or '').strip()
-                if not assist_cell:
-                    continue
-                assist_tokens = [t.strip() for t in assist_cell.split(',') if t.strip()]
-                if any(t == 'Assist' or t == 'Pot. Assist' for t in assist_tokens):
-                    assisted_flag = True
-                    break
+            # 6. Determine assisted_flag by scanning 'Assist Type', then all columns
+            assisted_flag = any(
+                t in ('Assist', 'Pot. Assist', 'Secondary Assist')
+                for t in extract_tokens(row.get('Assist Type', '') or '')
+            )
+            if not assisted_flag:
+                for h in fieldnames:
+                    if any(
+                        t in ('Assist', 'Pot. Assist', 'Secondary Assist')
+                        for t in extract_tokens(row.get(h, '') or '')
+                    ):
+                        assisted_flag = True
+                        break
 
             for token in tokens:
-                if token in ('ATR+', 'ATR-'):
-                    cls = 'atr'
-                    result = 'made' if token == 'ATR+' else 'miss'
-                elif token in ('2FG+', '2FG-'):
-                    cls = '2fg'
-                    result = 'made' if token == '2FG+' else 'miss'
-                elif token in ('3FG+', '3FG-'):
-                    cls = '3fg'
-                    result = 'made' if token == '3FG+' else 'miss'
-                else:
-                    cls = None
-
-                if cls:
-                    poss_val = row.get('POSSESSION TYPE', '')
-                    possession_str = '' if poss_val is None else str(poss_val).strip()
+                # —— Handle ATR / 2FG / 3FG ——
+                m = re.match(r'^(ATR|2FG|3FG)([+-])$', token, re.IGNORECASE)
+                if m:
+                    shot_key = m.group(1).lower()
+                    result = 'made' if token.endswith('+') else 'miss'
+                    poss_val = row.get('Shot Possession Type', '') or ''
+                    possession_type = str(poss_val).strip()
 
                     shot_obj = {
-                        'event':          'shot_attempt',
-                        'shot_class':     cls,
-                        'result':         result,
-                        'possession_type': possession_str,
-                        'Assisted':       'Assisted' if assisted_flag else '',
-                        'Non-Assisted':   '' if assisted_flag else 'Non-Assisted',
-                        'drill_labels':   labels,
+                        'event': 'shot_attempt',
+                        'shot_class': shot_key,
+                        'result': result,
+                        'possession_type': possession_type,
+                        'Assisted': 'Assisted' if assisted_flag else '',
+                        'Non-Assisted': '' if assisted_flag else 'Non-Assisted',
+                        'drill_labels': labels,
+                        'shot_location': safe_str(row.get('Shot Location', '')),
                     }
-                    shot_location = safe_str(row.get('Shot Location', ''))
-                    shot_obj['shot_location'] = shot_location
 
-                    if cls in ('2fg', 'atr'):
-                        # copy every 2FG/ATR detail column
-                        for detail_col in fieldnames:
-                            if detail_col.startswith('2FG (') and detail_col.endswith(')'):
-                                suffix = detail_col[len('2FG ('):-1].lower().replace(' ', '_').replace('/', '_')
-                                shot_obj[f'2fg_{suffix}'] = safe_str(row.get(detail_col, ''))
-                                if cls == 'atr':
-                                    shot_obj[f'atr_{suffix}'] = safe_str(row.get(detail_col, ''))
+                    # Copy every detail column matching "ATR/2FG/3FG (<Detail>)"
+                    for detail_col in fieldnames:
+                        detail_match = re.match(
+                            rf'^{re.escape(m.group(1))} \((.+)\)$',
+                            detail_col,
+                        )
+                        if detail_match:
+                            suffix = (
+                                detail_match.group(1)
+                                .lower()
+                                .replace(' ', '_')
+                                .replace('/', '_')
+                            )
+                            shot_obj[f"{shot_key}_{suffix}"] = safe_str(
+                                row.get(detail_col, '')
+                            )
 
-                        # copy every 2FG Scheme column
-                        for scheme_col in ('2FG Scheme (Attack)', '2FG Scheme (Drive)', '2FG Scheme (Pass)'):
-                            if scheme_col in fieldnames:
-                                val = safe_str(row.get(scheme_col, ''))
-                                if val:
-                                    key = scheme_col.lower().replace(' ', '_').replace('(', '').replace(')', '')
-                                    shot_obj[key] = val
-
-                    else:  # cls == '3fg'
-                        # copy every 3FG detail column
-                        for suffix in ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]:
-                            col_name = f"3FG ({suffix})"
-                            json_key = f"3fg_{suffix.lower().replace('/', '_').replace(' ', '_')}"
-                            shot_obj[json_key] = safe_str(row.get(col_name, ""))
-
-                        # copy every 3FG Scheme column
-                        for scheme_col in ("3FG Scheme (Attack)", "3FG Scheme (Drive)", "3FG Scheme (Pass)"):
-                            if scheme_col in fieldnames:
-                                for tok in extract_tokens(row.get(scheme_col, "")):
-                                    key = scheme_col.lower().replace(' ', '_').replace('(', '').replace(')', '')
-                                    shot_obj[f"{key}_{tok.replace(' ', '_').lower()}"] = tok
+                    # Copy every scheme column like "ATR/2FG/3FG Scheme (<Type>)"
+                    for scheme_col in fieldnames:
+                        if scheme_col.startswith(f"{m.group(1)} Scheme"):
+                            base_key = (
+                                scheme_col.lower()
+                                .replace(' ', '_')
+                                .replace('(', '')
+                                .replace(')', '')
+                            )
+                            for tok in extract_tokens(row.get(scheme_col, '') or ''):
+                                shot_obj[f"{base_key}_{tok.replace(' ', '_').lower()}"] = tok
 
                     shot_list.append(shot_obj)
-
-                # now handle free throws exactly the same way:
-                if token == 'FT+':
-                    ft_obj = {
-                        'event':       'shot_attempt',
-                        'shot_class':  'ft',
-                        'result':      'made',
-                        'drill_labels': labels,
-                    }
-                    ft_obj['shot_location'] = safe_str(row.get('Shot Location', ''))
-                    shot_list.append(ft_obj)
                     continue
-                elif token == 'FT-':
+
+                # —— Handle Free Throws ——
+                if token in ('FT+', 'FT-'):
                     ft_obj = {
-                        'event':       'shot_attempt',
-                        'shot_class':  'ft',
-                        'result':      'miss',
+                        'event': 'shot_attempt',
+                        'shot_class': 'ft',
+                        'result': 'made' if token == 'FT+' else 'miss',
                         'drill_labels': labels,
+                        'shot_location': safe_str(row.get('Shot Location', '')),
                     }
-                    ft_obj['shot_location'] = safe_str(row.get('Shot Location', ''))
                     shot_list.append(ft_obj)
                     continue
 
-    stat = RecruitShotTypeStat(recruit_id=recruit.id, shot_type_details=json.dumps(shot_list))
+    # 7. Commit to RecruitShotTypeStat exactly like practice parser
+    stat = RecruitShotTypeStat(
+        recruit_id=recruit.id,
+        shot_type_details=json.dumps(shot_list),
+    )
     db.session.add(stat)
     db.session.commit()
     return stat
@@ -150,3 +143,4 @@ def parse_recruits_csv(csv_path, recruit_id):
 if __name__ == '__main__':
     with db.app.app_context():
         parse_recruits_csv(sys.argv[1], int(sys.argv[2]))
+
