@@ -207,8 +207,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         'FT+',
                         'Turnover',       # turnover events
                         'Foul',           # non-shooting foul
-                        'Off Reb',        # individual offensive rebound
-                        'TEAM Off Reb'    # team offensive rebound
+                        'Off Reb'         # individual offensive rebound
                     ]
 
                     # Count and persist each event exactly as labeled
@@ -224,6 +223,15 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         db.session.add(ShotDetail(
                             possession_id=poss_id,
                             event_type='FT+'
+                        ))
+
+                # capture team offensive rebounds from the TEAM column
+                team_cell = row.get('TEAM', '')
+                for token in extract_tokens(team_cell):
+                    if token == 'Off Reb':
+                        db.session.add(ShotDetail(
+                            possession_id=poss_off.id,
+                            event_type='TEAM Off Reb'
                         ))
 
                 persist_events(poss_off.id, row_text)
