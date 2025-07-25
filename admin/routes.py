@@ -414,8 +414,17 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
         misses = events.get('fg_misses', 0)
         individual_off_reb_rate = person_off_rebs.get(player, 0) / misses if misses else 0
-        # combine individual + team rebounds for the team rate
-        team_rebs    = events.get('off_reb_on', 0) + events.get('team_off_reb_on', 0)
+        # Team Offensive Rebounds when player is on-court
+        recorded_team_rebs = (events.get('off_reb_on', 0) or 0) + (events.get('team_off_reb_on', 0) or 0)
+        if recorded_team_rebs > 0:
+            team_rebs = recorded_team_rebs
+        else:
+            # Fallback: estimate using aggregate BlueCollarStats.off_reb totals
+            total_off_reb = sum([
+                p.off_reb
+                for p in BlueCollarStats.query.filter_by(season_id=season_id).all()
+            ])
+            team_rebs = total_off_reb * (on_poss / TEAM_poss) if TEAM_poss else 0
         off_reb_rate = team_rebs / misses if misses else 0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
