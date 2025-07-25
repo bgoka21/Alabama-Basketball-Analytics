@@ -201,29 +201,28 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         off_players.append(name)
 
                 def persist_events(poss_id, text):
-                    # List Hudl’s exact event labels (case-sensitive)
                     hudl_labels = [
                         'ATR+', 'ATR-', '2FG+', '2FG-', '3FG+', '3FG-',
                         'FT+',
-                        'Turnover',       # turnover events
-                        'Foul',           # non-shooting foul
-                        'Off Reb'         # individual offensive rebound
+                        'Turnover', 'Foul',
+                        'Off Reb'
                     ]
 
-                    # Count and persist each event exactly as labeled
+                    # 1) count individual & team rebounds under one 'Off Reb' event
                     for label in hudl_labels:
                         count = text.count(label)
                         for _ in range(count):
-                            db.session.add(ShotDetail(
-                                possession_id=poss_id,
-                                event_type=label
-                            ))
+                            db.session.add(ShotDetail(possession_id=poss_id, event_type=label))
+
+                    # 2) separately catch any TEAM Off Reb labels and map to 'Off Reb'
+                    team_count = text.count('TEAM Off Reb')
+                    for _ in range(team_count):
+                        db.session.add(ShotDetail(possession_id=poss_id, event_type='Off Reb'))
+
+                    # 3) preserve the +1 free-throw hack
                     fp1 = f"{offense_team} Fouled +1"
                     if fp1 in text:
-                        db.session.add(ShotDetail(
-                            possession_id=poss_id,
-                            event_type='FT+'
-                        ))
+                        db.session.add(ShotDetail(possession_id=poss_id, event_type='FT+'))
 
                 # capture team offensive rebounds from the TEAM column
                 team_cell = row.get('TEAM', '')
