@@ -205,8 +205,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     hudl_labels = [
                         'ATR+', 'ATR-', '2FG+', '2FG-', '3FG+', '3FG-',
                         'FT+',
-                        'Turnover', 'Foul',
-                        'Off Reb'
+                        'Turnover', 'Foul'
                     ]
 
                     for label in hudl_labels:
