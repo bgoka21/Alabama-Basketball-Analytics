@@ -29,7 +29,7 @@
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
       Practice
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name) }}#skillDevelopment"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='development') }}#skillDevelopment"
        class="px-4 py-2 rounded bg-gray-200 text-black">
       Development
     </a>
@@ -998,9 +998,14 @@ function showShotTypeDetail(detail) {
 
   // —— DOM-ready initialization ——
   document.addEventListener('DOMContentLoaded', () => {
-    const hash = window.location.hash.replace('#','');
+    const params = new URLSearchParams(window.location.search);
+    const mode   = params.get('mode');
+    const hash   = window.location.hash.replace('#','');
+
     if (['seasonTotals','gameStats','shotType','skillDevelopment'].includes(hash)) {
       showTab(hash);
+    } else if (mode === 'development') {
+      showTab('skillDevelopment');
     } else {
       showTab('seasonTotals');
     }
