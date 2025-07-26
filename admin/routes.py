@@ -357,7 +357,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     (ShotDetail.event_type.in_(['ATR-','2FG-','3FG-']), 1),
                     else_=0
                 )
-            ).label('fg_misses')
+            ).label('team_misses_on')
         )
         .join(PlayerPossession, Roster.id == PlayerPossession.player_id)
         .join(Possession, PlayerPossession.possession_id == Possession.id)
@@ -412,10 +412,10 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
         turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
         individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
-        missed_shots_on = events.get('fg_misses', 0)
+        team_miss = events.get('team_misses_on', 0)
         individual_off_reb_rate = (
-            person_off_rebs.get(player, 0) / missed_shots_on
-            if missed_shots_on
+            person_off_rebs.get(player, 0) / team_miss
+            if team_miss
             else 0
         )
         recorded = events.get('off_reb_on', 0) + events.get('team_off_reb_on', 0)
@@ -426,11 +426,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             )
             * (on_poss / TEAM_poss)
         )
-        off_reb_rate = (
-            team_rebs / missed_shots_on
-            if missed_shots_on
-            else 0
-        )
+        off_reb_rate = team_rebs / team_miss if team_miss else 0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
         extra_rows[player] = {

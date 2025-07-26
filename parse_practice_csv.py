@@ -233,6 +233,14 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                                 events[player].get('team_off_reb_on', 0) + 1
                             )
 
+                # Capture team missed-shot events for OREB% denominator
+                label_val = str(row.get('Label', '') or '').strip()
+                if label_val in ('ATR-', '2FG-', '3FG-'):
+                    for p in off_players:
+                        events[p]['team_misses_on'] = (
+                            events[p].get('team_misses_on', 0) + 1
+                        )
+
                 persist_events(poss_off.id, row_text)
 
                 poss_def = Possession(
