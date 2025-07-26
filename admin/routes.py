@@ -418,7 +418,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             if team_miss
             else 0
         )
-        recorded = events.get('off_reb_on', 0) + events.get('team_off_reb_on', 0)
+        # only count the TEAM Off Reb events for team OREB% numerator
+        recorded = events.get('team_off_reb_on', 0)
         team_rebs = recorded if recorded > 0 else (
             sum(
                 p.off_reb
