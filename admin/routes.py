@@ -2462,6 +2462,8 @@ def player_detail(player_name):
     requested_mode = request.args.get('mode', None)
     if requested_mode in ("game", "practice"):
         mode = requested_mode
+    elif requested_mode == "development":
+        mode = "development"
     else:
         # If the player has no game entries but does have practice entries,
         # force “practice” mode. Otherwise default to “game.”
