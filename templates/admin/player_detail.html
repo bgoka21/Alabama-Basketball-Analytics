@@ -22,15 +22,15 @@
   <!-- Filters -->
   <div class="flex flex-wrap items-end gap-4 mb-4 no-print">
     <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', start_date=start_date, end_date=end_date, label=selected_labels) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-200 text-black' }}">
+       class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-200 text-black' }}">
       Game
     </a>
     <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', start_date=start_date, end_date=end_date, label=selected_labels) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
+       class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
       Practice
     </a>
     <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='development', start_date=start_date, end_date=end_date, label=selected_labels) }}#skillDevelopment"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'development' else 'bg-gray-200 text-black' }}">
+       class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'development' else 'bg-gray-200 text-black' }}">
       Development
     </a>
     <form id="filterForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-wrap items-end gap-2">
@@ -1017,6 +1017,11 @@ function showShotTypeDetail(detail) {
         df.action = df.action.split('#')[0] + window.location.hash;
       });
     }
+
+    // Preserve current tab when switching Game/Practice/Development links
+    document.querySelectorAll('.mode-link').forEach(link => {
+      link.href = link.href.split('#')[0] + window.location.hash;
+    });
 
   // 2) Wire up Game‑by‑Game sorting
   const table = document.getElementById("gameStatsTable");
