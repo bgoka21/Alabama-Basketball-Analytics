@@ -412,20 +412,25 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
         turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
         individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
-        misses = events.get('fg_misses', 0)
-        individual_off_reb_rate = person_off_rebs.get(player, 0) / misses if misses else 0
-        # Team Offensive Rebounds when player is on-court
-        recorded_team_rebs = (events.get('off_reb_on', 0) or 0) + (events.get('team_off_reb_on', 0) or 0)
-        if recorded_team_rebs > 0:
-            team_rebs = recorded_team_rebs
-        else:
-            # Fallback: estimate using aggregate BlueCollarStats.off_reb totals
-            total_off_reb = sum([
+        missed_shots_on = events.get('fg_misses', 0)
+        individual_off_reb_rate = (
+            person_off_rebs.get(player, 0) / missed_shots_on
+            if missed_shots_on
+            else 0
+        )
+        recorded = events.get('off_reb_on', 0) + events.get('team_off_reb_on', 0)
+        team_rebs = recorded if recorded > 0 else (
+            sum(
                 p.off_reb
-                for p in BlueCollarStats.query.filter_by(season_id=season_id).all()
-            ])
-            team_rebs = total_off_reb * (on_poss / TEAM_poss) if TEAM_poss else 0
-        off_reb_rate = team_rebs / misses if misses else 0
+                for p in BlueCollarStats.query.filter_by(season_id=season_id)
+            )
+            * (on_poss / TEAM_poss)
+        )
+        off_reb_rate = (
+            team_rebs / missed_shots_on
+            if missed_shots_on
+            else 0
+        )
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
         extra_rows[player] = {

@@ -113,6 +113,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     player_shot_list    = defaultdict(list)
     player_detail_list  = defaultdict(list)
     possession_data     = []
+    events              = defaultdict(lambda: defaultdict(int))
     # ── Find all columns beginning with "#" to use for player tokens
     player_columns = [c for c in df.columns if str(c).strip().startswith("#")]
     # ─────────────────────────────────────────────────────────────────────
@@ -221,10 +222,16 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 team_cell = row.get('TEAM', '')
                 for token in extract_tokens(team_cell):
                     if token == 'Off Reb':
-                        db.session.add(ShotDetail(
-                            possession_id=poss_off.id,
-                            event_type='TEAM Off Reb'
-                        ))
+                        db.session.add(
+                            ShotDetail(
+                                possession_id=poss_off.id,
+                                event_type='TEAM Off Reb'
+                            )
+                        )
+                        for player in off_players:
+                            events[player]['team_off_reb_on'] = (
+                                events[player].get('team_off_reb_on', 0) + 1
+                            )
 
                 persist_events(poss_off.id, row_text)
 
