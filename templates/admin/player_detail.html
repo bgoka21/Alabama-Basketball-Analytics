@@ -29,8 +29,8 @@
        class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
       Practice
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='development') }}#skillDevelopment"
-       class="px-4 py-2 rounded bg-gray-200 text-black">
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='development', start_date=start_date, end_date=end_date, label=selected_labels) }}#skillDevelopment"
+       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'development' else 'bg-gray-200 text-black' }}">
       Development
     </a>
     <form id="filterForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-wrap items-end gap-2">
