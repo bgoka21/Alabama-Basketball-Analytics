@@ -133,6 +133,21 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         # ─── Possession parsing ─────────────────────────────────────────
         team = row['Row']  # 'Crimson' or 'White'
         if team in ("Crimson", "White"):
+            # === Capture only true team Off Reb without creating a possession ===
+            team_cell = str(row.get('TEAM', '') or '')
+            if 'Off Reb' in [t.strip() for t in team_cell.split(',')]:
+                off_players = [
+                    name.strip()
+                    for name in str(row.get(f"{team.upper()} PLAYER POSSESSIONS", '')).split(',')
+                    if name.strip()
+                ]
+                for player in off_players:
+                    events[player]['team_off_reb_on'] = (
+                        events[player].get('team_off_reb_on', 0) + 1
+                    )
+                # skip normal possession parsing for this rebound row
+                continue
+            # ================================================================
             offense_label = 'Offense'
             defense_label = 'Defense'
             offense_team = team
@@ -155,7 +170,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             row_text = ' '.join(safe_str(val) for val in row.to_dict().values())
 
             upper_text = row_text.upper()
-            skip_tokens = ['OFF REB', 'NEUTRAL']
+            skip_tokens = ['NEUTRAL']
             skip_possession = any(tok in upper_text for tok in skip_tokens)
 
             def compute_points(text, team_name):
@@ -204,8 +219,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 def persist_events(poss_id, text):
                     hudl_labels = [
                         'ATR+', 'ATR-', '2FG+', '2FG-', '3FG+', '3FG-',
-                        'FT+',
-                        'Turnover', 'Foul'
+                        'FT+', 'Turnover', 'Foul'
                     ]
 
                     for label in hudl_labels:
