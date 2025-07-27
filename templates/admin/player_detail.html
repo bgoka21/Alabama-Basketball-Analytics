@@ -875,7 +875,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for d, group in entries|groupby('date') %}
+        {% for d, group in entries_list|groupby('date') %}
           <tr>
             <td class="border-t px-4 py-2">{{ d.strftime('%b %d, %Y') }}</td>
             {% for cls, subs in shot_map.items() %}
@@ -898,7 +898,7 @@
             {% endif %}
           </tr>
         {% endfor %}
-        {% if entries|length == 0 %}
+        {% if entries_list|length == 0 %}
           <tr>
             <td colspan="{{ 1 + (shot_map.values()|map('length')|sum) + (1 if current_user.is_admin else 0) }}" class="border-t px-4 py-2 text-center text-gray-500">No history yet.</td>
           </tr>
