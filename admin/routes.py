@@ -2995,6 +2995,7 @@ def player_detail(player_name):
 
         # ─── Pass the flat list of all SkillEntry rows (so template can group by date) ───
         entries                            = entries_list,
+        entries_list                       = entries_list,
         # ─── “Drill‐by‐drill” totals for shot_map (so template can show totals row) ───
         shot_totals                        = shot_totals,
         totals                             = shot_totals,
