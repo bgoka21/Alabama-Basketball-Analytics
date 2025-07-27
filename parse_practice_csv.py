@@ -170,7 +170,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             row_text = ' '.join(safe_str(val) for val in row.to_dict().values())
 
             upper_text = row_text.upper()
-            skip_tokens = ['NEUTRAL']
+            skip_tokens = ['OFF REB', 'NEUTRAL']
             skip_possession = any(tok in upper_text for tok in skip_tokens)
 
             def compute_points(text, team_name):
