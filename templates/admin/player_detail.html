@@ -800,7 +800,7 @@
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <div id="skillDevelopment" class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8">
   <!-- Drill Entry Form -->
-  {% if current_user.is_admin %}
+  {% if current_user.is_admin or current_user.player_name == player_name %}
   <div class="bg-white p-4 rounded shadow mb-6">
     <form method="post" class="space-y-4">
       <div>
@@ -839,7 +839,7 @@
   {% endif %}
 
   <!-- NBA 100 Form -->
-  {% if current_user.is_admin %}
+  {% if current_user.is_admin or current_user.player_name == player_name %}
   <div class="bg-white p-4 rounded shadow mb-6">
     <form method="post" action="{{ url_for('admin.add_nba100_entry', player_name=player_name) }}" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 items-end">
       <div class="flex-1">
@@ -1015,9 +1015,14 @@ function showShotTypeDetail(detail) {
       });
     }
 
-    // Preserve current tab when switching Game/Practice/Development links
+    // Preserve tab hash except always force Skill Development for Development mode
     document.querySelectorAll('.mode-link').forEach(link => {
-      link.href = link.href.split('#')[0] + window.location.hash;
+      const base = link.href.split('#')[0];
+      if (link.href.includes('mode=development')) {
+        link.href = base + '#skillDevelopment';
+      } else {
+        link.href = base + window.location.hash;
+      }
     });
 
   // 2) Wire up Game‑by‑Game sorting
