@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from models.database import PlayerStats, Game, Practice, Roster, db
 
 
-def get_player_stats_for_date_range(player_id, start_date, end_date, *, labels=None):
+def get_player_stats_for_date_range(player_id, start_date, end_date, *, labels=None, **kwargs):
     """Return aggregated stats for a player within a date range.
 
     Optionally filter by a set of ``labels`` representing drill labels.
@@ -43,6 +43,9 @@ def get_player_stats_for_date_range(player_id, start_date, end_date, *, labels=N
         )
         .all()
     )
+
+    if labels is None and 'drill_labels' in kwargs:
+        labels = kwargs['drill_labels']
 
     if labels:
         label_set = {lbl.strip().upper() for lbl in labels if lbl.strip()}
