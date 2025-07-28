@@ -1,19 +1,18 @@
 {% extends 'admin/base.html' %}
 {% block content %}
-<div class="p-6 bg-white rounded shadow">
-  <h1 class="text-2xl font-bold mb-4">{{ player_name }} — Session Comparison</h1>
-
   <form method="get" class="mb-4">
     {% for lbl in all_labels %}
-      <label class="inline-flex items-center mr-2 text-sm">
-        <input type="checkbox" name="labels" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-        <span class="ml-1">{{ lbl }}</span>
+      <label class="inline-block mr-4">
+        <input type="checkbox" name="labels" value="{{ lbl }}"
+               {% if lbl in labels %}checked{% endif %}>
+        {{ lbl }}
       </label>
     {% endfor %}
-    <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
+    <button type="submit" class="btn btn-sm btn-primary">Filter Drills</button>
   </form>
 
-  <div class="overflow-x-auto">
+  <div class="overflow-x-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4">{{ player_name }} — Session Comparison</h1>
     <table class="min-w-full border">
       <thead class="bg-gray-100">
         <tr>
@@ -30,61 +29,21 @@
         </tr>
       </thead>
       <tbody>
-        {% set metrics = [
-          ('efg_pct', 'Effective FG%', False),
-          ('points_per_shot', 'PPP', False),
-          ('atr_pct', 'ATR%', True),
-          ('two_fg_pct', '2FG%', True),
-          ('fg3_pct', '3FG%', True),
-          ('assist_turnover_ratio', 'AST/TO', False),
-          ('adj_assist_turnover_ratio', 'Adj AST/TO', False),
-          ('possessions', 'Team Poss', False),
-          ('ppp_on', 'PPP On', False),
-          ('team_turnover_rate', 'TO Rate', False),
-          ('individual_turnover_rate', 'Ind TO%', False),
-          ('ind_off_reb_pct', 'Ind Off Reb%', False),
-          ('ind_fouls_drawn_pct', 'Ind Fouls Drawn%', False),
-          ('steal', 'Steals', False),
-          ('block', 'Blocks', False),
-          ('deflection', 'Deflections', False),
-          ('off_reb', 'Offensive Rebs', False),
-          ('def_reb', 'Defensive Rebs', False),
-          ('reb_tip', 'Reb Tips', False),
-          ('charge_taken', 'Charges Taken', False),
-          ('floor_dive', 'Floor Dives', False),
-          ('total_blue_collar', 'Blue Collar Points', False)
-        ] %}
-        {% for key, label, has_freq in metrics %}
-          {% set row_class = 'bg-gray-50' if (loop.index0 % 2) else 'bg-white' %}
-          <tr class="{{ row_class }}">
-            <td class="px-4 py-2">{{ label }}</td>
-            {% for sess in sessions %}
-              {% set cls = '' %}
-              {% if loop.index0 == 1 and improved[key] is not none %}
-                {% if improved[key] %}
-                  {% set cls = 'text-green-600' %}
-                {% else %}
-                  {% set cls = 'text-red-600' %}
-                {% endif %}
-              {% endif %}
-              <td class="px-4 py-2 text-center {{ cls }}">
-                {{ sess.stats[key] or 0 }}
+        {% for stat in display_stats %}
+          <tr class="{{ cycle('bg-white','bg-gray-50') }}">
+            <td class="px-4 py-2">{{ stat.label }}</td>
+            {% for val in stat.session_values %}
+              <td class="px-4 py-2 text-center
+                  {% if loop.index0 == 1 %}
+                    {% if stat.improved %}text-green-600{% else %}text-red-600{% endif %}
+                  {% endif %}">
+                {{ val }}
               </td>
             {% endfor %}
-            <td class="px-4 py-2 text-center">{{ overall[key] or 0 }}</td>
+            <td class="px-4 py-2 text-center">{{ stat.overall_value }}</td>
           </tr>
-          {% if has_freq %}
-          <tr class="{{ row_class }}">
-            <td class="px-4 py-2 text-sm text-gray-600">Freq %</td>
-            {% for sess in sessions %}
-              <td class="px-4 py-2 text-center">{{ sess.freq[key] or 0 }}</td>
-            {% endfor %}
-            <td class="px-4 py-2 text-center">{{ overall_freq[key] or 0 }}</td>
-          </tr>
-          {% endif %}
         {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
 {% endblock %}

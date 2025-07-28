@@ -50,6 +50,7 @@ from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— ma
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from utils.session_helpers import get_player_stats_for_date_range
+from utils.leaderboard_helpers import get_player_overall_stats
 
 # --- Helper Functions at the top ---
 
@@ -3592,24 +3593,43 @@ def player_shot_type(player_name):
 @login_required
 @admin_required
 def player_session_report(player_name):
-    """Display aggregate stats for each session in the player's season."""
-    # 1. Verify the player exists and get their season
-    roster_entry = Roster.query.filter_by(player_name=player_name).first()
-    if not roster_entry:
+    """Compare a player's first two sessions using canonical helpers."""
+    player = Roster.query.filter_by(player_name=player_name).first()
+    if not player:
         abort(404, description=f'Player {player_name} not found')
 
-    # 2. Load sessions for this season
     sessions = (
-        Session.query.filter_by(season_id=roster_entry.season_id)
+        Session.query.filter_by(season_id=player.season_id)
         .order_by(Session.start_date)
         .all()
     )
 
-    # parse label filters from query string
     labels = request.args.getlist('labels')
     if len(labels) == 1 and ',' in labels[0]:
         labels = [l.strip() for l in labels[0].split(',') if l.strip()]
-    selected_labels = [l.upper() for l in labels]
+
+    all_records = (
+        PlayerStats.query
+        .filter_by(player_name=player_name, season_id=player.season_id)
+        .all()
+    )
+
+    def normalize(stats_dict):
+        mapping = {
+            'assist_turnover_ratio': 'ast_to_to_ratio',
+            'adj_assist_turnover_ratio': 'adj_ast_to_to',
+            'steal': 'steals',
+            'block': 'blocks',
+            'deflection': 'deflections',
+            'reb_tip': 'reb_tips',
+            'charge_taken': 'charges',
+            'floor_dive': 'floor_dives',
+            'total_blue_collar': 'blue_collar_points',
+        }
+        out = {}
+        for k, v in stats_dict.items():
+            out[mapping.get(k, k)] = v
+        return out
 
     def collect_labels(records):
         lbls = set()
@@ -3624,123 +3644,98 @@ def player_session_report(player_name):
                             lbls.add(lbl.strip().upper())
         return lbls
 
-    # 3. Build session-by-session aggregates and gather label options
-    session_data = []
-    all_labels = set()
-    for sess in sessions:
-        records = (
-            PlayerStats.query
-            .filter(PlayerStats.player_name == player_name)
-            .outerjoin(Game, PlayerStats.game_id == Game.id)
-            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
-            .filter(
-                or_(
-                    and_(PlayerStats.game_id != None, Game.game_date >= sess.start_date, Game.game_date <= sess.end_date),
-                    and_(PlayerStats.practice_id != None, Practice.date >= sess.start_date, Practice.date <= sess.end_date),
-                )
-            )
-            .all()
-        )
-        all_labels.update(collect_labels(records))
+    all_labels = collect_labels(all_records)
 
-        agg = get_player_stats_for_date_range(
-            roster_entry.id,
-            sess.start_date,
-            sess.end_date,
-            drill_labels=selected_labels,
+    if len(sessions) >= 1:
+        sessions[0].stats = normalize(
+            get_player_stats_for_date_range(
+                player.id,
+                sessions[0].start_date,
+                sessions[0].end_date,
+                labels=labels,
+            ).__dict__
         )
-        stats_map = agg.__dict__ if hasattr(agg, '__dict__') else dict(agg)
-        total_shots = (
-            stats_map.get('atr_attempts', 0)
-            + stats_map.get('fg2_attempts', 0)
-            + stats_map.get('fg3_attempts', 0)
+    if len(sessions) >= 2:
+        sessions[1].stats = normalize(
+            get_player_stats_for_date_range(
+                player.id,
+                sessions[1].start_date,
+                sessions[1].end_date,
+                labels=labels,
+            ).__dict__
         )
-        stats_map['two_fg_pct'] = (
-            round(stats_map.get('fg2_makes', 0) / stats_map.get('fg2_attempts', 0) * 100, 1)
-            if stats_map.get('fg2_attempts', 0)
-            else 0.0
-        )
-        stats_map['two_fg_freq_pct'] = (
-            round(stats_map.get('fg2_attempts', 0) / total_shots * 100, 1)
-            if total_shots
-            else 0.0
-        )
-        freq_map = {
-            'atr_pct': stats_map.get('atr_freq_pct', 0),
-            'two_fg_pct': stats_map.get('two_fg_freq_pct', 0),
-            'fg3_pct': stats_map.get('fg3_freq_pct', 0),
-        }
-        session_data.append({
-            'name': sess.name,
-            'start_date': sess.start_date,
-            'end_date': sess.end_date,
-            'stats': stats_map,
-            'freq': freq_map,
-        })
-
-    # 4. Compute overall totals by summing each numeric metric across sessions
-    overall = {}
-    if session_data:
-        first_stats = session_data[0]['stats']
-        for key in first_stats:
-            overall[key] = sum(s['stats'].get(key, 0) for s in session_data)
-
-    overall_total_shots = (
-        overall.get('atr_attempts', 0)
-        + overall.get('fg2_attempts', 0)
-        + overall.get('fg3_attempts', 0)
-    )
-    overall['two_fg_pct'] = (
-        round(overall.get('fg2_makes', 0) / overall.get('fg2_attempts', 0) * 100, 1)
-        if overall.get('fg2_attempts', 0)
-        else 0.0
-    )
-    overall['two_fg_freq_pct'] = (
-        round(overall.get('fg2_attempts', 0) / overall_total_shots * 100, 1)
-        if overall_total_shots
-        else 0.0
+    overall_stats = normalize(
+        get_player_overall_stats(player.id, labels=labels).__dict__
     )
 
-    overall_freq = {
-        'atr_pct': overall.get('atr_freq_pct', 0),
-        'two_fg_pct': overall.get('two_fg_freq_pct', 0),
-        'fg3_pct': overall.get('fg3_freq_pct', 0),
-    }
+    lower_better = {'team_turnover_rate_on', 'indiv_turnover_rate'}
+    improved = {}
+    if len(sessions) >= 2:
+        for key in overall_stats:
+            if key == 'offensive_poss_on':
+                improved[key] = None
+                continue
+            v1 = sessions[0].stats.get(key)
+            v2 = sessions[1].stats.get(key)
+            if v1 is None or v2 is None:
+                improved[key] = None
+            elif key in lower_better:
+                improved[key] = v2 < v1
+            else:
+                improved[key] = v2 > v1
 
-    metric_keys = [
-        'efg_pct','points_per_shot','atr_pct','atr_freq_pct',
-        'two_fg_pct','two_fg_freq_pct','fg3_pct','fg3_freq_pct',
-        'assist_turnover_ratio','adj_assist_turnover_ratio','possessions','ppp_on',
-        'team_turnover_rate','individual_turnover_rate','ind_off_reb_pct','ind_fouls_drawn_pct',
-        'steal','block','deflection','off_reb','def_reb','reb_tip','charge_taken','floor_dive','total_blue_collar'
+    stats_keys = [
+      ('efg_pct', 'Effective FG%'),
+      ('points_per_shot', 'PPP'),
+      ('atr_pct', 'ATR%'),
+      ('atr_freq_pct', 'ATR Freq%'),
+      ('two_fg_pct', '2FG%'),
+      ('two_fg_freq_pct', '2FG Freq%'),
+      ('three_fg_pct', '3FG%'),
+      ('three_fg_freq_pct', '3FG Freq%'),
+      ('ast_to_to_ratio', 'AST/TO'),
+      ('adj_ast_to_to', 'Adj AST/TO'),
+      ('offensive_poss_on', 'Team Poss'),
+      ('ppp_on', 'PPP On'),
+      ('team_turnover_rate_on', 'TO Rate'),
+      ('indiv_turnover_rate', 'Ind TO%'),
+      ('ind_off_reb_pct', 'Ind Off Reb%'),
+      ('ind_fouls_drawn_pct', 'Ind Fouls Drawn%'),
+      ('steals', 'Steals'),
+      ('blocks', 'Blocks'),
+      ('deflections', 'Deflections'),
+      ('off_reb', 'Offensive Rebs'),
+      ('def_reb', 'Defensive Rebs'),
+      ('reb_tips', 'Rebound Tips'),
+      ('charges', 'Charges Taken'),
+      ('floor_dives', 'Floor Dives'),
+      ('blue_collar_points', 'Blue-Collar Total'),
     ]
 
-    improved = {k: None for k in metric_keys}
-    if len(session_data) >= 2:
-        s1 = session_data[0]['stats']
-        s2 = session_data[1]['stats']
-        lower_better = {'team_turnover_rate', 'individual_turnover_rate'}
-        for k in metric_keys:
-            if k == 'possessions':
-                improved[k] = None
-                continue
-            v1 = s1.get(k, 0)
-            v2 = s2.get(k, 0)
-            if k in lower_better:
-                improved[k] = v2 < v1
-            else:
-                improved[k] = v2 > v1
+    display_stats = []
+    for key, label in stats_keys:
+        v1 = sessions[0].stats.get(key) if len(sessions) >= 1 else None
+        v2 = sessions[1].stats.get(key) if len(sessions) >= 2 else None
+        ov = overall_stats.get(key)
+        if ov is None:
+            continue
+        display_stats.append({
+            'key': key,
+            'label': label,
+            'session_values': [v1, v2],
+            'overall_value': ov,
+            'improved': improved.get(key),
+        })
 
-    # 5. Render the comparison template
     return render_template(
         'admin/player_session_report.html',
         player_name=player_name,
-        sessions=session_data,
-        overall=overall,
-        overall_freq=overall_freq,
-        all_labels=sorted(all_labels),
-        selected_labels=selected_labels,
+        sessions=sessions,
+        overall_stats=overall_stats,
+        display_stats=display_stats,
         improved=improved,
+        all_labels=sorted(all_labels),
+        labels=labels,
     )
 
 
