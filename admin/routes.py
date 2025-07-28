@@ -3587,6 +3587,54 @@ def player_shot_type(player_name):
     )
 
 
+@admin_bp.route('/player/<player_name>/sessions', methods=['GET'])
+@login_required
+@admin_required
+def player_session_report(player_name):
+    """Display aggregate stats for each session in the player's season."""
+    # 1. Verify the player exists and get their season
+    roster_entry = Roster.query.filter_by(player_name=player_name).first()
+    if not roster_entry:
+        abort(404, description=f'Player {player_name} not found')
+
+    # 2. Load sessions for this season
+    sessions = (
+        Session.query.filter_by(season_id=roster_entry.season_id)
+        .order_by(Session.start_date)
+        .all()
+    )
+
+    # 3. Build session-by-session aggregates
+    session_data = []
+    for sess in sessions:
+        agg = get_player_stats_for_date_range(
+            player_name,
+            sess.start_date,
+            sess.end_date,
+        )
+        session_data.append({
+            'name': sess.name,
+            'start_date': sess.start_date,
+            'end_date': sess.end_date,
+            'stats': agg,
+        })
+
+    # 4. Compute overall totals by summing each numeric metric across sessions
+    overall = {}
+    if session_data:
+        first_stats = session_data[0]['stats'].__dict__
+        for key in first_stats:
+            overall[key] = sum(s['stats'].__dict__.get(key, 0) for s in session_data)
+
+    # 5. Render the comparison template
+    return render_template(
+        'admin/player_session_report.html',
+        player_name=player_name,
+        sessions=session_data,
+        overall=overall,
+    )
+
+
 
 @admin_bp.route('/skill_totals')
 @login_required
