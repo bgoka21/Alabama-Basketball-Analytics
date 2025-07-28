@@ -59,6 +59,7 @@
 <div id="tabButtons" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
     <button
       id="btnSeasonTotals"
+      data-tab="season_totals"
       onclick="showTab('seasonTotals')"
       class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
@@ -66,6 +67,7 @@
     </button>
     <button
       id="btnGameStats"
+      data-tab="game_logs"
       onclick="showTab('gameStats')"
       class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
@@ -73,6 +75,7 @@
     </button>
     <button
       id="btnShotType"
+      data-tab="shot_type"
       onclick="showTab('shotType')"
       class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
@@ -81,6 +84,7 @@
     <button
       type="button"
       id="btnSkillDevelopment"
+      data-tab="skill_development"
       onclick="showTab('skillDevelopment')"
       class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
     >
@@ -799,138 +803,8 @@
 <!-- 4) Skill Development                                                           -->
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <div id="skillDevelopment" class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8">
-  <!-- Drill Entry Form -->
-  {% if current_user.is_admin or current_user.player_name == player_name %}
-  <div class="bg-white p-4 rounded shadow mb-6">
-    <form method="post" class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium">Date</label>
-        <input type="date" name="date" required class="border rounded p-2" />
-      </div>
-      <table class="min-w-full table-auto border-collapse bg-white rounded shadow mb-4">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="px-2 py-1">Shot Class</th>
-            <th class="px-2 py-1">Sub-Category</th>
-            <th class="px-2 py-1">Makes</th>
-            <th class="px-2 py-1">Attempts</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for cls, subs in shot_map.items() %}
-            {% for sub in subs %}
-              <tr>
-                <td class="px-2 py-1 font-semibold">{{ label_map[cls] }}</td>
-                <td class="px-2 py-1">{{ sub }}</td>
-                <td class="px-2 py-1">
-                  <input type="number" min="0" name="{{ cls }}_{{ sub|replace(' ', '_') }}_makes" class="w-16 border rounded p-1" />
-                </td>
-                <td class="px-2 py-1">
-                  <input type="number" min="0" name="{{ cls }}_{{ sub|replace(' ', '_') }}_attempts" class="w-16 border rounded p-1" />
-                </td>
-              </tr>
-            {% endfor %}
-          {% endfor %}
-        </tbody>
-      </table>
-      <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Save Drills</button>
-    </form>
-  </div>
-  {% endif %}
-
-  <!-- NBA 100 Form -->
-  {% if current_user.is_admin or current_user.player_name == player_name %}
-  <div class="bg-white p-4 rounded shadow mb-6">
-    <form method="post" action="{{ url_for('admin.add_nba100_entry', player_name=player_name) }}" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 items-end">
-      <div class="flex-1">
-        <label class="block text-sm font-medium">Date</label>
-        <input type="date" name="date" required class="border rounded p-2 w-full" />
-      </div>
-      <div class="w-32">
-        <label class="block text-sm font-medium">Makes (0–100)</label>
-        <input type="number" name="makes" min="0" max="100" required class="border rounded p-2 w-full" />
-      </div>
-      <div>
-        <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded">Save NBA 100</button>
-      </div>
-    </form>
-  </div>
-  {% endif %}
-
-  <!-- Drill History -->
-  <div class="overflow-x-auto mb-8">
-    <h3 class="text-lg font-semibold mb-2">Drill History</h3>
-    <table class="min-w-full bg-white rounded shadow">
-      <thead>
-        <tr class="bg-gray-100">
-          <th class="px-4 py-2 text-left">Date</th>
-          {% for cls, subs in shot_map.items() %}
-            {% for sub in subs %}
-              <th class="px-2 py-1 text-center">{{ label_map[cls] }} - {{ sub }}</th>
-            {% endfor %}
-          {% endfor %}
-          {% if current_user.is_admin %}
-            <th class="px-2 py-1 text-center">Actions</th>
-          {% endif %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for d, group in entries_list|groupby('date') %}
-          <tr>
-            <td class="border-t px-4 py-2">{{ d.strftime('%b %d, %Y') }}</td>
-            {% for cls, subs in shot_map.items() %}
-              {% for sub in subs %}
-                {% set e = group|selectattr('shot_class','equalto',cls)|selectattr('subcategory','equalto',sub)|list|first %}
-                <td class="border-t px-2 py-1 text-center">
-                  {% if e %}
-                    {{ e.makes }}/{{ e.attempts }} ({{ e.fg_pct }}%)
-                  {% else %}-{% endif %}
-                </td>
-              {% endfor %}
-            {% endfor %}
-            {% if current_user.is_admin %}
-              <td class="border-t px-2 py-1 text-center whitespace-nowrap">
-                <a href="{{ url_for('admin.edit_skill_entry', player_name=player_name, entry_date=d.isoformat()) }}" class="text-blue-600 hover:underline mr-2">Edit</a>
-                <form method="post" action="{{ url_for('admin.delete_skill_entry', player_name=player_name, entry_date=d.isoformat()) }}" class="inline">
-                  <button type="submit" class="text-red-600 hover:underline">Delete</button>
-                </form>
-              </td>
-            {% endif %}
-          </tr>
-        {% endfor %}
-        {% if entries_list|length == 0 %}
-          <tr>
-            <td colspan="{{ 1 + (shot_map.values()|map('length')|sum) + (1 if current_user.is_admin else 0) }}" class="border-t px-4 py-2 text-center text-gray-500">No history yet.</td>
-          </tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- NBA 100 History -->
-  <div class="overflow-x-auto">
-    <h3 class="text-lg font-semibold mb-2">NBA 100 History</h3>
-    <table class="min-w-full bg-white rounded shadow">
-      <thead>
-        <tr class="bg-gray-100">
-          <th class="px-4 py-2 text-left">Date</th>
-          <th class="px-4 py-2 text-left">Makes</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for n in nba100_entries %}
-          <tr>
-            <td class="border-t px-4 py-2">{{ n.date.strftime('%b %d, %Y') }}</td>
-            <td class="border-t px-4 py-2">{{ n.value }}/100</td>
-          </tr>
-        {% else %}
-          <tr>
-            <td colspan="2" class="border-t px-4 py-2 text-center text-gray-500">No NBA 100 entries yet.</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% include 'admin/_skill_development_form.html' %}
+  {% include 'admin/_drill_history.html' %}
 </div>  <!-- closes <div id="skillDevelopment"> -->
 
 </div>  <!-- /.inner container -->
