@@ -27,6 +27,7 @@ from models.database import (
     Possession,
     PlayerPossession,
     ShotDetail,
+    Session,
     Season,
     Roster,
     Practice,
@@ -3434,6 +3435,56 @@ def delete_roster(id):
     db.session.commit()
     flash(f"Removed {entry.player_name} from roster.", "success")
     return redirect(url_for('admin.roster', season_id=season_id))
+
+
+@admin_bp.route('/sessions', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def sessions():
+    season_id = request.args.get('season_id', type=int) or Season.query.order_by(Season.start_date.desc()).first().id
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    selected = Season.query.get_or_404(season_id)
+
+    if request.method == 'POST':
+        name = request.form['name']
+        start = request.form['start_date']
+        end = request.form['end_date']
+        new = Session(name=name, start_date=start, end_date=end, season_id=season_id)
+        db.session.add(new)
+        db.session.commit()
+        flash(f'Session "{name}" added.', 'success')
+        return redirect(url_for('admin.sessions', season_id=season_id))
+
+    sessions = Session.query.filter_by(season_id=season_id).order_by(Session.start_date).all()
+    return render_template('admin/sessions.html', seasons=seasons, selected=selected, sessions=sessions)
+
+
+@admin_bp.route('/session/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_session(id):
+    sess = Session.query.get_or_404(id)
+    if request.method == 'POST':
+        sess.name = request.form['name']
+        sess.start_date = request.form['start_date']
+        sess.end_date = request.form['end_date']
+        db.session.commit()
+        flash(f'Session "{sess.name}" updated.', 'success')
+        return redirect(url_for('admin.sessions', season_id=sess.season_id))
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    return render_template('admin/edit_session.html', sess=sess, seasons=seasons)
+
+
+@admin_bp.route('/session/delete/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_session(id):
+    sess = Session.query.get_or_404(id)
+    season_id = sess.season_id
+    db.session.delete(sess)
+    db.session.commit()
+    flash(f'Session "{sess.name}" deleted.', 'warning')
+    return redirect(url_for('admin.sessions', season_id=season_id))
 
 @admin_bp.context_processor
 def inject_seasons():

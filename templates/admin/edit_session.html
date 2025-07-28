@@ -1,0 +1,19 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Edit Session</h1>
+<form method="post" class="space-y-4 max-w-md">
+  <div>
+    <label class="block font-semibold mb-1">Name</label>
+    <input type="text" name="name" value="{{ sess.name }}" class="border p-2 rounded w-full" required>
+  </div>
+  <div>
+    <label class="block font-semibold mb-1">Start Date</label>
+    <input type="date" name="start_date" value="{{ sess.start_date }}" class="border p-2 rounded w-full" required>
+  </div>
+  <div>
+    <label class="block font-semibold mb-1">End Date</label>
+    <input type="date" name="end_date" value="{{ sess.end_date }}" class="border p-2 rounded w-full" required>
+  </div>
+  <button type="submit" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Save Changes</button>
+</form>
+{% endblock %}
