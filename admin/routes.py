@@ -1,6 +1,7 @@
 import os, json
 from collections import defaultdict
 from datetime import datetime, date
+import datetime as datetime_module
 import io
 import re
 import traceback
@@ -3448,8 +3449,8 @@ def sessions():
 
     if request.method == 'POST':
         name = request.form['name']
-        start = request.form['start_date']
-        end = request.form['end_date']
+        start = datetime_module.date.fromisoformat(request.form['start_date'])
+        end = datetime_module.date.fromisoformat(request.form['end_date'])
         new = Session(name=name, start_date=start, end_date=end, season_id=season_id)
         db.session.add(new)
         db.session.commit()
