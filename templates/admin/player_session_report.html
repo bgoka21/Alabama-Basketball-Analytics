@@ -1,37 +1,49 @@
 {% extends 'admin/base.html' %}
-
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">{{ player_name }} - Session Report</h1>
-<div class="overflow-x-auto">
-  <table class="min-w-full bg-white border rounded">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-4 py-2 text-left">Session</th>
-        {% if sessions %}
-          {% for key in sessions[0].stats.__dict__.keys() %}
-            <th class="px-4 py-2 text-right">{{ key }}</th>
+<div class="p-6 bg-white rounded shadow">
+  <h1 class="text-2xl font-bold mb-4">{{ player_name }} — Session Comparison</h1>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full border">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-4 py-2 text-left">Stat</th>
+          {% for sess in sessions %}
+            <th class="px-4 py-2 text-center">
+              {{ sess.name }}<br>
+              <span class="text-sm text-gray-600">
+                {{ sess.start_date.strftime('%b %-d') }}–{{ sess.end_date.strftime('%b %-d') }}
+              </span>
+            </th>
           {% endfor %}
-        {% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in sessions %}
-      <tr class="border-t">
-        <td class="px-4 py-2">{{ s.name }}<br><span class="text-xs text-gray-600">{{ s.start_date }} – {{ s.end_date }}</span></td>
-        {% for val in s.stats.__dict__.values() %}
-          <td class="px-4 py-2 text-right">{{ val }}</td>
+          <th class="px-4 py-2 text-center">Overall</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set metrics = [
+          ('points', 'Points'),
+          ('rebounds', 'Rebounds'),
+          ('assists', 'Assists'),
+          ('fg_attempts', 'FG Attempts'),
+          ('fg_made', 'FG Made'),
+          ('efg_pct', 'eFG%'),
+          ('points_per_shot', 'PPP')
+        ] %}
+        {% for key, label in metrics %}
+          <tr class="{% cycle 'bg-white' 'bg-gray-50' %}">
+            <td class="px-4 py-2">{{ label }}</td>
+            {% for sess in sessions %}
+              <td class="px-4 py-2 text-center">
+                {{ sess.stats[key] if sess.stats[key] is not none else 0 }}
+              </td>
+            {% endfor %}
+            <td class="px-4 py-2 text-center">
+              {{ overall[key] if overall[key] is not none else 0 }}
+            </td>
+          </tr>
         {% endfor %}
-      </tr>
-      {% endfor %}
-      {% if overall %}
-      <tr class="border-t font-bold">
-        <td class="px-4 py-2">Overall</td>
-        {% for key in sessions[0].stats.__dict__.keys() %}
-          <td class="px-4 py-2 text-right">{{ overall[key] }}</td>
-        {% endfor %}
-      </tr>
-      {% endif %}
-    </tbody>
-  </table>
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
