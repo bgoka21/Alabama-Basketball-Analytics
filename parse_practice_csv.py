@@ -135,7 +135,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         if team in ("Crimson", "White"):
             # === Capture only true team Off Reb without creating a possession ===
             team_cell = str(row.get('TEAM', '') or '')
-            if 'Off Reb' in [t.strip() for t in team_cell.split(',')]:
+            off_reb_row = 'Off Reb' in [t.strip() for t in team_cell.split(',')]
+            if off_reb_row:
                 off_players = [
                     name.strip()
                     for name in str(row.get(f"{team.upper()} PLAYER POSSESSIONS", '')).split(',')
@@ -146,7 +147,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         events[player].get('team_off_reb_on', 0) + 1
                     )
                 # skip normal possession parsing for this rebound row
-                continue
+                # (but still allow token parsing below to record shot attempts)
             # ================================================================
             offense_label = 'Offense'
             defense_label = 'Defense'
@@ -171,7 +172,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
             upper_text = row_text.upper()
             skip_tokens = ['OFF REB', 'NEUTRAL']
-            skip_possession = any(tok in upper_text for tok in skip_tokens)
+            skip_possession = any(tok in upper_text for tok in skip_tokens) or off_reb_row
 
             def compute_points(text, team_name):
                 pts = text.count('ATR+') * 2
