@@ -50,7 +50,7 @@ from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— ma
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from utils.session_helpers import get_player_stats_for_date_range
-from utils.leaderboard_helpers import get_player_overall_stats
+from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 
 # --- Helper Functions at the top ---
 
@@ -1865,6 +1865,20 @@ def aggregate_stats(stats_list):
     # shot percentages
     agg["atr_pct"] = round(agg["atr_makes"] / agg["atr_attempts"] * 100, 1) if agg["atr_attempts"] else 0.0
     agg["fg3_pct"] = round(agg["fg3_makes"] / agg["fg3_attempts"] * 100, 1) if agg["fg3_attempts"] else 0.0
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Add 2FG% and 2FG Frequency to session stats
+    two_att = agg.get('fg2_attempts', 0) + agg.get('atr_attempts', 0)
+    two_made = agg.get('fg2_makes', 0) + agg.get('atr_makes', 0)
+    agg['two_fg_pct'] = round(two_made / two_att * 100, 1) if two_att else None
+    agg['two_fg_freq_pct'] = round(two_att / total_shots * 100, 1) if total_shots else None
+
+    # Normalize 3FG keys to match overall helper
+    three_att = agg.get('fg3_attempts', 0)
+    three_made = agg.get('fg3_makes', 0)
+    agg['three_fg_pct'] = round(three_made / three_att * 100, 1) if three_att else None
+    agg['three_fg_freq_pct'] = round(three_att / total_shots * 100, 1) if total_shots else None
+    # ──────────────────────────────────────────────────────────────────────────
     # 3) assist/turnover ratios
     if agg["turnovers"]:
         agg["assist_turnover_ratio"]     = round(agg["assists"]     / agg["turnovers"], 2)
@@ -2079,6 +2093,20 @@ def compute_filtered_totals(stats_records, label_set):
 
     totals["atr_pct"] = round(totals["atr_makes"] / totals["atr_attempts"] * 100, 1) if totals["atr_attempts"] else 0.0
     totals["fg3_pct"] = round(totals["fg3_makes"] / totals["fg3_attempts"] * 100, 1) if totals["fg3_attempts"] else 0.0
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Add 2FG% and 2FG Frequency to session stats
+    two_att = totals.get('fg2_attempts', 0) + totals.get('atr_attempts', 0)
+    two_made = totals.get('fg2_makes', 0) + totals.get('atr_makes', 0)
+    totals['two_fg_pct'] = round(two_made / two_att * 100, 1) if two_att else None
+    totals['two_fg_freq_pct'] = round(two_att / total_shots * 100, 1) if total_shots else None
+
+    # Normalize 3FG keys to match overall helper
+    three_att = totals.get('fg3_attempts', 0)
+    three_made = totals.get('fg3_makes', 0)
+    totals['three_fg_pct'] = round(three_made / three_att * 100, 1) if three_att else None
+    totals['three_fg_freq_pct'] = round(three_att / total_shots * 100, 1) if total_shots else None
+    # ──────────────────────────────────────────────────────────────────────────
 
     if totals["turnovers"]:
         totals["assist_turnover_ratio"] = round(
@@ -3646,43 +3674,34 @@ def player_session_report(player_name):
 
     all_labels = collect_labels(all_records)
 
-    if len(sessions) >= 1:
-        sessions[0].stats = normalize(
-            get_player_stats_for_date_range(
-                player.id,
-                sessions[0].start_date,
-                sessions[0].end_date,
-                labels=labels,
-            ).__dict__
+    for sess in sessions:
+        stats = get_player_stats_for_date_range(
+            player.id,
+            sess.start_date,
+            sess.end_date,
+            labels=labels,
+        ).__dict__
+        on_court = get_on_court_metrics(
+            player.id,
+            start_date=sess.start_date,
+            end_date=sess.end_date,
+            labels=labels,
         )
-    if len(sessions) >= 2:
-        sessions[1].stats = normalize(
-            get_player_stats_for_date_range(
-                player.id,
-                sessions[1].start_date,
-                sessions[1].end_date,
-                labels=labels,
-            ).__dict__
-        )
+        stats.update(on_court)
+        sess.stats = normalize(stats)
+
     overall_stats = normalize(
         get_player_overall_stats(player.id, labels=labels).__dict__
     )
 
     lower_better = {'team_turnover_rate_on', 'indiv_turnover_rate'}
-    improved = {}
-    if len(sessions) >= 2:
-        for key in overall_stats:
-            if key == 'offensive_poss_on':
-                improved[key] = None
-                continue
-            v1 = sessions[0].stats.get(key)
-            v2 = sessions[1].stats.get(key)
-            if v1 is None or v2 is None:
-                improved[key] = None
-            elif key in lower_better:
-                improved[key] = v2 < v1
-            else:
-                improved[key] = v2 > v1
+
+    def compute_improved_flag(key, v1, v2):
+        if v1 is None or v2 is None or key == 'offensive_poss_on':
+            return None
+        if key in lower_better:
+            return v2 < v1
+        return v2 > v1
 
     stats_keys = [
       ('efg_pct', 'Effective FG%'),
@@ -3719,12 +3738,13 @@ def player_session_report(player_name):
         ov = overall_stats.get(key)
         if ov is None:
             continue
+        improved = compute_improved_flag(key, v1, v2)
         display_stats.append({
             'key': key,
             'label': label,
             'session_values': [v1, v2],
             'overall_value': ov,
-            'improved': improved.get(key),
+            'improved': improved,
         })
 
     return render_template(
@@ -3733,7 +3753,6 @@ def player_session_report(player_name):
         sessions=sessions,
         overall_stats=overall_stats,
         display_stats=display_stats,
-        improved=improved,
         all_labels=sorted(all_labels),
         labels=labels,
     )
