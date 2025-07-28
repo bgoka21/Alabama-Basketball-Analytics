@@ -114,6 +114,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     player_detail_list  = defaultdict(list)
     possession_data     = []
     events              = defaultdict(lambda: defaultdict(int))
+    last_offense_possession = {}  # map team name → (Possession, [player names])
     # ── Find all columns beginning with "#" to use for player tokens
     player_columns = [c for c in df.columns if str(c).strip().startswith("#")]
     # ─────────────────────────────────────────────────────────────────────
@@ -217,6 +218,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         db.session.add(PossessionPlayer(possession_id=poss_off.id, player_id=pid))
                         off_players.append(name)
 
+                last_offense_possession[offense_team] = (poss_off, off_players.copy())
+
                 def persist_events(poss_id, text):
                     hudl_labels = [
                         'ATR+', 'ATR-', '2FG+', '2FG-', '3FG+', '3FG-',
@@ -315,6 +318,27 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 # 3) Reset event lists for the next row
                 off_events.clear()
                 def_events.clear()
+            else:
+                poss_off, prev_off_players = last_offense_possession.get(offense_team, (None, []))
+                if poss_off is not None:
+                    poss_off.points_scored = (poss_off.points_scored or 0) + points_scored
+                    for label in ['ATR+','ATR-','2FG+','2FG-','3FG+','3FG-','FT+','Turnover','Foul']:
+                        count = row_text.count(label)
+                        for _ in range(count):
+                            db.session.add(ShotDetail(possession_id=poss_off.id, event_type=label))
+                    if f"{offense_team} Fouled +1" in row_text:
+                        db.session.add(ShotDetail(possession_id=poss_off.id, event_type='FT+'))
+                    team_cell = row.get('TEAM', '')
+                    for token in extract_tokens(team_cell):
+                        if token == 'Off Reb':
+                            db.session.add(ShotDetail(possession_id=poss_off.id, event_type='TEAM Off Reb'))
+                            if not off_reb_row:
+                                for player in prev_off_players:
+                                    events[player]['team_off_reb_on'] += 1
+                    label_val = str(row.get('Label','')).strip()
+                    if label_val in ('ATR-','2FG-','3FG-'):
+                        for player in prev_off_players:
+                            events[player]['team_misses_on'] += 1
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":
