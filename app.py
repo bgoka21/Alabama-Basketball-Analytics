@@ -216,11 +216,7 @@ def create_app():
     # using ``flask --app app:create_app`` to run the app. Expose the app
     # variable first so ``routes`` can import it without a circular import.
     globals()['app'] = app
-    import importlib, sys
-    if 'routes' in sys.modules:
-        importlib.reload(sys.modules['routes'])
-    else:
-        import routes  # noqa: F401
+    import routes  # noqa: F401
 
     return app
 
