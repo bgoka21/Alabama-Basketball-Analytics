@@ -30,18 +30,35 @@
       </thead>
       <tbody>
         {% for stat in display_stats %}
-          <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
-            <td class="px-4 py-2">{{ stat.label }}</td>
-            {% for val in stat.session_values %}
-              <td class="px-4 py-2 text-center
-                  {% if loop.index0 == 1 %}
-                    {% if stat.improved %}text-green-600{% else %}text-red-600{% endif %}
-                  {% endif %}">
-                {{ val }}
-              </td>
-            {% endfor %}
-            <td class="px-4 py-2 text-center">{{ stat.overall_value }}</td>
-          </tr>
+          {% if stat.key.startswith('blue') or stat.key in ['steals','blocks','deflections','off_reb','def_reb','reb_tips','charges','floor_dives'] %}
+            {% if not labels %}
+              <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+                <td class="px-4 py-2">{{ stat.label }}</td>
+                {% for val in stat.session_values %}
+                  <td class="px-4 py-2 text-center
+                      {% if loop.index0 == 1 %}
+                        {% if stat.improved %}text-green-600{% else %}text-red-600{% endif %}
+                      {% endif %}">
+                    {{ val or 0 }}
+                  </td>
+                {% endfor %}
+                <td class="px-4 py-2 text-center">{{ stat.overall_value or 0 }}</td>
+              </tr>
+            {% endif %}
+          {% else %}
+            <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+              <td class="px-4 py-2">{{ stat.label }}</td>
+              {% for val in stat.session_values %}
+                <td class="px-4 py-2 text-center
+                    {% if loop.index0 == 1 %}
+                      {% if stat.improved %}text-green-600{% else %}text-red-600{% endif %}
+                    {% endif %}">
+                  {{ val or 0 }}
+                </td>
+              {% endfor %}
+              <td class="px-4 py-2 text-center">{{ stat.overall_value or 0 }}</td>
+            </tr>
+          {% endif %}
         {% endfor %}
       </tbody>
     </table>
