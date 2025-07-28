@@ -30,7 +30,7 @@
       </thead>
       <tbody>
         {% for stat in display_stats %}
-          <tr class="{{ cycle('bg-white','bg-gray-50') }}">
+          <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
             <td class="px-4 py-2">{{ stat.label }}</td>
             {% for val in stat.session_values %}
               <td class="px-4 py-2 text-center
