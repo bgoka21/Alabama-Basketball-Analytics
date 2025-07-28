@@ -48,6 +48,7 @@ from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
+from utils.session_helpers import get_player_stats_for_date_range
 
 # --- Helper Functions at the top ---
 
