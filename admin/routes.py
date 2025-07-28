@@ -1867,11 +1867,11 @@ def aggregate_stats(stats_list):
     agg["fg3_pct"] = round(agg["fg3_makes"] / agg["fg3_attempts"] * 100, 1) if agg["fg3_attempts"] else 0.0
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Add 2FG% and 2FG Frequency to session stats
-    two_att = agg.get('fg2_attempts', 0) + agg.get('atr_attempts', 0)
-    two_made = agg.get('fg2_makes', 0) + agg.get('atr_makes', 0)
-    agg['two_fg_pct'] = round(two_made / two_att * 100, 1) if two_att else None
-    agg['two_fg_freq_pct'] = round(two_att / total_shots * 100, 1) if total_shots else None
+    # Pure FG2 metrics (exclude at-rim)
+    fg2_att = agg.get('fg2_attempts', 0)
+    fg2_made = agg.get('fg2_makes', 0)
+    agg['two_fg_pct'] = round(fg2_made / fg2_att * 100, 1) if fg2_att else None
+    agg['two_fg_freq_pct'] = round(fg2_att / total_shots * 100, 1) if total_shots else None
 
     # Normalize 3FG keys to match overall helper
     three_att = agg.get('fg3_attempts', 0)
@@ -2095,11 +2095,11 @@ def compute_filtered_totals(stats_records, label_set):
     totals["fg3_pct"] = round(totals["fg3_makes"] / totals["fg3_attempts"] * 100, 1) if totals["fg3_attempts"] else 0.0
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Add 2FG% and 2FG Frequency to session stats
-    two_att = totals.get('fg2_attempts', 0) + totals.get('atr_attempts', 0)
-    two_made = totals.get('fg2_makes', 0) + totals.get('atr_makes', 0)
-    totals['two_fg_pct'] = round(two_made / two_att * 100, 1) if two_att else None
-    totals['two_fg_freq_pct'] = round(two_att / total_shots * 100, 1) if total_shots else None
+    # Pure FG2 metrics (exclude at-rim)
+    fg2_att = totals.get('fg2_attempts', 0)
+    fg2_made = totals.get('fg2_makes', 0)
+    totals['two_fg_pct'] = round(fg2_made / fg2_att * 100, 1) if fg2_att else None
+    totals['two_fg_freq_pct'] = round(fg2_att / total_shots * 100, 1) if total_shots else None
 
     # Normalize 3FG keys to match overall helper
     three_att = totals.get('fg3_attempts', 0)
@@ -3675,20 +3675,21 @@ def player_session_report(player_name):
     all_labels = collect_labels(all_records)
 
     for sess in sessions:
-        stats = get_player_stats_for_date_range(
+        sess.stats = get_player_stats_for_date_range(
             player.id,
             sess.start_date,
             sess.end_date,
-            labels=labels,
+            labels=labels
         ).__dict__
+        # Merge in per-session on-court metrics, including Off Reb % and Fouls Drawn %
         on_court = get_on_court_metrics(
             player.id,
             start_date=sess.start_date,
             end_date=sess.end_date,
-            labels=labels,
+            labels=labels
         )
-        stats.update(on_court)
-        sess.stats = normalize(stats)
+        sess.stats.update(on_court)
+        sess.stats = normalize(sess.stats)
 
     overall_stats = normalize(
         get_player_overall_stats(player.id, labels=labels).__dict__
@@ -3705,7 +3706,7 @@ def player_session_report(player_name):
 
     stats_keys = [
       ('efg_pct', 'Effective FG%'),
-      ('points_per_shot', 'PPP'),
+      ('points_per_shot', 'PPS'),
       ('atr_pct', 'ATR%'),
       ('atr_freq_pct', 'ATR Freq%'),
       ('two_fg_pct', '2FG%'),
