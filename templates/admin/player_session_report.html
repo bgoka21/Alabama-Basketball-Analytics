@@ -30,15 +30,16 @@
           ('points_per_shot', 'PPP')
         ] %}
         {% for key, label in metrics %}
-          <tr class="{% cycle 'bg-white' 'bg-gray-50' %}">
+          {% set row_class = 'bg-gray-50' if (loop.index0 % 2) else 'bg-white' %}
+          <tr class="{{ row_class }}">
             <td class="px-4 py-2">{{ label }}</td>
             {% for sess in sessions %}
               <td class="px-4 py-2 text-center">
-                {{ sess.stats[key] if sess.stats[key] is not none else 0 }}
+                {{ sess.stats[key] or 0 }}
               </td>
             {% endfor %}
             <td class="px-4 py-2 text-center">
-              {{ overall[key] if overall[key] is not none else 0 }}
+              {{ overall[key] or 0 }}
             </td>
           </tr>
         {% endfor %}
