@@ -3605,27 +3605,131 @@ def player_session_report(player_name):
         .all()
     )
 
-    # 3. Build session-by-session aggregates
+    # parse label filters from query string
+    labels = request.args.getlist('labels')
+    if len(labels) == 1 and ',' in labels[0]:
+        labels = [l.strip() for l in labels[0].split(',') if l.strip()]
+    selected_labels = [l.upper() for l in labels]
+
+    def collect_labels(records):
+        lbls = set()
+        for r in records:
+            for blob in [r.shot_type_details, r.stat_details]:
+                if not blob:
+                    continue
+                data = json.loads(blob) if isinstance(blob, str) else blob
+                for item in data:
+                    for lbl in item.get('drill_labels', []):
+                        if isinstance(lbl, str) and lbl.strip():
+                            lbls.add(lbl.strip().upper())
+        return lbls
+
+    # 3. Build session-by-session aggregates and gather label options
     session_data = []
+    all_labels = set()
     for sess in sessions:
+        records = (
+            PlayerStats.query
+            .filter(PlayerStats.player_name == player_name)
+            .outerjoin(Game, PlayerStats.game_id == Game.id)
+            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+            .filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= sess.start_date, Game.game_date <= sess.end_date),
+                    and_(PlayerStats.practice_id != None, Practice.date >= sess.start_date, Practice.date <= sess.end_date),
+                )
+            )
+            .all()
+        )
+        all_labels.update(collect_labels(records))
+
         agg = get_player_stats_for_date_range(
-            player_name,
+            roster_entry.id,
             sess.start_date,
             sess.end_date,
+            drill_labels=selected_labels,
         )
+        stats_map = agg.__dict__ if hasattr(agg, '__dict__') else dict(agg)
+        total_shots = (
+            stats_map.get('atr_attempts', 0)
+            + stats_map.get('fg2_attempts', 0)
+            + stats_map.get('fg3_attempts', 0)
+        )
+        stats_map['two_fg_pct'] = (
+            round(stats_map.get('fg2_makes', 0) / stats_map.get('fg2_attempts', 0) * 100, 1)
+            if stats_map.get('fg2_attempts', 0)
+            else 0.0
+        )
+        stats_map['two_fg_freq_pct'] = (
+            round(stats_map.get('fg2_attempts', 0) / total_shots * 100, 1)
+            if total_shots
+            else 0.0
+        )
+        freq_map = {
+            'atr_pct': stats_map.get('atr_freq_pct', 0),
+            'two_fg_pct': stats_map.get('two_fg_freq_pct', 0),
+            'fg3_pct': stats_map.get('fg3_freq_pct', 0),
+        }
         session_data.append({
             'name': sess.name,
             'start_date': sess.start_date,
             'end_date': sess.end_date,
-            'stats': agg,
+            'stats': stats_map,
+            'freq': freq_map,
         })
 
     # 4. Compute overall totals by summing each numeric metric across sessions
     overall = {}
     if session_data:
-        first_stats = session_data[0]['stats'].__dict__
+        first_stats = session_data[0]['stats']
         for key in first_stats:
-            overall[key] = sum(s['stats'].__dict__.get(key, 0) for s in session_data)
+            overall[key] = sum(s['stats'].get(key, 0) for s in session_data)
+
+    overall_total_shots = (
+        overall.get('atr_attempts', 0)
+        + overall.get('fg2_attempts', 0)
+        + overall.get('fg3_attempts', 0)
+    )
+    overall['two_fg_pct'] = (
+        round(overall.get('fg2_makes', 0) / overall.get('fg2_attempts', 0) * 100, 1)
+        if overall.get('fg2_attempts', 0)
+        else 0.0
+    )
+    overall['two_fg_freq_pct'] = (
+        round(overall.get('fg2_attempts', 0) / overall_total_shots * 100, 1)
+        if overall_total_shots
+        else 0.0
+    )
+
+    overall_freq = {
+        'atr_pct': overall.get('atr_freq_pct', 0),
+        'two_fg_pct': overall.get('two_fg_freq_pct', 0),
+        'fg3_pct': overall.get('fg3_freq_pct', 0),
+    }
+
+    metric_keys = [
+        'efg_pct','points_per_shot','atr_pct','atr_freq_pct',
+        'two_fg_pct','two_fg_freq_pct','fg3_pct','fg3_freq_pct',
+        'assist_turnover_ratio','adj_assist_turnover_ratio','possessions','ppp_on',
+        'team_turnover_rate','individual_turnover_rate','ind_off_reb_pct','ind_fouls_drawn_pct',
+        'steal','block','deflection','off_reb','def_reb','reb_tip','charge_taken','floor_dive','total_blue_collar'
+    ]
+
+    improved = {k: None for k in metric_keys}
+    if len(session_data) >= 2:
+        s1 = session_data[0]['stats']
+        s2 = session_data[1]['stats']
+        lower_better = {'team_turnover_rate', 'individual_turnover_rate'}
+        for k in metric_keys:
+            if k == 'possessions':
+                improved[k] = None
+                continue
+            v1 = s1.get(k, 0)
+            v2 = s2.get(k, 0)
+            if k in lower_better:
+                improved[k] = v2 < v1
+            else:
+                improved[k] = v2 > v1
 
     # 5. Render the comparison template
     return render_template(
@@ -3633,6 +3737,10 @@ def player_session_report(player_name):
         player_name=player_name,
         sessions=session_data,
         overall=overall,
+        overall_freq=overall_freq,
+        all_labels=sorted(all_labels),
+        selected_labels=selected_labels,
+        improved=improved,
     )
 
 
