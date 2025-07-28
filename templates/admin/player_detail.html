@@ -52,8 +52,13 @@
       <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
       <a href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
     </form>
-    <a href="{{ url_for('admin.player_session_report', player_name=player_name) }}"
-       class="inline-block ml-4 px-3 py-1 bg-crimson text-white rounded hover:bg-red-700">
+  </div>
+
+  <div class="flex items-center space-x-2 mb-4">
+    <a
+      href="{{ url_for('admin.player_session_report', player_name=player.name) }}"
+      class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+    >
       Compare Sessions
     </a>
   </div>
