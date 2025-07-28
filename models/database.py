@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import UniqueConstraint
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
@@ -13,6 +14,19 @@ class Season(db.Model):
 
     games       = db.relationship('Game',   backref='season', lazy=True)
     roster      = db.relationship('Roster', backref='season', lazy=True)
+
+
+class Session(db.Model):
+    __tablename__ = 'session'
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    __table_args__ = (
+        UniqueConstraint('season_id', 'name', name='_season_session_uc'),
+    )
+    season = db.relationship('Season', backref=db.backref('sessions', lazy=True))
 
 
 class Game(db.Model):
