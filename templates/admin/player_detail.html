@@ -55,9 +55,8 @@
   </div>
 
   <div class="flex items-center space-x-2 mb-4">
-    {# Compare Sessions button #}
     <a
-      href="{{ url_for('admin.player_session_report', player_name=player.name) }}"
+      href="{{ url_for('admin.player_session_report', player_name=player_name) }}"
       class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
     >
       Compare Sessions
