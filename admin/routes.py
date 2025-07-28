@@ -2094,6 +2094,44 @@ def compute_filtered_totals(stats_records, label_set):
     return SimpleNamespace(**totals)
 
 
+# Helper: collect unique drill labels from a list of PlayerStats
+def collect_labels_from_records(stats_records):
+    """Return a set of drill labels present in the given stats records."""
+    labels = set()
+    for rec in stats_records:
+        if rec.shot_type_details:
+            shots = (
+                json.loads(rec.shot_type_details)
+                if isinstance(rec.shot_type_details, str)
+                else rec.shot_type_details
+            )
+            for shot in shots:
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in shot.get("drill_labels", [])
+                    if isinstance(lbl, str) and lbl.strip()
+                )
+                poss = shot.get("possession_type", "")
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in re.split(r",", poss)
+                    if lbl.strip()
+                )
+        if rec.stat_details:
+            details = (
+                json.loads(rec.stat_details)
+                if isinstance(rec.stat_details, str)
+                else rec.stat_details
+            )
+            for ev in details:
+                labels.update(
+                    lbl.strip().upper()
+                    for lbl in ev.get("drill_labels", [])
+                    if isinstance(lbl, str) and lbl.strip()
+                )
+    return labels
+
+
 # ─── Helper: compute team shot-type aggregates and summaries ─────────────
 def compute_team_shot_details(stats_records, label_set):
     """Return season shot totals and detail summaries for a list of PlayerStats."""
@@ -3598,6 +3636,12 @@ def player_session_report(player_name):
     if not roster_entry:
         abort(404, description=f'Player {player_name} not found')
 
+    # Selected drill labels from query string
+    raw_labels = request.args.getlist('labels')
+    if len(raw_labels) == 1 and ',' in raw_labels[0]:
+        raw_labels = [lbl for lbl in raw_labels[0].split(',') if lbl]
+    selected_labels = [lbl.upper() for lbl in raw_labels]
+
     # 2. Load sessions for this season
     sessions = (
         Session.query.filter_by(season_id=roster_entry.season_id)
@@ -3605,34 +3649,83 @@ def player_session_report(player_name):
         .all()
     )
 
-    # 3. Build session-by-session aggregates
+    # 3. Build session-by-session aggregates and collect labels
     session_data = []
+    all_labels = set()
     for sess in sessions:
+        records = (
+            PlayerStats.query
+            .filter(PlayerStats.player_name == player_name)
+            .outerjoin(Game, PlayerStats.game_id == Game.id)
+            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+            .filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= sess.start_date, Game.game_date <= sess.end_date),
+                    and_(PlayerStats.practice_id != None, Practice.date >= sess.start_date, Practice.date <= sess.end_date),
+                )
+            )
+            .all()
+        )
+        all_labels.update(collect_labels_from_records(records))
         agg = get_player_stats_for_date_range(
             player_name,
             sess.start_date,
             sess.end_date,
+            drill_labels=selected_labels,
         )
+        stats_map = agg.__dict__ if hasattr(agg, '__dict__') else dict(agg)
+        # derive 2FG frequency if not provided
+        if 'two_fg_freq_pct' not in stats_map:
+            a = stats_map.get('atr_freq_pct', 0)
+            b = stats_map.get('fg3_freq_pct', 0)
+            stats_map['two_fg_freq_pct'] = max(0, round(100 - a - b, 1))
         session_data.append({
             'name': sess.name,
             'start_date': sess.start_date,
             'end_date': sess.end_date,
-            'stats': agg,
+            'stats': stats_map,
         })
 
     # 4. Compute overall totals by summing each numeric metric across sessions
     overall = {}
     if session_data:
-        first_stats = session_data[0]['stats'].__dict__
+        first_stats = session_data[0]['stats']
         for key in first_stats:
-            overall[key] = sum(s['stats'].__dict__.get(key, 0) for s in session_data)
+            overall[key] = sum(s['stats'].get(key, 0) for s in session_data)
 
-    # 5. Render the comparison template
+    # 5. Determine stat improvements from session 1 -> session 2
+    improved = {}
+    if len(session_data) >= 2:
+        s1 = session_data[0]['stats']
+        s2 = session_data[1]['stats']
+        lower_better = {
+            'turnover_rate',
+            'individual_turnover_rate',
+        }
+        neutral = {'offensive_possessions'}
+        stat_keys = list(s1.keys())
+        for k in stat_keys:
+            if k in neutral:
+                improved[k] = None
+                continue
+            v1 = s1.get(k, 0)
+            v2 = s2.get(k, 0)
+            if k in lower_better:
+                improved[k] = v2 < v1
+            else:
+                improved[k] = v2 > v1
+    else:
+        improved = {k: None for k in (session_data[0]['stats'] if session_data else {})}
+
+    # 6. Render the comparison template
     return render_template(
         'admin/player_session_report.html',
         player_name=player_name,
         sessions=session_data,
         overall=overall,
+        all_labels=sorted(all_labels),
+        selected_labels=selected_labels,
+        improved=improved,
     )
 
 
