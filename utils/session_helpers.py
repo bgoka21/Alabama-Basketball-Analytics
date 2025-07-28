@@ -3,11 +3,11 @@ from types import SimpleNamespace
 from models.database import PlayerStats, Game, Practice, Roster, db
 
 
-def get_player_stats_for_date_range(player_id, start_date, end_date, drill_labels=None):
+def get_player_stats_for_date_range(player_id, start_date, end_date, *, labels=None):
     """Return aggregated stats for a player within a date range.
 
-    Optionally filter by a set of ``drill_labels``. ``player_id`` should be a
-    ``Roster`` id.
+    Optionally filter by a set of ``labels`` representing drill labels.
+    ``player_id`` should be a ``Roster`` id.
     """
     # Import here to avoid circular imports when admin.routes imports this module
     from admin.routes import (
@@ -44,8 +44,8 @@ def get_player_stats_for_date_range(player_id, start_date, end_date, drill_label
         .all()
     )
 
-    if drill_labels:
-        label_set = {lbl.strip().upper() for lbl in drill_labels if lbl.strip()}
+    if labels:
+        label_set = {lbl.strip().upper() for lbl in labels if lbl.strip()}
         totals = compute_filtered_totals(records, label_set)
         blue_totals = compute_filtered_blue(records, label_set)
     else:
