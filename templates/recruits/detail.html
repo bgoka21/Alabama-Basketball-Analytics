@@ -14,6 +14,7 @@
     {% if recruit.hometown %}<div><span class="font-semibold">Hometown:</span> {{ recruit.hometown }}</div>{% endif %}
     {% if recruit.rating %}<div><span class="font-semibold">Rating:</span> {{ recruit.rating }}</div>{% endif %}
     {% if recruit.ranking %}<div><span class="font-semibold">Ranking:</span> {{ recruit.ranking }}</div>{% endif %}
+    <div><span class="font-semibold">Overall PPS:</span> {{ overall_pps|round(2) }}</div>
   </div>
 
   {# Use the shot type tables partial which already contains the

@@ -99,6 +99,24 @@ def compute_shot_type_totals_for_recruit(recruit):
     return totals
 
 
+def compute_overall_pps_for_recruit(recruit):
+    """Return overall points per shot across all shot types."""
+    totals = compute_shot_type_totals_for_recruit(recruit)
+    attempts = (
+        totals.atr.attempts
+        + totals.fg2.attempts
+        + totals.fg3.attempts
+    )
+    if attempts == 0:
+        return 0.0
+    points = (
+        totals.atr.makes * 2
+        + totals.fg2.makes * 2
+        + totals.fg3.makes * 3
+    )
+    return round(points / attempts, 2)
+
+
 def compute_shot_summaries_for_recruit(recruit):
     latest = (
         RecruitShotTypeStat.query
@@ -120,11 +138,13 @@ def detail_recruit(id):
     r = Recruit.query.get_or_404(id)
     shot_type_totals = compute_shot_type_totals_for_recruit(r)
     shot_summaries = compute_shot_summaries_for_recruit(r)
+    overall_pps = compute_overall_pps_for_recruit(r)
     return render_template(
         'recruits/detail.html',
         recruit=r,
         shot_type_totals=shot_type_totals,
         shot_summaries=shot_summaries,
+        overall_pps=overall_pps,
     )
 
 
