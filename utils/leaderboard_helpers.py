@@ -117,38 +117,80 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
         return q.scalar() or 0
 
     turnovers_on = ev_count("Turnover")
-    off_reb_on = ev_count("Off Rebound")
-    fouls_drawn_on = ev_count("Fouled")
-    team_missed_on = sum(ev_count(ev) for ev in ["ATR-", "2FG-", "3FG-"])
-
-    player_to_q = PlayerStats.query.filter(
+    # Personal off rebounds and fouls are tracked in BlueCollarStats and
+    # PlayerStats respectively. Pull those aggregates using the same
+    # date/label filters applied above so values mirror the leaderboard.
+    bc_q = BlueCollarStats.query.filter(
+        BlueCollarStats.player_id == player_id,
+        BlueCollarStats.season_id == roster.season_id,
+    )
+    ps_filter_q = PlayerStats.query.filter(
         PlayerStats.player_name == roster.player_name,
         PlayerStats.season_id == roster.season_id,
     )
     if start_date or end_date:
-        player_to_q = player_to_q.outerjoin(Game, PlayerStats.game_id == Game.id).outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+        bc_q = bc_q.outerjoin(Game, BlueCollarStats.game_id == Game.id)
+        bc_q = bc_q.outerjoin(Practice, BlueCollarStats.practice_id == Practice.id)
+        ps_filter_q = ps_filter_q.outerjoin(Game, PlayerStats.game_id == Game.id)
+        ps_filter_q = ps_filter_q.outerjoin(Practice, PlayerStats.practice_id == Practice.id)
         if start_date:
-            player_to_q = player_to_q.filter(
+            bc_q = bc_q.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date >= start_date),
+                    and_(BlueCollarStats.practice_id != None, Practice.date >= start_date),
+                )
+            )
+            ps_filter_q = ps_filter_q.filter(
                 or_(
                     and_(PlayerStats.game_id != None, Game.game_date >= start_date),
                     and_(PlayerStats.practice_id != None, Practice.date >= start_date),
                 )
             )
         if end_date:
-            player_to_q = player_to_q.filter(
+            bc_q = bc_q.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date <= end_date),
+                    and_(BlueCollarStats.practice_id != None, Practice.date <= end_date),
+                )
+            )
+            ps_filter_q = ps_filter_q.filter(
                 or_(
                     and_(PlayerStats.game_id != None, Game.game_date <= end_date),
                     and_(PlayerStats.practice_id != None, Practice.date <= end_date),
                 )
             )
-    records = player_to_q.all()
+    if label_set:
+        bc_q = bc_q.join(
+            PlayerStats,
+            and_(
+                PlayerStats.season_id == BlueCollarStats.season_id,
+                PlayerStats.player_name == roster.player_name,
+                PlayerStats.practice_id == BlueCollarStats.practice_id,
+                PlayerStats.game_id == BlueCollarStats.game_id,
+            ),
+        )
+        clauses = [
+            PlayerStats.shot_type_details.ilike(f"%{lbl}%") | PlayerStats.stat_details.ilike(f"%{lbl}%")
+            for lbl in label_set
+        ]
+        bc_q = bc_q.filter(or_(*clauses))
+        ps_clauses = [
+            PlayerStats.shot_type_details.ilike(f"%{lbl}%") | PlayerStats.stat_details.ilike(f"%{lbl}%")
+            for lbl in label_set
+        ]
+        ps_filter_q = ps_filter_q.filter(or_(*ps_clauses))
+    off_reb_on = bc_q.with_entities(func.coalesce(func.sum(BlueCollarStats.off_reb), 0)).scalar() or 0
+    records = ps_filter_q.all()
     if label_set:
         from admin.routes import compute_filtered_totals
         totals = compute_filtered_totals(records, label_set)
     else:
         from admin.routes import aggregate_stats
         totals = aggregate_stats(records)
+    fouls_drawn_on = totals.foul_by
     player_turnovers = totals.turnovers
+    team_missed_on = sum(ev_count(ev) for ev in ["ATR-", "2FG-", "3FG-"])
+
 
     return {
         'offensive_poss_on': round(ON_poss, 0),
