@@ -167,3 +167,5 @@ def test_detail_page_renders_shot_type_js(client, app):
     assert 'id="cardFG3"' in html
     assert "showShotTypeDetail('atr')" in html
     assert 'document.addEventListener' in html
+    assert 'Overall PPS' in html
+    assert '1.67' in html
