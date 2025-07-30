@@ -169,19 +169,16 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             p_clock    = row.get(sc_col, '')
             p_clock_pt = row.get(scp_col, '')
 
+            # build full row text for shot/event parsing
             row_text = ' '.join(safe_str(val) for val in row.to_dict().values())
-
-            upper_text = row_text.upper()
-            skip_tokens = ['OFF REB', 'NEUTRAL']
-            skip_possession = any(tok in upper_text for tok in skip_tokens) or off_reb_row
+            # only skip when the TEAM cell literally says "Off Reb" or "Neutral"
+            team_cell = str(row.get('TEAM', '') or '').upper()
+            skip_possession = ('OFF REB' in team_cell) or ('NEUTRAL' in team_cell) or off_reb_row
 
             def compute_points(text, team_name):
-                pts = text.count('ATR+') * 2
-                pts += text.count('2FG+') * 2
-                pts += text.count('3FG+') * 3
-                pts += text.count('FT+') * 1
-                if f"{team_name} Fouled +1" in text:
-                    pts += 1
+                # count only actual made-shot points; ignore any "Fouled +1" credit
+                pts = text.count('ATR+')*2 + text.count('2FG+')*2
+                pts += text.count('3FG+')*3 + text.count('FT+')*1
                 return pts
 
             points_scored = compute_points(row_text, offense_team)
