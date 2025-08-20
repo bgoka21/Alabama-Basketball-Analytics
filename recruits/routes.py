@@ -66,6 +66,15 @@ def new_recruit():
             profile_image_url=request.form.get("profile_image_url"),
             notes=request.form.get("notes"),
         )
+        aau_team = request.form.get("aau_team") or None
+        ppg_raw = request.form.get("ppg")
+        try:
+            ppg = float(ppg_raw) if ppg_raw not in (None, "") else None
+        except ValueError:
+            ppg = None
+
+        r.aau_team = aau_team
+        r.ppg = ppg
         db.session.add(r)
         db.session.flush()
 
@@ -196,6 +205,14 @@ def edit_recruit(id):
         r.rating = _parse_int("rating")
         r.ranking = _parse_int("ranking")
         r.camp_performance = request.form.get("camp_performance")
+        aau_team = request.form.get("aau_team") or None
+        ppg_raw = request.form.get("ppg")
+        try:
+            ppg = float(ppg_raw) if ppg_raw not in (None, "") else None
+        except ValueError:
+            ppg = None
+        r.aau_team = aau_team
+        r.ppg = ppg
         r.offer_status = request.form.get("offer_status")
         r.offer_date = date.fromisoformat(offer_date_str) if offer_date_str else None
         r.commit_date = date.fromisoformat(commit_date_str) if commit_date_str else None

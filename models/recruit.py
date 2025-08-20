@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from .database import db
 
@@ -14,6 +14,8 @@ class Recruit(db.Model):
     weight            = Column(Integer)
     high_school       = Column(String(128))
     hometown          = Column(String(128))
+    aau_team          = Column(String(128), nullable=True)
+    ppg               = Column(Float, nullable=True)
     rating            = Column(Integer)
     ranking           = Column(Integer)
     camp_performance  = Column(Text)
