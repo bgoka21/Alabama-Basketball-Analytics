@@ -7,9 +7,9 @@
       {% if recruit.profile_image_url %}
         <img src="{{ recruit.profile_image_url }}" alt="{{ recruit.name }} headshot"
              class="w-28 h-28 rounded-full ring-4 ring-white/20 object-cover"
-             onerror="this.onerror=null;this.src='{{ url_for('static', filename='img/recruits/placeholder_headshot.png') }}';">
+             onerror="this.onerror=null;this.src='{{ url_for('static', filename='img/recruits/placeholder_headshot.svg') }}';">
       {% else %}
-        <img src="{{ url_for('static', filename='img/recruits/placeholder_headshot.png') }}" alt="Headshot"
+        <img src="{{ url_for('static', filename='img/recruits/placeholder_headshot.svg') }}" alt="Headshot"
              class="w-28 h-28 rounded-full ring-4 ring-white/20 object-cover">
       {% endif %}
       <div class="text-center sm:text-left">
