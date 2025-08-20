@@ -1,15 +1,63 @@
 import os
 import json
+import time
 from flask import render_template, request, redirect, url_for, flash, current_app
 from datetime import date
 from flask_login import current_user
 from types import SimpleNamespace
+from werkzeug.utils import secure_filename
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from . import recruits_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from flask import current_app
 from admin.routes import compute_team_shot_details
+
+ALLOWED_HEADSHOT_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "svg"}
+UPLOAD_SUBDIR_RECRUITS = "uploads/recruits"
+
+
+def _allowed_ext(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_HEADSHOT_EXTS
+
+
+def _save_headshot_and_get_url(file_storage, recruit_id: int) -> str:
+    """
+    Saves the uploaded file into static/uploads/recruits and returns a web path like:
+    /static/uploads/recruits/<recruit_id>-<ts>.<ext>
+    """
+    filename = secure_filename(file_storage.filename)
+    ext = filename.rsplit(".", 1)[1].lower()
+    ts = int(time.time())
+    new_name = f"{recruit_id}-{ts}.{ext}"
+
+    static_root = current_app.static_folder
+    target_dir = os.path.join(static_root, UPLOAD_SUBDIR_RECRUITS)
+    os.makedirs(target_dir, exist_ok=True)
+
+    abs_path = os.path.join(target_dir, new_name)
+    file_storage.save(abs_path)
+
+    return f"/static/{UPLOAD_SUBDIR_RECRUITS}/{new_name}"
+
+
+def _maybe_delete_old_headshot(old_url: str):
+    """
+    Best-effort cleanup: if old_url looks like /static/uploads/recruits/..., delete the file.
+    Ignore external URLs and placeholders.
+    """
+    if not old_url:
+        return
+    prefix = "/static/" + UPLOAD_SUBDIR_RECRUITS + "/"
+    if old_url.startswith(prefix):
+        static_root = current_app.static_folder
+        rel = old_url[len("/static/"):]
+        abs_path = os.path.join(static_root, rel)
+        try:
+            if os.path.exists(abs_path):
+                os.remove(abs_path)
+        except Exception:
+            pass
 
 
 @recruits_bp.before_request
@@ -63,7 +111,6 @@ def new_recruit():
             commit_date=date.fromisoformat(commit_date_str) if commit_date_str else None,
             email=request.form.get("email"),
             phone=request.form.get("phone"),
-            profile_image_url=request.form.get("profile_image_url"),
             notes=request.form.get("notes"),
         )
         aau_team = request.form.get("aau_team") or None
@@ -88,6 +135,17 @@ def new_recruit():
                 rank=idx
             )
             db.session.add(ts)
+
+        db.session.commit()
+
+        headshot = request.files.get("headshot_file")
+        if headshot and headshot.filename and _allowed_ext(headshot.filename):
+            new_url = _save_headshot_and_get_url(headshot, r.id)
+            r.profile_image_url = new_url
+        else:
+            manual_url = (request.form.get("profile_image_url") or "").strip()
+            if manual_url:
+                r.profile_image_url = manual_url
 
         db.session.commit()
         return redirect(url_for('recruits.list_recruits'))
@@ -218,8 +276,18 @@ def edit_recruit(id):
         r.commit_date = date.fromisoformat(commit_date_str) if commit_date_str else None
         r.email = request.form.get("email")
         r.phone = request.form.get("phone")
-        r.profile_image_url = request.form.get("profile_image_url")
         r.notes = request.form.get("notes")
+
+        headshot = request.files.get("headshot_file")
+        if headshot and headshot.filename and _allowed_ext(headshot.filename):
+            _maybe_delete_old_headshot(r.profile_image_url)
+            new_url = _save_headshot_and_get_url(headshot, r.id)
+            r.profile_image_url = new_url
+        else:
+            manual_url = (request.form.get("profile_image_url") or "").strip()
+            if manual_url:
+                r.profile_image_url = manual_url
+
         db.session.commit()
         return redirect(url_for('recruits.detail_recruit', id=id))
     return render_template('recruits/edit.html', recruit=r)
