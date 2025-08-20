@@ -9,9 +9,10 @@
     <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
       <thead class="bg-gray-100">
         <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th>
-          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Grad Year</th>
-          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Position</th>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase sortable">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase sortable">Grad Year</th>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase sortable">Position</th>
+          <th class="px-6 py-3 text-left text-xs font-medium uppercase sortable">PPS</th>
           <th class="px-6 py-3 text-center text-xs font-medium uppercase">Actions</th>
         </tr>
       </thead>
@@ -23,6 +24,7 @@
           </td>
           <td class="px-6 py-4">{{ r.graduation_year }}</td>
           <td class="px-6 py-4">{{ r.position }}</td>
+          <td class="px-6 py-4">{{ r.overall_pps }}</td>
           <td class="px-6 py-4 text-center">
             <a href="{{ url_for('recruits.edit_recruit', id=r.id) }}" class="text-blue-600 hover:underline mr-2">Edit</a>
             <form action="{{ url_for('recruits.delete_recruit', id=r.id) }}" method="post" class="inline">
@@ -32,10 +34,33 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="4" class="px-6 py-4 text-center">No recruits found.</td>
+          <td colspan="5" class="px-6 py-4 text-center">No recruits found.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  <script>
+    document.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const table = th.closest('table');
+        const tbody = table.querySelector('tbody');
+        const idx = Array.from(th.parentNode.children).indexOf(th);
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const desc = th.dataset.order !== 'desc';
+        rows.sort((a,b) => {
+          const aText = a.children[idx].textContent.trim();
+          const bText = b.children[idx].textContent.trim();
+          const aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
+          const bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            return desc ? bNum - aNum : aNum - bNum;
+          }
+          return desc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+        });
+        rows.forEach(row => tbody.appendChild(row));
+        th.dataset.order = desc ? 'desc' : 'asc';
+      });
+    });
+  </script>
 {% endblock %}

@@ -13,6 +13,7 @@ from models.user import User
 from werkzeug.security import generate_password_hash
 from recruits import recruits_bp
 from admin.routes import admin_bp
+from bs4 import BeautifulSoup
 
 
 @pytest.fixture
@@ -55,6 +56,30 @@ def client(app):
     with app.test_client() as client:
         client.post('/admin/login', data={'username': 'admin', 'password': 'pw'})
         yield client
+
+
+def test_list_page_includes_pps_and_sortable(client, app):
+    with app.app_context():
+        r = Recruit(name='PPS Recruit', graduation_year=2024, position='G')
+        db.session.add(r)
+        db.session.commit()
+        data = [
+            {"shot_class": "3fg", "result": "made", "shot_location": "Wing", "possession_type": "Halfcourt", "assisted": "Yes"},
+            {"shot_class": "3fg", "result": "miss", "shot_location": "Wing", "possession_type": "Halfcourt", "assisted": "No"},
+        ]
+        stat = RecruitShotTypeStat(recruit_id=r.id, shot_type_details=json.dumps(data))
+        db.session.add(stat)
+        db.session.commit()
+
+    resp = client.get('/recruits/')
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    soup = BeautifulSoup(html, 'html.parser')
+    headers = {th.get_text(strip=True): th for th in soup.find_all('th')}
+    assert 'PPS' in headers
+    for label in ['Name', 'Grad Year', 'Position', 'PPS']:
+        assert 'sortable' in headers[label]['class']
+    assert '1.5' in html
 
 
 def test_create_upload_and_delete_school(client, app, tmp_path):
