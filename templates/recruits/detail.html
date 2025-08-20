@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 {# HERO HEADER #}
-<div class="w-full rounded-xl mb-6 overflow-hidden">
+<div class="w-full rounded-xl mb-6 overflow-hidden shadow">
   <div class="bg-[#9E1B32] text-white">
     <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center gap-4">
       {% if recruit.profile_image_url %}
@@ -31,53 +31,55 @@
     {% if recruit.high_school %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">High School</div>
-        <div class="text-lg font-bold mt-1">{{ recruit.high_school }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ recruit.high_school }}</div>
       </div>
     {% endif %}
     {% if recruit.hometown %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">Hometown</div>
-        <div class="text-lg font-bold mt-1">{{ recruit.hometown }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ recruit.hometown }}</div>
       </div>
     {% endif %}
     {% if recruit.rating %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">Rating</div>
-        <div class="text-lg font-bold mt-1">{{ recruit.rating }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ recruit.rating }}</div>
       </div>
     {% endif %}
     {% if recruit.ranking %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">Ranking</div>
-        <div class="text-lg font-bold mt-1">{{ recruit.ranking }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ recruit.ranking }}</div>
       </div>
     {% endif %}
     {% if recruit.aau_team is defined and recruit.aau_team %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">AAU Team</div>
-        <div class="text-lg font-bold mt-1">{{ recruit.aau_team }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ recruit.aau_team }}</div>
       </div>
     {% endif %}
     {% if recruit.ppg is defined and recruit.ppg is not none %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">PPG</div>
-        <div class="text-lg font-bold mt-1">{{ '{:.1f}'.format(recruit.ppg) }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ '{:.1f}'.format(recruit.ppg) }}</div>
       </div>
     {% endif %}
     {% if overall_pps is defined %}
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">Points per Shot<span class="sr-only">Overall PPS</span></div>
-        <div class="text-lg font-bold mt-1">{{ '{:.2f}'.format(overall_pps) }}</div>
+        <div class="text-lg font-bold mt-1 text-black dark:text-white">{{ '{:.2f}'.format(overall_pps) }}</div>
       </div>
     {% endif %}
   </div>
 </div>
 
+<div class="max-w-7xl mx-auto px-4 mb-6">
   {# Use the shot type tables partial which already contains the
      overview cards acting as tabs. #}
   {% include "partials/shot_type_tables.html" with context %}
+</div>
 
-
+<div class="max-w-7xl mx-auto px-4">
   <h3 class="text-xl font-semibold mb-2">Top Schools</h3>
   <ul class="mb-4 space-y-1">
     {% for s in recruit.top_schools %}
@@ -86,6 +88,7 @@
       </li>
     {% endfor %}
   </ul>
+</div>
 
   <script>
   function showTab(tabName) {
