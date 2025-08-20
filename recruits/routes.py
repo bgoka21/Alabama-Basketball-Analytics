@@ -29,6 +29,8 @@ def recruits_before_request():
 @recruits_bp.route('/')
 def list_recruits():
     recruits = Recruit.query.order_by(Recruit.name).all()
+    for r in recruits:
+        r.overall_pps = compute_overall_pps_for_recruit(r)
     return render_template('recruits/list.html', recruits=recruits)
 
 
