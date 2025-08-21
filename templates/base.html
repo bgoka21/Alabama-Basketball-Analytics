@@ -43,8 +43,8 @@
   </aside>
 
 <!-- Main content -->
-<main class="flex-1 overflow-y-auto bg-white text-black md:ml-64">
-  <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
+<main class="flex-1 overflow-y-auto bg-white text-black md:ml-64 layout--with-sidebar">
+  <div class="main-content max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8 {% block page_class %}{% endblock %}">
     {# ── Page-specific controls (e.g. season dropdown) ── #}
     {% block page_controls %}{% endblock %}
 

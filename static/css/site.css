@@ -28,3 +28,30 @@
   font-size: 18px;
   line-height: 1.1;
 }
+
+/* Recruit page wide container (scoped) */
+.page--recruit.container--wide {
+  /* Increase the usable width only on this page */
+  max-width: 1360px;
+  padding-left: 20px;
+  padding-right: 24px;
+}
+
+/* If your base layout centers the inner container, let recruit page align to sidebar */
+.layout--with-sidebar .page--recruit.container--wide {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* Ensure inner content can expand to full width of the main column */
+.page--recruit .content-inner,
+.page--recruit .main-content,
+.page--recruit .container {
+  width: 100%;
+}
+
+/* Tables/cards fill available width on recruit page */
+.page--recruit .table,
+.page--recruit .card {
+  max-width: 100%;
+}

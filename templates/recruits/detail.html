@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block page_class %}page--recruit container--wide{% endblock %}
 {% block content %}
 {# HERO HEADER #}
 <div class="w-full rounded-xl mb-6 overflow-hidden shadow">
@@ -176,8 +177,8 @@
   {% include "partials/shot_type_tables.html" with context %}
 </div>
 
+{% if recruit.top_schools and recruit.top_schools|length > 0 %}
 <div class="max-w-7xl mx-auto px-4">
-  <h3 class="text-xl font-semibold mb-2">Top Schools</h3>
   <ul class="mb-4 space-y-1">
     {% for s in recruit.top_schools %}
       <li>
@@ -186,6 +187,7 @@
     {% endfor %}
   </ul>
 </div>
+{% endif %}
 
   <script>
   function showTab(tabName) {
