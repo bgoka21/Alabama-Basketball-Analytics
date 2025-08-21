@@ -8,10 +8,15 @@ from types import SimpleNamespace
 from werkzeug.utils import secure_filename
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
+from models.eybl import UnifiedStats
 from . import recruits_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from flask import current_app
 from admin.routes import compute_team_shot_details
+from services.circuit_stats import (
+    get_circuit_stats_for_recruit,
+    get_latest_circuit_stat,
+)
 
 ALLOWED_HEADSHOT_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "svg"}
 UPLOAD_SUBDIR_RECRUITS = "uploads/recruits"
@@ -76,10 +81,39 @@ def recruits_before_request():
 
 @recruits_bp.route('/')
 def list_recruits():
-    recruits = Recruit.query.order_by(Recruit.name).all()
+    circuit = request.args.get('circuit')
+    query = Recruit.query
+    if circuit and circuit != 'All':
+        query = query.filter(
+            db.session.query(UnifiedStats.id)
+            .filter(UnifiedStats.recruit_id == Recruit.id,
+                    UnifiedStats.circuit == circuit)
+            .exists()
+        )
+    recruits = query.order_by(Recruit.name).all()
     for r in recruits:
         r.overall_pps = compute_overall_pps_for_recruit(r)
-    return render_template('recruits/list.html', recruits=recruits)
+        r.circuit_stats = get_circuit_stats_for_recruit(r.id)
+        if r.circuit_stats:
+            r.latest_circuit = r.circuit_stats[0]['circuit']
+            circuits = {s['circuit'] for s in r.circuit_stats}
+            r.additional_circuits = [c for c in circuits if c != r.latest_circuit]
+        else:
+            r.latest_circuit = None
+            r.additional_circuits = []
+
+    circuit_counts = {
+        'All': db.session.query(UnifiedStats.recruit_id).distinct().count(),
+        'EYBL': db.session.query(UnifiedStats.recruit_id).filter_by(circuit='EYBL').distinct().count(),
+        '3SSB': db.session.query(UnifiedStats.recruit_id).filter_by(circuit='3SSB').distinct().count(),
+        'UA': db.session.query(UnifiedStats.recruit_id).filter_by(circuit='UA').distinct().count(),
+    }
+    return render_template(
+        'recruits/list.html',
+        recruits=recruits,
+        circuit_filter=circuit or 'All',
+        circuit_counts=circuit_counts,
+    )
 
 
 @recruits_bp.route('/new', methods=['GET', 'POST'])
@@ -208,12 +242,20 @@ def detail_recruit(id):
     shot_type_totals = compute_shot_type_totals_for_recruit(r)
     shot_summaries = compute_shot_summaries_for_recruit(r)
     overall_pps = compute_overall_pps_for_recruit(r)
+    circuit_stats = get_circuit_stats_for_recruit(r.id)
+    stats_by_circuit = {}
+    for stat in circuit_stats:
+        stats_by_circuit.setdefault(stat['circuit'], []).append(stat)
+    latest_by_circuit = {c: stats[0] for c, stats in stats_by_circuit.items()}
     return render_template(
         'recruits/detail.html',
         recruit=r,
         shot_type_totals=shot_type_totals,
         shot_summaries=shot_summaries,
         overall_pps=overall_pps,
+        circuit_stats=circuit_stats,
+        stats_by_circuit=stats_by_circuit,
+        latest_by_circuit=latest_by_circuit,
     )
 
 
