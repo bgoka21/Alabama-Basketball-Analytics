@@ -10,3 +10,6 @@ instance/database.db
 instance/app.db
 models/instance.db
 node_modules/
+instance/ingest_previews/
+instance/ingest_snapshots/
+sample_data/
