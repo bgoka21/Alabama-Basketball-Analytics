@@ -76,96 +76,93 @@
 <div class="max-w-7xl mx-auto px-4 mb-6">
   <h3 class="text-xl font-semibold mb-2">AAU Circuits</h3>
   {% if latest_by_circuit %}
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    {% for circuit, latest in latest_by_circuit.items() %}
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-      <div class="flex items-center justify-between">
-        <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">
-          {{ circuit }}{% if latest.season_year %} — {{ latest.season_year }}{% endif %}
+  <div class="space-y-6">
+    {% for circuit, stat in latest_by_circuit.items() %}
+    {% set has_pnr = stat.pnr_poss is not none or stat.pnr_ppp is not none or stat.pnr_to_pct is not none or stat.pnr_score_pct is not none %}
+    <div class="grid grid-cols-1 {% if has_pnr %}lg:grid-cols-2{% endif %} gap-4">
+      <div class="info-card bg-white dark:bg-gray-800 rounded-xl shadow">
+        <div class="card-body">
+          <div class="card-title text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-1">{{ circuit }}{% if stat.season_year %} — {{ stat.season_year }}{% endif %}</div>
+          {% if stat.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ stat.team_name }}</div>{% endif %}
+          <div class="grid grid-cols-4 gap-2">
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">PPG</div>
+              <div class="mini-value">{{ '%.1f'|format(stat.ppg) if stat.ppg is not none else '—' }}</div>
+            </div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">AST</div>
+              <div class="mini-value">{{ '%.1f'|format(stat.ast) if stat.ast is not none else '—' }}</div>
+            </div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">TOV</div>
+              <div class="mini-value">{{ '%.1f'|format(stat.tov) if stat.tov is not none else '—' }}</div>
+            </div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">PPP</div>
+              <div class="mini-value">{{ '%.2f'|format(stat.ppp) if stat.ppp is not none else '—' }}</div>
+            </div>
+          </div>
         </div>
-        <span class="text-gray-400 text-xs" title="Source: Synergy Leaderboards export · Imported {{ latest.ingested_at.strftime('%Y-%m-%d') }}">&#9432;</span>
       </div>
-      {% if latest.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ latest.team_name }}</div>{% endif %}
-      <div class="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPG</div>
-            <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.ppg) if latest.ppg is not none else '—' }}</div>
-          </div>
-          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">AST</div>
-            <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.ast) if latest.ast is not none else '—' }}</div>
-          </div>
-          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">TOV</div>
-            <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.tov) if latest.tov is not none else '—' }}</div>
-          </div>
-          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPP</div>
-            <div class="text-lg font-bold text-black dark:text-white">{{ '%.2f'|format(latest.ppp) if latest.ppp is not none else '—' }}</div>
-          </div>
-        </div>
-        {% set show_pnr = (latest.pnr_poss is not none or latest.pnr_ppp is not none or latest.pnr_to_pct is not none or latest.pnr_score_pct is not none) %}
-        {% if show_pnr %}
-        <div class="bg-gray-50 dark:bg-gray-700 rounded p-2">
-          <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 text-center">PnR (incl. Passes)</div>
-          <div class="mt-1 grid grid-cols-2 gap-1 text-center">
-            <div>
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Poss</div>
-              <div class="text-sm font-bold text-black dark:text-white">{{ latest.pnr_poss if latest.pnr_poss is not none else '—' }}</div>
+      {% if has_pnr %}
+      <div class="info-card bg-white dark:bg-gray-800 rounded-xl shadow">
+        <div class="card-body">
+          <div class="card-title text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-1">PnR (incl. Passes)</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ circuit }}{% if stat.season_year %} — {{ stat.season_year }}{% endif %}</div>
+          <div class="grid grid-cols-4 gap-2">
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">Poss</div>
+              <div class="mini-value">{{ stat.pnr_poss if stat.pnr_poss is not none else '—' }}</div>
             </div>
-            <div>
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPP</div>
-              <div class="text-sm font-bold text-black dark:text-white">{{ '%.2f'|format(latest.pnr_ppp) if latest.pnr_ppp is not none else '—' }}</div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">PPP</div>
+              <div class="mini-value">{{ '%.2f'|format(stat.pnr_ppp) if stat.pnr_ppp is not none else '—' }}</div>
             </div>
-            <div>
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">TO%</div>
-              <div class="text-sm font-bold text-black dark:text-white">{{ '%.1f'|format(latest.pnr_to_pct*100) if latest.pnr_to_pct is not none else '—' }}{% if latest.pnr_to_pct is not none %}%{% endif %}</div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">TO%</div>
+              <div class="mini-value">{% if stat.pnr_to_pct is not none %}{{ (stat.pnr_to_pct * 100)|round(1) }}%{% else %}—{% endif %}</div>
             </div>
-            <div>
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Score%</div>
-              <div class="text-sm font-bold text-black dark:text-white">{{ '%.1f'|format(latest.pnr_score_pct*100) if latest.pnr_score_pct is not none else '—' }}{% if latest.pnr_score_pct is not none %}%{% endif %}</div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">Score%</div>
+              <div class="mini-value">{% if stat.pnr_score_pct is not none %}{{ (stat.pnr_score_pct * 100)|round(1) }}%{% else %}—{% endif %}</div>
             </div>
           </div>
         </div>
-        {% endif %}
-      </div>
-      {% set others = stats_by_circuit[circuit][1:] %}
-      {% if others %}
-      <button type="button" class="text-xs text-blue-600 hover:underline mt-2" onclick="document.getElementById('more-{{ circuit }}').classList.toggle('hidden')">View other seasons</button>
-      <div id="more-{{ circuit }}" class="hidden mt-2 space-y-4">
-        {% for s in others %}
-        <div class="border-t border-gray-200 dark:border-gray-700 pt-2">
-          <div class="flex items-center justify-between">
-            <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">
-              {{ circuit }}{% if s.season_year %} — {{ s.season_year }}{% endif %}
-            </div>
-            <span class="text-gray-400 text-xs" title="Source: Synergy Leaderboards export · Imported {{ s.ingested_at.strftime('%Y-%m-%d') }}">&#9432;</span>
-          </div>
-          {% if s.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ s.team_name }}</div>{% endif %}
-          <div class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPG</div>
-              <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(s.ppg) if s.ppg is not none else '—' }}</div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">AST</div>
-              <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(s.ast) if s.ast is not none else '—' }}</div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">TOV</div>
-              <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(s.tov) if s.tov is not none else '—' }}</div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPP</div>
-              <div class="text-lg font-bold text-black dark:text-white">{{ '%.2f'|format(s.ppp) if s.ppp is not none else '—' }}</div>
-            </div>
-          </div>
-        </div>
-        {% endfor %}
       </div>
       {% endif %}
     </div>
+    {% set others = stats_by_circuit[circuit][1:] %}
+    {% if others %}
+    <button type="button" class="text-xs text-blue-600 hover:underline mt-2" onclick="document.getElementById('more-{{ circuit }}').classList.toggle('hidden')">View other seasons</button>
+    <div id="more-{{ circuit }}" class="hidden mt-2 space-y-4">
+      {% for s in others %}
+      <div class="info-card bg-white dark:bg-gray-800 rounded-xl shadow">
+        <div class="card-body">
+          <div class="card-title text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-1">{{ circuit }}{% if s.season_year %} — {{ s.season_year }}{% endif %}</div>
+          {% if s.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ s.team_name }}</div>{% endif %}
+          <div class="grid grid-cols-4 gap-2">
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">PPG</div>
+              <div class="mini-value">{{ '%.1f'|format(s.ppg) if s.ppg is not none else '—' }}</div>
+            </div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">AST</div>
+              <div class="mini-value">{{ '%.1f'|format(s.ast) if s.ast is not none else '—' }}</div>
+            </div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">TOV</div>
+              <div class="mini-value">{{ '%.1f'|format(s.tov) if s.tov is not none else '—' }}</div>
+            </div>
+            <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
+              <div class="mini-label">PPP</div>
+              <div class="mini-value">{{ '%.2f'|format(s.ppp) if s.ppp is not none else '—' }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% endfor %}
   </div>
   {% else %}
