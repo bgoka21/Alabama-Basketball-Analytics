@@ -13,7 +13,6 @@ def _row_to_dict(row: UnifiedStats) -> Dict:
         "ppg": row.ppg,
         "ast": row.ast,
         "tov": row.tov,
-        "fg_pct": row.fg_pct,
         "ppp": row.ppp,
         "ingested_at": row.ingested_at,
     }

@@ -21,8 +21,8 @@
       <th class="px-2 py-1">Team</th>
       <th class="px-2 py-1">GP</th>
       <th class="px-2 py-1">PPG</th>
-      <th class="px-2 py-1">AST</th>
-      <th class="px-2 py-1">TOV</th>
+      <th class="px-2 py-1">AST (G)</th>
+      <th class="px-2 py-1">TOV (G)</th>
       <th class="px-2 py-1">FG%</th>
       <th class="px-2 py-1">PPP</th>
     </tr>
@@ -33,9 +33,9 @@
       <td class="px-2 py-1">{{ r.player }}</td>
       <td class="px-2 py-1">{{ r.team }}</td>
       <td class="px-2 py-1">{{ r.gp }}</td>
-      <td class="px-2 py-1">{{ r.ppg }}</td>
-      <td class="px-2 py-1">{{ r.ast }}</td>
-      <td class="px-2 py-1">{{ r.tov }}</td>
+      <td class="px-2 py-1">{% if r.ppg is not none %}{{ r.ppg|round(1) }}{% endif %}</td>
+      <td class="px-2 py-1">{% if r.ast is not none %}{{ r.ast|round(1) }}{% endif %}</td>
+      <td class="px-2 py-1">{% if r.tov is not none %}{{ r.tov|round(1) }}{% endif %}</td>
       <td class="px-2 py-1">{% if r.fg_pct is not none %}{{ (r.fg_pct*100)|round(1) }}%{% endif %}</td>
       <td class="px-2 py-1">{% if r.ppp is not none %}{{ r.ppp|round(2) }}{% endif %}</td>
     </tr>
