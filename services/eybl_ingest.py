@@ -16,6 +16,70 @@ from models.eybl import ExternalIdentityMap, UnifiedStats, IdentitySynonym
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
+# ---------------------------------------------------------------------------
+# Numeric helpers
+# ---------------------------------------------------------------------------
+
+
+def to_float(x):
+    """Parse ``x`` to float returning ``None`` for blanks/NaN."""
+    if x is None:
+        return None
+    if isinstance(x, str):
+        x = x.replace(",", "").strip()
+        if not x or x.lower() == "nan":
+            return None
+    try:
+        val = pd.to_numeric([x], errors="coerce")[0]
+    except Exception:
+        return None
+    if pd.isna(val):
+        return None
+    return float(val)
+
+
+def to_int(x):
+    """Round ``x`` to the nearest int, returning ``None`` when unset."""
+    val = to_float(x)
+    if val is None:
+        return None
+    return int(round(val))
+
+
+def to_pct(x):
+    """Parse percentages from a variety of string/float formats."""
+    if x is None:
+        return None
+    if isinstance(x, str):
+        x = x.strip()
+        if not x or x.lower() == "nan":
+            return None
+        if x.endswith("%"):
+            val = to_float(x[:-1])
+            if val is None:
+                return None
+            val /= 100.0
+        else:
+            val = to_float(x)
+            if val is None:
+                return None
+            if val > 1.0:
+                val /= 100.0
+    else:
+        val = to_float(x)
+        if val is None:
+            return None
+        if val > 1.0:
+            val /= 100.0
+    # clamp to [0,1] to avoid slight rounding issues
+    if val < 0:
+        val = 0.0
+    if val > 1:
+        val = 1.0
+    return val
+
+
 # ---------------------------------------------------------------------------
 # CSV Readers
 # ---------------------------------------------------------------------------
@@ -86,37 +150,6 @@ def load_csvs(
         pnr_df = read_pnr_passes_csv(pnr_path)
     return overall_df, assists_df, fg_df, pnr_df
 
-# ---------------------------------------------------------------------------
-# Normalization helpers
-# ---------------------------------------------------------------------------
-
-
-def to_float(val) -> Optional[float]:
-    if val is None:
-        return None
-    if isinstance(val, str):
-        val = val.replace(",", "").strip()
-        if val == "":
-            return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
-
-
-def pct_to_decimal(val) -> Optional[float]:
-    if val is None:
-        return None
-    if isinstance(val, str):
-        val = val.strip().replace("%", "")
-    f = to_float(val)
-    if f is None:
-        return None
-    if f > 1:
-        f = f / 100.0
-    return f
-
-
 def clean_name(s: Optional[str]) -> str:
     if not s:
         return ""
@@ -148,20 +181,29 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
     for df in (overall_df, assists_df, fg_att_df):
         if not df.empty:
             df.columns = [c.strip() for c in df.columns]
-    if pnr_df is not None and not pnr_df.empty:
-        pnr_df.columns = [c.strip() for c in pnr_df.columns]
+    pnr_provided = pnr_df is not None and not pnr_df.empty
+    if pnr_provided:
+        pnr_df = pnr_df.rename(columns=lambda c: c.strip())
         required = {"Player", "Team", "Poss", "PPP", "TO%", "Score%"}
         if not required.issubset(pnr_df.columns):
-            logger.info("PNR CSV missing required headers %s; skipping", required - set(pnr_df.columns))
+            logger.info(
+                "PNR CSV missing required headers %s; skipping",
+                required - set(pnr_df.columns),
+            )
             pnr_df = None
+            pnr_provided = False
         else:
-            pnr_df = pnr_df.rename({c: f"{c}_pnr" for c in pnr_df.columns if c not in {"Player", "Team"}}, axis=1)
+            pnr_df["pnr_poss"] = pnr_df["Poss"].apply(to_int)
+            pnr_df["pnr_ppp"] = pnr_df["PPP"].apply(to_float)
+            pnr_df["pnr_to_pct"] = pnr_df["TO%"].apply(to_pct)
+            pnr_df["pnr_score_pct"] = pnr_df["Score%"].apply(to_pct)
+            pnr_df = pnr_df[["Player", "Team", "pnr_poss", "pnr_ppp", "pnr_to_pct", "pnr_score_pct"]]
 
     merged = pd.merge(overall_df, assists_df, on=["Player", "Team"], how="outer", suffixes=("", "_ast"))
     if not fg_att_df.empty:
         merged = pd.merge(merged, fg_att_df, on=["Player", "Team"], how="left", suffixes=("", "_fg"))
     if pnr_df is not None and not pnr_df.empty:
-        merged = pd.merge(merged, pnr_df, on=["Player", "Team"], how="left", suffixes=("", "_pnr"))
+        merged = pd.merge(merged, pnr_df, on=["Player", "Team"], how="left")
 
     records = []
     for _, row in merged.iterrows():
@@ -193,7 +235,7 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
             "yes" if tov_pg is not None else "no",
         )
 
-        fg_pct = pct_to_decimal(row.get("FG%"))
+        fg_pct = to_pct(row.get("FG%"))
         ppp_main = to_float(row.get("PP(P+A)"))
         ppp_overall = to_float(row.get("PPP"))
         poss = to_float(row.get("Poss"))
@@ -202,11 +244,10 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
                 pts / poss if pts is not None and poss and poss > 0 else None
             )
         )
-        pnr_poss = to_float(row.get("Poss_pnr"))
-        pnr_poss = int(pnr_poss) if pnr_poss is not None else None
-        pnr_ppp = to_float(row.get("PPP_pnr"))
-        pnr_to_pct = pct_to_decimal(row.get("TO%_pnr"))
-        pnr_score_pct = pct_to_decimal(row.get("Score%_pnr"))
+        pnr_poss = to_int(row.get("pnr_poss"))
+        pnr_ppp = to_float(row.get("pnr_ppp"))
+        pnr_to_pct = to_pct(row.get("pnr_to_pct"))
+        pnr_score_pct = to_pct(row.get("pnr_score_pct"))
 
         rec = {
             "player": player,
@@ -231,21 +272,38 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
         }
         records.append(rec)
     df = pd.DataFrame(records)
+    for col in ("pnr_poss", "pnr_ppp", "pnr_to_pct", "pnr_score_pct"):
+        if col not in df.columns:
+            df[col] = None
+        else:
+            df[col] = df[col].astype(object)
+            df[col] = df[col].where(pd.notna(df[col]), None)
+
     total = len(df)
-    if pnr_df is None or pnr_df.empty:
-        logger.info("PNR not provided (skipping)")
-    else:
+    counts = {
+        "poss": df["pnr_poss"].notna().sum(),
+        "ppp": df["pnr_ppp"].notna().sum(),
+        "to_pct": df["pnr_to_pct"].notna().sum(),
+        "score_pct": df["pnr_score_pct"].notna().sum(),
+    }
+    if pnr_provided:
         logger.info(
             "PNR fill rates: poss=%s/%s, ppp=%s/%s, to_pct=%s/%s, score_pct=%s/%s",
-            df["pnr_poss"].notna().sum(),
+            counts["poss"],
             total,
-            df["pnr_ppp"].notna().sum(),
+            counts["ppp"],
             total,
-            df["pnr_to_pct"].notna().sum(),
+            counts["to_pct"],
             total,
-            df["pnr_score_pct"].notna().sum(),
+            counts["score_pct"],
             total,
         )
+        if not any(counts.values()):
+            logger.warning(
+                "PNR provided but no usable numbers parsed (check column headers)."
+            )
+    else:
+        logger.info("PNR not provided (skipping)")
     return df
 
 # ---------------------------------------------------------------------------

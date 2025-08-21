@@ -4455,15 +4455,28 @@ def eybl_import():
         pnr_path,
     )
 
-    merged_df = normalize_and_merge(
-        overall_df,
-        assists_df,
-        fg_df,
-        pnr_df,
-        circuit=circuit,
-        season_year=season_year,
-        season_type=season_type,
-    )
+    try:
+        merged_df = normalize_and_merge(
+            overall_df,
+            assists_df,
+            fg_df,
+            pnr_df,
+            circuit=circuit,
+            season_year=season_year,
+            season_type=season_type,
+        )
+    except Exception:
+        current_app.logger.exception("EYBL preview failed")
+        flash(
+            "Preview failed to parse a CSV (check for empty numeric cells). We've logged the row/column for you.",
+            "error",
+        )
+        return render_template(
+            'admin/eybl_import.html',
+            circuit=circuit,
+            season_year=season_year,
+            season_type=season_type,
+        )
 
     matches = auto_match_to_recruits(merged_df)
     db.session.commit()
