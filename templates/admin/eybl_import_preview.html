@@ -15,7 +15,7 @@
   {% if pnr_available %}
   <p>PnR fields - Poss: {{ counts.pnr_poss }}, PPP: {{ counts.pnr_ppp }}, TO%: {{ counts.pnr_to_pct }}, Score%: {{ counts.pnr_score_pct }}</p>
   {% else %}
-  <p class="text-sm text-gray-500">PNR file not provided — skipping PnR metrics for this batch.</p>
+  <p class="text-sm text-gray-500">PnR file not provided or contained no numeric PnR values for this batch.</p>
   {% endif %}
   <p>Auto-verified: {{ verified }}, Needs review: {{ pending }}</p>
 </div>
@@ -50,10 +50,14 @@
       <td class="px-2 py-1">{% if r.fg_pct is not none %}{{ (r.fg_pct*100)|round(1) }}%{% endif %}</td>
       <td class="px-2 py-1">{% if r.ppp is not none %}{{ r.ppp|round(2) }}{% endif %}</td>
       {% if pnr_available %}
-      <td class="px-2 py-1">{{ r.pnr_poss|int if r.pnr_poss is not none else '—' }}</td>
-      <td class="px-2 py-1">{{ r.pnr_ppp|round(2) if r.pnr_ppp is not none else '—' }}</td>
-      <td class="px-2 py-1">{{ (r.pnr_to_pct*100)|round(1) if r.pnr_to_pct is not none else '—' }}{% if r.pnr_to_pct is not none %}%{% endif %}</td>
-      <td class="px-2 py-1">{{ (r.pnr_score_pct*100)|round(1) if r.pnr_score_pct is not none else '—' }}{% if r.pnr_score_pct is not none %}%{% endif %}</td>
+      {% set poss = r.get('pnr_poss') %}
+      {% set ppp = r.get('pnr_ppp') %}
+      {% set to_pct = r.get('pnr_to_pct') %}
+      {% set score_pct = r.get('pnr_score_pct') %}
+      <td class="px-2 py-1">{{ poss|int if poss is not none else '—' }}</td>
+      <td class="px-2 py-1">{{ ppp|round(2) if ppp is not none else '—' }}</td>
+      <td class="px-2 py-1">{{ (to_pct*100)|round(1) if to_pct is not none else '—' }}{% if to_pct is not none %}%{% endif %}</td>
+      <td class="px-2 py-1">{{ (score_pct*100)|round(1) if score_pct is not none else '—' }}{% if score_pct is not none %}%{% endif %}</td>
       {% endif %}
     </tr>
     {% endfor %}
