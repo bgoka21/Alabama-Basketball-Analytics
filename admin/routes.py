@@ -52,10 +52,7 @@ from stats_config import LEADERBOARD_STATS
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 from services.eybl_ingest import (
-    read_overall_csv,
-    read_assists_csv,
-    read_fg_attempts_csv,
-    read_pnr_passes_csv,
+    load_csvs,
     normalize_and_merge,
     auto_match_to_recruits,
     promote_verified_stats,
@@ -4433,10 +4430,30 @@ def eybl_import():
         pnr_path = os.path.join(batch_dir, 'pnr.csv')
         pnr_file.save(pnr_path)
 
-    overall_df = read_overall_csv(overall_path)
-    assists_df = read_assists_csv(assists_path)
-    fg_df = read_fg_attempts_csv(fg_path) if fg_path else pd.DataFrame()
-    pnr_df = read_pnr_passes_csv(pnr_path) if pnr_path else pd.DataFrame()
+    manifest = {
+        'overall': 'overall.csv',
+        'assists': 'assists.csv',
+        'fg': 'fg.csv' if fg_path else None,
+        'pnr': 'pnr.csv' if pnr_path else None,
+    }
+    with open(os.path.join(batch_dir, 'manifest.json'), 'w') as mf:
+        json.dump(manifest, mf)
+
+    current_app.logger.info(
+        'EYBL import %s %s keys=%s filenames=%s batch_dir=%s',
+        request.method,
+        request.url,
+        list(request.files.keys()),
+        {k: f.filename for k, f in request.files.items()},
+        batch_dir,
+    )
+
+    overall_df, assists_df, fg_df, pnr_df = load_csvs(
+        overall_path,
+        assists_path,
+        fg_path,
+        pnr_path,
+    )
 
     merged_df = normalize_and_merge(
         overall_df,
@@ -4463,6 +4480,9 @@ def eybl_import():
         'pnr_to_pct': merged_df['pnr_to_pct'].notna().sum(),
         'pnr_score_pct': merged_df['pnr_score_pct'].notna().sum(),
     }
+    pnr_available = any(
+        counts[k] for k in ['pnr_poss', 'pnr_ppp', 'pnr_to_pct', 'pnr_score_pct']
+    )
     verified = sum(1 for m in matches if m['is_verified'])
     pending = sum(1 for m in matches if not m['is_verified'])
 
@@ -4487,16 +4507,22 @@ def eybl_import():
     preview_rows.to_csv(preview_path, index=False)
 
     if promote:
-        summary = promote_verified_stats(
-            merged_df,
-            circuit=circuit,
-            season_year=season_year,
-            season_type=season_type,
-            original_filenames=[overall_file.filename, assists_file.filename]
-            + ([fg_file.filename] if fg_file and fg_file.filename else [])
-            + ([pnr_file.filename] if pnr_file and pnr_file.filename else []),
-        )
-        db.session.commit()
+        try:
+            summary = promote_verified_stats(
+                merged_df,
+                circuit=circuit,
+                season_year=season_year,
+                season_type=season_type,
+                original_filenames=[overall_file.filename, assists_file.filename]
+                + ([fg_file.filename] if fg_file and fg_file.filename else [])
+                + ([pnr_file.filename] if pnr_file and pnr_file.filename else []),
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash('Promotion failed for one or more rows — see server logs for details.', 'error')
+            return redirect(url_for('admin.eybl_import'))
+
         snapshot_dir = current_app.config['INGEST_SNAPSHOTS_DIR']
         snapshot_filename = f"eybl_{timestamp}.csv"
         snapshot_path = os.path.join(snapshot_dir, snapshot_filename)
@@ -4523,7 +4549,7 @@ def eybl_import():
         anomalies=anomalies,
         rows=preview_rows.to_dict(orient='records'),
         batch_dir=batch_dir,
-        pnr_present=pnr_path is not None,
+        pnr_available=pnr_available,
     )
 
 
@@ -4543,26 +4569,33 @@ def eybl_import_promote():
     pnr_path = os.path.join(batch_dir, 'pnr.csv')
     pnr_path = pnr_path if os.path.exists(pnr_path) else None
 
-    overall_df = read_overall_csv(overall_path)
-    assists_df = read_assists_csv(assists_path)
-    fg_df = read_fg_attempts_csv(fg_path) if fg_path else pd.DataFrame()
-    pnr_df = read_pnr_passes_csv(pnr_path) if pnr_path else pd.DataFrame()
+    overall_df, assists_df, fg_df, pnr_df = load_csvs(
+        overall_path,
+        assists_path,
+        fg_path,
+        pnr_path,
+    )
     merged_df = normalize_and_merge(
         overall_df, assists_df, fg_df, pnr_df,
         circuit=circuit, season_year=season_year, season_type=season_type
     )
 
     auto_match_to_recruits(merged_df)
-    summary = promote_verified_stats(
-        merged_df,
-        circuit=circuit,
-        season_year=season_year,
-        season_type=season_type,
-        original_filenames=[os.path.basename(overall_path), os.path.basename(assists_path)]
-        + ([os.path.basename(fg_path)] if fg_path else [])
-        + ([os.path.basename(pnr_path)] if pnr_path else []),
-    )
-    db.session.commit()
+    try:
+        summary = promote_verified_stats(
+            merged_df,
+            circuit=circuit,
+            season_year=season_year,
+            season_type=season_type,
+            original_filenames=[os.path.basename(overall_path), os.path.basename(assists_path)]
+            + ([os.path.basename(fg_path)] if fg_path else [])
+            + ([os.path.basename(pnr_path)] if pnr_path else []),
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash('Promotion failed for one or more rows — see server logs for details.', 'error')
+        return redirect(url_for('admin.eybl_import'))
 
     snapshot_dir = current_app.config['INGEST_SNAPSHOTS_DIR']
     timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%S')

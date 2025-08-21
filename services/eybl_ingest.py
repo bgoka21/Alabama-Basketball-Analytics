@@ -64,6 +64,28 @@ def read_pnr_passes_csv(path: str) -> pd.DataFrame:
     )
     return df
 
+
+def load_csvs(
+    overall_path: str,
+    assists_path: str,
+    fg_path: Optional[str] = None,
+    pnr_path: Optional[str] = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Load CSVs with logging."""
+    logger.info("Reading overall CSV ...")
+    overall_df = read_overall_csv(overall_path)
+    logger.info("Reading assists CSV ...")
+    assists_df = read_assists_csv(assists_path)
+    fg_df = pd.DataFrame()
+    if fg_path:
+        logger.info("Reading FG attempts CSV ...")
+        fg_df = read_fg_attempts_csv(fg_path)
+    pnr_df = pd.DataFrame()
+    if pnr_path:
+        logger.info("Reading PNR+Passes CSV ...")
+        pnr_df = read_pnr_passes_csv(pnr_path)
+    return overall_df, assists_df, fg_df, pnr_df
+
 # ---------------------------------------------------------------------------
 # Normalization helpers
 # ---------------------------------------------------------------------------
@@ -121,16 +143,24 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
     overall_df = overall_df.copy() if overall_df is not None else pd.DataFrame()
     assists_df = assists_df.copy() if assists_df is not None else pd.DataFrame()
     fg_att_df = fg_att_df.copy() if fg_att_df is not None else pd.DataFrame()
-    pnr_df = pnr_df.copy() if pnr_df is not None else pd.DataFrame()
+    pnr_df = pnr_df.copy() if pnr_df is not None else None
 
-    for df in (overall_df, assists_df, fg_att_df, pnr_df):
+    for df in (overall_df, assists_df, fg_att_df):
         if not df.empty:
             df.columns = [c.strip() for c in df.columns]
+    if pnr_df is not None and not pnr_df.empty:
+        pnr_df.columns = [c.strip() for c in pnr_df.columns]
+        required = {"Player", "Team", "Poss", "PPP", "TO%", "Score%"}
+        if not required.issubset(pnr_df.columns):
+            logger.info("PNR CSV missing required headers %s; skipping", required - set(pnr_df.columns))
+            pnr_df = None
+        else:
+            pnr_df = pnr_df.rename({c: f"{c}_pnr" for c in pnr_df.columns if c not in {"Player", "Team"}}, axis=1)
 
     merged = pd.merge(overall_df, assists_df, on=["Player", "Team"], how="outer", suffixes=("", "_ast"))
     if not fg_att_df.empty:
         merged = pd.merge(merged, fg_att_df, on=["Player", "Team"], how="left", suffixes=("", "_fg"))
-    if not pnr_df.empty:
+    if pnr_df is not None and not pnr_df.empty:
         merged = pd.merge(merged, pnr_df, on=["Player", "Team"], how="left", suffixes=("", "_pnr"))
 
     records = []
@@ -201,8 +231,10 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
         }
         records.append(rec)
     df = pd.DataFrame(records)
-    if not df.empty:
-        total = len(df)
+    total = len(df)
+    if pnr_df is None or pnr_df.empty:
+        logger.info("PNR not provided (skipping)")
+    else:
         logger.info(
             "PNR fill rates: poss=%s/%s, ppp=%s/%s, to_pct=%s/%s, score_pct=%s/%s",
             df["pnr_poss"].notna().sum(),
@@ -348,15 +380,40 @@ def promote_verified_stats(merged_df: pd.DataFrame, *, circuit: str, season_year
             source_system="synergy_portal_csv",
             original_filenames=",".join(original_filenames),
         )
-        if existing:
-            for k, v in values.items():
-                setattr(existing, k, v)
-            existing.ingested_at = db.func.now()
-            updated += 1
-        else:
-            stats = UnifiedStats(**unique_filter, **values)
-            db.session.add(stats)
-            inserted += 1
+        try:
+            if existing:
+                for k, v in values.items():
+                    setattr(existing, k, v)
+                existing.ingested_at = db.func.now()
+                updated += 1
+            else:
+                stats = UnifiedStats(**unique_filter, **values)
+                db.session.add(stats)
+                inserted += 1
+        except Exception:
+            logger.exception(
+                "unified_stats upsert failed",
+                extra={
+                    'recruit_id': recruit_id,
+                    'circuit': circuit,
+                    'season_year': season_year,
+                    'season_type': season_type,
+                    'team': row.team,
+                    'fields': {
+                        'gp': row.gp,
+                        'ppg': row.ppg,
+                        'ast': row.ast,
+                        'tov': row.tov,
+                        'fg_pct': row.fg_pct,
+                        'ppp': row.ppp,
+                        'pnr_poss': row.pnr_poss,
+                        'pnr_ppp': row.pnr_ppp,
+                        'pnr_to_pct': row.pnr_to_pct,
+                        'pnr_score_pct': row.pnr_score_pct,
+                    },
+                },
+            )
+            raise
     db.session.flush()
     return {"inserted": inserted, "updated": updated, "skipped": skipped, "anomalies": anomalies}
 
@@ -377,10 +434,7 @@ def promote_verified_stats(merged_df: pd.DataFrame, *, circuit: str, season_year
 def eybl_import_command(circuit, season_year, season_type, overall, assists, fgatt, pnr, dry_run):
     """Import EYBL/AAU stats from Synergy CSV exports."""
     # After deploying ingestion updates, rerun with Stage & Promote to refresh stored stats.
-    overall_df = read_overall_csv(overall)
-    assists_df = read_assists_csv(assists)
-    fg_df = read_fg_attempts_csv(fgatt) if fgatt else pd.DataFrame()
-    pnr_df = read_pnr_passes_csv(pnr) if pnr else pd.DataFrame()
+    overall_df, assists_df, fg_df, pnr_df = load_csvs(overall, assists, fgatt, pnr)
 
     merged_df = normalize_and_merge(
         overall_df,
