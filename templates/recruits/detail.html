@@ -105,8 +105,8 @@
             <div class="text-lg font-bold text-black dark:text-white">{{ '%.2f'|format(latest.ppp) if latest.ppp is not none else '—' }}</div>
           </div>
         </div>
-        {% set pnr_missing = (latest.pnr_poss is none and latest.pnr_ppp is none and latest.pnr_to_pct is none and latest.pnr_score_pct is none) %}
-        {% if not pnr_missing %}
+        {% set show_pnr = (latest.pnr_poss is not none or latest.pnr_ppp is not none or latest.pnr_to_pct is not none or latest.pnr_score_pct is not none) %}
+        {% if show_pnr %}
         <div class="bg-gray-50 dark:bg-gray-700 rounded p-2">
           <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 text-center">PnR (incl. Passes)</div>
           <div class="mt-1 grid grid-cols-2 gap-1 text-center">
