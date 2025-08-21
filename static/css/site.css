@@ -29,25 +29,32 @@
   line-height: 1.1;
 }
 
-/* Recruit page wide container (scoped) */
+/* Recruit page wide container (scoped & centered) */
 .page--recruit.container--wide {
   /* Increase the usable width only on this page */
   max-width: 1360px;
+  margin-left: auto;
+  margin-right: auto;
   padding-left: 20px;
   padding-right: 24px;
 }
 
-/* If your base layout centers the inner container, let recruit page align to sidebar */
+/* Center within layouts that include a sidebar */
 .layout--with-sidebar .page--recruit.container--wide {
-  margin-left: 0;
+  margin-left: auto;
   margin-right: auto;
 }
 
-/* Ensure inner content can expand to full width of the main column */
+/* Allow inner containers to span the full width */
 .page--recruit .content-inner,
 .page--recruit .main-content,
 .page--recruit .container {
   width: 100%;
+}
+
+/* Prevent nested generic containers from shrinking the width */
+.page--recruit .container {
+  max-width: 100%;
 }
 
 /* Tables/cards fill available width on recruit page */
