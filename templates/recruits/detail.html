@@ -86,23 +86,49 @@
         <span class="text-gray-400 text-xs" title="Source: Synergy Leaderboards export · Imported {{ latest.ingested_at.strftime('%Y-%m-%d') }}">&#9432;</span>
       </div>
       {% if latest.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ latest.team_name }}</div>{% endif %}
-      <div class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPG</div>
-          <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.ppg) if latest.ppg is not none else '—' }}</div>
+      <div class="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPG</div>
+            <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.ppg) if latest.ppg is not none else '—' }}</div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">AST</div>
+            <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.ast) if latest.ast is not none else '—' }}</div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">TOV</div>
+            <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.tov) if latest.tov is not none else '—' }}</div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPP</div>
+            <div class="text-lg font-bold text-black dark:text-white">{{ '%.2f'|format(latest.ppp) if latest.ppp is not none else '—' }}</div>
+          </div>
         </div>
-        <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">AST</div>
-          <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.ast) if latest.ast is not none else '—' }}</div>
+        {% set pnr_missing = (latest.pnr_poss is none and latest.pnr_ppp is none and latest.pnr_to_pct is none and latest.pnr_score_pct is none) %}
+        {% if not pnr_missing %}
+        <div class="bg-gray-50 dark:bg-gray-700 rounded p-2">
+          <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 text-center">PnR (incl. Passes)</div>
+          <div class="mt-1 grid grid-cols-2 gap-1 text-center">
+            <div>
+              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Poss</div>
+              <div class="text-sm font-bold text-black dark:text-white">{{ latest.pnr_poss if latest.pnr_poss is not none else '—' }}</div>
+            </div>
+            <div>
+              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPP</div>
+              <div class="text-sm font-bold text-black dark:text-white">{{ '%.2f'|format(latest.pnr_ppp) if latest.pnr_ppp is not none else '—' }}</div>
+            </div>
+            <div>
+              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">TO%</div>
+              <div class="text-sm font-bold text-black dark:text-white">{{ '%.1f'|format(latest.pnr_to_pct*100) if latest.pnr_to_pct is not none else '—' }}{% if latest.pnr_to_pct is not none %}%{% endif %}</div>
+            </div>
+            <div>
+              <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Score%</div>
+              <div class="text-sm font-bold text-black dark:text-white">{{ '%.1f'|format(latest.pnr_score_pct*100) if latest.pnr_score_pct is not none else '—' }}{% if latest.pnr_score_pct is not none %}%{% endif %}</div>
+            </div>
+          </div>
         </div>
-        <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">TOV</div>
-          <div class="text-lg font-bold text-black dark:text-white">{{ '%.1f'|format(latest.tov) if latest.tov is not none else '—' }}</div>
-        </div>
-        <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">PPP</div>
-          <div class="text-lg font-bold text-black dark:text-white">{{ '%.2f'|format(latest.ppp) if latest.ppp is not none else '—' }}</div>
-        </div>
+        {% endif %}
       </div>
       {% set others = stats_by_circuit[circuit][1:] %}
       {% if others %}

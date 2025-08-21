@@ -14,6 +14,10 @@ def _row_to_dict(row: UnifiedStats) -> Dict:
         "ast": row.ast,
         "tov": row.tov,
         "ppp": row.ppp,
+        "pnr_poss": row.pnr_poss,
+        "pnr_ppp": row.pnr_ppp,
+        "pnr_to_pct": row.pnr_to_pct,
+        "pnr_score_pct": row.pnr_score_pct,
         "ingested_at": row.ingested_at,
     }
 

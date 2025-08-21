@@ -55,6 +55,7 @@ from services.eybl_ingest import (
     read_overall_csv,
     read_assists_csv,
     read_fg_attempts_csv,
+    read_pnr_passes_csv,
     normalize_and_merge,
     auto_match_to_recruits,
     promote_verified_stats,
@@ -4402,6 +4403,7 @@ def eybl_import():
     overall_file = request.files.get('overall')
     assists_file = request.files.get('assists')
     fg_file = request.files.get('fg')
+    pnr_file = request.files.get('pnr')
 
     errors = []
     if not circuit:
@@ -4426,15 +4428,21 @@ def eybl_import():
     if fg_file and fg_file.filename:
         fg_path = os.path.join(batch_dir, 'fg.csv')
         fg_file.save(fg_path)
+    pnr_path = None
+    if pnr_file and pnr_file.filename:
+        pnr_path = os.path.join(batch_dir, 'pnr.csv')
+        pnr_file.save(pnr_path)
 
     overall_df = read_overall_csv(overall_path)
     assists_df = read_assists_csv(assists_path)
     fg_df = read_fg_attempts_csv(fg_path) if fg_path else pd.DataFrame()
+    pnr_df = read_pnr_passes_csv(pnr_path) if pnr_path else pd.DataFrame()
 
     merged_df = normalize_and_merge(
         overall_df,
         assists_df,
         fg_df,
+        pnr_df,
         circuit=circuit,
         season_year=season_year,
         season_type=season_type,
@@ -4450,6 +4458,10 @@ def eybl_import():
         'tov': merged_df['tov'].notna().sum(),
         'fg_pct': merged_df['fg_pct'].notna().sum(),
         'ppp': merged_df['ppp'].notna().sum(),
+        'pnr_poss': merged_df['pnr_poss'].notna().sum(),
+        'pnr_ppp': merged_df['pnr_ppp'].notna().sum(),
+        'pnr_to_pct': merged_df['pnr_to_pct'].notna().sum(),
+        'pnr_score_pct': merged_df['pnr_score_pct'].notna().sum(),
     }
     verified = sum(1 for m in matches if m['is_verified'])
     pending = sum(1 for m in matches if not m['is_verified'])
@@ -4465,7 +4477,10 @@ def eybl_import():
         if r.raw_poss is not None and r.raw_poss <= 0 and r.raw_pppa is None and r.raw_ppp is None:
             anomalies.append(f"Poss <=0 for {r.player}")
 
-    preview_rows = merged_df.head(100)[['player', 'team', 'gp', 'ppg', 'ast', 'tov', 'fg_pct', 'ppp']]
+    preview_rows = merged_df.head(100)[[
+        'player', 'team', 'gp', 'ppg', 'ast', 'tov', 'fg_pct', 'ppp',
+        'pnr_poss', 'pnr_ppp', 'pnr_to_pct', 'pnr_score_pct'
+    ]]
     preview_dir = current_app.config['INGEST_PREVIEWS_DIR']
     preview_filename = f"eybl_{timestamp}.csv"
     preview_path = os.path.join(preview_dir, preview_filename)
@@ -4477,7 +4492,9 @@ def eybl_import():
             circuit=circuit,
             season_year=season_year,
             season_type=season_type,
-            original_filenames=[overall_file.filename, assists_file.filename] + ([fg_file.filename] if fg_file and fg_file.filename else []),
+            original_filenames=[overall_file.filename, assists_file.filename]
+            + ([fg_file.filename] if fg_file and fg_file.filename else [])
+            + ([pnr_file.filename] if pnr_file and pnr_file.filename else []),
         )
         db.session.commit()
         snapshot_dir = current_app.config['INGEST_SNAPSHOTS_DIR']
@@ -4506,6 +4523,7 @@ def eybl_import():
         anomalies=anomalies,
         rows=preview_rows.to_dict(orient='records'),
         batch_dir=batch_dir,
+        pnr_present=pnr_path is not None,
     )
 
 
@@ -4522,12 +4540,15 @@ def eybl_import_promote():
     assists_path = os.path.join(batch_dir, 'assists.csv')
     fg_path = os.path.join(batch_dir, 'fg.csv')
     fg_path = fg_path if os.path.exists(fg_path) else None
+    pnr_path = os.path.join(batch_dir, 'pnr.csv')
+    pnr_path = pnr_path if os.path.exists(pnr_path) else None
 
     overall_df = read_overall_csv(overall_path)
     assists_df = read_assists_csv(assists_path)
     fg_df = read_fg_attempts_csv(fg_path) if fg_path else pd.DataFrame()
+    pnr_df = read_pnr_passes_csv(pnr_path) if pnr_path else pd.DataFrame()
     merged_df = normalize_and_merge(
-        overall_df, assists_df, fg_df,
+        overall_df, assists_df, fg_df, pnr_df,
         circuit=circuit, season_year=season_year, season_type=season_type
     )
 
@@ -4537,7 +4558,9 @@ def eybl_import_promote():
         circuit=circuit,
         season_year=season_year,
         season_type=season_type,
-        original_filenames=[os.path.basename(overall_path), os.path.basename(assists_path)] + ([os.path.basename(fg_path)] if fg_path else []),
+        original_filenames=[os.path.basename(overall_path), os.path.basename(assists_path)]
+        + ([os.path.basename(fg_path)] if fg_path else [])
+        + ([os.path.basename(pnr_path)] if pnr_path else []),
     )
     db.session.commit()
 

@@ -12,6 +12,9 @@
 <div class="mb-4">
   <p>Total rows: {{ total_rows }}</p>
   <p>Field counts - PPG: {{ counts.ppg }}, AST: {{ counts.ast }}, TOV: {{ counts.tov }}, FG%: {{ counts.fg_pct }}, PPP: {{ counts.ppp }}</p>
+  {% if counts.pnr_poss or counts.pnr_ppp or counts.pnr_to_pct or counts.pnr_score_pct %}
+  <p>PnR fields - Poss: {{ counts.pnr_poss }}, PPP: {{ counts.pnr_ppp }}, TO%: {{ counts.pnr_to_pct }}, Score%: {{ counts.pnr_score_pct }}</p>
+  {% endif %}
   <p>Auto-verified: {{ verified }}, Needs review: {{ pending }}</p>
 </div>
 <table class="table-auto w-full text-sm mb-4">
@@ -25,6 +28,12 @@
       <th class="px-2 py-1">TOV (G)</th>
       <th class="px-2 py-1">FG%</th>
       <th class="px-2 py-1">PPP</th>
+      {% if pnr_present %}
+      <th class="px-2 py-1">PnR Poss</th>
+      <th class="px-2 py-1">PnR PPP</th>
+      <th class="px-2 py-1">PnR TO%</th>
+      <th class="px-2 py-1">PnR Score%</th>
+      {% endif %}
     </tr>
   </thead>
   <tbody>
@@ -38,6 +47,12 @@
       <td class="px-2 py-1">{% if r.tov is not none %}{{ r.tov|round(1) }}{% endif %}</td>
       <td class="px-2 py-1">{% if r.fg_pct is not none %}{{ (r.fg_pct*100)|round(1) }}%{% endif %}</td>
       <td class="px-2 py-1">{% if r.ppp is not none %}{{ r.ppp|round(2) }}{% endif %}</td>
+      {% if pnr_present %}
+      <td class="px-2 py-1">{% if r.pnr_poss is not none %}{{ r.pnr_poss|int }}{% endif %}</td>
+      <td class="px-2 py-1">{% if r.pnr_ppp is not none %}{{ r.pnr_ppp|round(2) }}{% endif %}</td>
+      <td class="px-2 py-1">{% if r.pnr_to_pct is not none %}{{ (r.pnr_to_pct*100)|round(1) }}%{% endif %}</td>
+      <td class="px-2 py-1">{% if r.pnr_score_pct is not none %}{{ (r.pnr_score_pct*100)|round(1) }}%{% endif %}</td>
+      {% endif %}
     </tr>
     {% endfor %}
   </tbody>
