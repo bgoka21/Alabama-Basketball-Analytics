@@ -11,7 +11,7 @@ from flask.cli import with_appcontext
 
 from models.database import db
 from models.recruit import Recruit
-from models.eybl import ExternalIdentityMap, UnifiedStats
+from models.eybl import ExternalIdentityMap, UnifiedStats, IdentitySynonym
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -173,10 +173,24 @@ def auto_match_to_recruits(df: pd.DataFrame) -> List[Dict]:
     name_norm = {clean_name(r.name): r for r in recruits}
     name_team_norm = {(clean_name(r.name), clean_team(r.aau_team)): r for r in recruits}
 
+    # Load synonyms for normalized matching
+    name_syns = {
+        clean_name(s.source_value): clean_name(s.normalized_value)
+        for s in IdentitySynonym.query.filter_by(kind="name")
+    }
+    team_syns = {
+        clean_team(s.source_value): clean_team(s.normalized_value)
+        for s in IdentitySynonym.query.filter_by(kind="team")
+    }
+
     results: List[Dict] = []
     for _, row in df.iterrows():
         player = row["player"] or ""
         team = row["team"] or ""
+        player_clean = clean_name(player)
+        team_clean = clean_team(team)
+        player_norm = name_syns.get(player_clean, player_clean)
+        team_norm = team_syns.get(team_clean, team_clean)
         ext_key = deterministic_external_key(player, team, row["season_year"], row["circuit"])
         recruit_id = None
         confidence = 0.0
@@ -194,13 +208,13 @@ def auto_match_to_recruits(df: pd.DataFrame) -> List[Dict]:
                 confidence = 0.9
                 is_verified = True
             else:
-                r = name_team_norm.get((clean_name(player), clean_team(team)))
+                r = name_team_norm.get((player_norm, team_norm))
                 if r:
                     recruit_id = r.id
                     confidence = 0.9
                     is_verified = True
                 else:
-                    r = name_norm.get(clean_name(player))
+                    r = name_norm.get(player_norm)
                     if r:
                         recruit_id = r.id
                         confidence = 0.8

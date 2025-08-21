@@ -1,0 +1,99 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Identity Review</h1>
+<form method="get" class="mb-4 flex flex-wrap gap-2 items-end">
+  <div>
+    <label class="block text-sm">Circuit</label>
+    <select name="circuit" class="border px-2 py-1">
+      {% for c in ['EYBL','3SSB','UA','Other'] %}
+      <option value="{{c}}" {% if c==circuit %}selected{% endif %}>{{c}}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm">Season Year</label>
+    <input name="season_year" value="{{season_year or ''}}" class="border px-2 py-1 w-24" />
+  </div>
+  <div>
+    <label class="block text-sm">Status</label>
+    <select name="status" class="border px-2 py-1">
+      <option value="pending" {% if status=='pending' %}selected{% endif %}>pending</option>
+      <option value="verified" {% if status=='verified' %}selected{% endif %}>verified</option>
+      <option value="all" {% if status=='all' %}selected{% endif %}>all</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm">Search</label>
+    <input name="search" value="{{search}}" class="border px-2 py-1" />
+  </div>
+  <div>
+    <button type="submit" class="px-3 py-1 bg-gray-200 rounded">Filter</button>
+  </div>
+</form>
+<form method="post" id="bulk-form" class="mb-4">
+  <div class="mb-2 flex gap-2 items-center">
+    <select name="recruit_id" class="border px-2 py-1">
+      {% for r in recruits %}
+      <option value="{{r.id}}">{{r.name}}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" formaction="{{ url_for('admin.eybl_identity_bulk_link') }}" class="px-3 py-1 bg-[#9E1B32] text-white rounded">Bulk Verify</button>
+    <button type="submit" formaction="{{ url_for('admin.eybl_identity_bulk_unlink') }}" class="px-3 py-1 bg-gray-300 rounded">Bulk Unlink</button>
+  </div>
+  <table class="table-auto w-full text-sm">
+    <thead>
+      <tr class="bg-gray-200">
+        <th class="px-2 py-1"></th>
+        <th class="px-2 py-1">Player</th>
+        <th class="px-2 py-1">Team</th>
+        <th class="px-2 py-1">Season</th>
+        <th class="px-2 py-1">Confidence</th>
+        <th class="px-2 py-1">Recruit</th>
+        <th class="px-2 py-1">Updated</th>
+        <th class="px-2 py-1">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="odd:bg-white even:bg-gray-50">
+        <td class="px-2 py-1"><input type="checkbox" name="external_keys" value="{{ row.external_key }}"></td>
+        <td class="px-2 py-1">{{ row.player_name_external }}</td>
+        <td class="px-2 py-1">{{ row.team_external }}</td>
+        <td class="px-2 py-1">{{ row.season_year }}</td>
+        <td class="px-2 py-1">{{ row.match_confidence }}</td>
+        <td class="px-2 py-1">{{ recruit_map.get(row.recruit_id) }}</td>
+        <td class="px-2 py-1">{{ row.updated_at }}</td>
+        <td class="px-2 py-1">
+          <form method="post" action="{{ url_for('admin.eybl_identity_link') }}" class="inline">
+            <input type="hidden" name="external_key" value="{{ row.external_key }}">
+            <select name="recruit_id" class="border px-1 py-0">
+              {% for r in recruits %}
+              <option value="{{ r.id }}" {% if r.id==row.recruit_id %}selected{% endif %}>{{ r.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="px-2 py-1 bg-[#9E1B32] text-white rounded text-xs">Link</button>
+          </form>
+          {% if row.recruit_id %}
+          <form method="post" action="{{ url_for('admin.eybl_identity_unlink') }}" class="inline">
+            <input type="hidden" name="external_key" value="{{ row.external_key }}">
+            <button type="submit" class="px-2 py-1 bg-gray-300 rounded text-xs">Unlink</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% if pagination.pages > 1 %}
+<div class="mt-4">
+  {% if pagination.has_prev %}
+  <a href="{{ url_for('admin.eybl_identity', circuit=circuit, season_year=season_year, status=status, search=search, page=pagination.prev_num) }}" class="mr-2">Prev</a>
+  {% endif %}
+  Page {{ pagination.page }} of {{ pagination.pages }}
+  {% if pagination.has_next %}
+  <a href="{{ url_for('admin.eybl_identity', circuit=circuit, season_year=season_year, status=status, search=search, page=pagination.next_num) }}" class="ml-2">Next</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

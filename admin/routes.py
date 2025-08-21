@@ -51,6 +51,15 @@ from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
+from services.eybl_ingest import (
+    read_overall_csv,
+    read_assists_csv,
+    read_fg_attempts_csv,
+    normalize_and_merge,
+    auto_match_to_recruits,
+    promote_verified_stats,
+)
+from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 
 # --- Helper Functions at the top ---
 
@@ -4364,3 +4373,329 @@ def draft_upload():
         return redirect(url_for('admin.draft_upload'))
 
     return render_template('admin/draft_upload.html')
+
+
+# ---------------------------------------------------------------------------
+# EYBL / AAU CSV Import and Identity Management
+# ---------------------------------------------------------------------------
+
+
+def _parse_import_params(form):
+    circuit = form.get('circuit')
+    season_year = form.get('season_year')
+    try:
+        season_year = int(season_year) if season_year else None
+    except ValueError:
+        season_year = None
+    season_type = form.get('season_type') or 'AAU'
+    return circuit, season_year, season_type
+
+
+@admin_bp.route('/eybl/import', methods=['GET', 'POST'])
+@admin_required
+def eybl_import():
+    if request.method == 'GET':
+        return render_template('admin/eybl_import.html')
+
+    circuit, season_year, season_type = _parse_import_params(request.form)
+    promote = bool(request.form.get('promote'))
+    overall_file = request.files.get('overall')
+    assists_file = request.files.get('assists')
+    fg_file = request.files.get('fg')
+
+    errors = []
+    if not circuit:
+        errors.append('Circuit is required.')
+    if not overall_file or not assists_file:
+        errors.append('Overall and Assists files are required.')
+    if errors:
+        for e in errors:
+            flash(e, 'error')
+        return render_template('admin/eybl_import.html', circuit=circuit,
+                               season_year=season_year, season_type=season_type)
+
+    timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+    batch_dir = os.path.join(current_app.instance_path, 'uploads', 'eybl', timestamp)
+    os.makedirs(batch_dir, exist_ok=True)
+
+    overall_path = os.path.join(batch_dir, 'overall.csv')
+    assists_path = os.path.join(batch_dir, 'assists.csv')
+    overall_file.save(overall_path)
+    assists_file.save(assists_path)
+    fg_path = None
+    if fg_file and fg_file.filename:
+        fg_path = os.path.join(batch_dir, 'fg.csv')
+        fg_file.save(fg_path)
+
+    overall_df = read_overall_csv(overall_path)
+    assists_df = read_assists_csv(assists_path)
+    fg_df = read_fg_attempts_csv(fg_path) if fg_path else pd.DataFrame()
+
+    merged_df = normalize_and_merge(
+        overall_df,
+        assists_df,
+        fg_df,
+        circuit=circuit,
+        season_year=season_year,
+        season_type=season_type,
+    )
+
+    matches = auto_match_to_recruits(merged_df)
+    db.session.commit()
+
+    total_rows = len(merged_df)
+    counts = {
+        'ppg': merged_df['ppg'].notna().sum(),
+        'ast': merged_df['ast'].notna().sum(),
+        'tov': merged_df['tov'].notna().sum(),
+        'fg_pct': merged_df['fg_pct'].notna().sum(),
+        'ppp': merged_df['ppp'].notna().sum(),
+    }
+    verified = sum(1 for m in matches if m['is_verified'])
+    pending = sum(1 for m in matches if not m['is_verified'])
+
+    anomalies = []
+    for r in merged_df.itertuples():
+        if r.fg_pct is not None and not (0 <= r.fg_pct <= 1):
+            anomalies.append(f"FG% out of range for {r.player}")
+        if r.ppp is not None and not (0.6 <= r.ppp <= 1.5):
+            anomalies.append(f"PPP out of range for {r.player}")
+        if r.gp is not None and r.gp < 1:
+            anomalies.append(f"GP < 1 for {r.player}")
+        if r.raw_poss is not None and r.raw_poss <= 0 and r.raw_pppa is None and r.raw_ppp is None:
+            anomalies.append(f"Poss <=0 for {r.player}")
+
+    preview_rows = merged_df.head(100)[['player', 'team', 'gp', 'ppg', 'ast', 'tov', 'fg_pct', 'ppp']]
+    preview_dir = current_app.config['INGEST_PREVIEWS_DIR']
+    preview_filename = f"eybl_{timestamp}.csv"
+    preview_path = os.path.join(preview_dir, preview_filename)
+    preview_rows.to_csv(preview_path, index=False)
+
+    if promote:
+        summary = promote_verified_stats(
+            merged_df,
+            circuit=circuit,
+            season_year=season_year,
+            season_type=season_type,
+            original_filenames=[overall_file.filename, assists_file.filename] + ([fg_file.filename] if fg_file and fg_file.filename else []),
+        )
+        db.session.commit()
+        snapshot_dir = current_app.config['INGEST_SNAPSHOTS_DIR']
+        snapshot_filename = f"eybl_{timestamp}.csv"
+        snapshot_path = os.path.join(snapshot_dir, snapshot_filename)
+        preview_rows.to_csv(snapshot_path, index=False)
+        return render_template(
+            'admin/eybl_import_summary.html',
+            circuit=circuit,
+            season_year=season_year,
+            season_type=season_type,
+            summary=summary,
+            snapshot_filename=snapshot_filename,
+            identity_url=url_for('admin.eybl_identity', circuit=circuit, season_year=season_year, status='pending'),
+        )
+
+    return render_template(
+        'admin/eybl_import_preview.html',
+        circuit=circuit,
+        season_year=season_year,
+        season_type=season_type,
+        total_rows=total_rows,
+        counts=counts,
+        verified=verified,
+        pending=pending,
+        anomalies=anomalies,
+        rows=preview_rows.to_dict(orient='records'),
+        batch_dir=batch_dir,
+    )
+
+
+@admin_bp.route('/eybl/import/promote', methods=['POST'])
+@admin_required
+def eybl_import_promote():
+    circuit, season_year, season_type = _parse_import_params(request.form)
+    batch_dir = request.form.get('batch_dir')
+    if not batch_dir:
+        flash('Missing batch information', 'error')
+        return redirect(url_for('admin.eybl_import'))
+
+    overall_path = os.path.join(batch_dir, 'overall.csv')
+    assists_path = os.path.join(batch_dir, 'assists.csv')
+    fg_path = os.path.join(batch_dir, 'fg.csv')
+    fg_path = fg_path if os.path.exists(fg_path) else None
+
+    overall_df = read_overall_csv(overall_path)
+    assists_df = read_assists_csv(assists_path)
+    fg_df = read_fg_attempts_csv(fg_path) if fg_path else pd.DataFrame()
+    merged_df = normalize_and_merge(
+        overall_df, assists_df, fg_df,
+        circuit=circuit, season_year=season_year, season_type=season_type
+    )
+
+    auto_match_to_recruits(merged_df)
+    summary = promote_verified_stats(
+        merged_df,
+        circuit=circuit,
+        season_year=season_year,
+        season_type=season_type,
+        original_filenames=[os.path.basename(overall_path), os.path.basename(assists_path)] + ([os.path.basename(fg_path)] if fg_path else []),
+    )
+    db.session.commit()
+
+    snapshot_dir = current_app.config['INGEST_SNAPSHOTS_DIR']
+    timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%S')
+    snapshot_filename = f"eybl_{timestamp}.csv"
+    snapshot_path = os.path.join(snapshot_dir, snapshot_filename)
+    merged_df.to_csv(snapshot_path, index=False)
+
+    return render_template(
+        'admin/eybl_import_summary.html',
+        circuit=circuit,
+        season_year=season_year,
+        season_type=season_type,
+        summary=summary,
+        snapshot_filename=snapshot_filename,
+        identity_url=url_for('admin.eybl_identity', circuit=circuit, season_year=season_year, status='pending'),
+    )
+
+
+@admin_bp.route('/eybl/identity')
+@admin_required
+def eybl_identity():
+    circuit = request.args.get('circuit')
+    season_year = request.args.get('season_year', type=int)
+    status = request.args.get('status', 'pending')
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+
+    q = ExternalIdentityMap.query
+    if circuit:
+        q = q.filter_by(circuit=circuit)
+    if season_year is not None:
+        q = q.filter_by(season_year=season_year)
+    if status == 'pending':
+        q = q.filter(ExternalIdentityMap.is_verified.is_(False))
+    elif status == 'verified':
+        q = q.filter(ExternalIdentityMap.is_verified.is_(True))
+    if search:
+        q = q.filter(ExternalIdentityMap.player_name_external.ilike(f"%{search}%"))
+    q = q.order_by(ExternalIdentityMap.updated_at.desc())
+
+    pagination = q.paginate(page=page, per_page=50, error_out=False)
+    recruits = Recruit.query.order_by(Recruit.name).all()
+    recruit_map = {r.id: r.name for r in recruits}
+
+    return render_template(
+        'admin/eybl_identity.html',
+        rows=pagination.items,
+        pagination=pagination,
+        circuit=circuit,
+        season_year=season_year,
+        status=status,
+        search=search,
+        recruits=recruits,
+        recruit_map=recruit_map,
+    )
+
+
+@admin_bp.route('/eybl/identity/link', methods=['POST'])
+@admin_required
+def eybl_identity_link():
+    external_key = request.form.get('external_key')
+    recruit_id = request.form.get('recruit_id', type=int)
+    entry = ExternalIdentityMap.query.filter_by(external_key=external_key).one_or_none()
+    if entry and recruit_id:
+        entry.recruit_id = recruit_id
+        entry.is_verified = True
+        entry.match_confidence = 1.0
+        entry.updated_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(request.referrer or url_for('admin.eybl_identity'))
+
+
+@admin_bp.route('/eybl/identity/unlink', methods=['POST'])
+@admin_required
+def eybl_identity_unlink():
+    external_key = request.form.get('external_key')
+    entry = ExternalIdentityMap.query.filter_by(external_key=external_key).one_or_none()
+    if entry:
+        entry.recruit_id = None
+        entry.is_verified = False
+        entry.match_confidence = 0.0
+        entry.updated_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(request.referrer or url_for('admin.eybl_identity'))
+
+
+@admin_bp.route('/eybl/identity/bulk_link', methods=['POST'])
+@admin_required
+def eybl_identity_bulk_link():
+    keys = request.form.getlist('external_keys')
+    recruit_id = request.form.get('recruit_id', type=int)
+    if keys and recruit_id:
+        for key in keys:
+            entry = ExternalIdentityMap.query.filter_by(external_key=key).one_or_none()
+            if entry:
+                entry.recruit_id = recruit_id
+                entry.is_verified = True
+                entry.match_confidence = 1.0
+                entry.updated_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(request.referrer or url_for('admin.eybl_identity'))
+
+
+@admin_bp.route('/eybl/identity/bulk_unlink', methods=['POST'])
+@admin_required
+def eybl_identity_bulk_unlink():
+    keys = request.form.getlist('external_keys')
+    if keys:
+        for key in keys:
+            entry = ExternalIdentityMap.query.filter_by(external_key=key).one_or_none()
+            if entry:
+                entry.recruit_id = None
+                entry.is_verified = False
+                entry.match_confidence = 0.0
+                entry.updated_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(request.referrer or url_for('admin.eybl_identity'))
+
+
+@admin_bp.route('/eybl/synonyms')
+@admin_required
+def eybl_synonyms():
+    name_syns = IdentitySynonym.query.filter_by(kind='name').order_by(IdentitySynonym.source_value).all()
+    team_syns = IdentitySynonym.query.filter_by(kind='team').order_by(IdentitySynonym.source_value).all()
+    return render_template('admin/eybl_synonyms.html', name_syns=name_syns, team_syns=team_syns)
+
+
+@admin_bp.route('/eybl/synonyms/add', methods=['POST'])
+@admin_required
+def eybl_synonym_add():
+    kind = request.form.get('kind')
+    source = request.form.get('source_value')
+    normalized = request.form.get('normalized_value')
+    if kind in ('name', 'team') and source and normalized:
+        syn = IdentitySynonym(kind=kind, source_value=source, normalized_value=normalized)
+        db.session.add(syn)
+        db.session.commit()
+    return redirect(url_for('admin.eybl_synonyms'))
+
+
+@admin_bp.route('/eybl/synonyms/edit/<int:syn_id>', methods=['POST'])
+@admin_required
+def eybl_synonym_edit(syn_id):
+    syn = db.session.get(IdentitySynonym, syn_id)
+    if syn:
+        syn.source_value = request.form.get('source_value')
+        syn.normalized_value = request.form.get('normalized_value')
+        db.session.commit()
+    return redirect(url_for('admin.eybl_synonyms'))
+
+
+@admin_bp.route('/eybl/synonyms/delete/<int:syn_id>', methods=['POST'])
+@admin_required
+def eybl_synonym_delete(syn_id):
+    syn = db.session.get(IdentitySynonym, syn_id)
+    if syn:
+        db.session.delete(syn)
+        db.session.commit()
+    return redirect(url_for('admin.eybl_synonyms'))

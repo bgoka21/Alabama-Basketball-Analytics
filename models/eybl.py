@@ -51,3 +51,21 @@ class UnifiedStats(db.Model):
                          name='uq_unified_stats_unique'),
         Index('ix_unified_stats_circuit_season', 'circuit', 'season_year'),
     )
+
+
+class IdentitySynonym(db.Model):
+    """Simple mapping to normalize external player or team names."""
+
+    __tablename__ = "identity_synonym"
+
+    id = Column(Integer, primary_key=True)
+    kind = Column(String(16), nullable=False)  # 'name' or 'team'
+    source_value = Column(String(128), nullable=False)
+    normalized_value = Column(String(128), nullable=False)
+    created_at = Column(DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('kind', 'source_value', name='uq_identity_synonym_kind_source'),
+    )
+
