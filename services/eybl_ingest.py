@@ -125,13 +125,27 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
         ppg = to_float(row.get("PPG"))
         if ppg is None and pts is not None and gp and gp > 0:
             ppg = pts / gp
-        ast = to_float(row.get("Ast"))
-        if ast is None:
-            ast = to_float(row.get("AST/G"))
+
+        ast_pg = to_float(row.get("AST/G"))
+        ast_src = "AST/G"
+        if ast_pg is None:
+            ast_total = to_float(row.get("Ast"))
+            ast_src = "Ast" if ast_total is not None else "None"
+            if ast_total is not None and gp and gp > 0:
+                ast_pg = ast_total / gp
+
         ast_to = to_float(row.get("Ast/TO"))
         if ast_to is None:
             ast_to = to_float(row.get("AST/TO"))
-        tov = ast / ast_to if ast and ast_to and ast_to > 0 else None
+        tov_pg = ast_pg / ast_to if (ast_pg is not None and ast_to and ast_to > 0) else None
+
+        logger.info(
+            "%s: assist source=%s; tov_pg=%s",
+            player,
+            ast_src,
+            "yes" if tov_pg is not None else "no",
+        )
+
         fg_pct = pct_to_decimal(row.get("FG%"))
         ppp_main = to_float(row.get("PP(P+A)"))
         ppp_overall = to_float(row.get("PPP"))
@@ -146,8 +160,8 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
             "team": team,
             "gp": gp,
             "ppg": ppg,
-            "ast": ast,
-            "tov": tov,
+            "ast": ast_pg,
+            "tov": tov_pg,
             "fg_pct": fg_pct,
             "ppp": ppp,
             "circuit": circuit,
@@ -317,6 +331,7 @@ def promote_verified_stats(merged_df: pd.DataFrame, *, circuit: str, season_year
 @with_appcontext
 def eybl_import_command(circuit, season_year, season_type, overall, assists, fgatt, dry_run):
     """Import EYBL/AAU stats from Synergy CSV exports."""
+    # After deploying ingestion updates, rerun with Stage & Promote to refresh stored stats.
     overall_df = read_overall_csv(overall)
     assists_df = read_assists_csv(assists)
     fg_df = read_fg_attempts_csv(fgatt) if fgatt else pd.DataFrame()
