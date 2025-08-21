@@ -51,6 +51,19 @@ def read_fg_attempts_csv(path: str) -> pd.DataFrame:
     logger.info("Reading FG attempts CSV %s", path)
     return _read_csv_robust(path)
 
+
+def read_pnr_passes_csv(path: str) -> pd.DataFrame:
+    """Read the Pick and Rolls Including Passes CSV."""
+    logger.info("Reading PNR+Passes CSV %s", path)
+    df = _read_csv_robust(path)
+    logger.info(
+        "PNR CSV rows=%s cols=%s headers=%s",
+        len(df),
+        len(df.columns),
+        list(df.columns)[:8],
+    )
+    return df
+
 # ---------------------------------------------------------------------------
 # Normalization helpers
 # ---------------------------------------------------------------------------
@@ -103,18 +116,22 @@ def deterministic_external_key(player: str, team: str, season_year: Optional[int
 # ---------------------------------------------------------------------------
 
 def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_att_df: pd.DataFrame,
+                        pnr_df: Optional[pd.DataFrame] = None,
                         *, circuit: str, season_year: Optional[int], season_type: str = "AAU") -> pd.DataFrame:
     overall_df = overall_df.copy() if overall_df is not None else pd.DataFrame()
     assists_df = assists_df.copy() if assists_df is not None else pd.DataFrame()
     fg_att_df = fg_att_df.copy() if fg_att_df is not None else pd.DataFrame()
+    pnr_df = pnr_df.copy() if pnr_df is not None else pd.DataFrame()
 
-    for df in (overall_df, assists_df, fg_att_df):
+    for df in (overall_df, assists_df, fg_att_df, pnr_df):
         if not df.empty:
             df.columns = [c.strip() for c in df.columns]
 
     merged = pd.merge(overall_df, assists_df, on=["Player", "Team"], how="outer", suffixes=("", "_ast"))
     if not fg_att_df.empty:
         merged = pd.merge(merged, fg_att_df, on=["Player", "Team"], how="left", suffixes=("", "_fg"))
+    if not pnr_df.empty:
+        merged = pd.merge(merged, pnr_df, on=["Player", "Team"], how="left", suffixes=("", "_pnr"))
 
     records = []
     for _, row in merged.iterrows():
@@ -155,6 +172,12 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
                 pts / poss if pts is not None and poss and poss > 0 else None
             )
         )
+        pnr_poss = to_float(row.get("Poss_pnr"))
+        pnr_poss = int(pnr_poss) if pnr_poss is not None else None
+        pnr_ppp = to_float(row.get("PPP_pnr"))
+        pnr_to_pct = pct_to_decimal(row.get("TO%_pnr"))
+        pnr_score_pct = pct_to_decimal(row.get("Score%_pnr"))
+
         rec = {
             "player": player,
             "team": team,
@@ -164,6 +187,10 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
             "tov": tov_pg,
             "fg_pct": fg_pct,
             "ppp": ppp,
+            "pnr_poss": pnr_poss,
+            "pnr_ppp": pnr_ppp,
+            "pnr_to_pct": pnr_to_pct,
+            "pnr_score_pct": pnr_score_pct,
             "circuit": circuit,
             "season_year": season_year,
             "season_type": season_type,
@@ -174,6 +201,19 @@ def normalize_and_merge(overall_df: pd.DataFrame, assists_df: pd.DataFrame, fg_a
         }
         records.append(rec)
     df = pd.DataFrame(records)
+    if not df.empty:
+        total = len(df)
+        logger.info(
+            "PNR fill rates: poss=%s/%s, ppp=%s/%s, to_pct=%s/%s, score_pct=%s/%s",
+            df["pnr_poss"].notna().sum(),
+            total,
+            df["pnr_ppp"].notna().sum(),
+            total,
+            df["pnr_to_pct"].notna().sum(),
+            total,
+            df["pnr_score_pct"].notna().sum(),
+            total,
+        )
     return df
 
 # ---------------------------------------------------------------------------
@@ -301,6 +341,10 @@ def promote_verified_stats(merged_df: pd.DataFrame, *, circuit: str, season_year
             tov=row.tov,
             fg_pct=row.fg_pct,
             ppp=row.ppp,
+            pnr_poss=row.pnr_poss,
+            pnr_ppp=row.pnr_ppp,
+            pnr_to_pct=row.pnr_to_pct,
+            pnr_score_pct=row.pnr_score_pct,
             source_system="synergy_portal_csv",
             original_filenames=",".join(original_filenames),
         )
@@ -327,17 +371,26 @@ def promote_verified_stats(merged_df: pd.DataFrame, *, circuit: str, season_year
 @click.option("--overall", type=click.Path(exists=True), required=True)
 @click.option("--assists", type=click.Path(exists=True), required=True)
 @click.option("--fgatt", type=click.Path(exists=True))
+@click.option("--pnr", type=click.Path(exists=True))
 @click.option("--dry-run", is_flag=True, default=False)
 @with_appcontext
-def eybl_import_command(circuit, season_year, season_type, overall, assists, fgatt, dry_run):
+def eybl_import_command(circuit, season_year, season_type, overall, assists, fgatt, pnr, dry_run):
     """Import EYBL/AAU stats from Synergy CSV exports."""
     # After deploying ingestion updates, rerun with Stage & Promote to refresh stored stats.
     overall_df = read_overall_csv(overall)
     assists_df = read_assists_csv(assists)
     fg_df = read_fg_attempts_csv(fgatt) if fgatt else pd.DataFrame()
+    pnr_df = read_pnr_passes_csv(pnr) if pnr else pd.DataFrame()
 
-    merged_df = normalize_and_merge(overall_df, assists_df, fg_df,
-                                    circuit=circuit, season_year=season_year, season_type=season_type)
+    merged_df = normalize_and_merge(
+        overall_df,
+        assists_df,
+        fg_df,
+        pnr_df,
+        circuit=circuit,
+        season_year=season_year,
+        season_type=season_type,
+    )
     matches = auto_match_to_recruits(merged_df)
     db.session.commit()
 
@@ -348,11 +401,16 @@ def eybl_import_command(circuit, season_year, season_type, overall, assists, fga
         'tov': merged_df['tov'].notna().sum(),
         'fg_pct': merged_df['fg_pct'].notna().sum(),
         'ppp': merged_df['ppp'].notna().sum(),
+        'pnr_poss': merged_df['pnr_poss'].notna().sum(),
+        'pnr_ppp': merged_df['pnr_ppp'].notna().sum(),
+        'pnr_to_pct': merged_df['pnr_to_pct'].notna().sum(),
+        'pnr_score_pct': merged_df['pnr_score_pct'].notna().sum(),
     }
     verified = sum(1 for m in matches if m['is_verified'])
     unmatched = sum(1 for m in matches if m['recruit_id'] is None)
 
-    preview_cols = ['player', 'team', 'gp', 'ppg', 'ast', 'tov', 'fg_pct', 'ppp']
+    preview_cols = ['player', 'team', 'gp', 'ppg', 'ast', 'tov', 'fg_pct', 'ppp',
+                    'pnr_poss', 'pnr_ppp', 'pnr_to_pct', 'pnr_score_pct']
     df_preview = merged_df[preview_cols]
 
     anomalies = []
@@ -379,8 +437,15 @@ def eybl_import_command(circuit, season_year, season_type, overall, assists, fga
                 click.echo(f" - {a}")
         click.echo(f"Preview written to {preview_path}")
     else:
-        summary = promote_verified_stats(merged_df, circuit=circuit, season_year=season_year,
-                                         season_type=season_type, original_filenames=[overall, assists] + ([fgatt] if fgatt else []))
+        summary = promote_verified_stats(
+            merged_df,
+            circuit=circuit,
+            season_year=season_year,
+            season_type=season_type,
+            original_filenames=[overall, assists]
+            + ([fgatt] if fgatt else [])
+            + ([pnr] if pnr else []),
+        )
         db.session.commit()
         snapshot_dir = current_app.config['INGEST_SNAPSHOTS_DIR']
         os.makedirs(snapshot_dir, exist_ok=True)
