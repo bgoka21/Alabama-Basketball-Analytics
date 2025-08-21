@@ -5,6 +5,21 @@
     <a href="{{ url_for('recruits.new_recruit') }}" class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]">Add Recruit</a>
   </div>
 
+  <div class="mb-4 flex flex-wrap gap-2">
+    {% for lab in ['All','EYBL','3SSB','UA'] %}
+      {% set active = circuit_filter == lab %}
+      {% if lab == 'All' %}
+        {% set link = url_for('recruits.list_recruits') %}
+      {% else %}
+        {% set link = url_for('recruits.list_recruits', circuit=lab) %}
+      {% endif %}
+      <a href="{{ link }}"
+         class="px-3 py-1 rounded-full border text-sm {{ 'bg-[#9E1B32] text-white' if active else 'text-gray-700 hover:bg-gray-100' }}">
+         {{ lab }}{% if circuit_counts[lab] is defined %} ({{ circuit_counts[lab] }}){% endif %}
+      </a>
+    {% endfor %}
+  </div>
+
   <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
       <thead class="bg-gray-100">
@@ -21,6 +36,11 @@
         <tr>
           <td class="px-6 py-4">
             <a href="{{ url_for('recruits.detail_recruit', id=r.id) }}" class="text-blue-600 hover:underline">{{ r.name }}</a>
+            {% if r.latest_circuit %}
+              <span class="ml-1 text-xs bg-gray-200 text-gray-800 px-1 rounded" title="{% if r.additional_circuits %}{{ r.additional_circuits|join(', ') }}{% endif %}">
+                {{ r.latest_circuit }}{% if r.additional_circuits %} +{{ r.additional_circuits|length }}{% endif %}
+              </span>
+            {% endif %}
           </td>
           <td class="px-6 py-4">{{ r.graduation_year }}</td>
           <td class="px-6 py-4">{{ r.position }}</td>

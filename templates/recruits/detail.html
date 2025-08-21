@@ -74,6 +74,69 @@
 </div>
 
 <div class="max-w-7xl mx-auto px-4 mb-6">
+  <h3 class="text-xl font-semibold mb-2">Amateur Circuits</h3>
+  {% if latest_by_circuit %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for circuit, latest in latest_by_circuit.items() %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+      <div class="flex items-center justify-between">
+        <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">
+          {{ circuit }}{% if latest.season_year %} — {{ latest.season_year }}{% endif %}
+        </div>
+        <span class="text-gray-400 text-xs" title="Source: Synergy Leaderboards export · Imported {{ latest.ingested_at.strftime('%Y-%m-%d') }}">&#9432;</span>
+      </div>
+      {% if latest.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ latest.team_name }}</div>{% endif %}
+      <div class="mt-2 grid grid-cols-5 gap-x-2 text-center text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <div>PPG</div><div>AST</div><div>TOV</div><div>FG%</div><div>PPP</div>
+      </div>
+      <div class="grid grid-cols-5 gap-x-2 text-center font-bold text-sm">
+        <div>{{ '%.1f'|format(latest.ppg) if latest.ppg is not none else '—' }}</div>
+        <div>{{ '%.1f'|format(latest.ast) if latest.ast is not none else '—' }}</div>
+        <div>{{ '%.1f'|format(latest.tov) if latest.tov is not none else '—' }}</div>
+        <div>{{ '%.1f%%'|format(latest.fg_pct*100) if latest.fg_pct is not none else '—' }}</div>
+        <div>{{ '%.2f'|format(latest.ppp) if latest.ppp is not none else '—' }}</div>
+      </div>
+      {% set others = stats_by_circuit[circuit][1:] %}
+      {% if others %}
+      <button type="button" class="text-xs text-blue-600 hover:underline mt-2" onclick="document.getElementById('more-{{ circuit }}').classList.toggle('hidden')">View other seasons</button>
+      <div id="more-{{ circuit }}" class="hidden mt-2">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-gray-500 dark:text-gray-400 text-[10px] uppercase">
+              <th class="text-left">Season</th>
+              <th class="text-center">PPG</th>
+              <th class="text-center">AST</th>
+              <th class="text-center">TOV</th>
+              <th class="text-center">FG%</th>
+              <th class="text-center">PPP</th>
+              <th class="text-left">Team</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in others %}
+            <tr>
+              <td>{{ s.season_year or '' }}</td>
+              <td class="text-center">{{ '%.1f'|format(s.ppg) if s.ppg is not none else '—' }}</td>
+              <td class="text-center">{{ '%.1f'|format(s.ast) if s.ast is not none else '—' }}</td>
+              <td class="text-center">{{ '%.1f'|format(s.tov) if s.tov is not none else '—' }}</td>
+              <td class="text-center">{{ '%.1f%%'|format(s.fg_pct*100) if s.fg_pct is not none else '—' }}</td>
+              <td class="text-center">{{ '%.2f'|format(s.ppp) if s.ppp is not none else '—' }}</td>
+              <td>{{ s.team_name or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-gray-500 text-sm">No amateur circuit stats available.</p>
+  {% endif %}
+</div>
+
+<div class="max-w-7xl mx-auto px-4 mb-6">
   {# Use the shot type tables partial which already contains the
      overview cards acting as tabs. #}
   {% include "partials/shot_type_tables.html" with context %}
