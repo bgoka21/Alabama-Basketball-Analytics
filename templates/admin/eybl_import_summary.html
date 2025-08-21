@@ -1,0 +1,12 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Import Summary</h1>
+<p class="mb-4">Circuit: {{ circuit }} | Season: {{ season_year }} {{ season_type }}</p>
+<div class="mb-4">
+  <p>Inserted: {{ summary.inserted }}</p>
+  <p>Updated: {{ summary.updated }}</p>
+  <p>Skipped: {{ summary.skipped }}</p>
+</div>
+<p class="mb-4">Snapshot: {{ snapshot_filename }}</p>
+<a href="{{ identity_url }}" class="text-blue-600 underline">Go to Identity Review</a>
+{% endblock %}

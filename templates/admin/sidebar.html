@@ -66,7 +66,8 @@
   {% if current_user.is_admin %}
   {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
                         'merge.merge_csv', 'admin.roster', 'admin.users_list',
-                        'admin.usage_report', 'admin.draft_upload'] %}
+                        'admin.usage_report', 'admin.draft_upload',
+                        'admin.eybl_import', 'admin.eybl_identity', 'admin.eybl_synonyms'] %}
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
       <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
@@ -84,10 +85,11 @@
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
         {% if view_exists('admin.draft_upload') %}
-        <a class="nav-link" href="{{ url_for('admin.draft_upload') }}">
-          <i class="icon-upload"></i> Draft Upload
-        </a>
+        <a class="nav-link" href="{{ url_for('admin.draft_upload') }}">Draft Upload</a>
         {% endif %}
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.eybl_import' %} active{% endif %}" href="{{ url_for('admin.eybl_import') }}">EYBL / AAU Import</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.eybl_identity' %} active{% endif %}" href="{{ url_for('admin.eybl_identity', circuit='EYBL') }}">Identity Review</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.eybl_synonyms' %} active{% endif %}" href="{{ url_for('admin.eybl_synonyms') }}">Synonyms</a>
       </div>
     </details>
   </li>

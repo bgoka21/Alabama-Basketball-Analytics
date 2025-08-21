@@ -1,0 +1,48 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">EYBL / AAU Import</h1>
+<form method="POST" enctype="multipart/form-data" class="space-y-4 bg-white p-4 rounded shadow">
+  <div>
+    <label class="block font-medium">Circuit</label>
+    <select name="circuit" required class="border rounded w-full px-3 py-2">
+      <option value="">-- Select --</option>
+      {% for c in ['EYBL','3SSB','UA','Other'] %}
+      <option value="{{c}}" {% if circuit==c %}selected{% endif %}>{{c}}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block font-medium">Season Year</label>
+    <input type="number" name="season_year" value="{{season_year}}" class="border rounded w-full px-3 py-2">
+  </div>
+  <div>
+    <label class="block font-medium">Season Type</label>
+    <input type="text" name="season_type" value="{{season_type or 'AAU'}}" class="border rounded w-full px-3 py-2">
+  </div>
+  <div>
+    <label class="block font-medium">Overall – Player Offensive</label>
+    <input type="file" name="overall" required class="w-full" />
+  </div>
+  <div>
+    <label class="block font-medium">All Poss + Assists – Player Offensive</label>
+    <input type="file" name="assists" required class="w-full" />
+  </div>
+  <div>
+    <label class="block font-medium">All Field Goal Attempts (optional)</label>
+    <input type="file" name="fg" class="w-full" />
+  </div>
+  <div class="flex items-center">
+    <input type="checkbox" id="promote" name="promote" class="mr-2">
+    <label for="promote">Stage & Promote</label>
+  </div>
+  <div>
+    <button id="submit-btn" type="submit" class="px-4 py-2 bg-[#9E1B32] text-white rounded">Preview Import</button>
+  </div>
+</form>
+<script>
+  const promote = document.getElementById('promote');
+  const btn = document.getElementById('submit-btn');
+  function updateBtn(){ btn.textContent = promote.checked ? 'Import & Promote' : 'Preview Import'; }
+  promote.addEventListener('change', updateBtn); updateBtn();
+</script>
+{% endblock %}

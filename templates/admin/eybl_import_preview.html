@@ -1,0 +1,53 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Preview Import</h1>
+<p class="mb-2">Circuit: {{ circuit }} | Season: {{ season_year }} {{ season_type }}</p>
+{% if anomalies %}
+<div class="mb-4 p-2 bg-yellow-100">Warnings:
+  <ul class="list-disc ml-6">
+    {% for a in anomalies %}<li>{{ a }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+<div class="mb-4">
+  <p>Total rows: {{ total_rows }}</p>
+  <p>Field counts - PPG: {{ counts.ppg }}, AST: {{ counts.ast }}, TOV: {{ counts.tov }}, FG%: {{ counts.fg_pct }}, PPP: {{ counts.ppp }}</p>
+  <p>Auto-verified: {{ verified }}, Needs review: {{ pending }}</p>
+</div>
+<table class="table-auto w-full text-sm mb-4">
+  <thead>
+    <tr class="bg-gray-200">
+      <th class="px-2 py-1">Player</th>
+      <th class="px-2 py-1">Team</th>
+      <th class="px-2 py-1">GP</th>
+      <th class="px-2 py-1">PPG</th>
+      <th class="px-2 py-1">AST</th>
+      <th class="px-2 py-1">TOV</th>
+      <th class="px-2 py-1">FG%</th>
+      <th class="px-2 py-1">PPP</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr class="odd:bg-white even:bg-gray-50">
+      <td class="px-2 py-1">{{ r.player }}</td>
+      <td class="px-2 py-1">{{ r.team }}</td>
+      <td class="px-2 py-1">{{ r.gp }}</td>
+      <td class="px-2 py-1">{{ r.ppg }}</td>
+      <td class="px-2 py-1">{{ r.ast }}</td>
+      <td class="px-2 py-1">{{ r.tov }}</td>
+      <td class="px-2 py-1">{% if r.fg_pct is not none %}{{ (r.fg_pct*100)|round(1) }}%{% endif %}</td>
+      <td class="px-2 py-1">{% if r.ppp is not none %}{{ r.ppp|round(2) }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<form method="POST" action="{{ url_for('admin.eybl_import_promote') }}" class="mb-4">
+  <input type="hidden" name="circuit" value="{{ circuit }}">
+  <input type="hidden" name="season_year" value="{{ season_year }}">
+  <input type="hidden" name="season_type" value="{{ season_type }}">
+  <input type="hidden" name="batch_dir" value="{{ batch_dir }}">
+  <button type="submit" class="px-4 py-2 bg-[#9E1B32] text-white rounded">Promote Verified Now</button>
+</form>
+<a href="{{ url_for('admin.eybl_identity', circuit=circuit, season_year=season_year, status='pending') }}" class="text-blue-600 underline">Go to Identity Review</a>
+{% endblock %}
