@@ -73,6 +73,14 @@ def create_app():
         os.makedirs(instance_path)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 
+    # Ingest directories for EYBL/AAU stats previews and snapshots
+    ingest_previews = os.path.join(instance_path, 'ingest_previews')
+    ingest_snapshots = os.path.join(instance_path, 'ingest_snapshots')
+    os.makedirs(ingest_previews, exist_ok=True)
+    os.makedirs(ingest_snapshots, exist_ok=True)
+    app.config['INGEST_PREVIEWS_DIR'] = ingest_previews
+    app.config['INGEST_SNAPSHOTS_DIR'] = ingest_snapshots
+
     # Upload folder configuration
     upload_folder = os.path.join(basedir, 'data', 'uploads')
     app.config['UPLOAD_FOLDER'] = upload_folder
@@ -219,6 +227,9 @@ def create_app():
     # variable first so ``routes`` can import it without a circular import.
     globals()['app'] = app
     import routes  # noqa: F401
+
+    from services.eybl_ingest import eybl_import_command
+    app.cli.add_command(eybl_import_command)
 
     return app
 
