@@ -66,7 +66,7 @@ def create_app():
     app.config['SYNERGY_CLIENT_SECRET'] = os.environ.get('SYNERGY_CLIENT_SECRET', '0vBg4oX7mqNx')
 
     # Database path setup
-    basedir = os.path.abspath(os.path.dirname(__file__))
+    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     instance_path = os.path.join(basedir, 'instance')
     db_path = os.path.join(instance_path, 'database.db')
     if not os.path.exists(instance_path):
@@ -187,6 +187,7 @@ def create_app():
 
     # Ensure all tables exist when the application starts unless skipped
     if not os.environ.get('SKIP_CREATE_ALL'):
+        from app.models import prospect  # noqa: F401  # ensure models are registered
         with app.app_context():
             db.create_all()
 
@@ -230,6 +231,9 @@ def create_app():
 
     from services.eybl_ingest import eybl_import_command
     app.cli.add_command(eybl_import_command)
+
+    from app.cli.import_draft_stock import import_draft_stock
+    app.cli.add_command(import_draft_stock)
 
     return app
 
