@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl sm:text-3xl font-bold">{{ coach_name }}</h1>
+    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board') }}">← Back to Money Board</a>
+  </div>
+
+  <div class="grid sm:grid-cols-4 gap-3 mb-6">
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">Coach Team</div>
+      <div class="font-medium">{{ totals.coach_team or '—' }}</div>
+    </div>
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">Coach Conf</div>
+      <div class="font-medium">{{ totals.coach_conf or '—' }}</div>
+    </div>
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">Recruits</div>
+      <div class="font-semibold">{{ totals.recruits }}</div>
+    </div>
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">Avg NET / Recruit</div>
+      <div class="font-semibold">
+        {% set avg_net = (totals.net_sum / totals.recruits) if totals.recruits else 0 %}
+        ${{ "{:,.0f}".format(avg_net) }}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid sm:grid-cols-3 gap-3 mb-6">
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">Projected $</div>
+      <div class="text-lg font-semibold">${{ "{:,.0f}".format(totals.proj_sum or 0) }}</div>
+    </div>
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">Actual $</div>
+      <div class="text-lg font-semibold">${{ "{:,.0f}".format(totals.act_sum or 0) }}</div>
+    </div>
+    <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+      <div class="text-xs text-gray-500">NET $</div>
+      <div class="text-lg font-semibold">${{ "{:,.0f}".format(totals.net_sum or 0) }}</div>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-semibold mb-2">By Year</h2>
+  <div class="overflow-x-auto mb-6">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="py-2 pr-4">Year</th>
+          <th class="py-2 pr-4">Recruits</th>
+          <th class="py-2 pr-4">Projected $</th>
+          <th class="py-2 pr-4">Actual $</th>
+          <th class="py-2 pr-4">NET $</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in by_year %}
+        <tr class="border-b">
+          <td class="py-2 pr-4">{{ r.year or '—' }}</td>
+          <td class="py-2 pr-4">{{ r.n }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.proj_sum or 0) }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.act_sum or 0) }}</td>
+          <td class="py-2 pr-4 font-semibold">${{ "{:,.0f}".format(r.net_sum or 0) }}</td>
+        </tr>
+        {% endfor %}
+        {% if not by_year %}
+          <tr><td class="py-3 text-gray-500" colspan="5">No year data.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="text-xl font-semibold mb-2">Players</h2>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="py-2 pr-4">Player</th>
+          <th class="py-2 pr-4">Team</th>
+          <th class="py-2 pr-4">Year</th>
+          <th class="py-2 pr-4">Projected $</th>
+          <th class="py-2 pr-4">Actual $</th>
+          <th class="py-2 pr-4">NET $</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in players %}
+        <tr class="border-b">
+          <td class="py-2 pr-4 font-medium">{{ p.player }}</td>
+          <td class="py-2 pr-4">{{ p.team }}</td>
+          <td class="py-2 pr-4">{{ p.year or '—' }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(p.projected_money or 0) }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(p.actual_money or 0) }}</td>
+          <td class="py-2 pr-4 font-semibold">${{ "{:,.0f}".format(p.net or 0) }}</td>
+        </tr>
+        {% endfor %}
+        {% if not players %}
+          <tr><td class="py-3 text-gray-500" colspan="6">No players found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+

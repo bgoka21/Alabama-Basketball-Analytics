@@ -1,3 +1,7 @@
+{# mark Recruiting menu open when we're in the recruits blueprint #}
+{% set recruiting_active = request.endpoint and request.endpoint.startswith('recruits.') %}
+{% set recruit_list_url = url_for('recruits.list_recruits') if view_exists('recruits.list_recruits') else '#' %}
+{% set money_board_url = url_for('recruits.money_board') if view_exists('recruits.money_board') else '#' %}
 <ul class="flex flex-col gap-2">
   {% if current_user.is_player %}
   <li class="nav-item{% if request.endpoint == 'admin.player_detail' %} active{% endif %}">
@@ -34,11 +38,20 @@
       Players
     </a>
   </li>
-  {% set recruit_url = url_for('recruits.list_recruits') if view_exists('recruits.list_recruits') else '#' %}
-  <li class="nav-item{% if request.endpoint and request.endpoint.startswith('recruits.') %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ recruit_url }}">
-      Recruits
-    </a>
+  <li class="nav-item">
+    <details class="group" {% if recruiting_active %}open{% endif %}>
+      <summary class="nav-link flex items-center justify-between cursor-pointer">
+        <span>Recruiting</span>
+        <svg class="w-4 h-4 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/></svg>
+      </summary>
+      <div class="ml-4 mt-2 flex flex-col gap-2">
+        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('recruits.') and request.endpoint != 'recruits.money_board' and not request.endpoint.startswith('recruits.money_coach') %}active{% endif %}"
+           href="{{ recruit_list_url }}">Recruits</a>
+
+        <a class="nav-link {% if request.endpoint in ['recruits.money_board','recruits.money_coach'] %}active{% endif %}"
+           href="{{ money_board_url }}">Money Board</a>
+      </div>
+    </details>
   </li>
   <li class="nav-item{% if request.endpoint == 'admin.skill_totals' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.skill_totals') }}">
