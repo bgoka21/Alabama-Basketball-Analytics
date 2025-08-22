@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+  <h1 class="text-2xl sm:text-3xl font-bold mb-4">Import Draft Stock Workbook</h1>
+  <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+    Upload your Excel workbook. Rows are <strong>upserted</strong> by Player + Team + Year. No data is deleted.
+  </p>
+  <form method="post" enctype="multipart/form-data" class="space-y-4">
+    <input type="file" name="file" accept=".xlsx,.xlsm,.xls" class="block w-full" required />
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">Upload & Import</button>
+      <a class="px-4 py-2 rounded border" href="{{ url_for('recruits.money_board') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

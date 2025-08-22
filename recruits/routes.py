@@ -3,11 +3,12 @@ import json
 import time
 from flask import render_template, request, redirect, url_for, flash, current_app, abort
 from datetime import date
-from flask_login import current_user
+from flask_login import login_required, current_user
 from types import SimpleNamespace
+from io import BytesIO
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, desc
-from yourapp import db
+from models.database import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from models.eybl import UnifiedStats
 from . import recruits_bp
@@ -20,6 +21,7 @@ from services.circuit_stats import (
 
 ALLOWED_HEADSHOT_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "svg"}
 UPLOAD_SUBDIR_RECRUITS = "uploads/recruits"
+ALLOWED_EXT = {".xlsx", ".xlsm", ".xls"}
 
 
 def _allowed_ext(filename: str) -> bool:
@@ -115,6 +117,39 @@ def list_recruits():
         circuit_counts=circuit_counts,
     )
 
+
+@recruits_bp.route("/import", methods=["GET", "POST"])
+@login_required
+def import_recruits_workbook():
+    from app.services.draft_stock_importer import import_workbook
+    # Block players, mirror existing recruits access control
+    if getattr(current_user, "is_player", False):
+        return render_template("errors/403.html"), 403
+
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file or not file.filename:
+            flash("Please choose an Excel file.", "warning")
+            return redirect(request.url)
+
+        filename = secure_filename(file.filename)
+        ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
+        if ext not in ALLOWED_EXT:
+            flash("Only .xlsx, .xlsm, .xls files are allowed.", "warning")
+            return redirect(request.url)
+
+        try:
+            data = file.read()
+            summary = import_workbook(BytesIO(data), strict=True, commit_batch=500)
+        except Exception as e:
+            # no ACC auto-fix; this surfaces missing required columns, etc.
+            flash(f"Import failed: {e}", "danger")
+            return redirect(request.url)
+
+        flash(f"Import complete: {summary['upserts']} upserts across {summary['sheets']} sheets.", "success")
+        return redirect(url_for("recruits.money_board"))
+
+    return render_template("recruits/import.html")
 
 @recruits_bp.route('/new', methods=['GET', 'POST'])
 def new_recruit():

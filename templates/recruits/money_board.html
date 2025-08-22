@@ -4,6 +4,10 @@
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl sm:text-3xl font-bold">Money Board</h1>
+    <a href="{{ url_for('recruits.import_recruits_workbook') }}"
+       class="px-3 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">
+      Import Workbook
+    </a>
   </div>
 
   {# Filters #}
