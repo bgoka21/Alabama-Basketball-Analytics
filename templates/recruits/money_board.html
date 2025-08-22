@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl sm:text-3xl font-bold">Money Board</h1>
+  </div>
+
+  {# Filters #}
+  <form method="get" class="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-4">
+    <div>
+      <label class="block text-sm mb-1">Year ≥</label>
+      <select name="year_min" class="w-full border rounded p-2">
+        <option value="">Any</option>
+        {% for y in years %}
+          <option value="{{ y }}" {% if f_year_min==y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Year ≤</label>
+      <select name="year_max" class="w-full border rounded p-2">
+        <option value="">Any</option>
+        {% for y in years %}
+          <option value="{{ y }}" {% if f_year_max==y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Sheet (Conf)</label>
+      <select name="sheet" class="w-full border rounded p-2">
+        <option value="">All</option>
+        {% for s in sheets %}
+          <option value="{{ s }}" {% if f_sheet==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Coach Conf</label>
+      <select name="conf" class="w-full border rounded p-2">
+        <option value="">All</option>
+        {% for c in confs %}
+          <option value="{{ c }}" {% if f_conf==c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Min Recruits</label>
+      <input type="number" min="1" name="min_recruits" value="{{ f_min_recruits }}" class="w-full border rounded p-2" />
+    </div>
+    <div class="sm:col-span-5 flex items-end gap-2">
+      <label class="text-sm">Sort:</label>
+      <select name="sort" class="border rounded p-2">
+        <option value="net_desc" {% if f_sort=='net_desc' %}selected{% endif %}>NET (desc)</option>
+        <option value="actual_desc" {% if f_sort=='actual_desc' %}selected{% endif %}>Actual $ (desc)</option>
+        <option value="proj_desc" {% if f_sort=='proj_desc' %}selected{% endif %}>Projected $ (desc)</option>
+        <option value="avg_net_desc" {% if f_sort=='avg_net_desc' %}selected{% endif %}>Avg NET / Recruit (desc)</option>
+      </select>
+      <button class="ml-auto px-3 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">Apply</button>
+    </div>
+  </form>
+
+  {% if top %}
+  <div class="mb-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border">
+    <div class="text-sm text-gray-500">Top Coach (NET)</div>
+    <div class="text-xl font-semibold">{{ top.coach }}</div>
+    <div class="text-sm">{{ top.coach_team }} • {{ top.coach_conf }}</div>
+    <div class="mt-1 text-sm">
+      Recruits: <span class="font-semibold">{{ top.recruits }}</span> •
+      Projected: <span class="font-semibold">${{ "{:,.0f}".format(top.proj_sum) }}</span> •
+      Actual: <span class="font-semibold">${{ "{:,.0f}".format(top.act_sum) }}</span> •
+      NET: <span class="font-semibold">${{ "{:,.0f}".format(top.net_sum) }}</span> •
+      Avg NET: <span class="font-semibold">${{ "{:,.0f}".format(top.avg_net) }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="py-2 pr-4">Coach</th>
+          <th class="py-2 pr-4">Team</th>
+          <th class="py-2 pr-4">Conf</th>
+          <th class="py-2 pr-4">Recruits</th>
+          <th class="py-2 pr-4">Projected $</th>
+          <th class="py-2 pr-4">Actual $</th>
+          <th class="py-2 pr-4">NET $</th>
+          <th class="py-2 pr-4">Avg NET / Recruit</th>
+          <th class="py-2 pr-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-900">
+          <td class="py-2 pr-4 font-medium">{{ r.coach }}</td>
+          <td class="py-2 pr-4">{{ r.coach_team }}</td>
+          <td class="py-2 pr-4">{{ r.coach_conf }}</td>
+          <td class="py-2 pr-4">{{ r.recruits }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.proj_sum) }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.act_sum) }}</td>
+          <td class="py-2 pr-4 font-semibold">${{ "{:,.0f}".format(r.net_sum) }}</td>
+          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.avg_net) }}</td>
+          <td class="py-2 pr-4">
+            <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_coach', coach_name=r.coach) }}">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not rows %}
+          <tr><td class="py-3 text-gray-500" colspan="9">No results.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+

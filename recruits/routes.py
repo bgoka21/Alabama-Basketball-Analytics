@@ -1,17 +1,17 @@
 import os
 import json
 import time
-from flask import render_template, request, redirect, url_for, flash, current_app
+from flask import render_template, request, redirect, url_for, flash, current_app, abort
 from datetime import date
 from flask_login import current_user
 from types import SimpleNamespace
 from werkzeug.utils import secure_filename
+from sqlalchemy import func, desc
 from yourapp import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from models.eybl import UnifiedStats
 from . import recruits_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
-from flask import current_app
 from admin.routes import compute_team_shot_details
 from services.circuit_stats import (
     get_circuit_stats_for_recruit,
@@ -342,3 +342,151 @@ def delete_recruit(id):
     db.session.commit()
     flash('Recruit deleted.', 'success')
     return redirect(url_for('recruits.list_recruits'))
+
+
+@recruits_bp.route('/money')
+def money_board():
+    """
+    Coach leaderboard by money outcomes with filters.
+    Defaults: order by NET desc.
+    """
+    from app.models.prospect import Prospect
+    # ---- Filters from querystring ----
+    year_min = request.args.get('year_min', type=int)
+    year_max = request.args.get('year_max', type=int)
+    sheet = request.args.get('sheet')  # conference tab label, e.g. "SEC"
+    conf = request.args.get('conf')    # coach_current_conference
+    min_recruits = request.args.get('min_recruits', default=1, type=int)
+    sort = request.args.get('sort', default='net_desc')
+
+    # Distinct lists for filter controls
+    years = [y for (y,) in db.session.query(Prospect.year)
+                                      .filter(Prospect.year.isnot(None))
+                                      .distinct().order_by(Prospect.year).all()]
+    sheets = [s for (s,) in db.session.query(Prospect.sheet)
+                                      .filter(Prospect.sheet.isnot(None))
+                                      .distinct().order_by(Prospect.sheet).all()]
+    confs = [c for (c,) in db.session.query(Prospect.coach_current_conference)
+                                     .filter(Prospect.coach_current_conference.isnot(None))
+                                     .distinct().order_by(Prospect.coach_current_conference).all()]
+
+    # ---- Base query with filters applied BEFORE grouping ----
+    base = db.session.query(Prospect)
+    if year_min is not None:
+        base = base.filter(Prospect.year >= year_min)
+    if year_max is not None:
+        base = base.filter(Prospect.year <= year_max)
+    if sheet:
+        base = base.filter(Prospect.sheet == sheet)
+    if conf:
+        base = base.filter(Prospect.coach_current_conference == conf)
+
+    # ---- Aggregation by coach ----
+    sub = base.subquery()
+    q = (db.session.query(
+            sub.c.coach.label('coach'),
+            func.coalesce(sub.c.coach_current_team, '').label('coach_team'),
+            func.coalesce(sub.c.coach_current_conference, '').label('coach_conf'),
+            func.count(sub.c.id).label('recruits'),
+            func.sum(func.coalesce(sub.c.projected_money, 0)).label('proj_sum'),
+            func.sum(func.coalesce(sub.c.actual_money, 0)).label('act_sum'),
+            func.sum(func.coalesce(sub.c.net, 0)).label('net_sum'),
+        )
+        .select_from(sub)
+        .group_by(sub.c.coach, sub.c.coach_current_team, sub.c.coach_current_conference)
+    )
+
+    if min_recruits:
+        q = q.having(func.count() >= min_recruits)
+
+    # Sorting
+    if sort == 'actual_desc':
+        q = q.order_by(desc('act_sum'))
+    elif sort == 'proj_desc':
+        q = q.order_by(desc('proj_sum'))
+    elif sort == 'avg_net_desc':
+        # We'll sort in Python on avg_net to avoid SQL dialect differences
+        pass
+    else:
+        q = q.order_by(desc('net_sum'))
+
+    rows = q.all()
+    # Compute avg_net per recruit in Python for display/sort if requested
+    data = []
+    for r in rows:
+        avg_net = (r.net_sum / r.recruits) if r.recruits else 0.0
+        data.append({
+            "coach": r.coach,
+            "coach_team": r.coach_team,
+            "coach_conf": r.coach_conf,
+            "recruits": int(r.recruits),
+            "proj_sum": float(r.proj_sum or 0),
+            "act_sum": float(r.act_sum or 0),
+            "net_sum": float(r.net_sum or 0),
+            "avg_net": float(avg_net),
+        })
+
+    if sort == 'avg_net_desc':
+        data.sort(key=lambda x: x['avg_net'], reverse=True)
+
+    # Top card
+    top = data[0] if data else None
+
+    return render_template(
+        'recruits/money_board.html',
+        rows=data,
+        top=top,
+        years=years,
+        sheets=sheets,
+        confs=confs,
+        # echo filters
+        f_year_min=year_min, f_year_max=year_max, f_sheet=sheet, f_conf=conf,
+        f_min_recruits=min_recruits, f_sort=sort
+    )
+
+
+@recruits_bp.route('/money/coach/<coach_name>')
+def money_coach(coach_name):
+    """
+    Drilldown for a single coach: totals, by-year summary, and player list.
+    """
+    from app.models.prospect import Prospect
+    # Exact match; if you prefer case-insensitive, use ilike and first()
+    totals = (db.session.query(
+                func.sum(func.coalesce(Prospect.projected_money, 0)).label('proj_sum'),
+                func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
+                func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
+                func.count(Prospect.id).label('recruits'),
+                func.max(Prospect.coach_current_team).label('coach_team'),
+                func.max(Prospect.coach_current_conference).label('coach_conf'),
+             )
+             .filter(Prospect.coach == coach_name)
+             .one())
+
+    if totals.recruits == 0:
+        abort(404)
+
+    by_year = (db.session.query(
+                    Prospect.year,
+                    func.count(Prospect.id).label('n'),
+                    func.sum(func.coalesce(Prospect.projected_money, 0)).label('proj_sum'),
+                    func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
+                    func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
+               )
+               .filter(Prospect.coach == coach_name)
+               .group_by(Prospect.year)
+               .order_by(Prospect.year.asc())
+               .all())
+
+    players = (Prospect.query
+               .filter(Prospect.coach == coach_name)
+               .order_by(desc(Prospect.net), desc(Prospect.actual_money), Prospect.year.desc())
+               .all())
+
+    return render_template(
+        'recruits/coach_money.html',
+        coach_name=coach_name,
+        totals=totals,
+        by_year=by_year,
+        players=players
+    )
