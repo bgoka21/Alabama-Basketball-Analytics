@@ -89,7 +89,8 @@ def create_app():
     headshot_folder = os.path.join(app.static_folder, 'headshots')
     os.makedirs(headshot_folder, exist_ok=True)
 
-    app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
+    # Allow up to 32 MB uploads (tune as needed)
+    app.config.setdefault("MAX_CONTENT_LENGTH", 32 * 1024 * 1024)
 
     # --- Initialize Extensions ---
     db.init_app(app)

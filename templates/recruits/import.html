@@ -6,6 +6,10 @@
     Upload your Excel workbook. Rows are <strong>upserted</strong> by Player + Team + Year. No data is deleted.
   </p>
   <form method="post" enctype="multipart/form-data" class="space-y-4">
+    {% if csrf_token is defined %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% endif %}
+
     <input type="file" name="file" accept=".xlsx,.xlsm,.xls" class="block w-full" required />
     <div class="flex gap-2">
       <button class="px-4 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">Upload & Import</button>
