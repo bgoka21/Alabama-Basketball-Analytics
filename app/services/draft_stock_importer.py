@@ -5,8 +5,17 @@ from app.models.prospect import Prospect
 from app.utils.measurements import parse_feet_inches
 
 
+def _s(x):
+    """Safe string: return '' for None/NaN, else stripped string."""
+    if x is None:
+        return ""
+    if isinstance(x, float) and math.isnan(x):
+        return ""
+    return str(x).strip()
+
+
 def _to_int_or_none(x):
-    """Return int(x) if x is a valid number/string, else None (handles NaN, '', None)."""
+    """Return int or None (handles NaN, '', None, '2024.0')."""
     if x is None:
         return None
     if isinstance(x, float) and math.isnan(x):
@@ -15,7 +24,6 @@ def _to_int_or_none(x):
     if s == "" or s.lower() == "nan":
         return None
     try:
-        # handle '2024.0' coming from Excel by casting through float
         return int(float(s))
     except Exception:
         return None
@@ -67,18 +75,16 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             df["NET"] = df["NET"].where(df["NET"].notna(), df["Actual Money"] - df["Projected Money"])
 
         if "Year" in df.columns:
-            # Coerce to numeric first, then map NaN -> None, int otherwise
-            df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
-            df["Year"] = df["Year"].apply(_to_int_or_none)
+            df["Year"] = pd.to_numeric(df["Year"], errors="coerce").apply(_to_int_or_none)
 
         rows = df.to_dict(orient="records")
         total_rows += len(rows)
 
         batch = 0
         for r in rows:
-            coach = (r.get("Coach") or "").strip()
-            player = (r.get("Player") or "").strip()
-            team = (r.get("Team") or "").strip()
+            coach = _s(r.get("Coach"))
+            player = _s(r.get("Player"))
+            team   = _s(r.get("Team"))
             year = r.get("Year")
 
             if not coach or not player or not team:
@@ -92,12 +98,12 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
 
             obj.sheet = sheet
             obj.coach = coach
-            obj.coach_current_team = r.get("Coach Current Team")
-            obj.coach_current_conference = r.get("Coach Current Conference")
+            obj.coach_current_team = _s(r.get("Coach Current Team"))
+            obj.coach_current_conference = _s(r.get("Coach Current Conference"))
 
-            obj.player_class = r.get("Class")
+            obj.player_class = _s(r.get("Class"))
             obj.age = _to_num(r.get("Age"))
-            obj.player_conference = r.get("Player Conference")
+            obj.player_conference = _s(r.get("Player Conference"))
 
             obj.projected_money = _to_num(r.get("Projected Money"))
             obj.actual_money = _to_num(r.get("Actual Money"))
@@ -106,15 +112,15 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             else:
                 obj.net = _to_num(r.get("NET"))
 
-            obj.height_raw = r.get("Height")
-            obj.wingspan_raw = r.get("WingSpan")
+            obj.height_raw = _s(r.get("Height"))
+            obj.wingspan_raw = _s(r.get("WingSpan"))
             obj.height_in = r.get("height_in")
             obj.wingspan_in = r.get("wingspan_in")
             obj.ws_minus_h_in = r.get("ws_minus_h_in")
 
-            obj.home_city = r.get("Home City")
-            obj.home_state = r.get("Home State")
-            obj.country = r.get("Country")
+            obj.home_city = _s(r.get("Home City"))
+            obj.home_state = _s(r.get("Home State"))
+            obj.country = _s(r.get("Country"))
 
             if created:
                 db.session.add(obj)
