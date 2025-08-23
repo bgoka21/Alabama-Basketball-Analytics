@@ -1,7 +1,24 @@
+import math
 import pandas as pd
 from app import db
 from app.models.prospect import Prospect
 from app.utils.measurements import parse_feet_inches
+
+
+def _to_int_or_none(x):
+    """Return int(x) if x is a valid number/string, else None (handles NaN, '', None)."""
+    if x is None:
+        return None
+    if isinstance(x, float) and math.isnan(x):
+        return None
+    s = str(x).strip()
+    if s == "" or s.lower() == "nan":
+        return None
+    try:
+        # handle '2024.0' coming from Excel by casting through float
+        return int(float(s))
+    except Exception:
+        return None
 
 
 def _to_num(x):
@@ -37,7 +54,7 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             continue
 
         # Coerce numbers and parse measurements
-        for c in ["Projected Money","Actual Money","NET","Age","Year"]:
+        for c in ["Projected Money","Actual Money","NET","Age"]:
             if c in df.columns:
                 df[c] = df[c].apply(_to_num)
 
@@ -50,7 +67,9 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             df["NET"] = df["NET"].where(df["NET"].notna(), df["Actual Money"] - df["Projected Money"])
 
         if "Year" in df.columns:
-            df["Year"] = df["Year"].apply(lambda x: int(x) if x is not None and str(x).strip() != "" else None)
+            # Coerce to numeric first, then map NaN -> None, int otherwise
+            df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
+            df["Year"] = df["Year"].apply(_to_int_or_none)
 
         rows = df.to_dict(orient="records")
         total_rows += len(rows)
