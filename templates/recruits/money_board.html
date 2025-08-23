@@ -1,13 +1,23 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl sm:text-3xl font-bold">Money Board</h1>
-    <a href="{{ url_for('recruits.import_recruits_workbook') }}"
-       class="px-3 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">
-      Import Workbook
-    </a>
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
+  <div class="mb-4 rounded-2xl p-4 sm:p-6 bg-gradient-to-r from-gray-900 to-gray-700 text-white flex items-center justify-between">
+    <div>
+      <div class="text-xs uppercase opacity-80">Recruiting</div>
+      <h1 class="text-2xl sm:text-3xl font-bold">Money Board</h1>
+      {% if top %}
+        <div class="mt-1 text-sm opacity-90">Top coach: <span class="font-semibold">{{ top.coach }}</span> · NET <span class="font-semibold">{{ top.net_sum|fmt_money }}</span></div>
+      {% endif %}
+    </div>
+    <div class="flex gap-2">
+      <a href="{{ url_for('recruits.money_compare') }}" class="px-3 py-2 rounded-xl bg-white/20 text-white border border-white/30 hover:bg-white/10">Compare</a>
+      {% if not has_data %}
+      <a href="{{ url_for('recruits.import_recruits_workbook') }}" class="px-3 py-2 rounded-xl bg-white text-gray-900 shadow hover:shadow-md">
+        Import Workbook
+      </a>
+      {% endif %}
+    </div>
   </div>
 
   {# Filters #}
@@ -64,33 +74,18 @@
     </div>
   </form>
 
-  {% if top %}
-  <div class="mb-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border">
-    <div class="text-sm text-gray-500">Top Coach (NET)</div>
-    <div class="text-xl font-semibold">{{ top.coach }}</div>
-    <div class="text-sm">{{ top.coach_team }} • {{ top.coach_conf }}</div>
-    <div class="mt-1 text-sm">
-      Recruits: <span class="font-semibold">{{ top.recruits }}</span> •
-      Projected: <span class="font-semibold">${{ "{:,.0f}".format(top.proj_sum) }}</span> •
-      Actual: <span class="font-semibold">${{ "{:,.0f}".format(top.act_sum) }}</span> •
-      NET: <span class="font-semibold">${{ "{:,.0f}".format(top.net_sum) }}</span> •
-      Avg NET: <span class="font-semibold">${{ "{:,.0f}".format(top.avg_net) }}</span>
-    </div>
-  </div>
-  {% endif %}
-
   <div class="overflow-x-auto">
     <table class="min-w-full text-sm">
       <thead>
-        <tr class="text-left border-b">
+        <tr class="text-left sticky top-0 bg-white dark:bg-gray-800 border-b z-10">
           <th class="py-2 pr-4">Coach</th>
           <th class="py-2 pr-4">Team</th>
           <th class="py-2 pr-4">Conf</th>
-          <th class="py-2 pr-4">Recruits</th>
-          <th class="py-2 pr-4">Projected $</th>
-          <th class="py-2 pr-4">Actual $</th>
-          <th class="py-2 pr-4">NET $</th>
-          <th class="py-2 pr-4">Avg NET / Recruit</th>
+          <th class="py-2 pr-4 text-right">Recruits</th>
+          <th class="py-2 pr-4 text-right">Projected</th>
+          <th class="py-2 pr-4 text-right">Actual</th>
+          <th class="py-2 pr-4 text-right">NET</th>
+          <th class="py-2 pr-4 text-right">Avg NET</th>
           <th class="py-2 pr-4">Actions</th>
         </tr>
       </thead>
@@ -100,11 +95,11 @@
           <td class="py-2 pr-4 font-medium">{{ r.coach }}</td>
           <td class="py-2 pr-4">{{ r.coach_team }}</td>
           <td class="py-2 pr-4">{{ r.coach_conf }}</td>
-          <td class="py-2 pr-4">{{ r.recruits }}</td>
-          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.proj_sum) }}</td>
-          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.act_sum) }}</td>
-          <td class="py-2 pr-4 font-semibold">${{ "{:,.0f}".format(r.net_sum) }}</td>
-          <td class="py-2 pr-4">${{ "{:,.0f}".format(r.avg_net) }}</td>
+          <td class="py-2 pr-4 text-right">{{ r.recruits }}</td>
+          <td class="py-2 pr-4 text-right">{{ r.proj_sum|fmt_money }}</td>
+          <td class="py-2 pr-4 text-right">{{ r.act_sum|fmt_money }}</td>
+          <td class="py-2 pr-4 text-right font-semibold {{ r.net_sum|posneg }}">{{ r.net_sum|fmt_money }}</td>
+          <td class="py-2 pr-4 text-right">{{ r.avg_net|fmt_money }}</td>
           <td class="py-2 pr-4">
             <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_coach', coach_name=r.coach) }}">View</a>
           </td>

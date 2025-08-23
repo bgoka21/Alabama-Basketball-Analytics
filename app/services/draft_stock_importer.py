@@ -62,7 +62,7 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             continue
 
         # Coerce numbers and parse measurements
-        for c in ["Projected Money","Actual Money","NET","Age"]:
+        for c in ["Projected Money","Actual Money","NET","Age","Year","Projected Pick","Actual Pick"]:
             if c in df.columns:
                 df[c] = df[c].apply(_to_num)
 
@@ -75,7 +75,7 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             df["NET"] = df["NET"].where(df["NET"].notna(), df["Actual Money"] - df["Projected Money"])
 
         if "Year" in df.columns:
-            df["Year"] = pd.to_numeric(df["Year"], errors="coerce").apply(_to_int_or_none)
+            df["Year"] = df["Year"].apply(_to_int_or_none)
 
         rows = df.to_dict(orient="records")
         total_rows += len(rows)
@@ -111,6 +111,9 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
                 obj.net = obj.actual_money - obj.projected_money
             else:
                 obj.net = _to_num(r.get("NET"))
+
+            obj.projected_pick = _to_num(r.get("Projected Pick"))
+            obj.actual_pick    = _to_num(r.get("Actual Pick"))
 
             obj.height_raw = _s(r.get("Height"))
             obj.wingspan_raw = _s(r.get("WingSpan"))

@@ -26,6 +26,8 @@ class Prospect(db.Model):
     projected_money = sa.Column(sa.Float)
     actual_money = sa.Column(sa.Float)
     net = sa.Column(sa.Float)  # actual_money - projected_money
+    projected_pick = sa.Column(sa.Float)
+    actual_pick    = sa.Column(sa.Float)
 
     # Measurements (raw strings + normalized inches)
     height_raw = sa.Column(sa.String(16))
