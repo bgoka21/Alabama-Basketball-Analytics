@@ -195,10 +195,12 @@ def create_app():
         from app.models import prospect  # noqa: F401  # ensure models are registered
         with app.app_context():
             db.create_all()
-            # SAFE add: projected/actual pick (Float) if missing
+            # SAFE add: projected/actual pick fields (raw + numeric)
             ensure_columns(db.engine, "prospects", [
-                ("projected_pick", "REAL"),
-                ("actual_pick",    "REAL"),
+                ("projected_pick",     "REAL"),
+                ("actual_pick",        "REAL"),
+                ("projected_pick_raw", "TEXT"),
+                ("actual_pick_raw",    "TEXT"),
             ])
 
     @app.before_request

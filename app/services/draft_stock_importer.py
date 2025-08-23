@@ -1,4 +1,5 @@
 import math
+import re
 import pandas as pd
 from app import db
 from app.models.prospect import Prospect
@@ -36,6 +37,26 @@ def _to_num(x):
     except: return None
 
 
+def _pick_to_int(x):
+    """
+    Convert '20th' -> 20, '23' -> 23, 'Undrafted'/'UDFA' -> None, else None.
+    Leaves non-numeric descriptors (e.g., 'Lottery') as None; we keep text in *_raw.
+    """
+    if x is None:
+        return None
+    s = str(x).strip()
+    if not s or s.lower() in ("nan", "undrafted", "udfa", "u.d.f.a."):
+        return None
+    # strip ordinal suffixes and any non-digits, keep leading number
+    m = re.match(r"^\s*(\d+)", s.replace("st","" ).replace("nd","" ).replace("rd","" ).replace("th","" ))
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+    return None
+
+
 def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
     """
     Import the multi-sheet Excel workbook into Prospect rows.
@@ -62,7 +83,7 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             continue
 
         # Coerce numbers and parse measurements
-        for c in ["Projected Money","Actual Money","NET","Age","Year","Projected Pick","Actual Pick"]:
+        for c in ["Projected Money","Actual Money","NET","Age","Year"]:
             if c in df.columns:
                 df[c] = df[c].apply(_to_num)
 
@@ -112,8 +133,12 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             else:
                 obj.net = _to_num(r.get("NET"))
 
-            obj.projected_pick = _to_num(r.get("Projected Pick"))
-            obj.actual_pick    = _to_num(r.get("Actual Pick"))
+            proj_pick_raw = _s(r.get("Projected Pick"))
+            act_pick_raw  = _s(r.get("Actual Pick"))
+            obj.projected_pick_raw = proj_pick_raw or None
+            obj.actual_pick_raw    = act_pick_raw or None
+            obj.projected_pick     = _pick_to_int(proj_pick_raw)
+            obj.actual_pick        = _pick_to_int(act_pick_raw)
 
             obj.height_raw = _s(r.get("Height"))
             obj.wingspan_raw = _s(r.get("WingSpan"))
