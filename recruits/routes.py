@@ -121,30 +121,37 @@ def list_recruits():
 @recruits_bp.route("/import", methods=["GET", "POST"])
 @login_required
 def import_recruits_workbook():
-    from app.services.draft_stock_importer import import_workbook
-    # Block players, mirror existing recruits access control
+    # mirror other recruits access control
     if getattr(current_user, "is_player", False):
         return render_template("errors/403.html"), 403
 
     if request.method == "POST":
-        file = request.files.get("file")
-        if not file or not file.filename:
+        f = request.files.get("file")
+        if not f or not f.filename:
             flash("Please choose an Excel file.", "warning")
-            return redirect(request.url)
+            return render_template("recruits/import.html"), 400
 
-        filename = secure_filename(file.filename)
+        filename = secure_filename(f.filename)
         ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
         if ext not in ALLOWED_EXT:
             flash("Only .xlsx, .xlsm, .xls files are allowed.", "warning")
-            return redirect(request.url)
+            return render_template("recruits/import.html"), 400
+
+        data = f.read()
+        if not data:
+            flash("Uploaded file is empty.", "warning")
+            return render_template("recruits/import.html"), 400
 
         try:
-            data = file.read()
+            from app.services.draft_stock_importer import import_workbook
+            current_app.logger.info("IMPORT start: %s (%d bytes)", filename, len(data))
             summary = import_workbook(BytesIO(data), strict=True, commit_batch=500)
+            current_app.logger.info("IMPORT done: %s summary=%s", filename, summary)
         except Exception as e:
-            # no ACC auto-fix; this surfaces missing required columns, etc.
+            # surfaces issues like “missing required columns: ['Player']”
+            current_app.logger.exception("IMPORT FAILED for %s", filename)
             flash(f"Import failed: {e}", "danger")
-            return redirect(request.url)
+            return render_template("recruits/import.html"), 400
 
         flash(f"Import complete: {summary['upserts']} upserts across {summary['sheets']} sheets.", "success")
         return redirect(url_for("recruits.money_board"))
