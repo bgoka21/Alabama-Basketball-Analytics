@@ -62,3 +62,13 @@ def test_money_coach_ok(client):
     rv = client.get('/recruits/money/coach/Nate%20Oats')
     assert rv.status_code in (200, 404)
 
+
+def test_money_compare_interface(client):
+    rv = client.get('/recruits/money/compare')
+    assert rv.status_code == 200
+    assert b'coach-search' in rv.data
+
+    rv2 = client.get('/recruits/coach_list')
+    assert rv2.status_code == 200
+    assert isinstance(rv2.get_json(), list)
+

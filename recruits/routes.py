@@ -1,7 +1,7 @@
 import os
 import json
 import time
-from flask import render_template, request, redirect, url_for, flash, current_app, abort
+from flask import render_template, request, redirect, url_for, flash, current_app, abort, jsonify
 from datetime import date
 from flask_login import login_required, current_user
 from types import SimpleNamespace
@@ -543,6 +543,16 @@ def money_coach(coach_name):
         by_year=by_year,
         players=players
     )
+
+
+@recruits_bp.route('/coach_list')
+def coach_list():
+    """Return JSON array of unique coach names for autocomplete."""
+    from app.models.prospect import Prospect
+    names = [c for (c,) in db.session.query(Prospect.coach)
+                              .filter(Prospect.coach.isnot(None))
+                              .distinct().order_by(Prospect.coach).all()]
+    return jsonify(names)
 
 
 @recruits_bp.route('/money/compare', methods=['GET'])
