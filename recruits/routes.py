@@ -18,6 +18,14 @@ from services.circuit_stats import (
     get_circuit_stats_for_recruit,
     get_latest_circuit_stat,
 )
+import importlib.util
+from pathlib import Path
+
+_fmt_spec = importlib.util.spec_from_file_location(
+    "app.utils.formatting", Path(__file__).resolve().parents[1] / "app" / "utils" / "formatting.py"
+)
+_fmt_module = importlib.util.module_from_spec(_fmt_spec)
+_fmt_spec.loader.exec_module(_fmt_module)
 
 ALLOWED_HEADSHOT_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "svg"}
 UPLOAD_SUBDIR_RECRUITS = "uploads/recruits"
@@ -393,6 +401,8 @@ def money_board():
     Defaults: order by NET desc.
     """
     from app.models.prospect import Prospect
+    # hide Import button if table has any rows
+    has_data = db.session.query(func.count(Prospect.id)).scalar() > 0
     # ---- Filters from querystring ----
     year_min = request.args.get('year_min', type=int)
     year_max = request.args.get('year_max', type=int)
@@ -483,7 +493,8 @@ def money_board():
         confs=confs,
         # echo filters
         f_year_min=year_min, f_year_max=year_max, f_sheet=sheet, f_conf=conf,
-        f_min_recruits=min_recruits, f_sort=sort
+        f_min_recruits=min_recruits, f_sort=sort,
+        has_data=has_data
     )
 
 
@@ -532,3 +543,41 @@ def money_coach(coach_name):
         by_year=by_year,
         players=players
     )
+
+
+@recruits_bp.route('/money/compare', methods=['GET'])
+def money_compare():
+    # coach multi-select via ?coaches=Nate+Oats&coaches=Bruce+Pearl ...
+    from app.models.prospect import Prospect
+    selected = request.args.getlist('coaches')
+    # coach list for select
+    coach_list = [c for (c,) in db.session.query(Prospect.coach)
+                                .filter(Prospect.coach.isnot(None))
+                                .distinct().order_by(Prospect.coach).all()]
+
+    # aggregate for selected coaches
+    comps = []
+    if selected:
+        q = (db.session.query(
+                Prospect.coach.label('coach'),
+                func.count(Prospect.id).label('recruits'),
+                func.sum(func.coalesce(Prospect.projected_money,0)).label('proj_sum'),
+                func.sum(func.coalesce(Prospect.actual_money,0)).label('act_sum'),
+                func.sum(func.coalesce(Prospect.net,0)).label('net_sum'),
+             )
+             .filter(Prospect.coach.in_(selected))
+             .group_by(Prospect.coach))
+        for r in q.all():
+            comps.append({
+                "coach": r.coach,
+                "recruits": int(r.recruits or 0),
+                "proj_sum": float(r.proj_sum or 0),
+                "act_sum": float(r.act_sum or 0),
+                "net_sum": float(r.net_sum or 0),
+                "avg_net": float((r.net_sum or 0) / (r.recruits or 1)),
+            })
+
+    return render_template('recruits/money_compare.html',
+                           coaches=coach_list,
+                           selected=selected,
+                           comps=comps)

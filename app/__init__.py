@@ -14,6 +14,8 @@ from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
+from app.utils.schema import ensure_columns
+from app.utils.formatting import fmt_money, posneg_class
 
 # Allow JSON serialization of SimpleNamespace values across all Flask apps
 _orig_json_default = DefaultJSONProvider.default
@@ -166,6 +168,8 @@ def create_app():
     app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
     app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
     app.jinja_env.filters['grade_pps'] = grade_pps
+    app.jinja_env.filters["fmt_money"] = fmt_money
+    app.jinja_env.filters["posneg"] = posneg_class
 
     # --- Register Blueprints ---
     from public.routes import public_bp
@@ -191,6 +195,11 @@ def create_app():
         from app.models import prospect  # noqa: F401  # ensure models are registered
         with app.app_context():
             db.create_all()
+            # SAFE add: projected/actual pick (Float) if missing
+            ensure_columns(db.engine, "prospects", [
+                ("projected_pick", "REAL"),
+                ("actual_pick",    "REAL"),
+            ])
 
     @app.before_request
     def restrict_player_routes():
