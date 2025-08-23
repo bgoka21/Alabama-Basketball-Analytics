@@ -85,6 +85,15 @@
     updateDatalist('');
   });
 
+  form.addEventListener('submit', () => {
+    const val = input.value.trim();
+    if (coachList.includes(val)) {
+      addTag(val);
+    }
+    input.value = '';
+    updateDatalist('');
+  });
+
   // initialize datalist
   updateDatalist('');
 })();
