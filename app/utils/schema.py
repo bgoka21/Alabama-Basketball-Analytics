@@ -6,9 +6,8 @@ def ensure_columns(engine, table_name, cols):
     cols: list of tuples (name, sql_type_string), e.g. [("projected_pick","REAL")]
     Creates columns if missing. No-op if present.
     """
-    insp = inspect(engine)
-    existing = {c["name"] for c in insp.get_columns(table_name)}
     dialect = engine.dialect.name
+
     # map generic to dialect when needed
     def dtype(sql):
         if dialect in ("sqlite", "mysql"):
@@ -16,8 +15,13 @@ def ensure_columns(engine, table_name, cols):
         if dialect == "postgresql":
             return sql.replace("REAL", "DOUBLE PRECISION").replace("DOUBLE", "DOUBLE PRECISION")
         return sql
-    for name, sqltype in cols:
-        if name not in existing:
-            engine.execute(
-                text(f'ALTER TABLE "{table_name}" ADD COLUMN "{name}" {dtype(sqltype)}')
-            )
+
+    # use a transaction so column additions are committed together
+    with engine.begin() as conn:
+        insp = inspect(conn)
+        existing = {c["name"] for c in insp.get_columns(table_name)}
+        for name, sqltype in cols:
+            if name not in existing:
+                conn.execute(
+                    text(f'ALTER TABLE "{table_name}" ADD COLUMN "{name}" {dtype(sqltype)}')
+                )
