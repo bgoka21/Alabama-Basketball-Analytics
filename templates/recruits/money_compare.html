@@ -9,12 +9,10 @@
   <form method="get" class="mb-4 flex flex-col sm:flex-row gap-3 items-start">
     <div class="flex-1">
       <label class="block text-sm mb-1">Select up to 5 coaches</label>
-      <select name="coaches" multiple size="8" class="w-full border rounded p-2">
-        {% for c in coaches %}
-          <option value="{{ c }}" {% if c in selected %}selected{% endif %}>{{ c }}</option>
-        {% endfor %}
-      </select>
-      <p class="text-xs text-gray-500 mt-1">Hold Cmd/Ctrl to select multiple.</p>
+      <input type="text" id="coach-search" class="w-full border rounded p-2"
+             data-coaches='{{ coaches|tojson }}'
+             data-selected='{{ selected|tojson }}'>
+      <div id="coach-tags" class="mt-2 flex flex-wrap gap-2"></div>
     </div>
     <div class="sm:self-end">
       <button class="px-4 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">Compare</button>
@@ -44,4 +42,5 @@
     <div class="text-sm text-gray-500">Select coaches and click Compare.</div>
   {% endif %}
 </div>
+<script src="{{ url_for('static', filename='js/coach_autocomplete.js') }}"></script>
 {% endblock %}
