@@ -581,6 +581,7 @@ def money_compare():
     # aggregate for selected coaches
     comps = []
     if selected:
+        selected_lower = [s.lower() for s in selected]
         q = (db.session.query(
                 Prospect.coach.label('coach'),
                 func.count(Prospect.id).label('recruits'),
@@ -588,7 +589,7 @@ def money_compare():
                 func.sum(func.coalesce(Prospect.actual_money,0)).label('act_sum'),
                 func.sum(func.coalesce(Prospect.net,0)).label('net_sum'),
              )
-             .filter(Prospect.coach.in_(selected))
+             .filter(func.lower(Prospect.coach).in_(selected_lower))
              .group_by(Prospect.coach))
         for r in q.all():
             comps.append({
