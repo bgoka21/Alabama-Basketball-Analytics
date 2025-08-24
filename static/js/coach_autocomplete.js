@@ -4,6 +4,7 @@
   const tagContainer = document.getElementById('coach-tags');
   const selectedList = document.getElementById('coach-selected');
   const form = input.closest('form');
+  const coachListUrl = input.getAttribute('data-coach-list-url') || '/recruits/coach_list';
   let coachList = [];
   let selected = new Set();
 
@@ -65,7 +66,7 @@
 
   async function loadCoaches(){
     try {
-      const resp = await fetch('/recruits/coach_list');
+      const resp = await fetch(coachListUrl);
       if (!resp.ok) throw new Error('Network response was not ok');
       coachList = await resp.json();
       updateDatalist(input.value);
