@@ -84,3 +84,34 @@ def test_money_compare_limit(client):
     assert len(selected) == 5
     assert b'extra selections were ignored' in rv.data
 
+
+def test_money_compare_aggregates(client, app):
+    """Aggregated values for each selected coach are rendered."""
+    from app.models.prospect import Prospect
+
+    with app.app_context():
+        db.session.add_all([
+            Prospect(coach='CoachA', player='A1', year=2024,
+                     projected_money=100, actual_money=150, net=50),
+            Prospect(coach='CoachA', player='A2', year=2024,
+                     projected_money=200, actual_money=250, net=50),
+            Prospect(coach='CoachB', player='B1', year=2024,
+                     projected_money=80, actual_money=50, net=-30),
+        ])
+        db.session.commit()
+
+    rv = client.get('/recruits/money/compare?coaches=CoachA&coaches=CoachB')
+    assert rv.status_code == 200
+    html = rv.data.decode()
+
+    # CoachA totals: recruits=2, proj=$300, act=$400, net=$100, avg=$50
+    assert 'CoachA' in html
+    assert '$300' in html
+    assert '$400' in html
+    assert '$100' in html
+
+    # CoachB totals: recruits=1, proj=$80, act=$50, net=-$30, avg=-$30
+    assert 'CoachB' in html
+    assert '$80' in html
+    assert '-$30' in html
+
