@@ -66,12 +66,14 @@
   async function loadCoaches(){
     try {
       const resp = await fetch('/recruits/coach_list');
-      if (resp.ok) {
-        coachList = await resp.json();
-        updateDatalist(input.value);
-      }
+      if (!resp.ok) throw new Error('Network response was not ok');
+      coachList = await resp.json();
+      updateDatalist(input.value);
     } catch(e) {
       coachList = [];
+      if(selectedList){
+        selectedList.textContent = 'Unable to load coach list; enter names manually.';
+      }
     }
   }
 
@@ -88,7 +90,7 @@
 
   input.addEventListener('change', ()=>{
     const val=input.value.trim();
-    if(coachList.includes(val)){
+    if(!coachList.length || coachList.includes(val)){
       addTag(val);
     }
     input.value='';
@@ -97,7 +99,7 @@
 
   form.addEventListener('submit', () => {
     const val = input.value.trim();
-    if (coachList.includes(val)) {
+    if (!coachList.length || coachList.includes(val)) {
       addTag(val);
     }
     input.value = '';
