@@ -561,9 +561,21 @@ def coach_list():
 
 @recruits_bp.route('/money/compare', methods=['GET'])
 def money_compare():
+    """Compare projected/actual money totals for up to five coaches.
+
+    Coaches are provided via repeated ``coaches`` query parameters.  If more
+    than five are supplied the list is truncated and a warning is flashed so
+    users know only the first five were considered.
+    """
     # coach multi-select via ?coaches=Nate+Oats&coaches=Bruce+Pearl ...
     from app.models.prospect import Prospect
     selected = request.args.getlist('coaches')
+    if len(selected) > 5:
+        selected = selected[:5]
+        flash(
+            'You can compare up to five coaches at a time; extra selections were ignored.',
+            'warning',
+        )
     coach_list = _get_coach_names()
 
     # aggregate for selected coaches
