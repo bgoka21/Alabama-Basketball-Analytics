@@ -545,14 +545,18 @@ def money_coach(coach_name):
     )
 
 
+def _get_coach_names():
+    """Return a sorted list of unique coach names."""
+    from app.models.prospect import Prospect
+    return [c for (c,) in db.session.query(Prospect.coach)
+                               .filter(Prospect.coach.isnot(None))
+                               .distinct().order_by(Prospect.coach).all()]
+
+
 @recruits_bp.route('/coach_list')
 def coach_list():
-    """Return JSON array of unique coach names for autocomplete."""
-    from app.models.prospect import Prospect
-    names = [c for (c,) in db.session.query(Prospect.coach)
-                              .filter(Prospect.coach.isnot(None))
-                              .distinct().order_by(Prospect.coach).all()]
-    return jsonify(names)
+    """Return JSON array of coach names for autocomplete."""
+    return jsonify(_get_coach_names())
 
 
 @recruits_bp.route('/money/compare', methods=['GET'])
@@ -560,10 +564,7 @@ def money_compare():
     # coach multi-select via ?coaches=Nate+Oats&coaches=Bruce+Pearl ...
     from app.models.prospect import Prospect
     selected = request.args.getlist('coaches')
-    # coach list for select
-    coach_list = [c for (c,) in db.session.query(Prospect.coach)
-                                .filter(Prospect.coach.isnot(None))
-                                .distinct().order_by(Prospect.coach).all()]
+    coach_list = _get_coach_names()
 
     # aggregate for selected coaches
     comps = []
