@@ -7,11 +7,15 @@
   const coachListUrl = input.getAttribute('data-coach-list-url') || '/recruits/coach_list';
   let coachList = [];
   let coachListLower = [];
-  let selected = new Set();
+  let coachMap = {};
+  let selected = new Map();
 
-  const dl = document.createElement('datalist');
-  dl.id = 'coach-suggestions';
-  document.body.appendChild(dl);
+  const dlExisting = document.getElementById('coach-suggestions');
+  const dl = dlExisting || document.createElement('datalist');
+  if(!dlExisting){
+    dl.id = 'coach-suggestions';
+    document.body.appendChild(dl);
+  }
   input.setAttribute('list', dl.id);
 
   function updateDatalist(filter) {
@@ -29,22 +33,24 @@
 
   function updateHiddenInputs(){
     form.querySelectorAll('input[type="hidden"][name="coaches"]').forEach(el=>el.remove());
-    selected.forEach(coach=>{
+    selected.forEach((orig)=>{
       const h=document.createElement('input');
       h.type='hidden';
       h.name='coaches';
-      h.value=coach;
+      h.value=orig;
       form.appendChild(h);
     });
   }
 
   function addTag(coach){
-    const norm = coach.trim().toLowerCase();
+    const orig = coach.trim();
+    const norm = orig.toLowerCase();
     if(!norm || selected.has(norm) || selected.size>=5) return;
-    selected.add(norm);
+    const original = coachMap[norm] || orig;
+    selected.set(norm, original);
     const tag=document.createElement('span');
     tag.className='inline-flex items-center bg-gray-200 text-sm px-2 py-1 rounded';
-    tag.textContent=norm;
+    tag.textContent=original;
     const close=document.createElement('button');
     close.type='button';
     close.textContent='×';
@@ -65,7 +71,7 @@
 
   function updateSelectedList(){
     if(!selectedList) return;
-    selectedList.textContent = selected.size ? 'Selected: ' + Array.from(selected).join(', ') : '';
+    selectedList.textContent = selected.size ? 'Selected: ' + Array.from(selected.values()).join(', ') : '';
   }
 
   async function loadCoaches(){
@@ -73,15 +79,39 @@
       const resp = await fetch(coachListUrl);
       if (!resp.ok) throw new Error('Network response was not ok');
       coachList = await resp.json();
-      coachListLower = coachList.map(c => c.toLowerCase());
+      coachMap = {};
+      coachListLower = coachList.map(c => {
+        const lower = c.toLowerCase();
+        coachMap[lower] = c;
+        return lower;
+      });
       updateDatalist(input.value);
     } catch(e) {
       coachList = [];
       coachListLower = [];
+      coachMap = {};
       if(selectedList){
         selectedList.textContent = 'Unable to load coach list; enter names manually.';
       }
     }
+  }
+
+  const coachListData = input.getAttribute('data-coach-list');
+  if (coachListData) {
+    try {
+      const parsed = JSON.parse(coachListData);
+      coachList = parsed;
+      coachMap = {};
+      coachListLower = coachList.map(c => {
+        const lower = c.toLowerCase();
+        coachMap[lower] = c;
+        return lower;
+      });
+      updateDatalist('');
+    } catch(e) {}
+  }
+  if (!coachList.length) {
+    loadCoaches();
   }
 
   const selectedInitial = input.getAttribute('data-selected');
@@ -115,6 +145,5 @@
     updateDatalist('');
   });
 
-  loadCoaches();
   updateSelectedList();
 })();
