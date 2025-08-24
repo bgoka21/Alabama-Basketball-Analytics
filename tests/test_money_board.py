@@ -72,3 +72,15 @@ def test_money_compare_interface(client):
     assert rv2.status_code == 200
     assert isinstance(rv2.get_json(), list)
 
+
+def test_money_compare_limit(client):
+    qs = '&'.join(f'coaches=c{i}' for i in range(6))
+    rv = client.get(f'/recruits/money/compare?{qs}')
+    assert rv.status_code == 200
+    import json
+    html = rv.data.decode()
+    val = html.split('data-selected="', 1)[1].split('">', 1)[0]
+    selected = json.loads(val)
+    assert len(selected) == 5
+    assert b'extra selections were ignored' in rv.data
+
