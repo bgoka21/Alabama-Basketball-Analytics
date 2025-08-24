@@ -9,16 +9,12 @@
   <form method="get" class="mb-4 flex flex-col sm:flex-row gap-3 items-start">
     <div class="flex-1">
       <label class="block text-sm mb-1">Select up to five coaches (extra selections will be ignored)</label>
-      <input type="text" id="coach-search" class="w-full border rounded p-2" list="coach-suggestions"
-             data-coach-list="{{ coaches|tojson }}"
-             data-coach-list-url="{{ url_for('recruits.coach_list') }}"
-             data-selected="{{ selected|tojson }}">
-      <datalist id="coach-suggestions">
+      <select id="coach-search" class="w-full border rounded p-2" multiple
+              data-selected="{{ selected|tojson }}">
       {% for c in coaches %}
-        <option value="{{ c }}"></option>
+        <option value="{{ c }}">{{ c }}</option>
       {% endfor %}
-      </datalist>
-      <div id="coach-tags" class="mt-2 flex flex-wrap gap-2"></div>
+      </select>
       <div id="coach-selected" class="mt-2 text-sm text-gray-600"></div>
     </div>
     <div class="sm:self-end">

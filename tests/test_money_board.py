@@ -12,6 +12,7 @@ from models.database import db
 from models.user import User
 from admin.routes import admin_bp
 from recruits import recruits_bp
+from bs4 import BeautifulSoup
 
 
 @pytest.fixture
@@ -66,7 +67,10 @@ def test_money_coach_ok(client):
 def test_money_compare_interface(client):
     rv = client.get('/recruits/money/compare')
     assert rv.status_code == 200
-    assert b'coach-search' in rv.data
+    soup = BeautifulSoup(rv.data, 'html.parser')
+    sel = soup.find('select', id='coach-search')
+    assert sel is not None
+    assert sel.has_attr('multiple')
 
     rv2 = client.get('/recruits/coach_list')
     assert rv2.status_code == 200
@@ -114,4 +118,8 @@ def test_money_compare_aggregates(client, app):
     assert 'CoachB' in html
     assert '$80' in html
     assert '-$30' in html
+
+    soup = BeautifulSoup(html, 'html.parser')
+    cards = soup.select('div.p-4.rounded-xl.border')
+    assert len(cards) == 2
 
