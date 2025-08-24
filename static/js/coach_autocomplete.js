@@ -6,6 +6,7 @@
   const form = input.closest('form');
   const coachListUrl = input.getAttribute('data-coach-list-url') || '/recruits/coach_list';
   let coachList = [];
+  let coachListLower = [];
   let selected = new Set();
 
   const dl = document.createElement('datalist');
@@ -16,12 +17,14 @@
   function updateDatalist(filter) {
     dl.innerHTML='';
     const term = (filter || '').toLowerCase();
-    coachList.filter(c => c.toLowerCase().includes(term) && !selected.has(c))
-             .forEach(c => {
-                const opt=document.createElement('option');
-                opt.value=c;
-                dl.appendChild(opt);
-             });
+    coachList.forEach((c, idx) => {
+      const cLower = coachListLower[idx];
+      if (cLower.includes(term) && !selected.has(cLower)) {
+        const opt=document.createElement('option');
+        opt.value=c;
+        dl.appendChild(opt);
+      }
+    });
   }
 
   function updateHiddenInputs(){
@@ -36,17 +39,18 @@
   }
 
   function addTag(coach){
-    if(selected.has(coach) || selected.size>=5) return;
-    selected.add(coach);
+    const norm = coach.trim().toLowerCase();
+    if(!norm || selected.has(norm) || selected.size>=5) return;
+    selected.add(norm);
     const tag=document.createElement('span');
     tag.className='inline-flex items-center bg-gray-200 text-sm px-2 py-1 rounded';
-    tag.textContent=coach;
+    tag.textContent=norm;
     const close=document.createElement('button');
     close.type='button';
     close.textContent='×';
     close.className='ml-1';
     close.addEventListener('click',()=>{
-      selected.delete(coach);
+      selected.delete(norm);
       tag.remove();
       updateHiddenInputs();
       updateDatalist(input.value);
@@ -69,9 +73,11 @@
       const resp = await fetch(coachListUrl);
       if (!resp.ok) throw new Error('Network response was not ok');
       coachList = await resp.json();
+      coachListLower = coachList.map(c => c.toLowerCase());
       updateDatalist(input.value);
     } catch(e) {
       coachList = [];
+      coachListLower = [];
       if(selectedList){
         selectedList.textContent = 'Unable to load coach list; enter names manually.';
       }
@@ -91,7 +97,8 @@
 
   input.addEventListener('change', ()=>{
     const val=input.value.trim();
-    if(!coachList.length || coachList.includes(val)){
+    const valLower = val.toLowerCase();
+    if(!coachListLower.length || coachListLower.includes(valLower)){
       addTag(val);
     }
     input.value='';
@@ -100,7 +107,8 @@
 
   form.addEventListener('submit', () => {
     const val = input.value.trim();
-    if (!coachList.length || coachList.includes(val)) {
+    const valLower = val.toLowerCase();
+    if (!coachListLower.length || coachListLower.includes(valLower)) {
       addTag(val);
     }
     input.value = '';
