@@ -5,19 +5,8 @@
   const selectedList = document.getElementById('coach-selected');
   const form = input.closest('form');
   let coachList = [];
-  try {
-    const data = input.getAttribute('data-coaches');
-    if (data) coachList = JSON.parse(data);
-  } catch(e) {
-    coachList = [];
-  }
-  const selectedInitial = input.getAttribute('data-selected');
   let selected = new Set();
-  if (selectedInitial) {
-    try {
-      JSON.parse(selectedInitial).forEach(c=>addTag(c));
-    } catch(e) {}
-  }
+
   const dl = document.createElement('datalist');
   dl.id = 'coach-suggestions';
   document.body.appendChild(dl);
@@ -74,6 +63,25 @@
     selectedList.textContent = selected.size ? 'Selected: ' + Array.from(selected).join(', ') : '';
   }
 
+  async function loadCoaches(){
+    try {
+      const resp = await fetch('/recruits/coach_list');
+      if (resp.ok) {
+        coachList = await resp.json();
+        updateDatalist(input.value);
+      }
+    } catch(e) {
+      coachList = [];
+    }
+  }
+
+  const selectedInitial = input.getAttribute('data-selected');
+  if (selectedInitial) {
+    try {
+      JSON.parse(selectedInitial).forEach(c=>addTag(c));
+    } catch(e) {}
+  }
+
   input.addEventListener('input', ()=>{
     updateDatalist(input.value);
   });
@@ -96,7 +104,6 @@
     updateDatalist('');
   });
 
-  // initialize datalist
-  updateDatalist('');
+  loadCoaches();
   updateSelectedList();
 })();
