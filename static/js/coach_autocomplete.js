@@ -2,6 +2,7 @@
   const input = document.getElementById('coach-search');
   if(!input) return;
   const tagContainer = document.getElementById('coach-tags');
+  const selectedList = document.getElementById('coach-selected');
   const form = input.closest('form');
   let coachList = [];
   try {
@@ -9,12 +10,6 @@
     if (data) coachList = JSON.parse(data);
   } catch(e) {
     coachList = [];
-  }
-  if (!coachList.length) {
-    fetch('/recruits/coach_list').then(r=>r.json()).then(list=>{
-      coachList = list;
-      updateDatalist('');
-    });
   }
   const selectedInitial = input.getAttribute('data-selected');
   let selected = new Set();
@@ -32,7 +27,7 @@
     dl.innerHTML='';
     const term = (filter || '').toLowerCase();
     coachList.filter(c => c.toLowerCase().includes(term) && !selected.has(c))
-             .slice(0,10).forEach(c => {
+             .forEach(c => {
                 const opt=document.createElement('option');
                 opt.value=c;
                 dl.appendChild(opt);
@@ -65,11 +60,18 @@
       tag.remove();
       updateHiddenInputs();
       updateDatalist(input.value);
+      updateSelectedList();
     });
     tag.appendChild(close);
     tagContainer.appendChild(tag);
     updateHiddenInputs();
     updateDatalist(input.value);
+    updateSelectedList();
+  }
+
+  function updateSelectedList(){
+    if(!selectedList) return;
+    selectedList.textContent = selected.size ? 'Selected: ' + Array.from(selected).join(', ') : '';
   }
 
   input.addEventListener('input', ()=>{
@@ -96,4 +98,5 @@
 
   // initialize datalist
   updateDatalist('');
+  updateSelectedList();
 })();
