@@ -66,6 +66,11 @@
       Skill Totals
     </a>
   </li>
+  <li class="nav-item{% if request.endpoint == 'admin.ft_daily' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.ft_daily') }}">
+      FT Daily
+    </a>
+  </li>
   {% set team_totals_ep = 'admin.team_totals' %}
   {% set has_team_totals = (view_exists(team_totals_ep) if view_exists is defined else True) %}
   {% set team_totals_url = url_for(team_totals_ep) if has_team_totals else '#' %}
