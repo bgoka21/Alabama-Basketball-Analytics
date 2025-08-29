@@ -69,6 +69,7 @@
 </div>
 
 {% set args = request.args.to_dict() %}
+{% if has_entries %}
 <div class="overflow-x-auto">
   <table class="w-full table-auto border border-gray-200 rounded-md border-collapse">
     <thead>
@@ -106,10 +107,6 @@
         <td class="px-4 py-2 text-center text-sm">{% if row.ft_attempts %}{{ '%.1f'|format(row.ft_pct) }}{% else %}—{% endif %}</td>
         {% if include_total %}<td class="px-4 py-2 text-center text-sm">{{ row.total_shots }}</td>{% endif %}
       </tr>
-      {% else %}
-      <tr>
-        <td colspan="{{ 4 + (1 if include_total else 0) }}" class="px-4 py-2 text-center text-sm text-gray-500">No data</td>
-      </tr>
       {% endfor %}
     </tbody>
     <tfoot>
@@ -123,6 +120,9 @@
     </tfoot>
   </table>
 </div>
+{% else %}
+<p class="text-center text-sm text-gray-500">No free throw entries for this date.</p>
+{% endif %}
 
 {% endblock %}
 

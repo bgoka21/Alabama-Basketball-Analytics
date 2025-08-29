@@ -1,6 +1,7 @@
 import os, json
 from collections import defaultdict
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 import datetime as datetime_module
 import io
 import csv
@@ -3836,78 +3837,58 @@ def ft_daily():
     dir_ = request.args.get('dir', 'desc')
     fmt = request.args.get('format', 'html')
 
+    valid_sorts = {'makes', 'attempts', 'pct', 'name'}
+    if include_total:
+        valid_sorts.add('total')
+    if sort not in valid_sorts:
+        sort = 'attempts'
+    if sort == 'total' and not include_total:
+        sort = 'attempts'
+
     seasons = Season.query.order_by(Season.id.desc()).all()
     season_id = seasons[0].id if seasons else None
     roster_entries = Roster.query.filter_by(season_id=season_id).all() if season_id else []
 
-    players = {}
-    for r in roster_entries:
-        players[r.id] = {
-            'player_id': r.id,
-            'player_name': r.player_name,
-            'ft_makes': 0,
-            'ft_attempts': 0,
-        }
-        if include_total:
-            players[r.id]['total_shots'] = 0
-
-    ft_q = (
+    ft_sq = (
         db.session.query(
-            SkillEntry.player_id,
+            SkillEntry.player_id.label('player_id'),
             func.coalesce(func.sum(SkillEntry.makes), 0).label('makes'),
             func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
         )
         .filter(SkillEntry.shot_class == 'ft', SkillEntry.date == selected_date)
         .group_by(SkillEntry.player_id)
-    )
-    for row in ft_q:
-        p = players.get(row.player_id)
-        if not p:
-            roster = db.session.get(Roster, row.player_id)
-            if not roster:
-                continue
-            p = {
-                'player_id': roster.id,
-                'player_name': roster.player_name,
-                'ft_makes': 0,
-                'ft_attempts': 0,
-            }
-            if include_total:
-                p['total_shots'] = 0
-            players[row.player_id] = p
-        p['ft_makes'] = row.makes
-        p['ft_attempts'] = row.attempts
+    ).subquery()
+    ft_rows = {r.player_id: r for r in db.session.query(ft_sq)}
 
+    total_rows = {}
     if include_total:
-        total_q = (
+        total_sq = (
             db.session.query(
-                SkillEntry.player_id,
+                SkillEntry.player_id.label('player_id'),
                 func.coalesce(func.sum(SkillEntry.attempts), 0).label('total'),
             )
             .filter(SkillEntry.date == selected_date, SkillEntry.shot_class != None)
             .group_by(SkillEntry.player_id)
-        )
-        for row in total_q:
-            p = players.get(row.player_id)
-            if not p:
-                roster = db.session.get(Roster, row.player_id)
-                if not roster:
-                    continue
-                p = {
-                    'player_id': roster.id,
-                    'player_name': roster.player_name,
-                    'ft_makes': 0,
-                    'ft_attempts': 0,
-                    'total_shots': 0,
-                }
-                players[row.player_id] = p
-            p['total_shots'] = row.total
+        ).subquery()
+        total_rows = {r.player_id: r.total for r in db.session.query(total_sq)}
 
-    rows = list(players.values())
-    for r in rows:
-        attempts = r['ft_attempts']
-        r['ft_pct'] = (r['ft_makes'] / attempts * 100) if attempts else 0.0
+    rows = []
+    for r in roster_entries:
+        ft = ft_rows.get(r.id)
+        makes = ft.makes if ft else 0
+        attempts = ft.attempts if ft else 0
+        row = {
+            'player_id': r.id,
+            'player_name': r.player_name,
+            'ft_makes': makes,
+            'ft_attempts': attempts,
+            'ft_pct': (makes / attempts * 100) if attempts else 0.0,
+        }
+        if include_total:
+            row['total_shots'] = total_rows.get(r.id, 0)
+        rows.append(row)
 
+    has_entries = any(r['ft_attempts'] > 0 for r in rows)
     if hide_zeros:
         rows = [r for r in rows if r['ft_attempts'] > 0]
 
@@ -3929,7 +3910,8 @@ def ft_daily():
             headers.append('Total Shots')
         writer.writerow(headers)
         for r in rows:
-            row = [r['player_name'], r['ft_makes'], r['ft_attempts'], f"{r['ft_pct']:.1f}"]
+            pct = f"{r['ft_pct']:.1f}" if r['ft_attempts'] else ''
+            row = [r['player_name'], r['ft_makes'], r['ft_attempts'], pct]
             if include_total:
                 row.append(r.get('total_shots', 0))
             writer.writerow(row)
@@ -3947,6 +3929,7 @@ def ft_daily():
         dir=dir_,
         rows=rows,
         totals=totals,
+        has_entries=has_entries,
         active_page='ft_daily'
     )
 
@@ -4901,13 +4884,15 @@ def eybl_synonym_delete(syn_id):
 # --- Helpers for ft_daily --------------------------------------------------
 
 def _parse_date_param(value):
-    """Parse YYYY-MM-DD or return today's date."""
+    """Parse YYYY-MM-DD or return today's date in app's timezone."""
+    tzname = current_app.config.get('TIMEZONE')
+    today = datetime.now(ZoneInfo(tzname)).date() if tzname else date.today()
     if value:
         try:
             return date.fromisoformat(value)
         except ValueError:
             pass
-    return date.today()
+    return today
 
 
 def _ft_sort_key(sort):
@@ -4915,7 +4900,7 @@ def _ft_sort_key(sort):
     mapping = {
         'makes': lambda r: r['ft_makes'],
         'attempts': lambda r: r['ft_attempts'],
-        'pct': lambda r: r['ft_pct'],
+        'pct': lambda r: r.get('ft_pct') or 0.0,
         'total': lambda r: r.get('total_shots', 0),
         'name': lambda r: r['player_name'].lower(),
     }
