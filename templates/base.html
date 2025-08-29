@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alabama Basketball</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
   <style>
       @media (max-width: 768px) {
@@ -24,14 +23,21 @@
       }
 
   </style>
+    <!-- Print styles (print-only) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}" media="print">
+
+    <!-- html2pdf vendor bundle -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+    <!-- Our wrapper -->
+    <script src="{{ url_for('static', filename='js/pdf-export.js') }}" defer></script>
 </head>
 <body class="min-h-screen flex">
 
   <!-- Mobile menu button -->
-  <button id="mobile-menu-button" class="md:hidden p-2">&#9776;</button>
+  <button id="mobile-menu-button" class="md:hidden p-2 no-print">&#9776;</button>
 
   <!-- Sidebar -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 transform -translate-x-full md:translate-x-0 transition-transform z-50 bg-[#9E1B32] text-white flex flex-col px-3 py-4 sm:px-5 sm:py-6">
+  <aside id="sidebar" class="sidebar no-print fixed inset-y-0 left-0 w-64 transform -translate-x-full md:translate-x-0 transition-transform z-50 bg-[#9E1B32] text-white flex flex-col px-3 py-4 sm:px-5 sm:py-6">
     <h1 class="text-xl sm:text-2xl font-bold mb-8">Alabama Basketball</h1>
 
     <nav>

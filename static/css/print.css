@@ -1,109 +1,26 @@
-/* landscape orientation for detailed reports */
-@page {
-  size: letter landscape;
-  /* reduce margins so the report uses more page space */
-  margin: 0.25in;
-}
+/* Print-only rules — no impact on web/mobile */
 @media print {
-  /* hide navigation, sidebar and any no-print elements */
-  nav, header, footer, .no-print,
-  #sidebar, #mobile-menu-btn { display: none !important; }
-  /* preserve team colors */
-  html, body, * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  /* tighten up fonts and tables */
-  body {
-    font-size: 10pt !important;
-    margin: 0 !important;
-  }
-  h1 {
-    font-size: 1.25rem !important;
-    margin-bottom: 0.25rem !important;
-  }
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 8pt !important;
-  }
-  th, td {
-    border: 1px solid #ccc !important;
-    padding: 2px 4px !important;
-  }
-  /* scale charts/images to fit */
-  img, canvas {
-    max-width: 100% !important;
-    height: auto !important;
-  }
+  body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Never print nav/sidebars/filters/buttons/controls */
+  .no-print, nav, header .controls, .sidebar, .admin-sidebar, .filter-bar, .filters, form.filters,
+  .btn, button, select, input, .tab-controls, .pagination { display: none !important; }
 
-  /* shrink shot type section for better page fit */
-  #shotType {
-    /* enlarge shot type section to utilize blank space */
-    transform: scale(0.8);
-    transform-origin: top left;
-  }
-  #shotType table { font-size: 7pt !important; }
-  #shotType th, #shotType td { padding: 1px 2px !important; }
+  /* Ensure printable region expands and looks clean */
+  #print-area { display: block !important; width: 100% !important; }
+  .tab-panel { display: block !important; } /* show all tab contents on print */
 
-  /* hide tab buttons */
-  #tabButtons { display: none !important; }
+  /* Tables & cards: tidy for paper */
+  .card, .table { box-shadow: none !important; }
+  .table th, .table td { border-color: #000 !important; }
 
-  .player-header {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-  }
+  /* Page handling */
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+  .stat-card, .table, .leaderboard, .section { break-inside: avoid; page-break-inside: avoid; }
 
-  .shot-cards-container {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: flex-start !important;
-    margin-bottom: 8px !important;
-  }
-
-  .shot-card {
-    flex: 0 0 32% !important;
-    box-sizing: border-box !important;
-  }
-
-  /* hide any original full table */
-  .full-table { display: none !important; }
-
-  /* side-by-side holder */
-  .print-table-container {
-    display: flex !important;
-    justify-content: flex-start !important;
-    width: 100% !important;
-  }
-
-  /* both tables become visible */
-  .print-table-first,
-  .print-table-second {
-    display: table !important;
-    border-collapse: collapse !important;
-    width: auto !important;
-    font-size: 7pt !important;
-  }
-
-  /* first table: hide columns 7+ */
-  .print-table-first th:nth-child(n+7),
-  .print-table-first td:nth-child(n+7) {
-    display: none !important;
-  }
-
-  /* second table: hide columns 1–6 */
-  .print-table-second th:nth-child(-n+6),
-  .print-table-second td:nth-child(-n+6) {
-    display: none !important;
-  }
-
-  /* small gutter between tables */
-  .print-table-second {
-    margin-left: 6px !important;
-  }
-
-  th, td {
-    border: 1px solid #ccc !important;
-    padding: 2px 3px !important;
-  }
+  @page { size: auto; margin: 0.5in; }
 }
+
+/* Optional: A class we can toggle pre-capture (no effect unless JS adds it) */
+body.print-capture .tab-controls { display: none !important; }
+body.print-capture .tab-panel { display: block !important; }
+body.print-capture .no-print { display: none !important; }
