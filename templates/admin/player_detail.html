@@ -11,8 +11,9 @@
 
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
   <h1 class="text-xl sm:text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
-  <button class="no-print btn btn-primary"
-          onclick="exportStatsPDF({ filename: '{{ player_name|replace(" ", "_") }}.pdf' })">
+  <button id="downloadPdfBtn"
+          class="no-print btn btn-primary"
+          type="button">
     Download PDF
   </button>
   {% if not has_stats %}
@@ -885,6 +886,12 @@ function showShotTypeDetail(detail) {
     const params = new URLSearchParams(window.location.search);
     const mode   = params.get('mode');
     const hash   = window.location.hash.replace('#','');
+      const pdfBtn = document.getElementById("downloadPdfBtn");
+      if (pdfBtn) {
+        pdfBtn.addEventListener("click", () => {
+          exportStatsPDF({ filename: "{{ player_name|replace(" ", "_") }}.pdf" });
+        });
+      }
 
     if (['seasonTotals','gameStats','shotType','skillDevelopment'].includes(hash)) {
       showTab(hash);
