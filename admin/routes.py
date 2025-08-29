@@ -3777,10 +3777,8 @@ def player_session_report(player_name):
 @login_required
 def skill_totals():
     """Display total skill-development shot counts for each player."""
-    season_id = request.args.get('season_id', type=int)
-    seasons = Season.query.order_by(Season.id.desc()).all()
-    if not season_id and seasons:
-        season_id = seasons[0].id
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    season_id = request.args.get('season_id', type=int) or (seasons[0].id if seasons else None)
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     if start_date:
