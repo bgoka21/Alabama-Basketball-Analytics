@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
-  <div class="flex flex-col items-center text-center space-y-4 md:flex-row md:items-start md:space-y-0 md:space-x-6">
-    <h1 class="text-2xl font-bold">{{ player.player_name }}</h1>
-  </div>
+<div id="print-area">
+  <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
+    <div class="flex flex-col items-center text-center space-y-4 md:flex-row md:items-start md:space-y-0 md:space-x-6">
+      <h1 class="text-2xl font-bold">{{ player.player_name }}</h1>
+      <button id="downloadPdfBtn">Download PDF</button>
+    </div>
 
   <h3 class="mt-6">On-Court Offensive Possessions &amp; Efficiency</h3>
 
@@ -53,7 +55,8 @@
   </div>
 
   {# Include shot type tables with sticky headers #}
-  {% include "partials/shot_type_tables.html" with context %}
+    {% include "partials/shot_type_tables.html" with context %}
+  </div>
 </div>
 
 <script>
@@ -107,6 +110,15 @@ function showShotTypeDetail(detail) {
 
 document.addEventListener('DOMContentLoaded', () => {
   showTab('shotType');
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const pdfBtn = document.getElementById('downloadPdfBtn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', () =>
+      exportStatsPDF({ filename: `${player.player_name.replace(/\s+/g, '_')}.pdf` })
+    );
+  }
 });
 </script>
 
