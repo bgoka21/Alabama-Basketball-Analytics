@@ -4926,8 +4926,8 @@ def _ft_daily_data(selected_date, include_total, hide_zeros, sort, dir_):
     if sort == 'total' and not include_total:
         sort = 'attempts'
 
-    seasons = Season.query.order_by(Season.id.desc()).all()
-    season_id = seasons[0].id if seasons else None
+    current_season = Season.query.order_by(Season.start_date.desc()).first()
+    season_id = current_season.id if current_season else None
     roster_entries = Roster.query.filter_by(season_id=season_id).all() if season_id else []
 
     ft_sq = (
