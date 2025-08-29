@@ -889,7 +889,11 @@ function showShotTypeDetail(detail) {
       const pdfBtn = document.getElementById("downloadPdfBtn");
       if (pdfBtn) {
         pdfBtn.addEventListener("click", () => {
-          exportStatsPDF({ filename: "{{ player_name|replace(" ", "_") }}.pdf" });
+          if (window.exportStatsPDF) {
+            exportStatsPDF({ filename: "{{ player_name|replace(" ", "_") }}.pdf" });
+          } else {
+            alert('PDF export unavailable');
+          }
         });
       }
 
