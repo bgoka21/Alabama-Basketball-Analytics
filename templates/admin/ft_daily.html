@@ -1,82 +1,128 @@
 {% extends 'admin/base.html' %}
 
-{% block page_controls %}
-<form method="get" class="mb-4 flex flex-wrap items-end gap-4">
-  <div>
-    <label class="block text-sm font-medium mb-1">Date</label>
-    <input type="date" name="date" value="{{ selected_date.isoformat() }}" class="border p-2 rounded" />
-  </div>
-  <div class="flex items-center">
-    <input type="checkbox" name="include_total" value="1" {% if include_total %}checked{% endif %} class="mr-2" />
-    <label class="text-sm">Include Total Shots</label>
-  </div>
-  <div class="flex items-center">
-    <input type="checkbox" name="hide_zeros" value="1" {% if hide_zeros %}checked{% endif %} class="mr-2" />
-    <label class="text-sm">Hide Zeros</label>
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">Sort</label>
-    <select name="sort" class="border p-2 rounded">
-      <option value="attempts" {% if sort == 'attempts' %}selected{% endif %}>Attempts</option>
-      <option value="makes" {% if sort == 'makes' %}selected{% endif %}>Makes</option>
-      <option value="pct" {% if sort == 'pct' %}selected{% endif %}>FT %</option>
-      {% if include_total %}<option value="total" {% if sort == 'total' %}selected{% endif %}>Total Shots</option>{% endif %}
-      <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
-    </select>
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">Dir</label>
-    <select name="dir" class="border p-2 rounded">
-      <option value="desc" {% if dir == 'desc' %}selected{% endif %}>Desc</option>
-      <option value="asc" {% if dir == 'asc' %}selected{% endif %}>Asc</option>
-    </select>
-  </div>
-  <div>
-    <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
-  </div>
-  <div>
-    <a href="{{ url_for('admin.ft_daily') }}" class="text-gray-600 hover:underline text-sm">Today</a>
-  </div>
-</form>
+{% block head %}
+<style>
+@media print {
+  #sidebar, #mobile-menu-btn, .no-print { display: none !important; }
+  @page { size: portrait; margin: 1in; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #000; }
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Free Throws - {{ selected_date }}</h1>
+{% set date_str = selected_date.strftime('%B %d, %Y') %}
+
+<div class="flex flex-col gap-4 mb-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold flex items-center">
+        Daily Free Throws
+        <span class="ml-3 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">Daily {{ date_str }}</span>
+      </h1>
+      <p class="text-sm text-gray-600">Report Date: {{ date_str }}</p>
+    </div>
+    <div class="space-x-2 no-print">
+      <a href="{{ url_for('admin.ft_daily', **request.args.to_dict(), format='csv') }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
+      <button type="button" onclick="window.print()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">Print / Save PDF</button>
+    </div>
+  </div>
+
+  <form method="get" class="flex flex-wrap items-end gap-4 no-print">
+    <div>
+      <label class="block text-sm font-medium mb-1">Date</label>
+      <input type="date" name="date" value="{{ selected_date.isoformat() }}" class="border border-gray-300 rounded px-2 py-1" />
+    </div>
+    <label class="inline-flex items-center text-sm">
+      <input type="checkbox" name="include_total" value="1" {% if include_total %}checked{% endif %} class="mr-2" />
+      Include Total Shots (All Drills)
+    </label>
+    <label class="inline-flex items-center text-sm">
+      <input type="checkbox" name="hide_zeros" value="1" {% if hide_zeros %}checked{% endif %} class="mr-2" />
+      Hide players with 0 FT attempts
+    </label>
+    <div>
+      <label class="block text-sm font-medium mb-1">Sort</label>
+      <select name="sort" class="border border-gray-300 rounded px-2 py-1">
+        <option value="attempts" {% if sort == 'attempts' %}selected{% endif %}>Attempts</option>
+        <option value="makes" {% if sort == 'makes' %}selected{% endif %}>Makes</option>
+        <option value="pct" {% if sort == 'pct' %}selected{% endif %}>FT %</option>
+        {% if include_total %}<option value="total" {% if sort == 'total' %}selected{% endif %}>Total Shots</option>{% endif %}
+        <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Dir</label>
+      <select name="dir" class="border border-gray-300 rounded px-2 py-1">
+        <option value="asc" {% if dir == 'asc' %}selected{% endif %}>Asc</option>
+        <option value="desc" {% if dir == 'desc' %}selected{% endif %}>Desc</option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
+    </div>
+    <div>
+      <a href="{{ url_for('admin.ft_daily') }}" class="text-gray-600 hover:underline text-sm">Reset</a>
+    </div>
+  </form>
+</div>
+
+{% set args = request.args.to_dict() %}
 <div class="overflow-x-auto">
-  <table class="w-full table-auto border border-gray-200 rounded-md">
+  <table class="w-full table-auto border border-gray-200 rounded-md border-collapse">
     <thead>
       <tr class="bg-gray-200">
-        <th class="px-4 py-2 text-left text-sm font-medium">Player</th>
-        <th class="px-4 py-2 text-center text-sm font-medium">FT Makes</th>
-        <th class="px-4 py-2 text-center text-sm font-medium">FT Attempts</th>
-        <th class="px-4 py-2 text-center text-sm font-medium">FT %</th>
-        {% if include_total %}<th class="px-4 py-2 text-center text-sm font-medium">Total Shots</th>{% endif %}
+        <th class="px-4 py-2 text-left text-sm font-medium">
+          {% set new_dir = 'asc' if sort != 'name' else ('desc' if dir == 'asc' else 'asc') %}
+          <a href="{{ url_for('admin.ft_daily', **args, sort='name', dir=new_dir) }}" class="inline-flex items-center">Player{% if sort == 'name' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+        </th>
+        <th class="px-4 py-2 text-center text-sm font-medium">
+          {% set new_dir = 'asc' if sort != 'makes' else ('desc' if dir == 'asc' else 'asc') %}
+          <a href="{{ url_for('admin.ft_daily', **args, sort='makes', dir=new_dir) }}" class="inline-flex items-center">FT Makes{% if sort == 'makes' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+        </th>
+        <th class="px-4 py-2 text-center text-sm font-medium">
+          {% set new_dir = 'asc' if sort != 'attempts' else ('desc' if dir == 'asc' else 'asc') %}
+          <a href="{{ url_for('admin.ft_daily', **args, sort='attempts', dir=new_dir) }}" class="inline-flex items-center">FT Attempts{% if sort == 'attempts' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+        </th>
+        <th class="px-4 py-2 text-center text-sm font-medium">
+          {% set new_dir = 'asc' if sort != 'pct' else ('desc' if dir == 'asc' else 'asc') %}
+          <a href="{{ url_for('admin.ft_daily', **args, sort='pct', dir=new_dir) }}" class="inline-flex items-center">FT %{% if sort == 'pct' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+        </th>
+        {% if include_total %}
+        <th class="px-4 py-2 text-center text-sm font-medium">
+          {% set new_dir = 'asc' if sort != 'total' else ('desc' if dir == 'asc' else 'asc') %}
+          <a href="{{ url_for('admin.ft_daily', **args, sort='total', dir=new_dir) }}" class="inline-flex items-center">Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+        </th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
-    {% for row in rows %}
+      {% for row in rows %}
       <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
         <td class="px-4 py-2 text-sm">{{ row.player_name }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ row.ft_makes }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ row.ft_attempts }}</td>
-        <td class="px-4 py-2 text-center text-sm">{{ '%.1f'|format(row.ft_pct) }}</td>
+        <td class="px-4 py-2 text-center text-sm">{% if row.ft_attempts %}{{ '%.1f'|format(row.ft_pct) }}{% else %}—{% endif %}</td>
         {% if include_total %}<td class="px-4 py-2 text-center text-sm">{{ row.total_shots }}</td>{% endif %}
       </tr>
-    {% else %}
+      {% else %}
       <tr>
         <td colspan="{{ 4 + (1 if include_total else 0) }}" class="px-4 py-2 text-center text-sm text-gray-500">No data</td>
       </tr>
-    {% endfor %}
+      {% endfor %}
     </tbody>
     <tfoot>
       <tr class="bg-gray-200 font-semibold">
         <td class="px-4 py-2 text-sm">Totals</td>
         <td class="px-4 py-2 text-center text-sm">{{ totals.ft_makes }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ totals.ft_attempts }}</td>
-        <td class="px-4 py-2 text-center text-sm">{{ '%.1f'|format(totals.ft_pct) }}</td>
+        <td class="px-4 py-2 text-center text-sm">{% if totals.ft_attempts %}{{ '%.1f'|format(totals.ft_pct) }}{% else %}—{% endif %}</td>
         {% if include_total %}<td class="px-4 py-2 text-center text-sm">{{ totals.total_shots }}</td>{% endif %}
       </tr>
     </tfoot>
   </table>
 </div>
+
 {% endblock %}
+
