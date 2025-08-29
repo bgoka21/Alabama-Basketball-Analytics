@@ -3571,10 +3571,8 @@ def inject_last_stats_update():
 @login_required
 def players_list():
     season_id = request.args.get('season_id', type=int)
-    seasons = Season.query.order_by(Season.id.desc()).all()
-    
-    if not season_id and seasons:
-        season_id = seasons[0].id
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    season_id = season_id or (seasons[0].id if seasons else None)
 
     import re
     def sort_key(name):
@@ -3591,8 +3589,6 @@ def players_list():
         
     return render_template('admin/players.html',
                            players=players,
-                           seasons=seasons,
-                           selected_season=season_id,
                            active_page='players')
 
 
