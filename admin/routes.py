@@ -4005,9 +4005,12 @@ def nba100_scores():
 def team_totals():
     """Aggregate all PlayerStats for a given season."""
     season_id = request.args.get('season_id', type=int)
-    seasons = Season.query.order_by(Season.id.desc()).all()
-    if not season_id and seasons:
-        season_id = seasons[0].id
+    season_query = Season.query.order_by(Season.start_date.desc())
+    seasons = season_query.all()
+    if not season_id:
+        first_season = season_query.first()
+        if first_season:
+            season_id = first_season.id
     practice_categories = [
         r[0] for r in db.session.query(Practice.category).distinct().order_by(Practice.category).all()
     ]
