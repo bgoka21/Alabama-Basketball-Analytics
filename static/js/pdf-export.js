@@ -29,6 +29,9 @@
 
     try {
       await html2pdf().set(opt).from(root).save();
+    } catch (err) {
+      console.error(err);
+      alert('PDF export failed');
     } finally {
       document.body.classList.remove('print-capture');
     }
