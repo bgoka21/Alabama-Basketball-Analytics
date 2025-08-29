@@ -10,6 +10,7 @@ import traceback
 import zipfile
 import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
+import pdfkit
 
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -3836,71 +3837,9 @@ def ft_daily():
     sort = request.args.get('sort', 'attempts')
     dir_ = request.args.get('dir', 'desc')
     fmt = request.args.get('format', 'html')
-
-    valid_sorts = {'makes', 'attempts', 'pct', 'name'}
-    if include_total:
-        valid_sorts.add('total')
-    if sort not in valid_sorts:
-        sort = 'attempts'
-    if sort == 'total' and not include_total:
-        sort = 'attempts'
-
-    seasons = Season.query.order_by(Season.id.desc()).all()
-    season_id = seasons[0].id if seasons else None
-    roster_entries = Roster.query.filter_by(season_id=season_id).all() if season_id else []
-
-    ft_sq = (
-        db.session.query(
-            SkillEntry.player_id.label('player_id'),
-            func.coalesce(func.sum(SkillEntry.makes), 0).label('makes'),
-            func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
-        )
-        .filter(SkillEntry.shot_class == 'ft', SkillEntry.date == selected_date)
-        .group_by(SkillEntry.player_id)
-    ).subquery()
-    ft_rows = {r.player_id: r for r in db.session.query(ft_sq)}
-
-    total_rows = {}
-    if include_total:
-        total_sq = (
-            db.session.query(
-                SkillEntry.player_id.label('player_id'),
-                func.coalesce(func.sum(SkillEntry.attempts), 0).label('total'),
-            )
-            .filter(SkillEntry.date == selected_date, SkillEntry.shot_class != None)
-            .group_by(SkillEntry.player_id)
-        ).subquery()
-        total_rows = {r.player_id: r.total for r in db.session.query(total_sq)}
-
-    rows = []
-    for r in roster_entries:
-        ft = ft_rows.get(r.id)
-        makes = ft.makes if ft else 0
-        attempts = ft.attempts if ft else 0
-        row = {
-            'player_id': r.id,
-            'player_name': r.player_name,
-            'ft_makes': makes,
-            'ft_attempts': attempts,
-            'ft_pct': (makes / attempts * 100) if attempts else 0.0,
-        }
-        if include_total:
-            row['total_shots'] = total_rows.get(r.id, 0)
-        rows.append(row)
-
-    has_entries = any(r['ft_attempts'] > 0 for r in rows)
-    if hide_zeros:
-        rows = [r for r in rows if r['ft_attempts'] > 0]
-
-    rows.sort(key=_ft_sort_key(sort), reverse=(dir_ == 'desc'))
-
-    totals = {
-        'ft_makes': sum(r['ft_makes'] for r in rows),
-        'ft_attempts': sum(r['ft_attempts'] for r in rows),
-    }
-    totals['ft_pct'] = (totals['ft_makes'] / totals['ft_attempts'] * 100) if totals['ft_attempts'] else 0.0
-    if include_total:
-        totals['total_shots'] = sum(r.get('total_shots', 0) for r in rows)
+    rows, totals, has_entries, sort = _ft_daily_data(
+        selected_date, include_total, hide_zeros, sort, dir_
+    )
 
     if fmt == 'csv':
         output = io.StringIO()
@@ -3930,8 +3869,49 @@ def ft_daily():
         rows=rows,
         totals=totals,
         has_entries=has_entries,
-        active_page='ft_daily'
+        active_page='ft_daily',
+        print_mode=False
     )
+
+
+@admin_bp.route('/ft-daily.pdf', methods=['GET'])
+@admin_bp.route('/admin/ft-daily.pdf', methods=['GET'])
+@login_required
+def ft_daily_pdf():
+    """Return a PDF version of the ft_daily report."""
+    from app import PDFKIT_CONFIG, PDF_OPTIONS
+    if not PDFKIT_CONFIG:
+        abort(501)
+
+    selected_date = _parse_date_param(request.args.get('date'))
+    include_total = request.args.get('include_total', type=int, default=0) == 1
+    hide_zeros = request.args.get('hide_zeros', type=int, default=0) == 1
+    sort = request.args.get('sort', 'attempts')
+    dir_ = request.args.get('dir', 'desc')
+
+    rows, totals, has_entries, sort = _ft_daily_data(
+        selected_date, include_total, hide_zeros, sort, dir_
+    )
+
+    html = render_template(
+        'admin/ft_daily.html',
+        selected_date=selected_date,
+        include_total=include_total,
+        hide_zeros=hide_zeros,
+        sort=sort,
+        dir=dir_,
+        rows=rows,
+        totals=totals,
+        has_entries=has_entries,
+        active_page='ft_daily',
+        print_mode=True,
+    )
+
+    pdf = pdfkit.from_string(html, False, options=PDF_OPTIONS, configuration=PDFKIT_CONFIG)
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=ft-daily-{selected_date}.pdf'
+    return response
 
 
 @admin_bp.route('/nba100_scores')
@@ -4905,3 +4885,75 @@ def _ft_sort_key(sort):
         'name': lambda r: r['player_name'].lower(),
     }
     return mapping.get(sort, lambda r: r['ft_attempts'])
+
+
+def _ft_daily_data(selected_date, include_total, hide_zeros, sort, dir_):
+    """Collect rows and totals for the ft_daily views."""
+    valid_sorts = {'makes', 'attempts', 'pct', 'name'}
+    if include_total:
+        valid_sorts.add('total')
+    if sort not in valid_sorts:
+        sort = 'attempts'
+    if sort == 'total' and not include_total:
+        sort = 'attempts'
+
+    seasons = Season.query.order_by(Season.id.desc()).all()
+    season_id = seasons[0].id if seasons else None
+    roster_entries = Roster.query.filter_by(season_id=season_id).all() if season_id else []
+
+    ft_sq = (
+        db.session.query(
+            SkillEntry.player_id.label('player_id'),
+            func.coalesce(func.sum(SkillEntry.makes), 0).label('makes'),
+            func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
+        )
+        .filter(SkillEntry.shot_class == 'ft', SkillEntry.date == selected_date)
+        .group_by(SkillEntry.player_id)
+    ).subquery()
+    ft_rows = {r.player_id: r for r in db.session.query(ft_sq)}
+
+    total_rows = {}
+    if include_total:
+        total_sq = (
+            db.session.query(
+                SkillEntry.player_id.label('player_id'),
+                func.coalesce(func.sum(SkillEntry.attempts), 0).label('total'),
+            )
+            .filter(SkillEntry.date == selected_date, SkillEntry.shot_class != None)
+            .group_by(SkillEntry.player_id)
+        ).subquery()
+        total_rows = {r.player_id: r.total for r in db.session.query(total_sq)}
+
+    rows = []
+    for r in roster_entries:
+        ft = ft_rows.get(r.id)
+        makes = ft.makes if ft else 0
+        attempts = ft.attempts if ft else 0
+        row = {
+            'player_id': r.id,
+            'player_name': r.player_name,
+            'ft_makes': makes,
+            'ft_attempts': attempts,
+            'ft_pct': (makes / attempts * 100) if attempts else 0.0,
+        }
+        if include_total:
+            row['total_shots'] = total_rows.get(r.id, 0)
+        rows.append(row)
+
+    has_entries = any(r['ft_attempts'] > 0 for r in rows)
+    if hide_zeros:
+        rows = [r for r in rows if r['ft_attempts'] > 0]
+
+    rows.sort(key=_ft_sort_key(sort), reverse=(dir_ == 'desc'))
+
+    totals = {
+        'ft_makes': sum(r['ft_makes'] for r in rows),
+        'ft_attempts': sum(r['ft_attempts'] for r in rows),
+    }
+    totals['ft_pct'] = (
+        totals['ft_makes'] / totals['ft_attempts'] * 100
+    ) if totals['ft_attempts'] else 0.0
+    if include_total:
+        totals['total_shots'] = sum(r.get('total_shots', 0) for r in rows)
+
+    return rows, totals, has_entries, sort
