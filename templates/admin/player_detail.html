@@ -11,6 +11,10 @@
 
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
   <h1 class="text-xl sm:text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
+  <button class="no-print btn btn-primary"
+          onclick="exportStatsPDF({ filename: '{{ player_name|replace(" ", "_") }}.pdf' })">
+    Download PDF
+  </button>
   {% if not has_stats %}
     <p class="mb-4 text-yellow-600">No stats found for this player.</p>
   {% endif %}
@@ -54,7 +58,7 @@
     </form>
   </div>
 
-  <div class="flex items-center space-x-2 mb-4">
+  <div class="flex items-center space-x-2 mb-4 no-print">
     <a
       href="{{ url_for('admin.player_session_report', player_name=player_name) }}"
       class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -62,10 +66,9 @@
       Compare Sessions
     </a>
   </div>
-
-
+  <div id="print-area">
 <!-- Tab Buttons -->
-<div id="tabButtons" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
+<div id="tabButtons" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4 tab-controls no-print">
     <button
       id="btnSeasonTotals"
       data-tab="season_totals"
@@ -103,7 +106,7 @@
   </div>
 
 <!-- 1) Season Totals -->
-<div id="seasonTotals" class="tab-content block">
+<div id="seasonTotals" class="tab-content block tab-panel">
 
 
   <!-- Row 1: Advanced Shooting Metrics -->
@@ -314,7 +317,7 @@
 
 
 <!-- 2) Game-by-Game / Practice-by-Practice Stats -->
-<div id="gameStats" class="tab-content hidden">
+<div id="gameStats" class="tab-content hidden tab-panel">
   <h2 class="text-lg sm:text-xl font-semibold mb-2">
     {% if mode == 'game' %}
       Game-by-Game Breakdown
@@ -415,7 +418,7 @@
 
 
   <!-- Shot Type Section -->
-  <div id="shotType" class="tab-content hidden">
+  <div id="shotType" class="tab-content hidden tab-panel">
   <div>
   <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Type Overview</h2>
 
@@ -812,11 +815,11 @@
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <!-- 4) Skill Development                                                           -->
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
-<div id="skillDevelopment" class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8">
+<div id="skillDevelopment" class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8 tab-panel">
   {% include 'admin/_skill_development_form.html' %}
   {% include 'admin/_drill_history.html' %}
 </div>  <!-- closes <div id="skillDevelopment"> -->
-
+</div> <!-- /#print-area -->
 </div>  <!-- /.inner container -->
 
 
