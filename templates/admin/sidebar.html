@@ -59,7 +59,7 @@
   </li>
   <li class="nav-item{% if request.endpoint == 'admin.ft_daily' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.ft_daily') }}">
-      FT Daily
+      Daily Free Throws
     </a>
   </li>
   {% set has_team_totals = (view_exists('admin.team_totals') if view_exists is defined else True) %}
