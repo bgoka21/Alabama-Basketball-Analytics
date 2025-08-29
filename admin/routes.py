@@ -8,6 +8,7 @@ import csv
 import re
 import traceback
 import zipfile
+from urllib.parse import urlencode
 import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
 import pdfkit
@@ -3827,7 +3828,6 @@ def skill_totals():
 
 
 @admin_bp.route('/ft-daily', methods=['GET'])
-@admin_bp.route('/admin/ft-daily', methods=['GET'])
 @login_required
 def ft_daily():
     """Display a table of daily free throws with optional totals and CSV export."""
@@ -3859,6 +3859,34 @@ def ft_daily():
         response.headers['Content-Disposition'] = f'attachment; filename=ft-daily-{selected_date}.csv'
         return response
 
+    base_args = {
+        'date': selected_date.strftime('%Y-%m-%d'),
+        'include_total': '1' if include_total else '0',
+        'hide_zeros': '1' if hide_zeros else '0',
+        'sort': sort,
+        'dir': dir_,
+    }
+
+    def _build_url(overrides=None):
+        q = dict(base_args)
+        if overrides:
+            q.update(overrides)
+        return url_for('admin.ft_daily') + '?' + urlencode(q)
+
+    csv_url = _build_url({'format': 'csv'})
+
+    def _next_dir(col):
+        return 'asc' if (sort == col and dir_ == 'desc') else 'desc'
+
+    sort_urls = {
+        'name': _build_url({'sort': 'name', 'dir': _next_dir('name')}),
+        'makes': _build_url({'sort': 'makes', 'dir': _next_dir('makes')}),
+        'attempts': _build_url({'sort': 'attempts', 'dir': _next_dir('attempts')}),
+        'pct': _build_url({'sort': 'pct', 'dir': _next_dir('pct')}),
+    }
+    if include_total:
+        sort_urls['total'] = _build_url({'sort': 'total', 'dir': _next_dir('total')})
+
     return render_template(
         'admin/ft_daily.html',
         selected_date=selected_date,
@@ -3869,13 +3897,14 @@ def ft_daily():
         rows=rows,
         totals=totals,
         has_entries=has_entries,
+        csv_url=csv_url,
+        sort_urls=sort_urls,
         active_page='ft_daily',
         print_mode=False
     )
 
 
 @admin_bp.route('/ft-daily.pdf', methods=['GET'])
-@admin_bp.route('/admin/ft-daily.pdf', methods=['GET'])
 @login_required
 def ft_daily_pdf():
     """Return a PDF version of the ft_daily report."""
