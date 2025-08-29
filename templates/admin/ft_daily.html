@@ -25,7 +25,7 @@
     </div>
     {% if not print_mode %}
     <div class="space-x-2 no-print">
-      <a href="{{ url_for('admin.ft_daily', **request.args.to_dict(), format='csv') }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
+      <a href="{{ csv_url }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
       <button type="button" onclick="window.print()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">Print / Save PDF</button>
     </div>
     {% endif %}
@@ -72,35 +72,29 @@
   {% endif %}
 </div>
 
-{% set args = request.args.to_dict() %}
 {% if has_entries %}
 <div class="overflow-x-auto">
   <table class="w-full table-auto border border-gray-200 rounded-md border-collapse">
     <thead>
-      <tr class="bg-gray-200">
-        <th class="px-4 py-2 text-left text-sm font-medium">
-          {% set new_dir = 'asc' if sort != 'name' else ('desc' if dir == 'asc' else 'asc') %}
-          <a href="{{ url_for('admin.ft_daily', **args, sort='name', dir=new_dir) }}" class="inline-flex items-center">Player{% if sort == 'name' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
-        </th>
-        <th class="px-4 py-2 text-center text-sm font-medium">
-          {% set new_dir = 'asc' if sort != 'makes' else ('desc' if dir == 'asc' else 'asc') %}
-          <a href="{{ url_for('admin.ft_daily', **args, sort='makes', dir=new_dir) }}" class="inline-flex items-center">FT Makes{% if sort == 'makes' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
-        </th>
-        <th class="px-4 py-2 text-center text-sm font-medium">
-          {% set new_dir = 'asc' if sort != 'attempts' else ('desc' if dir == 'asc' else 'asc') %}
-          <a href="{{ url_for('admin.ft_daily', **args, sort='attempts', dir=new_dir) }}" class="inline-flex items-center">FT Attempts{% if sort == 'attempts' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
-        </th>
-        <th class="px-4 py-2 text-center text-sm font-medium">
-          {% set new_dir = 'asc' if sort != 'pct' else ('desc' if dir == 'asc' else 'asc') %}
-          <a href="{{ url_for('admin.ft_daily', **args, sort='pct', dir=new_dir) }}" class="inline-flex items-center">FT %{% if sort == 'pct' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
-        </th>
-        {% if include_total %}
-        <th class="px-4 py-2 text-center text-sm font-medium">
-          {% set new_dir = 'asc' if sort != 'total' else ('desc' if dir == 'asc' else 'asc') %}
-          <a href="{{ url_for('admin.ft_daily', **args, sort='total', dir=new_dir) }}" class="inline-flex items-center">Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
-        </th>
-        {% endif %}
-      </tr>
+        <tr class="bg-gray-200">
+          <th class="px-4 py-2 text-left text-sm font-medium">
+            <a href="{{ sort_urls.name }}" class="inline-flex items-center">Player{% if sort == 'name' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.makes }}" class="inline-flex items-center">FT Makes{% if sort == 'makes' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.attempts }}" class="inline-flex items-center">FT Attempts{% if sort == 'attempts' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.pct }}" class="inline-flex items-center">FT %{% if sort == 'pct' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          {% if include_total %}
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.total }}" class="inline-flex items-center">Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          {% endif %}
+        </tr>
     </thead>
     <tbody>
       {% for row in rows %}
