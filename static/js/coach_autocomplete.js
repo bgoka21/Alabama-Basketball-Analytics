@@ -1,94 +1,101 @@
-(function(){
+(function () {
+  const MAX = 10;
   const select = document.getElementById('coach-search');
-  if(!select) return;
-  const form = select.closest('form');
-  const badgeContainer = document.getElementById('coach-badges');
-  const filterInput = document.getElementById('coach-filter');
-  const max = 5;
+  const filter = document.getElementById('coach-filter');
+  const holder = document.getElementById('coach-selected');  // container for badges
+  const hiddenHolder = document.getElementById('coach-hidden'); // where hidden inputs go
+  const counter = document.getElementById('coach-count'); // a small counter element (add to template if missing)
 
-  function updateHiddenInputs(){
-    form.querySelectorAll('input[type="hidden"][name="coaches"]').forEach(el=>el.remove());
-    Array.from(select.selectedOptions).forEach(opt=>{
-      const h=document.createElement('input');
-      h.type='hidden';
-      h.name='coaches';
-      h.value=opt.value;
-      form.appendChild(h);
+  function updateCounter() {
+    const count = holder.querySelectorAll('[data-coach-badge]').length;
+    if (counter) counter.textContent = `${count}/${MAX} selected`;
+  }
+
+  function disableIfAtMax() {
+    const count = holder.querySelectorAll('[data-coach-badge]').length;
+    const disable = count >= MAX;
+    [...select.options].forEach(opt => {
+      if (!opt.selected) opt.disabled = disable;
     });
   }
 
-  function updateDisabled(){
-    const selected = Array.from(select.selectedOptions);
-    const disable = selected.length >= max;
-    Array.from(select.options).forEach(opt=>{
-      if(!opt.selected){
-        opt.disabled = disable;
-      }
+  function addCoach(name, value) {
+    // prevent dupes
+    const key = value.toLowerCase();
+    if (holder.querySelector(`[data-coach-badge="${key}"]`)) return;
+
+    // create badge
+    const badge = document.createElement('span');
+    badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
+    badge.setAttribute('data-coach-badge', key);
+    badge.textContent = name;
+
+    // remove button
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'ml-1 text-xs';
+    x.innerHTML = '×';
+    x.addEventListener('click', () => {
+      badge.remove();
+      const hid = hiddenHolder.querySelector(`input[type="hidden"][value="${value}"]`);
+      if (hid) hid.remove();
+      // also unselect option
+      [...select.options].forEach(o => { if ((o.value || o.text) === value) o.selected = false; });
+      disableIfAtMax();
+      updateCounter();
+      updateCompareButton();
+    });
+
+    badge.appendChild(x);
+    holder.appendChild(badge);
+
+    // hidden input for form submit
+    const hid = document.createElement('input');
+    hid.type = 'hidden';
+    hid.name = 'coaches';
+    hid.value = value;
+    hiddenHolder.appendChild(hid);
+
+    disableIfAtMax();
+    updateCounter();
+    updateCompareButton();
+  }
+
+  function updateCompareButton() {
+    const btn = document.getElementById('compare-btn');
+    if (!btn) return;
+    const count = holder.querySelectorAll('[data-coach-badge]').length;
+    btn.disabled = count < 2 || count > MAX;
+  }
+
+  // select change
+  if (select) {
+    select.addEventListener('change', () => {
+      const count = holder.querySelectorAll('[data-coach-badge]').length;
+      if (count >= MAX) return;
+      const opt = select.options[select.selectedIndex];
+      if (!opt) return;
+      const name = opt.text.trim();
+      const value = (opt.value || name).trim();
+      opt.selected = true;
+      addCoach(name, value);
     });
   }
 
-  function renderBadges(){
-    if(!badgeContainer) return;
-    badgeContainer.innerHTML='';
-    Array.from(select.selectedOptions).forEach(opt=>{
-      const span=document.createElement('span');
-      span.className='flex items-center bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs';
-      span.textContent=opt.value;
-      const btn=document.createElement('button');
-      btn.type='button';
-      btn.className='ml-1 text-blue-500 hover:text-blue-700';
-      btn.setAttribute('data-value', opt.value);
-      btn.innerHTML='&times;';
-      span.appendChild(btn);
-      badgeContainer.appendChild(span);
-    });
-  }
-
-  select.addEventListener('change', ()=>{
-    updateHiddenInputs();
-    updateDisabled();
-    renderBadges();
-  });
-
-  if(badgeContainer){
-    badgeContainer.addEventListener('click', e=>{
-      if(e.target.tagName==='BUTTON'){
-        const val=e.target.getAttribute('data-value');
-        Array.from(select.options).forEach(opt=>{
-          if(opt.value===val){
-            opt.selected=false;
-          }
-        });
-        updateHiddenInputs();
-        updateDisabled();
-        renderBadges();
-      }
-    });
-  }
-
-  if(filterInput){
-    filterInput.addEventListener('input', ()=>{
-      const q=filterInput.value.toLowerCase();
-      Array.from(select.options).forEach(opt=>{
-        opt.hidden = !opt.value.toLowerCase().includes(q);
+  // filter typing
+  if (filter && select) {
+    filter.addEventListener('input', () => {
+      const q = filter.value.toLowerCase();
+      [...select.options].forEach(o => {
+        const show = (o.text || '').toLowerCase().includes(q);
+        o.style.display = show ? '' : 'none';
       });
     });
   }
 
-  const initial = select.getAttribute('data-selected');
-  if(initial){
-    try{
-      const arr=JSON.parse(initial);
-      Array.from(select.options).forEach(opt=>{
-        if(arr.includes(opt.value)){
-          opt.selected=true;
-        }
-      });
-    }catch(e){}
-  }
-
-  updateHiddenInputs();
-  updateDisabled();
-  renderBadges();
+  // init
+  updateCounter();
+  disableIfAtMax();
+  updateCompareButton();
 })();
 

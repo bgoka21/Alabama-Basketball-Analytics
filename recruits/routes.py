@@ -567,47 +567,63 @@ def coach_list():
 
 @recruits_bp.route('/money/compare', methods=['GET'])
 def money_compare():
-    """Compare projected/actual money totals for up to five coaches.
+    """Compare projected/actual money totals for up to ten coaches."""
 
-    Coaches are provided via repeated ``coaches`` query parameters.  If more
-    than five are supplied the list is truncated and a warning is flashed so
-    users know only the first five were considered.
-    """
-    # coach multi-select via ?coaches=Nate+Oats&coaches=Bruce+Pearl ...
+    # --- START PATCH: selection cap & stable ordering ---
+    selected = request.args.getlist('coaches')  # may contain mixed case & duplicates
+    # Normalize, de-dupe preserving order
+    seen = set()
+    selected = [c for c in selected if not (c.lower() in seen or seen.add(c.lower()))]
+
+    MAX_COMPARE = 10
+    if len(selected) > MAX_COMPARE:
+        selected = selected[:MAX_COMPARE]
+        flash(f"You can compare up to {MAX_COMPARE} coaches at a time.", "warning")
+
+    # Lowercase set for filtering
+    selected_lower = [c.lower() for c in selected]
+
+    # Query aggregates for just these coaches (case-insensitive)
     from app.models.prospect import Prospect
-    selected = request.args.getlist('coaches')
-    if len(selected) > 5:
-        selected = selected[:5]
-        flash(
-            'You can compare up to five coaches at a time; extra selections were ignored.',
-            'warning',
+    q = (
+        db.session.query(
+            Prospect.coach.label('coach'),
+            func.count(Prospect.id).label('recruits'),
+            func.sum(func.coalesce(Prospect.projected_money, 0)).label('proj_sum'),
+            func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
+            func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
         )
+        .filter(func.lower(Prospect.coach).in_(selected_lower))
+        .group_by(Prospect.coach)
+    )
+
+    rows = q.all()
+
+    # Index by lowercase coach for quick lookup
+    by_coach = {r.coach.lower(): r for r in rows}
+
+    # Build comps in the exact order user selected
+    comps = []
+    for name in selected:
+        r = by_coach.get(name.lower())
+        if not r:
+            continue
+        avg_net = (r.net_sum / r.recruits) if r.recruits else 0
+        comps.append({
+            "coach": r.coach,
+            "recruits": int(r.recruits or 0),
+            "proj_sum": float(r.proj_sum or 0),
+            "act_sum": float(r.act_sum or 0),
+            "net_sum": float(r.net_sum or 0),
+            "avg_net": float(avg_net or 0),
+        })
+    # --- END PATCH ---
+
     coach_list = _get_coach_names()
 
-    # aggregate for selected coaches
-    comps = []
-    if selected:
-        selected_lower = [s.lower() for s in selected]
-        q = (db.session.query(
-                Prospect.coach.label('coach'),
-                func.count(Prospect.id).label('recruits'),
-                func.sum(func.coalesce(Prospect.projected_money,0)).label('proj_sum'),
-                func.sum(func.coalesce(Prospect.actual_money,0)).label('act_sum'),
-                func.sum(func.coalesce(Prospect.net,0)).label('net_sum'),
-             )
-             .filter(func.lower(Prospect.coach).in_(selected_lower))
-             .group_by(Prospect.coach))
-        for r in q.all():
-            comps.append({
-                "coach": r.coach,
-                "recruits": int(r.recruits or 0),
-                "proj_sum": float(r.proj_sum or 0),
-                "act_sum": float(r.act_sum or 0),
-                "net_sum": float(r.net_sum or 0),
-                "avg_net": float((r.net_sum or 0) / (r.recruits or 1)),
-            })
-
-    return render_template('recruits/money_compare.html',
-                           coaches=coach_list,
-                           selected=selected,
-                           comps=comps)
+    return render_template(
+        'recruits/money_compare.html',
+        coaches=coach_list,
+        selected=selected,
+        comps=comps,
+    )

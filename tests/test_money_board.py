@@ -76,7 +76,7 @@ def test_money_board_has_coach_selector(client, app):
     assert sel is not None
     assert sel.has_attr('multiple')
     assert soup.find('input', id='coach-filter') is not None
-    assert soup.find(id='coach-badges') is not None
+    assert soup.find(id='coach-selected') is not None
     compare_btn = soup.find('button', string=lambda s: s and 'Compare' in s)
     assert compare_btn is not None
 
@@ -98,19 +98,19 @@ def test_money_compare_has_search_and_badge_container(client):
     rv = client.get('/recruits/money/compare')
     soup = BeautifulSoup(rv.data, 'html.parser')
     assert soup.find('input', id='coach-filter') is not None
-    assert soup.find(id='coach-badges') is not None
+    assert soup.find(id='coach-selected') is not None
 
 
 def test_money_compare_limit(client):
-    qs = '&'.join(f'coaches=c{i}' for i in range(6))
+    qs = '&'.join(f'coaches=c{i}' for i in range(11))
     rv = client.get(f'/recruits/money/compare?{qs}')
     assert rv.status_code == 200
     import json
     html = rv.data.decode()
     val = html.split('data-selected="', 1)[1].split('">', 1)[0]
     selected = json.loads(val)
-    assert len(selected) == 5
-    assert b'extra selections were ignored' in rv.data
+    assert len(selected) == 10
+    assert b'up to 10 coaches' in rv.data
 
 
 def test_money_compare_aggregates(client, app):
