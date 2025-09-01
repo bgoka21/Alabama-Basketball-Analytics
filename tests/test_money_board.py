@@ -147,3 +147,28 @@ def test_money_compare_aggregates(client, app):
     cards = soup.select('div.p-4.rounded-xl.border')
     assert len(cards) == 2
 
+
+def test_money_board_redirects_to_compare(client, app):
+    """Selecting coaches on /recruits/money redirects to the compare view."""
+    from app.models.prospect import Prospect
+
+    with app.app_context():
+        db.session.add_all([
+            Prospect(coach='CoachA', player='A', year=2024),
+            Prospect(coach='CoachB', player='B', year=2024),
+        ])
+        db.session.commit()
+
+    rv = client.get('/recruits/money?coaches=CoachA&coaches=CoachB')
+    assert rv.status_code == 302
+    assert '/recruits/money/compare' in rv.location
+    assert 'coaches=CoachA' in rv.location
+    assert 'coaches=CoachB' in rv.location
+
+    # Follow redirect and ensure selected coaches are displayed
+    rv2 = client.get(rv.location)
+    assert rv2.status_code == 200
+    html = rv2.data.decode()
+    assert 'CoachA' in html
+    assert 'CoachB' in html
+
