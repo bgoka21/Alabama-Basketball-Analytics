@@ -401,6 +401,10 @@ def money_board():
     Defaults: order by NET desc.
     """
     from app.models.prospect import Prospect
+    # If coaches are provided via query parameters, redirect to compare view
+    selected = request.args.getlist('coaches')
+    if selected:
+        return redirect(url_for('recruits.money_compare', coaches=selected))
     # hide Import button if table has any rows
     has_data = db.session.query(func.count(Prospect.id)).scalar() > 0
     # ---- Filters from querystring ----
