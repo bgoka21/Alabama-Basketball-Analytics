@@ -511,19 +511,34 @@ def money_coach(coach_name):
     """
     from app.models.prospect import Prospect
     # Exact match; if you prefer case-insensitive, use ilike and first()
-    totals = (db.session.query(
-                func.sum(func.coalesce(Prospect.projected_money, 0)).label('proj_sum'),
-                func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
-                func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
-                func.count(Prospect.id).label('recruits'),
-                func.max(Prospect.coach_current_team).label('coach_team'),
-                func.max(Prospect.coach_current_conference).label('coach_conf'),
-             )
-             .filter(Prospect.coach == coach_name)
-             .one())
+    totals_row = (db.session.query(
+                    func.sum(func.coalesce(Prospect.projected_money, 0)).label('proj_sum'),
+                    func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
+                    func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
+                    func.count(Prospect.id).label('recruits'),
+                    func.max(Prospect.coach_current_team).label('coach_team'),
+                    func.max(Prospect.coach_current_conference).label('coach_conf'),
+                 )
+                 .filter(Prospect.coach == coach_name)
+                 .one())
 
-    if totals.recruits == 0:
+    if totals_row.recruits == 0:
         abort(404)
+
+    coach_summary = {
+        "coach": coach_name,
+        "coach_team": totals_row.coach_team or "",
+        "coach_conf": totals_row.coach_conf or "",
+        "recruits": int(totals_row.recruits or 0),
+        "proj_sum": float(totals_row.proj_sum or 0),
+        "act_sum": float(totals_row.act_sum or 0),
+        "net_sum": float(totals_row.net_sum or 0),
+        "avg_net": float((totals_row.net_sum or 0) / totals_row.recruits) if totals_row.recruits else 0.0,
+    }
+
+    # --- START PATCH: sanity assertions (optional, remove in prod) ---
+    assert 'team' not in coach_summary, "coach_summary must not contain a 'team' key"
+    # --- END PATCH ---
 
     by_year = (db.session.query(
                     Prospect.year,
@@ -545,9 +560,9 @@ def money_coach(coach_name):
     return render_template(
         'recruits/coach_money.html',
         coach_name=coach_name,
-        totals=totals,
+        coach_summary=coach_summary,
         by_year=by_year,
-        players=players
+        players=players,
     )
 
 

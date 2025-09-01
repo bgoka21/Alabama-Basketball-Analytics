@@ -10,7 +10,7 @@ HEADER_SYNONYMS = {
     # core identity
     "coach": ["coach", "coach name"],
     "player": ["player", "prospect", "athlete"],
-    "team": ["team", "school", "program"],
+    "team": ["team", "school", "program", "college"],
     "year": ["year", "recruiting year", "class year"],
     # money
     "projected_money": [
@@ -162,6 +162,15 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
         df = xl.parse(sheet, dtype=str)
         df = normalize_headers(df)
 
+        # --- START PATCH: ensure 'team' exists and is clean ---
+        if "team" not in df.columns:
+            # If the sheet truly has no team info, create an empty column (won't crash drilldown)
+            df["team"] = None
+
+        # Strip whitespace
+        df["team"] = df["team"].fillna("").astype(str).str.strip()
+        # --- END PATCH ---
+
         # Required columns must exist; no auto-fix of Player.1
         required = ["coach", "player", "team"]
         missing = [c for c in required if c not in df.columns]
@@ -231,6 +240,9 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
 
             obj.sheet = sheet
             obj.coach = coach
+            # --- START PATCH: persist player team ---
+            obj.team = (r.get("team") or "").strip() or None
+            # --- END PATCH ---
             obj.coach_current_team = _s(r.get("coach_current_team"))
             obj.coach_current_conference = _s(r.get("coach_current_conference"))
 
