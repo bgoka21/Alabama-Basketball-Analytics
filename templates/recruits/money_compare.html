@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
-  <div class="flex items-center justify-between mb-4">
+  <div class="sticky top-0 z-10 pb-2 mb-4 bg-white dark:bg-gray-800 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
     <h1 class="text-2xl sm:text-3xl font-bold">Compare Coaches</h1>
     <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">← Back to Money Board</a>
   </div>
 
-  <form method="get" action="{{ url_for('recruits.money_compare') }}" class="mb-4 space-y-3">
+  <form method="get" action="{{ url_for('recruits.money_compare') }}" class="space-y-4">
     <input type="hidden" name="year_min" value="{{ year_min if year_min is not none else '' }}">
     <input type="hidden" name="year_max" value="{{ year_max if year_max is not none else '' }}">
     <input type="hidden" name="sheet" value="{{ sheet or '' }}">
@@ -14,16 +14,18 @@
     <input type="hidden" name="min_recruits" value="{{ min_recruits if min_recruits is not none else '' }}">
     <input type="hidden" name="sort" value="{{ sort or '' }}">
 
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2 flex-wrap">
-        <input id="coach-filter" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
-        <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <input id="coach-filter" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
+      <div class="flex items-center gap-2 text-sm text-gray-500">
+        <span id="coach-count">0/10 selected</span>
+        <button type="button" id="coach-clear" class="hover:underline">Clear all</button>
       </div>
-      <div class="text-xs text-gray-500">Select up to <b>ten</b> coaches to compare</div>
     </div>
+    <div class="text-xs text-gray-500 text-right">Select up to <b>ten</b> coaches to compare</div>
+    <div class="text-center text-xs uppercase tracking-wide text-gray-500">Select Coaches</div>
 
-    <div class="flex items-start gap-3">
-      <select id="coach-search" name="coaches" multiple size="10" class="select select-bordered w-full max-w-md">
+    <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+      <select id="coach-search" name="coaches" multiple size="10" class="select select-bordered w-full sm:max-w-md">
         {% for coach in coaches %}
           <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
         {% endfor %}
@@ -32,10 +34,12 @@
       <div class="flex-1">
         <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
         <div id="coach-hidden" class="hidden"></div>
+        <p class="mt-2 text-sm text-gray-500">Select coaches and click Compare.</p>
       </div>
     </div>
 
-    <div class="flex justify-end">
+    <div class="flex justify-end items-center gap-4">
+      <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}">Download CSV</a>
       <button id="compare-btn" type="submit" class="btn btn-primary">Compare</button>
     </div>
   </form>
@@ -43,19 +47,6 @@
   <noscript>
     <p class="mt-2 text-xs text-amber-600">Tip: Hold Ctrl/Cmd to select multiple coaches, then click Compare.</p>
   </noscript>
-
-  <!-- CSV Download -->
-  <div class="flex justify-end mb-3">
-    <a
-      class="btn btn-outline btn-sm"
-      href="{{ url_for('recruits.money_compare_csv',
-                       coaches=selected,
-                       year_min=year_min, year_max=year_max,
-                       sheet=sheet, conf=conf, min_recruits=min_recruits) }}"
-    >
-      Download CSV
-    </a>
-  </div>
 
   {% if comps %}
   <!-- --- START PATCH: Responsive cards grid --- -->

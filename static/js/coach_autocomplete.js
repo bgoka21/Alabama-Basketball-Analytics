@@ -5,6 +5,8 @@
   const holder = document.getElementById('coach-selected');
   const counter = document.getElementById('coach-count');
   const btn = document.getElementById('compare-btn');
+  const clearBtn = document.getElementById('coach-clear');
+  const csvLink = document.getElementById('compare-csv');
   if (!select) return;
 
   function selectedValues() {
@@ -30,6 +32,14 @@
         opt.disabled = false;
       }
     });
+  }
+
+  function updateCsvLink() {
+    if (!csvLink) return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete('coaches');
+    selectedValues().forEach(v => params.append('coaches', v));
+    csvLink.href = csvLink.getAttribute('href').split('?')[0] + '?' + params.toString();
   }
 
   function refreshBadges() {
@@ -60,6 +70,7 @@
         updateCounter();
         updateButtonState();
         enforceMax();
+        updateCsvLink();
       });
       badge.appendChild(x);
       holder.appendChild(badge);
@@ -80,10 +91,27 @@
     updateCounter();
     updateButtonState();
     enforceMax();
+    updateCsvLink();
   });
 
   if (filter) {
     filter.addEventListener('input', applyFilter);
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      Array.from(select.options).forEach(opt => {
+        opt.selected = false;
+        opt.disabled = false;
+      });
+      if (filter) filter.value = '';
+      applyFilter();
+      refreshBadges();
+      updateCounter();
+      updateButtonState();
+      enforceMax();
+      updateCsvLink();
+    });
   }
 
   // initial state
@@ -91,5 +119,6 @@
   updateCounter();
   updateButtonState();
   enforceMax();
+  updateCsvLink();
   applyFilter();
 })();
