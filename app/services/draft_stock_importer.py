@@ -5,6 +5,96 @@ from app import db
 from app.models.prospect import Prospect
 from app.utils.measurements import parse_feet_inches
 
+# --- START PATCH: header normalization & pick parsing helpers ---
+HEADER_SYNONYMS = {
+    # core identity
+    "coach": ["coach", "coach name"],
+    "player": ["player", "prospect", "athlete"],
+    "team": ["team", "school", "program"],
+    "year": ["year", "recruiting year", "class year"],
+    # money
+    "projected_money": [
+        "projected money",
+        "proj money",
+        "projected $",
+        "proj $",
+        "projected_amount",
+    ],
+    "actual_money": [
+        "actual money",
+        "act money",
+        "actual $",
+        "act $",
+        "actual_amount",
+    ],
+    "net": ["net", "difference", "net $"],
+    # picks
+    "projected_pick_raw": [
+        "projected pick",
+        "proj pick",
+        "projected draft pick",
+        "proj draft pick",
+        "projected_pick",
+    ],
+    "actual_pick_raw": [
+        "actual pick",
+        "draft pick",
+        "actual draft pick",
+        "actual_pick",
+    ],
+    # optional coach context
+    "coach_current_team": [
+        "coach current team",
+        "coach team",
+        "coach_team",
+        "current team",
+    ],
+    "coach_current_conference": [
+        "coach current conference",
+        "coach conference",
+        "coach_conf",
+        "current conference",
+    ],
+}
+
+
+def _normalize_col(s: str) -> str:
+    return re.sub(r"[\s_]+", " ", (s or "")).strip().lower()
+
+
+def normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename df columns to canonical names defined in HEADER_SYNONYMS when possible."""
+    col_map = {}
+    inv = {}
+    for canon, alts in HEADER_SYNONYMS.items():
+        for a in alts:
+            inv[_normalize_col(a)] = canon
+    for c in df.columns:
+        key = _normalize_col(str(c))
+        col_map[c] = inv.get(key, c)  # fallback to original if no match
+    return df.rename(columns=col_map)
+
+
+def parse_pick_to_int(raw: str) -> int | None:
+    """Extract the first integer pick from a raw string. Returns None for UDFA/blank/unparseable."""
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    low = s.lower()
+    if low in {"udfa", "ufa", "n/a", "na", "-", "undrafted"}:
+        return None
+    # common formats: "20", "20th", "Round 2, Pick 45", "No. 12", "Pick #30"
+    m = re.search(r"(\d+)", s)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+# --- END PATCH ---
+
 
 def _s(x):
     """Safe string: return '' for None/NaN, else stripped string."""
@@ -69,11 +159,11 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
     per_sheet = []
 
     for sheet in xl.sheet_names:
-        df = xl.parse(sheet)
-        df.columns = [str(c).strip() for c in df.columns]
+        df = xl.parse(sheet, dtype=str)
+        df = normalize_headers(df)
 
         # Required columns must exist; no auto-fix of Player.1
-        required = ["Coach", "Player", "Team"]
+        required = ["coach", "player", "team"]
         missing = [c for c in required if c not in df.columns]
         if missing:
             msg = f"Sheet '{sheet}' missing required columns: {missing}."
@@ -82,31 +172,53 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             per_sheet.append({"sheet": sheet, "status": "skipped", "reason": msg})
             continue
 
-        # Coerce numbers and parse measurements
-        for c in ["Projected Money","Actual Money","NET","Age","Year"]:
-            if c in df.columns:
-                df[c] = df[c].apply(_to_num)
+        # strip whitespace across known text fields (if present)
+        for col in ["coach", "player", "team", "coach_current_team", "coach_current_conference"]:
+            if col in df.columns:
+                df[col] = df[col].fillna("").astype(str).str.strip()
 
-        df["height_in"]   = df["Height"].apply(parse_feet_inches)   if "Height"   in df.columns else None
+        # coerce numeric-ish money and year, robustly
+        for col in ["projected_money", "actual_money", "net", "year"]:
+            if col in df.columns:
+                df[col] = (
+                    df[col]
+                    .replace({r"[\$,]": ""}, regex=True)
+                    .apply(lambda v: None if str(v).strip() in {"", "n/a", "na", "-"} else v)
+                )
+                if col == "year":
+                    df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+                else:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df["height_in"] = df["Height"].apply(parse_feet_inches) if "Height" in df.columns else None
         df["wingspan_in"] = df["WingSpan"].apply(parse_feet_inches) if "WingSpan" in df.columns else None
         df["ws_minus_h_in"] = df["wingspan_in"] - df["height_in"]
 
         # Compute NET where missing
-        if "Actual Money" in df.columns and "Projected Money" in df.columns:
-            df["NET"] = df["NET"].where(df["NET"].notna(), df["Actual Money"] - df["Projected Money"])
+        if "actual_money" in df.columns and "projected_money" in df.columns:
+            df["net"] = df["net"].where(df["net"].notna(), df["actual_money"] - df["projected_money"])
 
-        if "Year" in df.columns:
-            df["Year"] = df["Year"].apply(_to_int_or_none)
+        # ensure both pick raw columns exist, even if missing in the sheet
+        for col in ["projected_pick_raw", "actual_pick_raw"]:
+            if col not in df.columns:
+                df[col] = None
+
+        # derive numeric picks
+        df["projected_pick"] = df["projected_pick_raw"].apply(parse_pick_to_int)
+        df["actual_pick"] = df["actual_pick_raw"].apply(parse_pick_to_int)
+
+        if "year" in df.columns:
+            df["year"] = df["year"].apply(_to_int_or_none)
 
         rows = df.to_dict(orient="records")
         total_rows += len(rows)
 
         batch = 0
         for r in rows:
-            coach = _s(r.get("Coach"))
-            player = _s(r.get("Player"))
-            team   = _s(r.get("Team"))
-            year = r.get("Year")
+            coach = _s(r.get("coach"))
+            player = _s(r.get("player"))
+            team = _s(r.get("team"))
+            year = _to_int_or_none(r.get("year"))
 
             if not coach or not player or not team:
                 continue
@@ -119,26 +231,28 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
 
             obj.sheet = sheet
             obj.coach = coach
-            obj.coach_current_team = _s(r.get("Coach Current Team"))
-            obj.coach_current_conference = _s(r.get("Coach Current Conference"))
+            obj.coach_current_team = _s(r.get("coach_current_team"))
+            obj.coach_current_conference = _s(r.get("coach_current_conference"))
 
             obj.player_class = _s(r.get("Class"))
             obj.age = _to_num(r.get("Age"))
             obj.player_conference = _s(r.get("Player Conference"))
 
-            obj.projected_money = _to_num(r.get("Projected Money"))
-            obj.actual_money = _to_num(r.get("Actual Money"))
+            obj.projected_money = _to_num(r.get("projected_money"))
+            obj.actual_money = _to_num(r.get("actual_money"))
             if obj.actual_money is not None and obj.projected_money is not None:
                 obj.net = obj.actual_money - obj.projected_money
             else:
-                obj.net = _to_num(r.get("NET"))
+                obj.net = _to_num(r.get("net"))
 
-            proj_pick_raw = _s(r.get("Projected Pick"))
-            act_pick_raw  = _s(r.get("Actual Pick"))
+            # --- START PATCH: persist pick fields on Prospect ---
+            proj_pick_raw = _s(r.get("projected_pick_raw"))
+            act_pick_raw = _s(r.get("actual_pick_raw"))
             obj.projected_pick_raw = proj_pick_raw or None
-            obj.actual_pick_raw    = act_pick_raw or None
-            obj.projected_pick     = _pick_to_int(proj_pick_raw)
-            obj.actual_pick        = _pick_to_int(act_pick_raw)
+            obj.actual_pick_raw = act_pick_raw or None
+            obj.projected_pick = int(r["projected_pick"]) if pd.notna(r.get("projected_pick")) else None
+            obj.actual_pick = int(r["actual_pick"]) if pd.notna(r.get("actual_pick")) else None
+            # --- END PATCH ---
 
             obj.height_raw = _s(r.get("Height"))
             obj.wingspan_raw = _s(r.get("WingSpan"))
