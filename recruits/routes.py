@@ -24,6 +24,16 @@ from services.circuit_stats import (
 import importlib.util
 from pathlib import Path
 
+# --- START PATCH: imports for workbook manager ---
+import os, json, time
+from datetime import datetime
+from flask import current_app, request, redirect, url_for, flash, send_file
+from werkzeug.utils import secure_filename
+# try to import your importer(s)
+_import_money_board = None
+_import_money_board_alt = None
+# --- END PATCH ---
+
 _fmt_spec = importlib.util.spec_from_file_location(
     "app.utils.formatting", Path(__file__).resolve().parents[1] / "app" / "utils" / "formatting.py"
 )
@@ -33,6 +43,75 @@ _fmt_spec.loader.exec_module(_fmt_module)
 ALLOWED_HEADSHOT_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "svg"}
 UPLOAD_SUBDIR_RECRUITS = "uploads/recruits"
 ALLOWED_EXT = {".xlsx", ".xlsm", ".xls"}
+
+# --- START PATCH: workbook file helpers ---
+ALLOWED_WORKBOOK_EXTS = {'.xlsx', '.xls', '.csv'}
+
+def _money_dir():
+    # store in instance/money_board
+    d = os.path.join(current_app.instance_path, 'money_board')
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def _wb_path():
+    # normalize to a single canonical filename (we'll preserve original in manifest)
+    return os.path.join(_money_dir(), 'money_board.xlsx')
+
+def _manifest_path():
+    return os.path.join(_money_dir(), 'manifest.json')
+
+def _load_manifest():
+    p = _manifest_path()
+    if os.path.exists(p):
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def _save_manifest(data: dict):
+    with open(_manifest_path(), 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def _has_workbook():
+    return os.path.exists(_wb_path())
+
+def _workbook_info():
+    """Return dict with current file info or None if not present."""
+    if not _has_workbook():
+        return None
+    st = os.stat(_wb_path())
+    m = _load_manifest()
+    return {
+        "path": _wb_path(),
+        "original_filename": m.get("original_filename") or os.path.basename(_wb_path()),
+        "size_bytes": st.st_size,
+        "uploaded_at": m.get("uploaded_at") or datetime.fromtimestamp(st.st_mtime).isoformat(timespec='seconds'),
+        "mtime": st.st_mtime,
+    }
+
+def _run_import(file_path: str):
+    """Call whichever importer your project exposes."""
+    global _import_money_board, _import_money_board_alt
+    if _import_money_board is None:
+        try:
+            from app.services.money_board_importer import import_money_board as _import_money_board  # type: ignore
+        except Exception:
+            _import_money_board = None
+    if _import_money_board is not None:
+        return _import_money_board(file_path)
+    if _import_money_board_alt is None:
+        try:
+            from app.services.draft_stock_importer import import_workbook as _import_money_board_alt  # type: ignore
+        except Exception:
+            _import_money_board_alt = None
+    if _import_money_board_alt is not None:
+        return _import_money_board_alt(file_path)
+    # If neither importer exists, just log and return
+    current_app.logger.warning("[Workbook] No money board importer function found.")
+    return None
+# --- END PATCH ---
 
 
 def _allowed_ext(filename: str) -> bool:
@@ -741,3 +820,90 @@ def money_compare_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=money_compare.csv"}
     )
+
+# --- START PATCH: workbook manager routes ---
+
+@recruits_bp.get("/money/workbook")
+def money_workbook():
+    """
+    Manager page: show current workbook info + forms to upload/delete/download.
+    """
+    info = _workbook_info()
+    return render_template("recruits/money_workbook.html", info=info)
+
+
+@recruits_bp.post("/money/workbook/upload")
+def money_workbook_upload():
+    """
+    Upload a replacement workbook and immediately import it.
+    """
+    f = request.files.get("file")
+    if not f or not f.filename:
+        flash("Please choose a file.", "warning")
+        return redirect(url_for("recruits.money_workbook"))
+
+    filename = secure_filename(f.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_WORKBOOK_EXTS:
+        flash("Unsupported file type. Please upload .xlsx, .xls, or .csv", "warning")
+        return redirect(url_for("recruits.money_workbook"))
+
+    # Save to canonical path
+    dest = _wb_path()
+    # write to temp then replace to avoid partial writes
+    tmp = dest + ".tmp"
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    f.save(tmp)
+    os.replace(tmp, dest)
+
+    # Update manifest
+    _save_manifest({
+        "original_filename": filename,
+        "uploaded_at": datetime.now().isoformat(timespec='seconds'),
+    })
+
+    # Run importer
+    try:
+        _run_import(dest)
+        flash(f"Workbook '{filename}' uploaded and imported successfully.", "success")
+    except Exception as e:
+        current_app.logger.exception(f"[Workbook] Import failed: {e}")
+        flash(f"Upload saved, but import failed: {e}", "danger")
+
+    return redirect(url_for("recruits.money_workbook"))
+
+
+@recruits_bp.post("/money/workbook/delete")
+def money_workbook_delete():
+    """
+    Delete the current workbook file (does not modify DB).
+    """
+    if _has_workbook():
+        try:
+            os.remove(_wb_path())
+        except Exception as e:
+            current_app.logger.exception(f"[Workbook] Delete failed: {e}")
+            flash(f"Could not delete file: {e}", "danger")
+            return redirect(url_for("recruits.money_workbook"))
+    # clear manifest too
+    try:
+        if os.path.exists(_manifest_path()):
+            os.remove(_manifest_path())
+    except Exception:
+        pass
+    flash("Workbook file deleted.", "success")
+    return redirect(url_for("recruits.money_workbook"))
+
+
+@recruits_bp.get("/money/workbook/download")
+def money_workbook_download():
+    """
+    Download the current workbook file.
+    """
+    if not _has_workbook():
+        flash("No workbook on file.", "warning")
+        return redirect(url_for("recruits.money_workbook"))
+    info = _workbook_info() or {}
+    as_name = info.get("original_filename") or "money_board.xlsx"
+    return send_file(_wb_path(), as_attachment=True, download_name=as_name)
+# --- END PATCH ---
