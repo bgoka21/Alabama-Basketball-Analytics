@@ -421,6 +421,7 @@ def money_board():
     confs = [c for (c,) in db.session.query(Prospect.coach_current_conference)
                                      .filter(Prospect.coach_current_conference.isnot(None))
                                      .distinct().order_by(Prospect.coach_current_conference).all()]
+    coach_list = _get_coach_names()
 
     # ---- Base query with filters applied BEFORE grouping ----
     base = db.session.query(Prospect)
@@ -491,6 +492,7 @@ def money_board():
         years=years,
         sheets=sheets,
         confs=confs,
+        coach_list=coach_list,
         # echo filters
         f_year_min=year_min, f_year_max=year_max, f_sheet=sheet, f_conf=conf,
         f_min_recruits=min_recruits, f_sort=sort,
