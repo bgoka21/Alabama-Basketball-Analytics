@@ -3,47 +3,46 @@
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl sm:text-3xl font-bold">Compare Coaches</h1>
-    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}">← Back to Money Board</a>
+    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">← Back to Money Board</a>
   </div>
 
-  <form method="get" class="mb-4 flex flex-col gap-3">
-    <!-- --- START PATCH: Sticky header & counter --- -->
-    <div class="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur px-3 py-2 mb-3 border-b border-gray-200 dark:border-gray-800">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2 flex-wrap" id="coach-selected">
-          <!-- badges injected by JS -->
-        </div>
-        <div class="flex items-center gap-3">
-          <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
-          <a href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}" class="text-sm underline">Clear all</a>
-        </div>
-      </div>
-      <!-- hidden inputs live here for form submits -->
-      <div id="coach-hidden" class="hidden"></div>
-      <input type="hidden" name="year_min" value="{{ year_min if year_min is not none else '' }}">
-      <input type="hidden" name="year_max" value="{{ year_max if year_max is not none else '' }}">
-      <input type="hidden" name="sheet" value="{{ sheet or '' }}">
-      <input type="hidden" name="conf" value="{{ conf or '' }}">
-      <input type="hidden" name="min_recruits" value="{{ min_recruits if min_recruits is not none else '' }}">
-    </div>
-    <!-- --- END PATCH --- -->
+  <form method="get" action="{{ url_for('recruits.money_compare') }}" class="mb-4 space-y-3">
+    <input type="hidden" name="year_min" value="{{ year_min if year_min is not none else '' }}">
+    <input type="hidden" name="year_max" value="{{ year_max if year_max is not none else '' }}">
+    <input type="hidden" name="sheet" value="{{ sheet or '' }}">
+    <input type="hidden" name="conf" value="{{ conf or '' }}">
+    <input type="hidden" name="min_recruits" value="{{ min_recruits if min_recruits is not none else '' }}">
+    <input type="hidden" name="sort" value="{{ sort or '' }}">
 
-    <button type="button" id="coach-picker-toggle" class="px-4 py-2 mb-2 border rounded">Select Coaches</button>
-    <div id="coach-picker" class="hidden">
-      <div class="flex-1">
-        <label class="block text-sm mb-1">Select up to ten coaches</label>
-        <input id="coach-filter" type="text" placeholder="Search coaches..." class="w-full border rounded p-2 mb-2" />
-        <ul id="coach-options" class="w-full border rounded p-2 max-h-64 overflow-y-auto" data-selected="{{ selected|tojson }}">
-        {% for c in coaches %}
-          <li data-coach="{{ c }}" class="cursor-pointer px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700">{{ c }}</li>
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <input id="coach-filter" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
+        <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
+      </div>
+      <div class="text-xs text-gray-500">Select up to <b>ten</b> coaches to compare</div>
+    </div>
+
+    <div class="flex items-start gap-3">
+      <select id="coach-search" name="coaches" multiple size="10" class="select select-bordered w-full max-w-md">
+        {% for coach in coaches %}
+          <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
         {% endfor %}
-        </ul>
+      </select>
+
+      <div class="flex-1">
+        <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
+        <div id="coach-hidden" class="hidden"></div>
       </div>
     </div>
+
     <div class="flex justify-end">
-      <button id="compare-btn" class="px-4 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black" disabled>Compare</button>
+      <button id="compare-btn" type="submit" class="btn btn-primary">Compare</button>
     </div>
   </form>
+
+  <noscript>
+    <p class="mt-2 text-xs text-amber-600">Tip: Hold Ctrl/Cmd to select multiple coaches, then click Compare.</p>
+  </noscript>
 
   <!-- CSV Download -->
   <div class="flex justify-end mb-3">
@@ -136,9 +135,4 @@
   {% endif %}
 </div>
 <script src="{{ url_for('static', filename='js/coach_autocomplete.js') }}"></script>
-<script>
-  document.getElementById('coach-picker-toggle').addEventListener('click', function () {
-    document.getElementById('coach-picker').classList.toggle('hidden');
-  });
-</script>
 {% endblock %}

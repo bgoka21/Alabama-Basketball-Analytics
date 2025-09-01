@@ -483,10 +483,6 @@ def money_board():
     Defaults: order by NET desc.
     """
     from app.models.prospect import Prospect
-    # If coaches are provided via query parameters, redirect to compare view
-    selected = request.args.getlist('coaches')
-    if selected:
-        return redirect(url_for('recruits.money_compare', coaches=selected))
     # hide Import button if table has any rows
     has_data = db.session.query(func.count(Prospect.id)).scalar() > 0
     # ---- Filters from querystring ----
@@ -507,7 +503,6 @@ def money_board():
     confs = [c for (c,) in db.session.query(Prospect.coach_current_conference)
                                      .filter(Prospect.coach_current_conference.isnot(None))
                                      .distinct().order_by(Prospect.coach_current_conference).all()]
-    coach_list = _get_coach_names()
 
     # ---- Base query with filters applied BEFORE grouping ----
     base = db.session.query(Prospect)
@@ -578,7 +573,6 @@ def money_board():
         years=years,
         sheets=sheets,
         confs=confs,
-        coaches=coach_list,
         # echo filters
         f_year_min=year_min, f_year_max=year_max, f_sheet=sheet, f_conf=conf,
         f_min_recruits=min_recruits, f_sort=sort,
@@ -687,6 +681,7 @@ def money_compare():
     sheet    = (request.args.get("sheet") or "").strip()
     conf     = (request.args.get("conf") or "").strip()
     min_rec  = request.args.get("min_recruits", type=int)
+    sort     = request.args.get("sort") or ""
 
     filters = []
     if year_min is not None:
@@ -755,7 +750,7 @@ def money_compare():
         selected=selected,
         comps=comps,
         players_by_coach=players_by_coach,
-        year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_rec,
+        year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_rec, sort=sort,
     )
 
 

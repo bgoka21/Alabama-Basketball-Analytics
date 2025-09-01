@@ -64,30 +64,33 @@ def test_money_coach_ok(client):
     assert rv.status_code in (200, 404)
 
 
-def test_money_board_has_coach_selector(client, app):
+def test_money_board_has_compare_link(client, app):
     with app.app_context():
         from app.models.prospect import Prospect
         db.session.add(Prospect(coach='CoachX', player='PX', year=2024))
         db.session.commit()
 
-    rv = client.get('/recruits/money')
+    rv = client.get('/recruits/money?year_min=2020&conf=SEC')
     soup = BeautifulSoup(rv.data, 'html.parser')
-    sel = soup.find('select', id='coach-search')
-    assert sel is not None
-    assert sel.has_attr('multiple')
-    assert soup.find('input', id='coach-filter') is not None
-    assert soup.find(id='coach-selected') is not None
-    compare_btn = soup.find('button', string=lambda s: s and 'Compare' in s)
-    assert compare_btn is not None
+
+    # no coach selector on Money Board
+    assert soup.find('select', id='coach-search') is None
+
+    link = soup.find('a', string=lambda s: s and 'Compare Coaches' in s)
+    assert link is not None
+    href = link['href']
+    assert '/recruits/money/compare' in href
+    assert 'year_min=2020' in href
+    assert 'conf=SEC' in href
 
 
 def test_money_compare_interface(client):
     rv = client.get('/recruits/money/compare')
     assert rv.status_code == 200
     soup = BeautifulSoup(rv.data, 'html.parser')
-    # Coach selector is toggled by a button and renders options in a list
-    assert soup.find(id='coach-picker-toggle') is not None
-    assert soup.find(id='coach-options') is not None
+    sel = soup.find('select', id='coach-search')
+    assert sel is not None
+    assert sel.has_attr('multiple')
 
     rv2 = client.get('/recruits/coach_list')
     assert rv2.status_code == 200
@@ -101,26 +104,21 @@ def test_money_compare_has_search_and_badge_container(client):
     assert soup.find(id='coach-selected') is not None
 
 
-def test_money_compare_limit(client):
+def test_money_compare_limit(client, app):
+    with app.app_context():
+        from app.models.prospect import Prospect
+        db.session.add_all([Prospect(coach=f'c{i}', player=f'p{i}', year=2024) for i in range(11)])
+        db.session.commit()
+
     qs = '&'.join(f'coaches=c{i}' for i in range(11))
     rv = client.get(f'/recruits/money/compare?{qs}')
     assert rv.status_code == 200
     html = rv.data.decode()
     soup = BeautifulSoup(html, 'html.parser')
-    # Selected coaches are represented either as hidden inputs or badges.
-    selected_inputs = soup.select('input[name="coaches"]')
-    badges = soup.select('#coach-selected .badge')
-    if selected_inputs:
-        count = len(selected_inputs)
-    elif badges:
-        count = len(badges)
-    else:
-        # Fallback for older markup that exposes selections via data-selected
-        import json
-        val = html.split('data-selected="', 1)[1].split('">', 1)[0]
-        count = len(json.loads(val))
+    selected_opts = soup.select('select[name="coaches"] option[selected]')
+    count = len(selected_opts)
     assert count == 10
-    assert b'up to 10 coaches' in rv.data
+    assert 'up to ten coaches' in soup.get_text()
 
 
 def test_money_compare_aggregates(client, app):
@@ -163,8 +161,8 @@ def test_money_compare_aggregates(client, app):
     assert names == ['CoachA', 'CoachB']
 
 
-def test_money_board_redirects_to_compare(client, app):
-    """Selecting coaches on /recruits/money redirects to the compare view."""
+def test_money_board_no_redirect(client, app):
+    """Money Board should not redirect when coaches are provided."""
     from app.models.prospect import Prospect
 
     with app.app_context():
@@ -175,15 +173,8 @@ def test_money_board_redirects_to_compare(client, app):
         db.session.commit()
 
     rv = client.get('/recruits/money?coaches=CoachA&coaches=CoachB')
-    assert rv.status_code == 302
-    assert '/recruits/money/compare' in rv.location
-    assert 'coaches=CoachA' in rv.location
-    assert 'coaches=CoachB' in rv.location
-
-    # Follow redirect and ensure selected coaches are displayed
-    rv2 = client.get(rv.location)
-    assert rv2.status_code == 200
-    html = rv2.data.decode()
-    assert 'CoachA' in html
-    assert 'CoachB' in html
+    assert rv.status_code == 200
+    soup = BeautifulSoup(rv.data, 'html.parser')
+    link = soup.find('a', string=lambda s: s and 'Compare Coaches' in s)
+    assert link is not None
 
