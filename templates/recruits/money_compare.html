@@ -8,14 +8,16 @@
 
   <form method="get" class="mb-4 flex flex-col sm:flex-row gap-3 items-start">
     <div class="flex-1">
-      <label class="block text-sm mb-1">Select up to five coaches (extra selections will be ignored)</label>
+      <label class="block text-sm mb-1">Select up to five coaches</label>
+      <input id="coach-filter" type="text" placeholder="Search coaches..." class="w-full border rounded p-2 mb-2" />
       <select id="coach-search" class="w-full border rounded p-2" multiple
               data-selected="{{ selected|tojson }}">
       {% for c in coaches %}
         <option value="{{ c }}">{{ c }}</option>
       {% endfor %}
       </select>
-      <div id="coach-selected" class="mt-2 text-sm text-gray-600"></div>
+      <p class="mt-1 text-xs text-gray-500">You can choose up to five coaches.</p>
+      <div id="coach-badges" class="mt-2 flex flex-wrap gap-2"></div>
     </div>
     <div class="sm:self-end">
       <button class="px-4 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">Compare</button>

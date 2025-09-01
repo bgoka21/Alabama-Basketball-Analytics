@@ -78,6 +78,13 @@ def test_money_board_has_checkboxes(client, app):
     assert first_th.get_text(strip=True) == ''
 
 
+def test_money_board_has_selection_panel(client):
+    rv = client.get('/recruits/money')
+    soup = BeautifulSoup(rv.data, 'html.parser')
+    panel = soup.find(id='selected-summary')
+    assert panel is not None
+
+
 def test_money_compare_interface(client):
     rv = client.get('/recruits/money/compare')
     assert rv.status_code == 200
@@ -89,6 +96,13 @@ def test_money_compare_interface(client):
     rv2 = client.get('/recruits/coach_list')
     assert rv2.status_code == 200
     assert isinstance(rv2.get_json(), list)
+
+
+def test_money_compare_has_search_and_badge_container(client):
+    rv = client.get('/recruits/money/compare')
+    soup = BeautifulSoup(rv.data, 'html.parser')
+    assert soup.find('input', id='coach-filter') is not None
+    assert soup.find(id='coach-badges') is not None
 
 
 def test_money_compare_limit(client):
