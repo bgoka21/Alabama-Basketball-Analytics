@@ -71,35 +71,43 @@
       </select>
       <button class="ml-auto px-3 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black">Apply</button>
     </div>
-    <div class="sm:col-span-5">
-      <!-- Coach selector toolbar -->
-      <div class="flex items-center justify-between gap-3 mb-2">
-        <div class="flex items-center gap-2 flex-wrap">
-          <input id="coach-filter" type="text" placeholder="Search coaches..."
-                 class="input input-sm w-52" />
-          <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
-        </div>
-        <div class="text-xs text-gray-500">Select up to <b>ten</b> coaches to compare</div>
-      </div>
+  </form>
 
-      <div class="flex items-start gap-3 mb-3">
-        <select id="coach-search" multiple class="select select-bordered w-full max-w-md">
-          {% for coach in coach_list %}
-            <option value="{{ coach }}">{{ coach }}</option>
-          {% endfor %}
-        </select>
+  <!-- Coach selector + Compare button -->
+  <form method="GET" action="{{ url_for('recruits.money_compare') }}" class="space-y-2">
+    {# carry existing filters forward #}
+    <input type="hidden" name="year_min" value="{{ request.args.get('year_min','') }}">
+    <input type="hidden" name="year_max" value="{{ request.args.get('year_max','') }}">
+    <input type="hidden" name="sheet"    value="{{ request.args.get('sheet','') }}">
+    <input type="hidden" name="conf"     value="{{ request.args.get('conf','') }}">
+    <input type="hidden" name="min_recruits" value="{{ request.args.get('min_recruits','') }}">
 
-        <div class="flex-1">
-          <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
-          <div id="coach-hidden" class="hidden"></div>
-        </div>
+    <!-- existing toolbar with search + counter -->
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <input id="coach-filter" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
+        <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
       </div>
+      <div class="text-xs text-gray-500">Select up to <b>ten</b> coaches to compare</div>
+    </div>
 
-      <div class="flex justify-end">
-        <button id="compare-btn" class="btn btn-primary" type="submit" formaction="{{ url_for('recruits.money_compare') }}" disabled>
-          Compare
-        </button>
+    <div class="flex items-start gap-3 mb-3">
+      <select id="coach-search" multiple class="select select-bordered w-full max-w-md">
+        {% for coach in coach_list %}
+          <option value="{{ coach }}">{{ coach }}</option>
+        {% endfor %}
+      </select>
+
+      <div class="flex-1">
+        <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
+        <div id="coach-hidden" class="hidden"></div>
       </div>
+    </div>
+
+    <div class="flex justify-end">
+      <button id="compare-btn" class="btn btn-primary" type="submit" disabled>
+        Compare
+      </button>
     </div>
   </form>
 
