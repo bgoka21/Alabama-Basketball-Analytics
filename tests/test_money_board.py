@@ -64,7 +64,7 @@ def test_money_coach_ok(client):
     assert rv.status_code in (200, 404)
 
 
-def test_money_board_has_checkboxes(client, app):
+def test_money_board_has_coach_selector(client, app):
     with app.app_context():
         from app.models.prospect import Prospect
         db.session.add(Prospect(coach='CoachX', player='PX', year=2024))
@@ -72,17 +72,13 @@ def test_money_board_has_checkboxes(client, app):
 
     rv = client.get('/recruits/money')
     soup = BeautifulSoup(rv.data, 'html.parser')
-    boxes = soup.select('input.coach-select[type="checkbox"]')
-    assert boxes, 'checkboxes should be present for coach selection'
-    first_th = soup.select('table thead th')[0]
-    assert first_th.get_text(strip=True) == ''
-
-
-def test_money_board_has_selection_panel(client):
-    rv = client.get('/recruits/money')
-    soup = BeautifulSoup(rv.data, 'html.parser')
-    panel = soup.find(id='selected-summary')
-    assert panel is not None
+    sel = soup.find('select', id='coach-search')
+    assert sel is not None
+    assert sel.has_attr('multiple')
+    assert soup.find('input', id='coach-filter') is not None
+    assert soup.find(id='coach-badges') is not None
+    compare_btn = soup.find('button', string=lambda s: s and 'Compare' in s)
+    assert compare_btn is not None
 
 
 def test_money_compare_interface(client):
