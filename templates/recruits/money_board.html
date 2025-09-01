@@ -78,51 +78,20 @@
     </div>
   </form>
 
-  <!-- --- START PATCH: robust compare submit --- -->
-  <form id="compare-form" method="GET" action="{{ url_for('recruits.money_compare') }}" class="space-y-3">
-    {# carry current filters forward #}
-    <input type="hidden" name="year_min" value="{{ request.args.get('year_min','') }}">
-    <input type="hidden" name="year_max" value="{{ request.args.get('year_max','') }}">
-    <input type="hidden" name="sheet"    value="{{ request.args.get('sheet','') }}">
-    <input type="hidden" name="conf"     value="{{ request.args.get('conf','') }}">
-    <input type="hidden" name="min_recruits" value="{{ request.args.get('min_recruits','') }}">
-
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2 flex-wrap">
-        <input id="coach-filter" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
-        <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
-      </div>
-      <div class="text-xs text-gray-500">Select up to <b>ten</b> coaches to compare</div>
-    </div>
-
-    <div class="flex items-start gap-3">
-      <!-- IMPORTANT: name="coaches" ensures the browser submits selections even without JS -->
-      <select id="coach-search" name="coaches" multiple size="10" class="select select-bordered w-full max-w-md">
-        {% for coach in coaches %}
-          <option value="{{ coach }}">{{ coach }}</option>
-        {% endfor %}
-      </select>
-
-      <div class="flex-1">
-        <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
-        <!-- Hidden holder MUST be inside the form if used by JS -->
-        <div id="coach-hidden" class="hidden"></div>
-      </div>
-    </div>
-
-    <div class="flex justify-end">
-      <!-- Default: enabled (so no-JS fallback works).
-           JS will dynamically disable < 2 or > 10 selections. -->
-      <button id="compare-btn" type="submit" class="btn btn-primary">
-        Compare
-      </button>
-    </div>
-  </form>
-
-  <noscript>
-    <p class="mt-2 text-xs text-amber-600">Tip: Hold Ctrl/Cmd to select multiple coaches, then click Compare.</p>
-  </noscript>
-  <!-- --- END PATCH --- -->
+  <div class="flex justify-end mb-4">
+    <a
+      class="text-sm underline text-blue-600"
+      href="{{ url_for('recruits.money_compare',
+                        year_min=request.args.get('year_min'),
+                        year_max=request.args.get('year_max'),
+                        sheet=request.args.get('sheet'),
+                        conf=request.args.get('conf'),
+                        min_recruits=request.args.get('min_recruits'),
+                        sort=request.args.get('sort')) }}"
+    >
+      Compare Coaches
+    </a>
+  </div>
 
   <div class="overflow-x-auto">
     <table class="min-w-full text-sm">
@@ -161,7 +130,6 @@
       </tbody>
     </table>
   </div>
-  <script src="{{ url_for('static', filename='js/coach_autocomplete.js') }}"></script>
 </div>
 
 {% endblock %}
