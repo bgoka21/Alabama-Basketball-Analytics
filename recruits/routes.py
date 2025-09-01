@@ -499,7 +499,7 @@ def money_board():
         years=years,
         sheets=sheets,
         confs=confs,
-        coach_list=coach_list,
+        coaches=coach_list,
         # echo filters
         f_year_min=year_min, f_year_max=year_max, f_sheet=sheet, f_conf=conf,
         f_min_recruits=min_recruits, f_sort=sort,
@@ -588,6 +588,7 @@ def money_compare():
     """Compare projected/actual money totals for up to ten coaches."""
 
     selected = request.args.getlist('coaches')  # may contain mixed case & duplicates
+    current_app.logger.info(f"[Compare] coaches={selected}")
     # Normalize, de-dupe preserving order
     seen = set()
     selected = [c for c in selected if not (c.lower() in seen or seen.add(c.lower()))]
