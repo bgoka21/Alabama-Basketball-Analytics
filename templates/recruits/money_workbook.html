@@ -1,0 +1,54 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+
+<div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-900 rounded-xl shadow">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Money Board — Workbook Manager</h1>
+    <a href="{{ url_for('recruits.money_board') }}" class="text-sm underline">← Back to Money Board</a>
+  </div>
+
+  {% if info %}
+  <div class="grid sm:grid-cols-2 gap-4 mb-6">
+    <div class="p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+      <div class="text-sm text-gray-500">Current file</div>
+      <div class="font-medium break-all">{{ info.original_filename }}</div>
+
+      <div class="mt-2 text-sm text-gray-500">Size</div>
+      <div>{{ (info.size_bytes / 1024 / 1024) | round(2) }} MB</div>
+
+      <div class="mt-2 text-sm text-gray-500">Uploaded</div>
+      <div>{{ info.uploaded_at }}</div>
+
+      <div class="mt-4 flex gap-2">
+        <a class="btn btn-outline btn-sm" href="{{ url_for('recruits.money_workbook_download') }}">Download</a>
+        <form method="POST" action="{{ url_for('recruits.money_workbook_delete') }}" onsubmit="return confirm('Delete the current workbook file? This will not change the database.');">
+          <button class="btn btn-error btn-sm" type="submit">Delete file</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+      <div class="text-sm text-gray-500 mb-2">Upload replacement</div>
+      <form method="POST" action="{{ url_for('recruits.money_workbook_upload') }}" enctype="multipart/form-data" class="space-y-3">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" class="file-input file-input-bordered w-full" required>
+        <p class="text-xs text-gray-500">Accepted: .xlsx, .xls, .csv. Upload immediately re-imports Money Board data.</p>
+        <button class="btn btn-primary" type="submit">Upload & Import</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 mb-6">
+    <div class="text-sm text-gray-500 mb-2">No workbook on file.</div>
+    <form method="POST" action="{{ url_for('recruits.money_workbook_upload') }}" enctype="multipart/form-data" class="flex items-center gap-3">
+      <input type="file" name="file" accept=".xlsx,.xls,.csv" class="file-input file-input-bordered" required>
+      <button class="btn btn-primary" type="submit">Upload & Import</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="text-xs text-gray-500">
+    <p><b>Note:</b> Deleting the file does not remove previously imported data. Uploading a replacement will re-import and update rows idempotently (per your importer logic).</p>
+  </div>
+</div>
+
+{% endblock %}

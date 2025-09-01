@@ -16,6 +16,11 @@
         Import Workbook
       </a>
       {% endif %}
+      <!-- --- START PATCH: add manager link near Money Board title --- -->
+      <a href="{{ url_for('recruits.money_workbook') }}" class="px-3 py-2 rounded-xl bg-white text-gray-900 shadow hover:shadow-md">
+        Workbook Manager
+      </a>
+      <!-- --- END PATCH --- -->
     </div>
   </div>
 
