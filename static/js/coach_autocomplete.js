@@ -2,100 +2,87 @@
   const MAX = 10;
   const select = document.getElementById('coach-search');
   const filter = document.getElementById('coach-filter');
-  const holder = document.getElementById('coach-selected');  // container for badges
-  const hiddenHolder = document.getElementById('coach-hidden'); // where hidden inputs go
-  const counter = document.getElementById('coach-count'); // a small counter element (add to template if missing)
+  const holder = document.getElementById('coach-selected');
+  const counter = document.getElementById('coach-count');
+  const btn = document.getElementById('compare-btn');
+
+  if (!select || !holder) return;
+
+  function selectedValues() {
+    return Array.from(select.selectedOptions).map(o => (o.value || o.text).trim());
+  }
 
   function updateCounter() {
-    const count = holder.querySelectorAll('[data-coach-badge]').length;
-    if (counter) counter.textContent = `${count}/${MAX} selected`;
+    if (!counter) return;
+    counter.textContent = `${selectedValues().length}/${MAX} selected`;
   }
 
-  function disableIfAtMax() {
-    const count = holder.querySelectorAll('[data-coach-badge]').length;
-    const disable = count >= MAX;
-    [...select.options].forEach(opt => {
-      if (!opt.selected) opt.disabled = disable;
-    });
-  }
-
-  function addCoach(name, value) {
-    // prevent dupes
-    const key = value.toLowerCase();
-    if (holder.querySelector(`[data-coach-badge="${key}"]`)) return;
-
-    // create badge
-    const badge = document.createElement('span');
-    badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
-    badge.setAttribute('data-coach-badge', key);
-    badge.textContent = name;
-
-    // remove button
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'ml-1 text-xs';
-    x.innerHTML = '×';
-    x.addEventListener('click', () => {
-      badge.remove();
-      const hid = hiddenHolder.querySelector(`input[type="hidden"][value="${value}"]`);
-      if (hid) hid.remove();
-      // also unselect option
-      [...select.options].forEach(o => { if ((o.value || o.text) === value) o.selected = false; });
-      disableIfAtMax();
-      updateCounter();
-      updateCompareButton();
-    });
-
-    badge.appendChild(x);
-    holder.appendChild(badge);
-
-    // hidden input for form submit
-    const hid = document.createElement('input');
-    hid.type = 'hidden';
-    hid.name = 'coaches';
-    hid.value = value;
-    hiddenHolder.appendChild(hid);
-
-    disableIfAtMax();
-    updateCounter();
-    updateCompareButton();
-  }
-
-  function updateCompareButton() {
-    const btn = document.getElementById('compare-btn');
+  function updateButtonState() {
     if (!btn) return;
-    const count = holder.querySelectorAll('[data-coach-badge]').length;
-    btn.disabled = count < 2 || count > MAX;
+    const n = selectedValues().length;
+    // Allow submit by default; gently discourage invalid counts
+    btn.disabled = (n < 2 || n > MAX);
   }
 
-  // select change
-  if (select) {
-    select.addEventListener('change', () => {
-      const count = holder.querySelectorAll('[data-coach-badge]').length;
-      if (count >= MAX) return;
-      const opt = select.options[select.selectedIndex];
-      if (!opt) return;
-      const name = opt.text.trim();
-      const value = (opt.value || name).trim();
-      opt.selected = true;
-      addCoach(name, value);
+  function syncBadges() {
+    // Clear and rebuild from select
+    holder.querySelectorAll('[data-coach-badge]').forEach(el => el.remove());
+    selectedValues().forEach(val => {
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
+      badge.setAttribute('data-coach-badge', val.toLowerCase());
+      badge.textContent = val;
+
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'ml-1 text-xs';
+      x.textContent = '×';
+      x.addEventListener('click', () => {
+        // Deselect in the select element
+        Array.from(select.options).forEach(o => {
+          if ((o.value || o.text).trim() === val) o.selected = false;
+        });
+        syncBadges();
+        updateCounter();
+        updateButtonState();
+        enforceMax();
+      });
+
+      badge.appendChild(x);
+      holder.appendChild(badge);
     });
   }
 
-  // filter typing
-  if (filter && select) {
+  function enforceMax() {
+    const n = selectedValues().length;
+    const lock = n >= MAX;
+    Array.from(select.options).forEach(o => {
+      if (!o.selected) o.disabled = lock;
+    });
+  }
+
+  // Select change (supports click and keyboard multi-select)
+  select.addEventListener('change', () => {
+    syncBadges();
+    updateCounter();
+    updateButtonState();
+    enforceMax();
+  });
+
+  // Text filter
+  if (filter) {
     filter.addEventListener('input', () => {
       const q = filter.value.toLowerCase();
-      [...select.options].forEach(o => {
+      Array.from(select.options).forEach(o => {
         const show = (o.text || '').toLowerCase().includes(q);
         o.style.display = show ? '' : 'none';
       });
     });
   }
 
-  // init
+  // Initial
+  syncBadges();
   updateCounter();
-  disableIfAtMax();
-  updateCompareButton();
+  updateButtonState();
+  enforceMax();
 })();
-
