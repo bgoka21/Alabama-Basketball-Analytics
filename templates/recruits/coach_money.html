@@ -10,21 +10,20 @@
   <div class="grid sm:grid-cols-4 gap-3 mb-6">
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">Coach Team</div>
-      <div class="font-medium">{{ totals.coach_team or '—' }}</div>
+      <div class="font-medium">{{ coach_summary.coach_team or '—' }}</div>
     </div>
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">Coach Conf</div>
-      <div class="font-medium">{{ totals.coach_conf or '—' }}</div>
+      <div class="font-medium">{{ coach_summary.coach_conf or '—' }}</div>
     </div>
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">Recruits</div>
-      <div class="font-semibold">{{ totals.recruits }}</div>
+      <div class="font-semibold">{{ coach_summary.recruits }}</div>
     </div>
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">Avg NET / Recruit</div>
       <div class="font-semibold">
-        {% set avg_net = (totals.net_sum / totals.recruits) if totals.recruits else 0 %}
-        ${{ "{:,.0f}".format(avg_net) }}
+        ${{ "{:,.0f}".format(coach_summary.avg_net) }}
       </div>
     </div>
   </div>
@@ -32,15 +31,15 @@
   <div class="grid sm:grid-cols-3 gap-3 mb-6">
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">Projected $</div>
-      <div class="text-lg font-semibold">{{ totals.proj_sum|fmt_money }}</div>
+      <div class="text-lg font-semibold">{{ coach_summary.proj_sum|fmt_money }}</div>
     </div>
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">Actual $</div>
-      <div class="text-lg font-semibold">{{ totals.act_sum|fmt_money }}</div>
+      <div class="text-lg font-semibold">{{ coach_summary.act_sum|fmt_money }}</div>
     </div>
     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border">
       <div class="text-xs text-gray-500">NET $</div>
-      <div class="text-lg font-semibold {{ totals.net_sum|posneg }}">{{ totals.net_sum|fmt_money }}</div>
+      <div class="text-lg font-semibold {{ coach_summary.net_sum|posneg }}">{{ coach_summary.net_sum|fmt_money }}</div>
     </div>
   </div>
 
@@ -92,7 +91,7 @@
         {% for p in players %}
         <tr class="border-b">
           <td class="py-2 pr-4 font-medium">{{ p.player }}</td>
-          <td class="py-2 pr-4">{{ p.team }}</td>
+          <td class="py-2 pr-4">{{ p.team if p.team else '—' }}</td>
           <td class="py-2 pr-4">{{ p.year or '—' }}</td>
           <td class="py-2 pr-4 text-right">
             {# --- START PATCH: projected pick display fallback --- #}
