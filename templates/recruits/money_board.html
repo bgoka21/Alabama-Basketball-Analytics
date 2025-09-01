@@ -94,7 +94,7 @@
           {% for r in rows %}
           <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-900">
             <td class="py-2 pr-4">
-              <input type="checkbox" class="coach-select h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" data-coach="{{ r.coach }}" />
+              <input type="checkbox" name="coaches" value="{{ r.coach }}" class="coach-select h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" data-coach="{{ r.coach }}" />
             </td>
             <td class="py-2 pr-4 font-medium">{{ r.coach }}</td>
             <td class="py-2 pr-4">{{ r.coach_team }}</td>
@@ -116,7 +116,7 @@
       </table>
     </div>
     <div class="mt-2 flex items-center gap-4">
-      <button id="compare-btn" disabled class="px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-gray-200 dark:text-black ml-auto">Compare</button>
+      <button type="submit" id="compare-btn" disabled class="px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-gray-200 dark:text-black ml-auto">Compare</button>
     </div>
     <div id="selected-summary" class="hidden fixed bottom-4 right-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow p-3 text-sm text-gray-700 dark:text-gray-300"></div>
   </form>

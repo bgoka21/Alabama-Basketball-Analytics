@@ -35,19 +35,5 @@
     });
   });
 
-  compareBtn.addEventListener('click', evt => {
-    evt.preventDefault();
-    const form = compareBtn.closest('form');
-    form.querySelectorAll('input[name="coaches"]').forEach(el => el.remove());
-    selected.forEach(name => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'coaches';
-      input.value = name;
-      form.appendChild(input);
-    });
-    form.submit();
-  });
-
   update();
 })(document);
