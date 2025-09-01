@@ -85,8 +85,9 @@ def test_money_compare_interface(client):
     rv = client.get('/recruits/money/compare')
     assert rv.status_code == 200
     soup = BeautifulSoup(rv.data, 'html.parser')
-    ul = soup.find('ul', id='coach-options')
-    assert ul is not None
+    # Coach selector is toggled by a button and renders options in a list
+    assert soup.find(id='coach-picker-toggle') is not None
+    assert soup.find(id='coach-options') is not None
 
     rv2 = client.get('/recruits/coach_list')
     assert rv2.status_code == 200
@@ -104,11 +105,21 @@ def test_money_compare_limit(client):
     qs = '&'.join(f'coaches=c{i}' for i in range(11))
     rv = client.get(f'/recruits/money/compare?{qs}')
     assert rv.status_code == 200
-    import json
     html = rv.data.decode()
-    val = html.split('data-selected="', 1)[1].split('">', 1)[0]
-    selected = json.loads(val)
-    assert len(selected) == 10
+    soup = BeautifulSoup(html, 'html.parser')
+    # Selected coaches are represented either as hidden inputs or badges.
+    selected_inputs = soup.select('input[name="coaches"]')
+    badges = soup.select('#coach-selected .badge')
+    if selected_inputs:
+        count = len(selected_inputs)
+    elif badges:
+        count = len(badges)
+    else:
+        # Fallback for older markup that exposes selections via data-selected
+        import json
+        val = html.split('data-selected="', 1)[1].split('">', 1)[0]
+        count = len(json.loads(val))
+    assert count == 10
     assert b'up to 10 coaches' in rv.data
 
 
@@ -145,6 +156,11 @@ def test_money_compare_aggregates(client, app):
     soup = BeautifulSoup(html, 'html.parser')
     cards = soup.select('div.p-4.rounded-xl.border')
     assert len(cards) == 2
+
+    # Coaches should be listed in descending order by net money
+    names = [c.find('div', class_='font-semibold').get_text(strip=True)
+             for c in cards]
+    assert names == ['CoachA', 'CoachB']
 
 
 def test_money_board_redirects_to_compare(client, app):
