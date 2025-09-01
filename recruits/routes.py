@@ -734,6 +734,8 @@ def money_compare():
     if min_rec:
         comps = [c for c in comps if c["recruits"] >= min_rec]
 
+    comps.sort(key=lambda c: c["net_sum"], reverse=True)
+
     # Players query
     players_q = Prospect.query.filter(func.lower(Prospect.coach).in_(selected_lower))
     if filters:
