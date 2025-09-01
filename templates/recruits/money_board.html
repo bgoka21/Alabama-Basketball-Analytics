@@ -11,7 +11,6 @@
       {% endif %}
     </div>
     <div class="flex gap-2">
-      <a href="{{ url_for('recruits.money_compare') }}" class="px-3 py-2 rounded-xl bg-white/20 text-white border border-white/30 hover:bg-white/10">Compare</a>
       {% if not has_data %}
       <a href="{{ url_for('recruits.import_recruits_workbook') }}" class="px-3 py-2 rounded-xl bg-white text-gray-900 shadow hover:shadow-md">
         Import Workbook
@@ -74,43 +73,54 @@
     </div>
   </form>
 
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead>
-        <tr class="text-left sticky top-0 bg-white dark:bg-gray-800 border-b z-10">
-          <th class="py-2 pr-4">Coach</th>
-          <th class="py-2 pr-4">Team</th>
-          <th class="py-2 pr-4">Conf</th>
-          <th class="py-2 pr-4 text-right">Recruits</th>
-          <th class="py-2 pr-4 text-right">Projected</th>
-          <th class="py-2 pr-4 text-right">Actual</th>
-          <th class="py-2 pr-4 text-right">NET</th>
-          <th class="py-2 pr-4 text-right">Avg NET</th>
-          <th class="py-2 pr-4">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in rows %}
-        <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-900">
-          <td class="py-2 pr-4 font-medium">{{ r.coach }}</td>
-          <td class="py-2 pr-4">{{ r.coach_team }}</td>
-          <td class="py-2 pr-4">{{ r.coach_conf }}</td>
-          <td class="py-2 pr-4 text-right">{{ r.recruits }}</td>
-          <td class="py-2 pr-4 text-right">{{ r.proj_sum|fmt_money }}</td>
-          <td class="py-2 pr-4 text-right">{{ r.act_sum|fmt_money }}</td>
-          <td class="py-2 pr-4 text-right font-semibold {{ r.net_sum|posneg }}">{{ r.net_sum|fmt_money }}</td>
-          <td class="py-2 pr-4 text-right">{{ r.avg_net|fmt_money }}</td>
-          <td class="py-2 pr-4">
-            <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_coach', coach_name=r.coach) }}">View</a>
-          </td>
-        </tr>
-        {% endfor %}
-        {% if not rows %}
-          <tr><td class="py-3 text-gray-500" colspan="9">No results.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
+  <form method="get" action="{{ url_for('recruits.money_compare') }}">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left sticky top-0 bg-white dark:bg-gray-800 border-b z-10">
+            <th class="py-2 pr-4"></th>
+            <th class="py-2 pr-4">Coach</th>
+            <th class="py-2 pr-4">Team</th>
+            <th class="py-2 pr-4">Conf</th>
+            <th class="py-2 pr-4 text-right">Recruits</th>
+            <th class="py-2 pr-4 text-right">Projected</th>
+            <th class="py-2 pr-4 text-right">Actual</th>
+            <th class="py-2 pr-4 text-right">NET</th>
+            <th class="py-2 pr-4 text-right">Avg NET</th>
+            <th class="py-2 pr-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-900">
+            <td class="py-2 pr-4">
+              <input type="checkbox" class="coach-select" data-coach="{{ r.coach }}" />
+            </td>
+            <td class="py-2 pr-4 font-medium">{{ r.coach }}</td>
+            <td class="py-2 pr-4">{{ r.coach_team }}</td>
+            <td class="py-2 pr-4">{{ r.coach_conf }}</td>
+            <td class="py-2 pr-4 text-right">{{ r.recruits }}</td>
+            <td class="py-2 pr-4 text-right">{{ r.proj_sum|fmt_money }}</td>
+            <td class="py-2 pr-4 text-right">{{ r.act_sum|fmt_money }}</td>
+            <td class="py-2 pr-4 text-right font-semibold {{ r.net_sum|posneg }}">{{ r.net_sum|fmt_money }}</td>
+            <td class="py-2 pr-4 text-right">{{ r.avg_net|fmt_money }}</td>
+            <td class="py-2 pr-4">
+              <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_coach', coach_name=r.coach) }}">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not rows %}
+            <tr><td class="py-3 text-gray-500" colspan="10">No results.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-2 flex items-center gap-4">
+      <div id="selected-summary" class="text-sm text-gray-700 dark:text-gray-300"></div>
+      <button id="compare-btn" disabled class="px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-gray-200 dark:text-black ml-auto">Compare</button>
+    </div>
+  </form>
+  <script src="{{ url_for('static', filename='js/money_board_compare.js') }}"></script>
 </div>
 
 {% endblock %}
