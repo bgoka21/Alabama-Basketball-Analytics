@@ -1,88 +1,109 @@
 (function () {
   const MAX = 10;
-  const select = document.getElementById('coach-search');
+  const options = document.getElementById('coach-options');
   const filter = document.getElementById('coach-filter');
   const holder = document.getElementById('coach-selected');
+  const hidden = document.getElementById('coach-hidden');
   const counter = document.getElementById('coach-count');
   const btn = document.getElementById('compare-btn');
 
-  if (!select || !holder) return;
+  if (!options || !holder || !hidden) return;
 
   function selectedValues() {
-    return Array.from(select.selectedOptions).map(o => (o.value || o.text).trim());
+    return Array.from(hidden.querySelectorAll('input[name="coaches"]')).map(i => i.value);
   }
 
   function updateCounter() {
-    if (!counter) return;
-    counter.textContent = `${selectedValues().length}/${MAX} selected`;
+    if (counter) counter.textContent = `${selectedValues().length}/${MAX} selected`;
   }
 
   function updateButtonState() {
     if (!btn) return;
     const n = selectedValues().length;
-    // Allow submit by default; gently discourage invalid counts
     btn.disabled = (n < 2 || n > MAX);
   }
 
-  function syncBadges() {
-    // Clear and rebuild from select
-    holder.querySelectorAll('[data-coach-badge]').forEach(el => el.remove());
-    selectedValues().forEach(val => {
-      const badge = document.createElement('span');
-      badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
-      badge.setAttribute('data-coach-badge', val.toLowerCase());
-      badge.textContent = val;
-
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'ml-1 text-xs';
-      x.textContent = '×';
-      x.addEventListener('click', () => {
-        // Deselect in the select element
-        Array.from(select.options).forEach(o => {
-          if ((o.value || o.text).trim() === val) o.selected = false;
-        });
-        syncBadges();
-        updateCounter();
-        updateButtonState();
-        enforceMax();
-      });
-
-      badge.appendChild(x);
-      holder.appendChild(badge);
-    });
-  }
-
   function enforceMax() {
-    const n = selectedValues().length;
-    const lock = n >= MAX;
-    Array.from(select.options).forEach(o => {
-      if (!o.selected) o.disabled = lock;
+    const lock = selectedValues().length >= MAX;
+    Array.from(options.querySelectorAll('li')).forEach(li => {
+      if (lock) {
+        li.classList.add('pointer-events-none', 'opacity-50');
+      } else {
+        li.classList.remove('pointer-events-none', 'opacity-50');
+      }
     });
   }
 
-  // Select change (supports click and keyboard multi-select)
-  select.addEventListener('change', () => {
-    syncBadges();
+  function addCoach(name, li) {
+    // badge
+    const badge = document.createElement('span');
+    badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
+    badge.setAttribute('data-coach-badge', name.toLowerCase());
+    badge.textContent = name;
+
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'ml-1 text-xs';
+    x.textContent = '×';
+    x.addEventListener('click', () => {
+      badge.remove();
+      const hid = hidden.querySelector(`input[data-coach-hidden='${name.toLowerCase()}']`);
+      if (hid) hid.remove();
+      options.appendChild(li);
+      applyFilter();
+      updateCounter();
+      updateButtonState();
+      enforceMax();
+    });
+
+    badge.appendChild(x);
+    holder.appendChild(badge);
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'coaches';
+    input.value = name;
+    input.setAttribute('data-coach-hidden', name.toLowerCase());
+    hidden.appendChild(input);
+
+    li.remove();
+
     updateCounter();
     updateButtonState();
     enforceMax();
-  });
+  }
 
-  // Text filter
-  if (filter) {
-    filter.addEventListener('input', () => {
-      const q = filter.value.toLowerCase();
-      Array.from(select.options).forEach(o => {
-        const show = (o.text || '').toLowerCase().includes(q);
-        o.style.display = show ? '' : 'none';
-      });
+  function applyFilter() {
+    if (!filter) return;
+    const q = filter.value.toLowerCase();
+    Array.from(options.querySelectorAll('li')).forEach(li => {
+      const show = (li.dataset.coach || '').toLowerCase().includes(q);
+      li.style.display = show ? '' : 'none';
     });
   }
 
-  // Initial
-  syncBadges();
-  updateCounter();
-  updateButtonState();
-  enforceMax();
+  options.addEventListener('click', e => {
+    const li = e.target.closest('li[data-coach]');
+    if (!li) return;
+    if (selectedValues().length >= MAX) return;
+    addCoach(li.dataset.coach, li);
+  });
+
+  if (filter) {
+    filter.addEventListener('input', applyFilter);
+  }
+
+  // initial selections
+  (function init() {
+    const selected = options.dataset.selected ? JSON.parse(options.dataset.selected) : [];
+    selected.forEach(name => {
+      const li = options.querySelector(`li[data-coach="${name}"]`);
+      if (li) addCoach(name, li);
+    });
+    applyFilter();
+    updateCounter();
+    updateButtonState();
+    enforceMax();
+  })();
 })();
+

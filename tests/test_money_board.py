@@ -85,9 +85,8 @@ def test_money_compare_interface(client):
     rv = client.get('/recruits/money/compare')
     assert rv.status_code == 200
     soup = BeautifulSoup(rv.data, 'html.parser')
-    sel = soup.find('select', id='coach-search')
-    assert sel is not None
-    assert sel.has_attr('multiple')
+    ul = soup.find('ul', id='coach-options')
+    assert ul is not None
 
     rv2 = client.get('/recruits/coach_list')
     assert rv2.status_code == 200
