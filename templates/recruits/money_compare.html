@@ -3,7 +3,7 @@
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl sm:text-3xl font-bold">Compare Coaches</h1>
-    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board') }}">← Back to Money Board</a>
+    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}">← Back to Money Board</a>
   </div>
 
   <form method="get" class="mb-4 flex flex-col gap-3">
@@ -15,11 +15,16 @@
         </div>
         <div class="flex items-center gap-3">
           <span id="coach-count" class="text-sm text-gray-500">0/10 selected</span>
-          <a href="{{ url_for('recruits.money_board') }}" class="text-sm underline">Clear all</a>
+          <a href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}" class="text-sm underline">Clear all</a>
         </div>
       </div>
       <!-- hidden inputs live here for form submits -->
       <div id="coach-hidden" class="hidden"></div>
+      <input type="hidden" name="year_min" value="{{ year_min if year_min is not none else '' }}">
+      <input type="hidden" name="year_max" value="{{ year_max if year_max is not none else '' }}">
+      <input type="hidden" name="sheet" value="{{ sheet or '' }}">
+      <input type="hidden" name="conf" value="{{ conf or '' }}">
+      <input type="hidden" name="min_recruits" value="{{ min_recruits if min_recruits is not none else '' }}">
     </div>
     <!-- --- END PATCH --- -->
 
@@ -37,6 +42,19 @@
       <button id="compare-btn" class="px-4 py-2 rounded bg-gray-900 text-white dark:bg-gray-200 dark:text-black" disabled>Compare</button>
     </div>
   </form>
+
+  <!-- CSV Download -->
+  <div class="flex justify-end mb-3">
+    <a
+      class="btn btn-outline btn-sm"
+      href="{{ url_for('recruits.money_compare_csv',
+                       coaches=selected,
+                       year_min=year_min, year_max=year_max,
+                       sheet=sheet, conf=conf, min_recruits=min_recruits) }}"
+    >
+      Download CSV
+    </a>
+  </div>
 
   {% if comps %}
   <!-- --- START PATCH: Responsive cards grid --- -->
@@ -57,6 +75,60 @@
     {% endfor %}
   </div>
   <!-- --- END PATCH --- -->
+
+  <div class="space-y-4 mt-4">
+    {% for c in comps %}
+    <details class="group border border-gray-200 dark:border-gray-800 rounded-xl">
+      <summary class="cursor-pointer px-4 py-3 flex items-center justify-between">
+        <span class="font-semibold">{{ c.coach }}</span>
+        <span class="text-sm text-gray-500 group-open:hidden">Show players</span>
+        <span class="text-sm text-gray-500 hidden group-open:inline">Hide players</span>
+      </summary>
+
+      <div class="px-4 pb-4 overflow-x-auto">
+        {% set roster = players_by_coach.get(c.coach, []) %}
+        {% if roster %}
+        <table class="min-w-full text-sm">
+          <thead class="text-left sticky top-0 bg-white dark:bg-gray-900">
+            <tr class="border-b border-gray-200 dark:border-gray-800">
+              <th class="py-2 pr-3">Player</th>
+              <th class="py-2 pr-3">Team</th>
+              <th class="py-2 pr-3">Year</th>
+              <th class="py-2 pr-3">Proj Pick</th>
+              <th class="py-2 pr-3">Actual Pick</th>
+              <th class="py-2 pr-3 text-right">Projected $</th>
+              <th class="py-2 pr-3 text-right">Actual $</th>
+              <th class="py-2 pr-3 text-right">NET $</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in roster %}
+            <tr class="border-b border-gray-100 dark:border-gray-800">
+              <td class="py-1 pr-3">{{ p.player }}</td>
+              <td class="py-1 pr-3">{{ p.team or '—' }}</td>
+              <td class="py-1 pr-3">{{ p.year }}</td>
+              <td class="py-1 pr-3">
+                {% set proj_pick = p.projected_pick_raw or (('#' ~ p.projected_pick) if p.projected_pick is not none else '—') %}
+                {{ proj_pick }}
+              </td>
+              <td class="py-1 pr-3">
+                {% set act_pick = p.actual_pick_raw or (('#' ~ p.actual_pick) if p.actual_pick is not none else '—') %}
+                {{ act_pick }}
+              </td>
+              <td class="py-1 pr-3 text-right">{{ p.projected_money|fmt_money }}</td>
+              <td class="py-1 pr-3 text-right">{{ p.actual_money|fmt_money }}</td>
+              <td class="py-1 pr-3 text-right {{ p.net|posneg }}">{{ p.net|fmt_money }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="text-sm text-gray-500">No players match the current filters.</div>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
   {% else %}
     <div class="text-sm text-gray-500">Select coaches and click Compare.</div>
   {% endif %}

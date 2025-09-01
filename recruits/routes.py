@@ -1,13 +1,16 @@
 import os
 import json
 import time
-from flask import render_template, request, redirect, url_for, flash, current_app, abort, jsonify
+import csv
+import io
+from collections import defaultdict
+from flask import render_template, request, redirect, url_for, flash, current_app, abort, jsonify, Response
 from datetime import date
 from flask_login import login_required, current_user
 from types import SimpleNamespace
 from io import BytesIO
 from werkzeug.utils import secure_filename
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, and_
 from models.database import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from models.eybl import UnifiedStats
@@ -584,7 +587,6 @@ def coach_list():
 def money_compare():
     """Compare projected/actual money totals for up to ten coaches."""
 
-    # --- START PATCH: selection cap & stable ordering ---
     selected = request.args.getlist('coaches')  # may contain mixed case & duplicates
     # Normalize, de-dupe preserving order
     seen = set()
@@ -595,12 +597,29 @@ def money_compare():
         selected = selected[:MAX_COMPARE]
         flash(f"You can compare up to {MAX_COMPARE} coaches at a time.", "warning")
 
-    # Lowercase set for filtering
     selected_lower = [c.lower() for c in selected]
 
-    # Query aggregates for just these coaches (case-insensitive)
     from app.models.prospect import Prospect
-    q = (
+
+    # Extract filters
+    year_min = request.args.get("year_min", type=int)
+    year_max = request.args.get("year_max", type=int)
+    sheet    = (request.args.get("sheet") or "").strip()
+    conf     = (request.args.get("conf") or "").strip()
+    min_rec  = request.args.get("min_recruits", type=int)
+
+    filters = []
+    if year_min is not None:
+        filters.append(Prospect.year >= year_min)
+    if year_max is not None:
+        filters.append(Prospect.year <= year_max)
+    if sheet:
+        filters.append(Prospect.sheet == sheet)
+    if conf:
+        filters.append(Prospect.coach_current_conference == conf)
+
+    # Totals query with filters
+    agg_q = (
         db.session.query(
             Prospect.coach.label('coach'),
             func.count(Prospect.id).label('recruits'),
@@ -609,15 +628,14 @@ def money_compare():
             func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
         )
         .filter(func.lower(Prospect.coach).in_(selected_lower))
-        .group_by(Prospect.coach)
     )
+    if filters:
+        agg_q = agg_q.filter(and_(*filters))
 
-    rows = q.all()
+    rows = agg_q.group_by(Prospect.coach).all()
 
-    # Index by lowercase coach for quick lookup
     by_coach = {r.coach.lower(): r for r in rows}
 
-    # Build comps in the exact order user selected
     comps = []
     for name in selected:
         r = by_coach.get(name.lower())
@@ -632,7 +650,20 @@ def money_compare():
             "net_sum": float(r.net_sum or 0),
             "avg_net": float(avg_net or 0),
         })
-    # --- END PATCH ---
+
+    if min_rec:
+        comps = [c for c in comps if c["recruits"] >= min_rec]
+
+    # Players query
+    players_q = Prospect.query.filter(func.lower(Prospect.coach).in_(selected_lower))
+    if filters:
+        players_q = players_q.filter(and_(*filters))
+    players_q = players_q.order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
+    players = players_q.all()
+
+    players_by_coach = defaultdict(list)
+    for p in players:
+        players_by_coach[p.coach].append(p)
 
     coach_list = _get_coach_names()
 
@@ -641,4 +672,71 @@ def money_compare():
         coaches=coach_list,
         selected=selected,
         comps=comps,
+        players_by_coach=players_by_coach,
+        year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_rec,
+    )
+
+
+@recruits_bp.route("/money/compare.csv")
+def money_compare_csv():
+    selected = request.args.getlist("coaches")
+    if not selected:
+        return Response("No coaches selected", status=400)
+
+    selected_lower = [c.lower() for c in selected]
+
+    from app.models.prospect import Prospect
+
+    year_min = request.args.get("year_min", type=int)
+    year_max = request.args.get("year_max", type=int)
+    sheet    = (request.args.get("sheet") or "").strip()
+    conf     = (request.args.get("conf") or "").strip()
+
+    filters = [func.lower(Prospect.coach).in_(selected_lower)]
+    if year_min is not None:
+        filters.append(Prospect.year >= year_min)
+    if year_max is not None:
+        filters.append(Prospect.year <= year_max)
+    if sheet:
+        filters.append(Prospect.sheet == sheet)
+    if conf:
+        filters.append(Prospect.coach_current_conference == conf)
+
+    q = Prospect.query.filter(and_(*filters)).order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
+    rows = q.all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        "Coach", "Coach Team", "Coach Conf",
+        "Player", "Team", "Year",
+        "Projected Pick (raw)", "Projected Pick (#)",
+        "Actual Pick (raw)", "Actual Pick (#)",
+        "Projected $", "Actual $", "NET $"
+    ])
+
+    for p in rows:
+        w.writerow([
+            p.coach,
+            p.coach_current_team or "",
+            p.coach_current_conference or "",
+            p.player,
+            p.team or "",
+            p.year,
+            p.projected_pick_raw or "",
+            p.projected_pick or "",
+            p.actual_pick_raw or "",
+            p.actual_pick or "",
+            ("" if p.projected_money is None else f"{p.projected_money:.2f}"),
+            ("" if p.actual_money    is None else f"{p.actual_money:.2f}"),
+            ("" if p.net             is None else f"{p.net:.2f}"),
+        ])
+
+    csv_data = buf.getvalue()
+    buf.close()
+
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=money_compare.csv"}
     )
