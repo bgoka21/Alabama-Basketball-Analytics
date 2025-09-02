@@ -12,6 +12,7 @@ from app.utils.import_utils import (
     parse_pick_to_int,
     validate_required,
 )
+from app.utils.coach_names import normalize_coach_name
 
 
 def _s(x):
@@ -95,7 +96,12 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             skipped = 0
 
             for idx, row in enumerate(rows):
-                coach = (row.get("coach") or "").strip()
+                coach_raw = (row.get("coach") or "").strip()
+                _, coach = normalize_coach_name(coach_raw)
+                if coach_raw and coach_raw != coach:
+                    current_app.logger.info(
+                        f"[MoneyBoard Import] normalized coach '{coach_raw}' -> '{coach}'"
+                    )
                 player = (row.get("player") or "").strip()
                 team = (row.get("team") or "").strip()
                 year = row.get("year")

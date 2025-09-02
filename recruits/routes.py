@@ -23,6 +23,7 @@ from services.circuit_stats import (
 )
 import importlib.util
 from pathlib import Path
+from app.utils.coach_names import normalize_coach_name, get_alias_variants
 
 # --- START PATCH: imports for workbook manager ---
 import os, json, time
@@ -157,7 +158,6 @@ def _maybe_delete_old_headshot(old_url: str):
             pass
 
 
-@recruits_bp.before_request
 def recruits_before_request():
     if not hasattr(current_app, 'login_manager'):
         return
@@ -169,6 +169,9 @@ def recruits_before_request():
             else:
                 target = url_for('public.homepage')
             return redirect(target)
+
+if not getattr(recruits_bp, '_got_registered_once', False):
+    recruits_bp.before_request(recruits_before_request)
 
 
 @recruits_bp.route('/')
@@ -545,23 +548,46 @@ def money_board():
         q = q.order_by(desc('net_sum'))
 
     rows = q.all()
-    # Compute avg_net per recruit in Python for display/sort if requested
-    data = []
+    # Fold any aliases by canonical coach key
+    merged: dict[str, dict] = {}
     for r in rows:
-        avg_net = (r.net_sum / r.recruits) if r.recruits else 0.0
-        data.append({
-            "coach": r.coach,
-            "coach_team": r.coach_team,
-            "coach_conf": r.coach_conf,
-            "recruits": int(r.recruits),
-            "proj_sum": float(r.proj_sum or 0),
-            "act_sum": float(r.act_sum or 0),
-            "net_sum": float(r.net_sum or 0),
-            "avg_net": float(avg_net),
-        })
+        key, disp = normalize_coach_name(r.coach)
+        entry = merged.get(key)
+        if not entry:
+            entry = {
+                "coach": disp,
+                "coach_team": r.coach_team,
+                "coach_conf": r.coach_conf,
+                "recruits": int(r.recruits),
+                "proj_sum": float(r.proj_sum or 0),
+                "act_sum": float(r.act_sum or 0),
+                "net_sum": float(r.net_sum or 0),
+            }
+            merged[key] = entry
+        else:
+            entry["recruits"] += int(r.recruits)
+            entry["proj_sum"] += float(r.proj_sum or 0)
+            entry["act_sum"] += float(r.act_sum or 0)
+            entry["net_sum"] += float(r.net_sum or 0)
+            if not entry["coach_team"] and r.coach_team:
+                entry["coach_team"] = r.coach_team
+            if not entry["coach_conf"] and r.coach_conf:
+                entry["coach_conf"] = r.coach_conf
 
-    if sort == 'avg_net_desc':
+    data = []
+    for e in merged.values():
+        avg_net = (e["net_sum"] / e["recruits"]) if e["recruits"] else 0.0
+        e["avg_net"] = float(avg_net)
+        data.append(e)
+
+    if sort == 'actual_desc':
+        data.sort(key=lambda x: x['act_sum'], reverse=True)
+    elif sort == 'proj_desc':
+        data.sort(key=lambda x: x['proj_sum'], reverse=True)
+    elif sort == 'avg_net_desc':
         data.sort(key=lambda x: x['avg_net'], reverse=True)
+    else:
+        data.sort(key=lambda x: x['net_sum'], reverse=True)
 
     # Top card
     top = data[0] if data else None
@@ -643,29 +669,41 @@ def money_coach(coach_name):
 
 
 def _get_coach_names():
-    """Return a sorted list of unique coach names."""
+    """Return sorted canonical coach names for picker UI."""
     from app.models.prospect import Prospect
-    return [c for (c,) in db.session.query(Prospect.coach)
+    raw = [c for (c,) in db.session.query(Prospect.coach)
                                .filter(Prospect.coach.isnot(None))
-                               .distinct().order_by(Prospect.coach).all()]
+                               .distinct().all()]
+    seen: dict[str, str] = {}
+    for name in raw:
+        key, disp = normalize_coach_name(name)
+        seen[key] = disp
+    return sorted(seen.values())
 
 
 @recruits_bp.route('/money/compare', methods=['GET'])
 def money_compare():
     """Compare projected/actual money totals for up to ten coaches."""
 
-    selected = request.args.getlist('coaches')  # may contain mixed case & duplicates
-    current_app.logger.info(f"[Compare] coaches={selected}")
-    # Normalize, de-dupe preserving order
-    seen = set()
-    selected = [c for c in selected if not (c.lower() in seen or seen.add(c.lower()))]
+    raw_selected = request.args.getlist('coaches')
+    current_app.logger.info(f"[Compare] coaches={raw_selected}")
+    seen_keys: set[str] = set()
+    selected: list[str] = []
+    for raw in raw_selected:
+        key, disp = normalize_coach_name(raw)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        selected.append(disp)
 
     MAX_COMPARE = 10
     if len(selected) > MAX_COMPARE:
         selected = selected[:MAX_COMPARE]
         flash(f"You can compare up to {MAX_COMPARE} coaches at a time.", "warning")
 
-    selected_lower = [c.lower() for c in selected]
+    variant_set: set[str] = set()
+    for name in selected:
+        variant_set.update(get_alias_variants(name))
 
     from app.models.prospect import Prospect
 
@@ -696,29 +734,41 @@ def money_compare():
             func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
             func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
         )
-        .filter(func.lower(Prospect.coach).in_(selected_lower))
+        .filter(func.lower(Prospect.coach).in_(variant_set))
     )
     if filters:
         agg_q = agg_q.filter(and_(*filters))
 
     rows = agg_q.group_by(Prospect.coach).all()
 
-    by_coach = {r.coach.lower(): r for r in rows}
+    merged: dict[str, dict] = {}
+    for r in rows:
+        key, disp = normalize_coach_name(r.coach)
+        entry = merged.get(key)
+        if not entry:
+            entry = {
+                "coach": disp,
+                "recruits": int(r.recruits or 0),
+                "proj_sum": float(r.proj_sum or 0),
+                "act_sum": float(r.act_sum or 0),
+                "net_sum": float(r.net_sum or 0),
+            }
+            merged[key] = entry
+        else:
+            entry["recruits"] += int(r.recruits or 0)
+            entry["proj_sum"] += float(r.proj_sum or 0)
+            entry["act_sum"] += float(r.act_sum or 0)
+            entry["net_sum"] += float(r.net_sum or 0)
 
     comps = []
     for name in selected:
-        r = by_coach.get(name.lower())
-        if not r:
+        key, _ = normalize_coach_name(name)
+        e = merged.get(key)
+        if not e:
             continue
-        avg_net = (r.net_sum / r.recruits) if r.recruits else 0
-        comps.append({
-            "coach": r.coach,
-            "recruits": int(r.recruits or 0),
-            "proj_sum": float(r.proj_sum or 0),
-            "act_sum": float(r.act_sum or 0),
-            "net_sum": float(r.net_sum or 0),
-            "avg_net": float(avg_net or 0),
-        })
+        avg_net = (e["net_sum"] / e["recruits"]) if e["recruits"] else 0
+        e["avg_net"] = float(avg_net or 0)
+        comps.append(e)
 
     if min_rec:
         comps = [c for c in comps if c["recruits"] >= min_rec]
@@ -733,7 +783,7 @@ def money_compare():
         comps.sort(key=lambda c: c["net_sum"], reverse=True)
 
     # Players query
-    players_q = Prospect.query.filter(func.lower(Prospect.coach).in_(selected_lower))
+    players_q = Prospect.query.filter(func.lower(Prospect.coach).in_(variant_set))
     if filters:
         players_q = players_q.filter(and_(*filters))
     players_q = players_q.order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
@@ -741,7 +791,8 @@ def money_compare():
 
     players_by_coach = defaultdict(list)
     for p in players:
-        players_by_coach[p.coach].append(p)
+        _, disp = normalize_coach_name(p.coach)
+        players_by_coach[disp].append(p)
 
     if min_rec:
         valid = {c["coach"] for c in comps}
@@ -749,7 +800,7 @@ def money_compare():
 
     coach_list = _get_coach_names()
 
-    not_enough = bool(request.args.getlist('coaches')) and len(selected) < 2
+    not_enough = bool(raw_selected) and len(selected) < 2
 
     return render_template(
         'recruits/money_compare.html',
@@ -764,16 +815,24 @@ def money_compare():
 
 @recruits_bp.route("/money/compare.csv")
 def money_compare_csv():
-    selected = request.args.getlist("coaches")
-    seen = set()
-    selected = [c for c in selected if not (c.lower() in seen or seen.add(c.lower()))]
+    raw_selected = request.args.getlist("coaches")
+    seen_keys: set[str] = set()
+    selected: list[str] = []
+    for raw in raw_selected:
+        key, disp = normalize_coach_name(raw)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        selected.append(disp)
     MAX_COMPARE = 10
     if len(selected) > MAX_COMPARE:
         selected = selected[:MAX_COMPARE]
     if not selected:
         return Response("No coaches selected", status=400)
 
-    selected_lower = [c.lower() for c in selected]
+    variant_set: set[str] = set()
+    for name in selected:
+        variant_set.update(get_alias_variants(name))
 
     from app.models.prospect import Prospect
 
@@ -783,7 +842,7 @@ def money_compare_csv():
     conf     = (request.args.get("conf") or "").strip()
     min_rec  = request.args.get("min_recruits", type=int)
 
-    filters = [func.lower(Prospect.coach).in_(selected_lower)]
+    filters = [func.lower(Prospect.coach).in_(variant_set)]
     if year_min is not None:
         filters.append(Prospect.year >= year_min)
     if year_max is not None:
@@ -797,8 +856,8 @@ def money_compare_csv():
     rows = q.all()
 
     if min_rec:
-        counts = Counter(p.coach.lower() for p in rows)
-        rows = [p for p in rows if counts[p.coach.lower()] >= min_rec]
+        counts = Counter(normalize_coach_name(p.coach)[0] for p in rows)
+        rows = [p for p in rows if counts[normalize_coach_name(p.coach)[0]] >= min_rec]
 
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -811,8 +870,9 @@ def money_compare_csv():
     ])
 
     for p in rows:
+        _, disp = normalize_coach_name(p.coach)
         w.writerow([
-            p.coach,
+            disp,
             p.coach_current_team or "",
             p.coach_current_conference or "",
             p.player,
