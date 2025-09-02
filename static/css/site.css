@@ -62,3 +62,8 @@
 .page--recruit .card {
   max-width: 100%;
 }
+
+/* Ensure filtered <option> elements using inline display:none are fully hidden */
+select option[style*="display: none"] {
+  display: none;
+}

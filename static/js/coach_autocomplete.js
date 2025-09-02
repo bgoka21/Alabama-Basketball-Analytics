@@ -85,7 +85,8 @@
     const q = filter.value.toLowerCase();
     Array.from(select.options).forEach(opt => {
       const show = opt.value.toLowerCase().includes(q);
-      opt.hidden = !show;
+      // Use display toggling for wider browser support instead of the `hidden` attribute
+      opt.style.display = show ? '' : 'none';
     });
   }
 
