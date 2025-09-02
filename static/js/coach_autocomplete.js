@@ -113,14 +113,41 @@
     updateButtonState();
     enforceMax();
     updateCsvLink();
+    // NEW: after selecting a coach, clear the filter and hide the list again
+    if (filter) {
+      filter.value = '';
+      applyFilter();   // applyFilter() hides the <select> when the query is empty
+      filter.focus();  // let the user immediately type the next coach
+    }
+    // OPTIONAL: trigger an immediate preview/compare update if available
+    try {
+      if (typeof window.renderCoachCompare === 'function') {
+        window.renderCoachCompare(); // call your in-page live render if it exists
+      } else {
+        const compareBtn =
+          document.querySelector('#compare-now, button[data-role="compare-now"], button[name="compare"]');
+        if (compareBtn && !compareBtn.disabled) {
+          // emulate a user click to refresh the preview/results area
+          compareBtn.click();
+        }
+      }
+    } catch (e) {
+      // no-op: this is optional; if not present, do nothing
+    }
   });
 
   if (filter) {
     filter.addEventListener('input', applyFilter);
     filter.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
-        e.preventDefault();
-        applyFilter();
+        const firstVisible = Array.from(select.options).find(o => o.style.display !== 'none');
+        if (firstVisible) {
+          firstVisible.selected = true;
+          // Fire the same flow as clicking/selecting
+          const changeEvent = new Event('change', { bubbles: true });
+          select.dispatchEvent(changeEvent);
+          e.preventDefault();
+        }
       }
     });
   }
