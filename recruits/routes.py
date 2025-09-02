@@ -3,8 +3,8 @@ import json
 import time
 import csv
 import io
-from collections import defaultdict
-from flask import render_template, request, redirect, url_for, flash, current_app, abort, jsonify, Response
+from collections import defaultdict, Counter
+from flask import render_template, request, redirect, url_for, flash, current_app, abort, Response
 from datetime import date
 from flask_login import login_required, current_user
 from types import SimpleNamespace
@@ -650,12 +650,6 @@ def _get_coach_names():
                                .distinct().order_by(Prospect.coach).all()]
 
 
-@recruits_bp.route('/coach_list')
-def coach_list():
-    """Return JSON array of coach names for autocomplete."""
-    return jsonify(_get_coach_names())
-
-
 @recruits_bp.route('/money/compare', methods=['GET'])
 def money_compare():
     """Compare projected/actual money totals for up to ten coaches."""
@@ -729,7 +723,14 @@ def money_compare():
     if min_rec:
         comps = [c for c in comps if c["recruits"] >= min_rec]
 
-    comps.sort(key=lambda c: c["net_sum"], reverse=True)
+    if sort == 'actual_desc':
+        comps.sort(key=lambda c: c["act_sum"], reverse=True)
+    elif sort == 'proj_desc':
+        comps.sort(key=lambda c: c["proj_sum"], reverse=True)
+    elif sort == 'avg_net_desc':
+        comps.sort(key=lambda c: c["avg_net"], reverse=True)
+    else:
+        comps.sort(key=lambda c: c["net_sum"], reverse=True)
 
     # Players query
     players_q = Prospect.query.filter(func.lower(Prospect.coach).in_(selected_lower))
@@ -742,7 +743,13 @@ def money_compare():
     for p in players:
         players_by_coach[p.coach].append(p)
 
+    if min_rec:
+        valid = {c["coach"] for c in comps}
+        players_by_coach = {k: v for k, v in players_by_coach.items() if k in valid}
+
     coach_list = _get_coach_names()
+
+    not_enough = bool(request.args.getlist('coaches')) and len(selected) < 2
 
     return render_template(
         'recruits/money_compare.html',
@@ -751,12 +758,18 @@ def money_compare():
         comps=comps,
         players_by_coach=players_by_coach,
         year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_rec, sort=sort,
+        not_enough=not_enough,
     )
 
 
 @recruits_bp.route("/money/compare.csv")
 def money_compare_csv():
     selected = request.args.getlist("coaches")
+    seen = set()
+    selected = [c for c in selected if not (c.lower() in seen or seen.add(c.lower()))]
+    MAX_COMPARE = 10
+    if len(selected) > MAX_COMPARE:
+        selected = selected[:MAX_COMPARE]
     if not selected:
         return Response("No coaches selected", status=400)
 
@@ -768,6 +781,7 @@ def money_compare_csv():
     year_max = request.args.get("year_max", type=int)
     sheet    = (request.args.get("sheet") or "").strip()
     conf     = (request.args.get("conf") or "").strip()
+    min_rec  = request.args.get("min_recruits", type=int)
 
     filters = [func.lower(Prospect.coach).in_(selected_lower)]
     if year_min is not None:
@@ -781,6 +795,10 @@ def money_compare_csv():
 
     q = Prospect.query.filter(and_(*filters)).order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
     rows = q.all()
+
+    if min_rec:
+        counts = Counter(p.coach.lower() for p in rows)
+        rows = [p for p in rows if counts[p.coach.lower()] >= min_rec]
 
     buf = io.StringIO()
     w = csv.writer(buf)

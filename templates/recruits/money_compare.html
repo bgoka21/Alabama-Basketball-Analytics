@@ -15,7 +15,8 @@
     <input type="hidden" name="sort" value="{{ sort or '' }}">
 
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <input id="coach-filter" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
+      <label for="coach-filter" class="sr-only">Search coaches</label>
+      <input id="coach-filter" aria-label="Search coaches" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
       <div class="flex items-center gap-2 text-sm text-gray-500">
         <span id="coach-count">0/10 selected</span>
         <button type="button" id="coach-clear" class="hover:underline">Clear all</button>
@@ -25,7 +26,8 @@
     <div class="text-center text-xs uppercase tracking-wide text-gray-500">Select Coaches</div>
 
     <div class="flex flex-col sm:flex-row sm:items-start gap-3">
-      <select id="coach-search" name="coaches" multiple size="10" class="select select-bordered w-full sm:max-w-md">
+      <label for="coach-search" class="sr-only">Coach list</label>
+      <select id="coach-search" name="coaches" data-testid="compare-select" multiple size="10" class="select select-bordered w-full sm:max-w-md" aria-describedby="coach-help">
         {% for coach in coaches %}
           <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
         {% endfor %}
@@ -33,8 +35,7 @@
 
       <div class="flex-1">
         <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
-        <div id="coach-hidden" class="hidden"></div>
-        <p class="mt-2 text-sm text-gray-500">Select coaches and click Compare.</p>
+        <p id="coach-help" class="mt-2 text-sm text-gray-500">Select coaches and click Compare.</p>
       </div>
     </div>
 
@@ -42,6 +43,9 @@
       <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}">Download CSV</a>
       <button id="compare-btn" type="submit" class="btn btn-primary">Compare</button>
     </div>
+    {% if not_enough %}
+      <p class="text-sm text-red-600 text-right">Select at least two coaches.</p>
+    {% endif %}
   </form>
 
   <noscript>
