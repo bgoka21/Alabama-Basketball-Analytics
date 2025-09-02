@@ -79,39 +79,50 @@
         <span class="text-sm text-gray-500 hidden group-open:inline">Hide players</span>
       </summary>
 
-      <div class="px-4 pb-4 overflow-x-auto">
+      <div class="px-4 pb-4 overflow-x-auto" data-coach-scope="{{ loop.index0 }}">
         {% set roster = players_by_coach.get(c.coach, []) %}
         {% if roster %}
+        <div class="hidden mb-2 flex items-center justify-between gap-2 text-xs" data-controls>
+          <div>
+            <label for="player-search-{{ loop.index0 }}" class="sr-only">Search players</label>
+            <input id="player-search-{{ loop.index0 }}" aria-label="Search players" type="text" placeholder="Search players..." class="input input-xs w-36" data-search>
+          </div>
+          <div class="flex items-center gap-2 text-gray-500">
+            <span data-row-count aria-live="polite">{{ roster|length }} players</span>
+            <span data-topn-status class="hidden">Top 25 by NET</span>
+            <button type="button" data-topn-toggle class="text-blue-600 hover:underline hidden">Show all</button>
+          </div>
+        </div>
         <table class="min-w-full text-sm">
           <thead class="text-left sticky top-0 bg-white dark:bg-gray-900">
             <tr class="border-b border-gray-200 dark:border-gray-800">
-              <th class="py-2 pr-3">Player</th>
-              <th class="py-2 pr-3">Team</th>
-              <th class="py-2 pr-3">Year</th>
-              <th class="py-2 pr-3">Proj Pick</th>
-              <th class="py-2 pr-3">Actual Pick</th>
-              <th class="py-2 pr-3 text-right">Projected $</th>
-              <th class="py-2 pr-3 text-right">Actual $</th>
-              <th class="py-2 pr-3 text-right">NET $</th>
+              <th class="py-2 pr-3 cursor-pointer select-none" data-key="player" data-default="asc" aria-sort="none">Player <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 cursor-pointer select-none" data-key="team" data-default="asc" aria-sort="none">Team <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 cursor-pointer select-none" data-key="year" data-default="desc" aria-sort="none">Year <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 cursor-pointer select-none" data-key="proj_pick" data-default="asc" aria-sort="none">Proj Pick <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 cursor-pointer select-none" data-key="act_pick" data-default="asc" aria-sort="none">Actual Pick <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 text-right cursor-pointer select-none" data-key="projected" data-default="desc" aria-sort="none">Projected $ <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 text-right cursor-pointer select-none" data-key="actual" data-default="desc" aria-sort="none">Actual $ <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
+              <th class="py-2 pr-3 text-right cursor-pointer select-none" data-key="net" data-default="desc" aria-sort="none">NET $ <span class="inline-block ml-1 opacity-0" data-caret>▲</span></th>
             </tr>
           </thead>
           <tbody>
             {% for p in roster %}
             <tr class="border-b border-gray-100 dark:border-gray-800">
-              <td class="py-1 pr-3">{{ p.player }}</td>
-              <td class="py-1 pr-3">{{ p.team or '—' }}</td>
-              <td class="py-1 pr-3">{{ p.year }}</td>
-              <td class="py-1 pr-3">
+              <td class="py-1 pr-3" data-cell="player">{{ p.player }}</td>
+              <td class="py-1 pr-3" data-cell="team">{{ p.team or '—' }}</td>
+              <td class="py-1 pr-3" data-cell="year" data-sort="{{ p.year }}">{{ p.year }}</td>
+              <td class="py-1 pr-3" data-cell="proj_pick" data-sort="{{ p.projected_pick if p.projected_pick is not none else '' }}">
                 {% set proj_pick = p.projected_pick_raw or (('#' ~ p.projected_pick) if p.projected_pick is not none else '—') %}
                 {{ proj_pick }}
               </td>
-              <td class="py-1 pr-3">
+              <td class="py-1 pr-3" data-cell="act_pick" data-sort="{{ p.actual_pick if p.actual_pick is not none else '' }}">
                 {% set act_pick = p.actual_pick_raw or (('#' ~ p.actual_pick) if p.actual_pick is not none else '—') %}
                 {{ act_pick }}
               </td>
-              <td class="py-1 pr-3 text-right">{{ p.projected_money|fmt_money }}</td>
-              <td class="py-1 pr-3 text-right">{{ p.actual_money|fmt_money }}</td>
-              <td class="py-1 pr-3 text-right {{ p.net|posneg }}">{{ p.net|fmt_money }}</td>
+              <td class="py-1 pr-3 text-right" data-cell="projected" data-sort="{{ p.projected_money }}">{{ p.projected_money|fmt_money }}</td>
+              <td class="py-1 pr-3 text-right" data-cell="actual" data-sort="{{ p.actual_money }}">{{ p.actual_money|fmt_money }}</td>
+              <td class="py-1 pr-3 text-right {{ p.net|posneg }}" data-cell="net" data-sort="{{ p.net }}">{{ p.net|fmt_money }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -128,4 +139,5 @@
   {% endif %}
 </div>
 <script src="{{ url_for('static', filename='js/coach_autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/compare_players_table.js') }}"></script>
 {% endblock %}
