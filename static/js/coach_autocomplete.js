@@ -7,7 +7,8 @@
   const btn = document.getElementById('compare-btn');
   const clearBtn = document.getElementById('coach-clear');
   const csvLink = document.getElementById('compare-csv');
-  if (!select) return;
+  if (!select || select.dataset.enhanced) return;
+  select.dataset.enhanced = '1';
 
   function selectedValues() {
     return Array.from(select.selectedOptions).map(o => o.value);
@@ -57,11 +58,13 @@
       const badge = document.createElement('span');
       badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
       badge.setAttribute('data-coach-badge', key);
+      badge.setAttribute('data-testid', 'compare-badge');
       badge.textContent = val;
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'ml-1 text-xs';
       x.textContent = '×';
+      x.setAttribute('aria-label', `Remove ${val}`);
       x.addEventListener('click', () => {
         Array.from(select.options).forEach(opt => {
           if (opt.value === val) opt.selected = false;

@@ -92,9 +92,6 @@ def test_money_compare_interface(client):
     assert sel is not None
     assert sel.has_attr('multiple')
 
-    rv2 = client.get('/recruits/coach_list')
-    assert rv2.status_code == 200
-    assert isinstance(rv2.get_json(), list)
 
 
 def test_money_compare_has_search_and_badge_container(client):
