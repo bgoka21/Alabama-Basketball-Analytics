@@ -18,7 +18,7 @@
       <label for="coach-filter" class="sr-only">Search coaches</label>
       <input id="coach-filter" aria-label="Search coaches" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
       <div class="flex items-center gap-2 text-sm text-gray-500">
-        <span id="coach-count">0/10 selected</span>
+        <span id="coach-count" aria-live="polite">0/10 selected</span>
         <button type="button" id="coach-clear" class="hover:underline">Clear all</button>
       </div>
     </div>
@@ -26,8 +26,8 @@
     <div class="text-center text-xs uppercase tracking-wide text-gray-500">Select Coaches</div>
 
     <div class="flex flex-col sm:flex-row sm:items-start gap-3">
-      <label for="coach-search" class="sr-only">Coach list</label>
-      <select id="coach-search" name="coaches" data-testid="compare-select" multiple size="10" class="select select-bordered w-full sm:max-w-md" aria-describedby="coach-help">
+      <label for="coach-search" class="sr-only">Coaches to compare</label>
+      <select id="coach-search" name="coaches" data-testid="compare-select" multiple size="10" class="select select-bordered w-full sm:max-w-md" aria-describedby="coach-help" aria-label="Coaches to compare">
         {% for coach in coaches %}
           <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
         {% endfor %}
@@ -40,7 +40,7 @@
     </div>
 
     <div class="flex justify-end items-center gap-4">
-      <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits) }}">Download CSV</a>
+      <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">Download CSV</a>
       <button id="compare-btn" type="submit" class="btn btn-primary">Compare</button>
     </div>
     {% if not_enough %}
@@ -53,7 +53,6 @@
   </noscript>
 
   {% if comps %}
-  <!-- --- START PATCH: Responsive cards grid --- -->
   <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
     {% for c in comps %}
     <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -70,7 +69,6 @@
     </div>
     {% endfor %}
   </div>
-  <!-- --- END PATCH --- -->
 
   <div class="space-y-4 mt-4">
     {% for c in comps %}
