@@ -250,7 +250,9 @@ def create_app():
     return app
 
 # Create the app instance for CLI & WSGI
-app = create_app()
+app = None  # type: ignore
+if os.environ.get("FLASK_CREATE_APP") == "1":
+    app = create_app()
 
 if __name__ == "__main__":
     if not os.environ.get('SKIP_CREATE_ALL'):
