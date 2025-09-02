@@ -41,11 +41,12 @@
 
     <div class="flex flex-col sm:flex-row sm:items-start gap-3">
       <label for="coach-search" class="sr-only">Coaches to compare</label>
-      <select id="coach-search" name="coaches" data-testid="compare-select" multiple size="10" class="select select-bordered w-full sm:max-w-md" aria-describedby="coach-help" aria-label="Coaches to compare">
+      <select id="coach-search" name="coaches" data-testid="compare-select" multiple size="10" class="select select-bordered w-full sm:max-w-md hidden" aria-describedby="coach-help" aria-label="Coaches to compare">
         {% for coach in coaches %}
           <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
         {% endfor %}
       </select>
+      <div id="coach-no-matches" class="hidden text-sm text-gray-500">No coaches match your search.</div>
 
       <div class="flex-1">
         <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
