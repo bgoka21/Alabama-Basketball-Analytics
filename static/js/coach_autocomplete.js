@@ -8,6 +8,7 @@
   const clearBtn = document.getElementById('coach-clear');
   const csvLink = document.getElementById('compare-csv');
   const noMatches = document.getElementById('coach-no-matches');
+  const searchBtn = document.getElementById('coach-search-btn');
   if (!select || select.dataset.enhanced) return;
   select.dataset.enhanced = '1';
 
@@ -116,6 +117,18 @@
 
   if (filter) {
     filter.addEventListener('input', applyFilter);
+    filter.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyFilter();
+      }
+    });
+  }
+
+  if (searchBtn) {
+    searchBtn.addEventListener('click', applyFilter);
+    searchBtn.disabled = true;
+    searchBtn.classList.add('hidden');
   }
 
   if (clearBtn) {
