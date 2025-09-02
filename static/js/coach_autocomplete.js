@@ -7,6 +7,7 @@
   const btn = document.getElementById('compare-btn');
   const clearBtn = document.getElementById('coach-clear');
   const csvLink = document.getElementById('compare-csv');
+  const noMatches = document.getElementById('coach-no-matches');
   if (!select || select.dataset.enhanced) return;
   select.dataset.enhanced = '1';
 
@@ -83,11 +84,26 @@
   function applyFilter() {
     if (!filter) return;
     const q = filter.value.toLowerCase();
+    let matches = 0;
     Array.from(select.options).forEach(opt => {
       const show = opt.value.toLowerCase().includes(q);
       // Use display toggling for wider browser support instead of the `hidden` attribute
       opt.style.display = show ? '' : 'none';
+      if (show) matches++;
     });
+
+    if (q) {
+      if (matches > 0) {
+        select.classList.remove('hidden');
+        if (noMatches) noMatches.classList.add('hidden');
+      } else {
+        select.classList.add('hidden');
+        if (noMatches) noMatches.classList.remove('hidden');
+      }
+    } else {
+      select.classList.add('hidden');
+      if (noMatches) noMatches.classList.add('hidden');
+    }
   }
 
   select.addEventListener('change', () => {
