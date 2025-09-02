@@ -90,6 +90,7 @@
       const show = opt.value.toLowerCase().includes(q);
       // Use display toggling for wider browser support instead of the `hidden` attribute
       opt.style.display = show ? '' : 'none';
+      opt.hidden = !show;
       if (show) matches++;
     });
 
@@ -113,37 +114,32 @@
     updateButtonState();
     enforceMax();
     updateCsvLink();
-    // NEW: after selecting a coach, clear the filter and hide the list again
+    // After selecting a coach, clear the search input and hide the list again
     if (filter) {
       filter.value = '';
-      applyFilter();   // applyFilter() hides the <select> when the query is empty
-      filter.focus();  // let the user immediately type the next coach
+      // Re-run filtering logic; with an empty query, this should hide the <select>
+      applyFilter();
+      // Put focus back in the input so the user can immediately type the next name
+      filter.focus();
     }
-    // OPTIONAL: trigger an immediate preview/compare update if available
     try {
       if (typeof window.renderCoachCompare === 'function') {
-        window.renderCoachCompare(); // call your in-page live render if it exists
+        window.renderCoachCompare();
       } else {
         const compareBtn =
-          document.querySelector('#compare-now, button[data-role="compare-now"], button[name="compare"]');
-        if (compareBtn && !compareBtn.disabled) {
-          // emulate a user click to refresh the preview/results area
-          compareBtn.click();
-        }
+          document.querySelector('#compare-now, button[data-role="compare-now"], #compare-btn, button[name="compare"]');
+        if (compareBtn && !compareBtn.disabled) compareBtn.click();
       }
-    } catch (e) {
-      // no-op: this is optional; if not present, do nothing
-    }
+    } catch (_) {}
   });
 
   if (filter) {
     filter.addEventListener('input', applyFilter);
-    filter.addEventListener('keydown', e => {
+    filter.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        const firstVisible = Array.from(select.options).find(o => o.style.display !== 'none');
+        const firstVisible = Array.from(select.options).find(o => !o.hidden);
         if (firstVisible) {
           firstVisible.selected = true;
-          // Fire the same flow as clicking/selecting
           const changeEvent = new Event('change', { bubbles: true });
           select.dispatchEvent(changeEvent);
           e.preventDefault();
