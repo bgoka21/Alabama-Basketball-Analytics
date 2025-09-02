@@ -3,8 +3,22 @@
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
   <div class="sticky top-0 z-10 pb-2 mb-4 bg-white dark:bg-gray-800 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
     <h1 class="text-2xl sm:text-3xl font-bold">Compare Coaches</h1>
-    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">← Back to Money Board</a>
+    <div class="flex items-center gap-2">
+      <div id="saved-sets" class="hidden items-center gap-1 text-sm" aria-label="Saved compare sets">
+        <label for="saved-sets-list" class="sr-only">Saved sets</label>
+        <select id="saved-sets-list" class="select select-xs">
+          <option value="">Saved sets…</option>
+        </select>
+        <button type="button" id="saved-sets-save" class="btn btn-xs">Save</button>
+        <button type="button" id="saved-sets-apply" class="btn btn-xs" disabled>Apply</button>
+        <button type="button" id="saved-sets-copy" class="btn btn-xs" disabled>Copy</button>
+        <button type="button" id="saved-sets-rename" class="btn btn-xs" disabled>Rename</button>
+        <button type="button" id="saved-sets-delete" class="btn btn-xs" disabled>Delete</button>
+      </div>
+      <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board', year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">← Back to Money Board</a>
+    </div>
   </div>
+  <div id="saved-sets-status" class="sr-only" aria-live="polite"></div>
 
   <form method="get" action="{{ url_for('recruits.money_compare') }}" class="space-y-4">
     <input type="hidden" name="year_min" value="{{ year_min if year_min is not none else '' }}">
@@ -140,4 +154,5 @@
 </div>
 <script src="{{ url_for('static', filename='js/coach_autocomplete.js') }}"></script>
 <script src="{{ url_for('static', filename='js/compare_players_table.js') }}"></script>
+<script src="{{ url_for('static', filename='js/compare_saved_sets.js') }}"></script>
 {% endblock %}
