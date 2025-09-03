@@ -1,187 +1,194 @@
-(function () {
-  const MAX = 10;
-  const select = document.getElementById('coach-search');
-  const filter = document.getElementById('coach-filter');
-  const holder = document.getElementById('coach-selected');
-  const counter = document.getElementById('coach-count');
-  const btn = document.getElementById('compare-btn');
-  const clearBtn = document.getElementById('coach-clear');
-  const csvLink = document.getElementById('compare-csv');
-  const noMatches = document.getElementById('coach-no-matches');
-  const searchBtn = document.getElementById('coach-search-btn');
-  if (!select || select.dataset.enhanced) return;
-  select.dataset.enhanced = '1';
+// static/js/coach_autocomplete.js
+(() => {
+  document.addEventListener('DOMContentLoaded', () => {
+    const filter  = document.getElementById('coach-filter');
+    const select  = document.getElementById('coach-search');
+    const chips   = document.getElementById('coach-selected');
+    const btn     = document.getElementById('compare-btn');
+    const counter = document.getElementById('coach-count');   // ok if null
+    const clear   = document.getElementById('coach-clear');   // ok if null
 
-  function selectedValues() {
-    return Array.from(select.selectedOptions).map(o => o.value);
-  }
+    if (!filter || !select) return;
 
-  function updateCounter() {
-    if (counter) counter.textContent = `${selectedValues().length}/${MAX} selected`;
-  }
+    const MAX = (() => {
+      const m = (select.dataset && select.dataset.max) ? parseInt(select.dataset.max, 10) : 10;
+      return Number.isFinite(m) ? m : 10;
+    })();
 
-  function updateButtonState() {
-    if (!btn) return;
-    const n = selectedValues().length;
-    btn.disabled = (n < 1 || n > MAX);
-  }
+    // ---------- helpers ----------
+    const normalize = (s) => (s || '')
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-  function enforceMax() {
-    const lock = selectedValues().length >= MAX;
-    Array.from(select.options).forEach(opt => {
-      if (lock && !opt.selected) {
-        opt.disabled = true;
-      } else {
-        opt.disabled = false;
-      }
-    });
-  }
+    const tokens = (s) => normalize(s).split(' ').filter(Boolean);
 
-  function updateCsvLink() {
-    if (!csvLink) return;
-    const params = new URLSearchParams(window.location.search);
-    params.delete('coaches');
-    selectedValues().forEach(v => params.append('coaches', v));
-    csvLink.href = csvLink.getAttribute('href').split('?')[0] + '?' + params.toString();
-  }
+    // a match if *every* query token appears (prefix or full) in the option label/value tokens
+    function optionMatches(opt, q) {
+      if (!q) return true;
+      const qTok = tokens(q);
+      if (!qTok.length) return true;
 
-  function refreshBadges() {
-    if (!holder) return;
-    const current = new Set(selectedValues().map(v => v.toLowerCase()));
-    // remove badges that are no longer selected
-    Array.from(holder.querySelectorAll('[data-coach-badge]')).forEach(badge => {
-      const name = badge.getAttribute('data-coach-badge');
-      if (!current.has(name)) badge.remove();
-    });
-    // add badges for new selections
-    selectedValues().forEach(val => {
-      const key = val.toLowerCase();
-      if (holder.querySelector(`[data-coach-badge='${key}']`)) return;
-      const badge = document.createElement('span');
-      badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm';
-      badge.setAttribute('data-coach-badge', key);
-      badge.setAttribute('data-testid', 'compare-badge');
-      badge.textContent = val;
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'ml-1 text-xs';
-      x.textContent = '×';
-      x.setAttribute('aria-label', `Remove ${val}`);
-      x.addEventListener('click', () => {
-        Array.from(select.options).forEach(opt => {
-          if (opt.value === val) opt.selected = false;
-        });
-        refreshBadges();
-        updateCounter();
-        updateButtonState();
-        enforceMax();
-        updateCsvLink();
-      });
-      badge.appendChild(x);
-      holder.appendChild(badge);
-    });
-  }
+      const label = (opt.textContent || opt.innerText || '') + ' ' + (opt.value || '');
+      const oTok = tokens(label);
+      if (!oTok.length) return false;
 
-  function applyFilter() {
-    if (!filter) return;
-    const q = filter.value.toLowerCase();
-    let matches = 0;
-
-    Array.from(select.options).forEach(opt => {
-      const show = opt.value.toLowerCase().includes(q);
-      // Use display toggling for wider browser support
-      opt.style.display = show ? '' : 'none';
-      opt.hidden = !show;
-      if (show) matches++;
-    });
-
-    const hasSelection = selectedValues().length > 0;
-    // Show the list if: there’s a query with matches, OR the input is focused, OR something is already selected.
-    if ((q && matches > 0) || document.activeElement === filter || hasSelection) {
-      select.classList.remove('hidden');
-      if (noMatches) noMatches.classList.add('hidden');
-    } else if (q && matches === 0) {
-      select.classList.add('hidden');
-      if (noMatches) noMatches.classList.remove('hidden');
-    } else {
-      // No query and no selection: keep it hidden
-      select.classList.add('hidden');
-      if (noMatches) noMatches.classList.add('hidden');
+      return qTok.every(t => oTok.some(o => o === t || o.startsWith(t)));
     }
-  }
 
-  select.addEventListener('change', () => {
-    refreshBadges();
-    updateCounter();
-    updateButtonState();
-    enforceMax();
-    updateCsvLink();
-
-    // Clear the search *but* keep the list visible if something is selected
-    if (filter) {
-      filter.value = '';
+    function selectedValues() {
+      return Array.from(select.options).filter(o => o.selected).map(o => o.value);
     }
-    applyFilter();
 
-    // Optional: auto-compare only if you want. Keeping as-is is fine:
-    try {
-      if (typeof window.renderCoachCompare === 'function') {
-        window.renderCoachCompare();
+    function enforceMax() {
+      const sel = Array.from(select.options).filter(o => o.selected);
+      if (sel.length <= MAX) return;
+      // drop oldest selections first
+      let toDrop = sel.length - MAX;
+      for (const o of sel) {
+        if (toDrop <= 0) break;
+        o.selected = false;
+        toDrop--;
       }
-    } catch {}
-  });
+    }
 
-  if (filter) {
-    filter.addEventListener('input', applyFilter);
-    filter.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault(); // prevent accidental form submit
-        const firstVisible = Array.from(select.options).find(o => !o.hidden);
-        if (firstVisible) {
-          firstVisible.selected = true;
-          const changeEvent = new Event('change', { bubbles: true });
-          select.dispatchEvent(changeEvent);
-        } else {
-          // No match → show the list + "no matches"
-          applyFilter();
-          if (noMatches) noMatches.classList.remove('hidden');
-        }
-      }
-    });
+    function addChipFor(opt) {
+      if (!chips) return;
+      const exists = chips.querySelector(`[data-value="${CSS.escape(opt.value)}"]`);
+      if (exists) return;
 
-    // Also reveal the list when focusing the search box
-    filter.addEventListener('focus', () => {
-      applyFilter();
-    });
-  }
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.dataset.value = opt.value;
+      chip.className = 'inline-flex items-center rounded-full border px-3 py-1 text-sm mr-2 mb-2';
+      chip.textContent = opt.textContent;
 
-  if (searchBtn) {
-    searchBtn.addEventListener('click', applyFilter);
-    searchBtn.disabled = true;
-    searchBtn.classList.add('hidden');
-  }
+      const x = document.createElement('span');
+      x.textContent = ' ×';
+      x.className = 'ml-1 opacity-70';
+      chip.appendChild(x);
 
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      Array.from(select.options).forEach(opt => {
+      chip.addEventListener('click', () => {
         opt.selected = false;
-        opt.disabled = false;
+        chip.remove();
+        updateUI();
       });
-      if (filter) filter.value = '';
-      applyFilter();
-      refreshBadges();
-      updateCounter();
-      updateButtonState();
-      enforceMax();
-      updateCsvLink();
-    });
-  }
 
-  // initial state
-  refreshBadges();
-  updateCounter();
-  updateButtonState();
-  enforceMax();
-  updateCsvLink();
-  applyFilter();
+      chips.appendChild(chip);
+    }
+
+    function refreshChips() {
+      if (!chips) return;
+      chips.innerHTML = '';
+      for (const o of select.options) {
+        if (o.selected) addChipFor(o);
+      }
+    }
+
+    function updateCounter() {
+      if (!counter) return;
+      counter.textContent = `${selectedValues().length}/${MAX} selected`;
+    }
+
+    function updateButton() {
+      if (!btn) return;
+      // allow comparing with >= 1 (change to 2 if you want)
+      btn.disabled = selectedValues().length < 1;
+    }
+
+    function updateCsvLink() {
+      // optional: if you have an element with id="compare-csv" that needs query sync
+      const a = document.getElementById('compare-csv');
+      if (!a) return;
+      const url = new URL(a.href, window.location.origin);
+      url.searchParams.delete('coaches');
+      for (const v of selectedValues()) url.searchParams.append('coaches', v);
+      a.href = url.toString();
+    }
+
+    function applyFilter() {
+      const q = filter.value;
+      let visible = 0;
+      for (const opt of select.options) {
+        const show = optionMatches(opt, q);
+        opt.hidden = !show;
+        opt.style.display = show ? '' : 'none';
+        if (show) visible++;
+      }
+
+      // Make the list visible when typing or when there are selections
+      if (q || selectedValues().length) {
+        select.classList.remove('hidden');
+        // resize to a comfortable height based on visible options
+        select.size = Math.min(Math.max(visible || 6, 6), 12);
+      } else {
+        select.classList.add('hidden');
+      }
+    }
+
+    function selectFirstMatchFromQuery() {
+      const q = filter.value;
+      // search across *all* options (not only visible)
+      const match = Array.from(select.options).find(o => optionMatches(o, q));
+      if (!match) return false;
+      match.selected = true;
+      return true;
+    }
+
+    function clearSearchKeepList() {
+      filter.value = '';
+      applyFilter();
+      filter.focus();
+    }
+
+    function updateUI() {
+      enforceMax();
+      refreshChips();
+      updateCounter();
+      updateButton();
+      updateCsvLink();
+    }
+
+    // ---------- events ----------
+    filter.addEventListener('focus', applyFilter);
+    filter.addEventListener('input', applyFilter);
+
+    // Pressing Enter in the search:
+    //  - prevents form submit
+    //  - picks the first matching option (even if list is hidden)
+    //  - clears the search but keeps the list accessible
+    filter.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const added = selectFirstMatchFromQuery();
+      updateUI();
+      clearSearchKeepList();
+
+      // If nothing matched, still show the list so it's obvious
+      if (!added) select.classList.remove('hidden');
+    });
+
+    // Change from the <select> (click, arrow+space, etc.)
+    select.addEventListener('change', () => {
+      updateUI();
+      // keep user in the flow of adding more
+      filter.focus();
+    });
+
+    if (clear) {
+      clear.addEventListener('click', (e) => {
+        e.preventDefault();
+        for (const o of select.options) o.selected = false;
+        updateUI();
+        applyFilter();
+        filter.focus();
+      });
+    }
+
+    // ---------- init ----------
+    updateUI();
+    // If there were server-preselected coaches, reveal the list
+    if (selectedValues().length) select.classList.remove('hidden');
+  });
 })();
