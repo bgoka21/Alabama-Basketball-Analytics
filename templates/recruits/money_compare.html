@@ -39,8 +39,7 @@
             name="coaches"
             multiple
             size="12"
-            class="hidden w-full sm:max-w-md border rounded p-1 overflow-auto"
-            aria-describedby="coach-help"
+            class="hidden w-full max-w-md border rounded p-1 overflow-auto"
             aria-label="Coaches to compare"
             data-max="10">
       {% for coach in coaches %}
@@ -56,7 +55,7 @@
 
     <div id="coach-selected" class="flex items-center gap-2 flex-wrap mt-2"></div>
 
-    <div id="coach-help" class="text-xs text-gray-500 text-right">Select up to ten coaches to compare</div>
+    <div id="coach-help" class="text-xs text-gray-500 text-right">Select up to 10 coaches to compare</div>
 
     <div class="flex justify-end items-center gap-4">
       <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">Download CSV</a>
@@ -157,7 +156,7 @@
     <div class="text-sm text-gray-500">Select coaches and click Compare.</div>
   {% endif %}
 </div>
-<script defer src="{{ url_for('static', filename='js/coach_autocomplete.js') }}?v=2025-09-03-1"></script>
+<script defer src="{{ url_for('static', filename='js/coach_autocomplete.js') }}?v=2025-09-03-2"></script>
 <script src="{{ url_for('static', filename='js/compare_players_table.js') }}"></script>
 <script src="{{ url_for('static', filename='js/compare_saved_sets.js') }}"></script>
 {% endblock %}
