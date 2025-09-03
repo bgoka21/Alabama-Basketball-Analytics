@@ -30,7 +30,12 @@
 
     <div class="flex flex-wrap items-center justify-between gap-2">
       <label for="coach-filter" class="sr-only">Search coaches</label>
-      <input id="coach-filter" aria-label="Search coaches" type="text" placeholder="Search coaches..." class="input input-sm w-52" />
+      <input id="coach-filter"
+             aria-label="Search coaches"
+             type="text"
+             placeholder="Search coaches..."
+             class="input input-sm w-52"
+             autocomplete="off" />
       <button type="button" id="coach-search-btn" class="btn btn-sm hidden">Search</button>
       <div class="flex items-center gap-2 text-sm text-gray-500">
         <span id="coach-count" aria-live="polite">0/10 selected</span>
@@ -38,11 +43,16 @@
       </div>
     </div>
     <div class="text-xs text-gray-500 text-right">Select up to <b>ten</b> coaches to compare</div>
-    <div class="text-center text-xs uppercase tracking-wide text-gray-500">Select Coaches</div>
 
     <div class="flex flex-col sm:flex-row sm:items-start gap-3">
       <label for="coach-search" class="sr-only">Coaches to compare</label>
-      <select id="coach-search" name="coaches" data-testid="compare-select" multiple size="10" class="select select-bordered w-full sm:max-w-md hidden" aria-describedby="coach-help" aria-label="Coaches to compare">
+      <select id="coach-search"
+              name="coaches"
+              multiple
+              size="12"
+              class="hidden w-full max-w-md border rounded p-1 overflow-auto"
+              aria-describedby="coach-help"
+              aria-label="Coaches to compare">
         {% for coach in coaches %}
           <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
         {% endfor %}
@@ -51,7 +61,9 @@
 
       <div class="flex-1">
         <div id="coach-selected" class="flex items-center gap-2 flex-wrap"></div>
-        <p id="coach-help" class="mt-2 text-sm text-gray-500">Select coaches and click Compare.</p>
+        <p id="coach-help" class="mt-2 text-sm text-gray-500">
+          Type to filter. Press Enter to add the top match. Click a badge “×” to remove.
+        </p>
       </div>
     </div>
 
