@@ -23,7 +23,7 @@
   function updateButtonState() {
     if (!btn) return;
     const n = selectedValues().length;
-    btn.disabled = (n < 2 || n > MAX);
+    btn.disabled = (n < 1 || n > MAX);
   }
 
   function enforceMax() {
@@ -86,23 +86,25 @@
     if (!filter) return;
     const q = filter.value.toLowerCase();
     let matches = 0;
+
     Array.from(select.options).forEach(opt => {
       const show = opt.value.toLowerCase().includes(q);
-      // Use display toggling for wider browser support instead of the `hidden` attribute
+      // Use display toggling for wider browser support
       opt.style.display = show ? '' : 'none';
       opt.hidden = !show;
       if (show) matches++;
     });
 
-    if (q) {
-      if (matches > 0) {
-        select.classList.remove('hidden');
-        if (noMatches) noMatches.classList.add('hidden');
-      } else {
-        select.classList.add('hidden');
-        if (noMatches) noMatches.classList.remove('hidden');
-      }
+    const hasSelection = selectedValues().length > 0;
+    // Show the list if: there’s a query with matches, OR the input is focused, OR something is already selected.
+    if ((q && matches > 0) || document.activeElement === filter || hasSelection) {
+      select.classList.remove('hidden');
+      if (noMatches) noMatches.classList.add('hidden');
+    } else if (q && matches === 0) {
+      select.classList.add('hidden');
+      if (noMatches) noMatches.classList.remove('hidden');
     } else {
+      // No query and no selection: keep it hidden
       select.classList.add('hidden');
       if (noMatches) noMatches.classList.add('hidden');
     }
@@ -114,37 +116,42 @@
     updateButtonState();
     enforceMax();
     updateCsvLink();
-    // After selecting a coach, clear the search input and hide the list again
+
+    // Clear the search *but* keep the list visible if something is selected
     if (filter) {
       filter.value = '';
-      // Re-run filtering logic; with an empty query, this should hide the <select>
-      applyFilter();
-      // Put focus back in the input so the user can immediately type the next name
-      filter.focus();
     }
+    applyFilter();
+
+    // Optional: auto-compare only if you want. Keeping as-is is fine:
     try {
       if (typeof window.renderCoachCompare === 'function') {
         window.renderCoachCompare();
-      } else {
-        const compareBtn =
-          document.querySelector('#compare-now, button[data-role="compare-now"], #compare-btn, button[name="compare"]');
-        if (compareBtn && !compareBtn.disabled) compareBtn.click();
       }
-    } catch (_) {}
+    } catch {}
   });
 
   if (filter) {
     filter.addEventListener('input', applyFilter);
     filter.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
+        e.preventDefault(); // prevent accidental form submit
         const firstVisible = Array.from(select.options).find(o => !o.hidden);
         if (firstVisible) {
           firstVisible.selected = true;
           const changeEvent = new Event('change', { bubbles: true });
           select.dispatchEvent(changeEvent);
-          e.preventDefault();
+        } else {
+          // No match → show the list + "no matches"
+          applyFilter();
+          if (noMatches) noMatches.classList.remove('hidden');
         }
       }
+    });
+
+    // Also reveal the list when focusing the search box
+    filter.addEventListener('focus', () => {
+      applyFilter();
     });
   }
 
