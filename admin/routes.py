@@ -3630,7 +3630,10 @@ def player_shot_type(player_name):
 @login_required
 @admin_required
 def player_session_report(player_name):
-    """Compare a player's first two sessions using canonical helpers."""
+    """Compare a player's sessions using canonical helpers.
+
+    Supports an arbitrary number of sessions, not just two.
+    """
     player = Roster.query.filter_by(player_name=player_name).first()
     if not player:
         abort(404, description=f'Player {player_name} not found')
@@ -3743,18 +3746,21 @@ def player_session_report(player_name):
 
     display_stats = []
     for key, label in stats_keys:
-        v1 = sessions[0].stats.get(key) if len(sessions) >= 1 else None
-        v2 = sessions[1].stats.get(key) if len(sessions) >= 2 else None
+        session_values = [sess.stats.get(key) for sess in sessions]
         ov = overall_stats.get(key)
         if ov is None:
             continue
-        improved = compute_improved_flag(key, v1, v2)
+        improved = compute_improved_flag(
+            key,
+            session_values[0] if len(session_values) > 0 else None,
+            session_values[1] if len(session_values) > 1 else None,
+        )
         display_stats.append({
-            'key': key,
-            'label': label,
-            'session_values': [v1, v2],
-            'overall_value': ov,
-            'improved': improved,
+            "key": key,
+            "label": label,
+            "session_values": session_values,
+            "overall_value": ov,
+            "improved": improved,
         })
 
     return render_template(
