@@ -115,7 +115,7 @@ def test_money_compare_limit(client, app):
     selected_opts = soup.select('select[name="coaches"] option[selected]')
     count = len(selected_opts)
     assert count == 10
-    assert 'up to ten coaches' in soup.get_text()
+    assert 'up to 10 coaches' in soup.get_text()
 
 
 def test_money_compare_aggregates(client, app):
