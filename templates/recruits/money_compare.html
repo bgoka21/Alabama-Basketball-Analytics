@@ -20,7 +20,7 @@
   </div>
   <div id="saved-sets-status" class="sr-only" aria-live="polite"></div>
 
-  <form method="get" action="{{ url_for('recruits.money_compare') }}" class="space-y-4">
+  <form id="compare-form" method="get" action="{{ url_for('recruits.money_compare') }}" class="space-y-4">
     <input type="hidden" name="year_min" value="{{ year_min if year_min is not none else '' }}">
     <input type="hidden" name="year_max" value="{{ year_max if year_max is not none else '' }}">
     <input type="hidden" name="sheet" value="{{ sheet or '' }}">
@@ -47,10 +47,12 @@
       {% endfor %}
     </select>
 
+    <div id="coach-no-matches" class="hidden text-sm text-red-600">No matches</div>
+
     <!-- Optional counter + clear link (ids used by JS above) -->
     <div class="flex items-center gap-3 mt-2 text-sm text-gray-600">
-      <span id="coach-count">{{ selected|length if selected else 0 }}/10 selected</span>
-      <a href="#" id="coach-clear" class="underline">Clear all</a>
+      <span id="coach-count">{{ selected|length if selected else 0 }}</span>
+      <button id="coach-clear" type="button" class="underline">Clear all</button>
     </div>
 
     <div id="coach-selected" class="flex items-center gap-2 flex-wrap mt-2"></div>
