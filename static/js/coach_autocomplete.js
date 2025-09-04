@@ -1,21 +1,20 @@
 // static/js/coach_autocomplete.js
 (() => {
-  document.addEventListener('DOMContentLoaded', () => {
-    const filter  = document.getElementById('coach-filter');
-    const select  = document.getElementById('coach-search');
-    const chips   = document.getElementById('coach-selected');
-    const btn     = document.getElementById('compare-btn');
-    const counter = document.getElementById('coach-count');   // optional
-    const clear   = document.getElementById('coach-clear');   // optional
-    const csvLink = document.getElementById('compare-csv');   // optional
-    const noMatches = document.getElementById('coach-no-matches'); // optional
+  const filter  = document.getElementById('coach-filter');
+  const select  = document.getElementById('coach-search');
+  const chips   = document.getElementById('coach-selected');
+  const btn     = document.getElementById('compare-btn');
+  const counter = document.getElementById('coach-count');   // optional
+  const clear   = document.getElementById('coach-clear');   // optional
+  const csvLink = document.getElementById('compare-csv');   // optional
+  const noMatches = document.getElementById('coach-no-matches'); // optional
 
-    if (!filter || !select) return;
+  if (!filter || !select) return;
 
-    const MAX = (() => {
-      const m = parseInt(select.getAttribute('data-max') || '10', 10);
-      return Number.isFinite(m) ? m : 10;
-    })();
+  const MAX = (() => {
+    const m = parseInt(select.getAttribute('data-max') || '10', 10);
+    return Number.isFinite(m) ? m : 10;
+  })();
 
     // ---------- helpers ----------
     const normalize = (s) => (s || '')
@@ -215,10 +214,9 @@
       });
     }
 
-    // init
-    updateUI();
-    applyFilter();
-    if (selectedValues().length) select.classList.remove('hidden');
-  });
+  // init
+  updateUI();
+  applyFilter();
+  if (selectedValues().length) select.classList.remove('hidden');
 })();
 
