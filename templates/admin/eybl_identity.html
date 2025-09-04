@@ -41,7 +41,8 @@
     <button type="submit" formaction="{{ url_for('admin.eybl_identity_bulk_link') }}" class="px-3 py-1 bg-[#9E1B32] text-white rounded">Bulk Verify</button>
     <button type="submit" formaction="{{ url_for('admin.eybl_identity_bulk_unlink') }}" class="px-3 py-1 bg-gray-300 rounded">Bulk Unlink</button>
   </div>
-  <table class="table-auto w-full text-sm">
+</form>
+<table class="table-auto w-full text-sm">
     <thead>
       <tr class="bg-gray-200">
         <th class="px-2 py-1"></th>
@@ -57,7 +58,7 @@
     <tbody>
       {% for row in rows %}
       <tr class="odd:bg-white even:bg-gray-50">
-        <td class="px-2 py-1"><input type="checkbox" name="external_keys" value="{{ row.external_key }}"></td>
+        <td class="px-2 py-1"><input type="checkbox" name="external_keys" value="{{ row.external_key }}" form="bulk-form"></td>
         <td class="px-2 py-1">{{ row.player_name_external }}</td>
         <td class="px-2 py-1">{{ row.team_external }}</td>
         <td class="px-2 py-1">{{ row.season_year }}</td>
@@ -85,7 +86,6 @@
       {% endfor %}
     </tbody>
   </table>
-</form>
 {% if pagination.pages > 1 %}
 <div class="mt-4">
   {% if pagination.has_prev %}
