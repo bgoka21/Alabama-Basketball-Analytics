@@ -85,7 +85,7 @@
         <div class="card-body">
           <div class="card-title text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-1">{{ circuit }}{% if stat.season_year %} — {{ stat.season_year }}{% endif %}</div>
           {% if stat.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ stat.team_name }}</div>{% endif %}
-          <div class="grid grid-cols-4 gap-2">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
               <div class="mini-label">PPG</div>
               <div class="mini-value">{{ '%.1f'|format(stat.ppg) if stat.ppg is not none else '—' }}</div>
@@ -110,7 +110,7 @@
         <div class="card-body">
           <div class="card-title text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-1">PnR (incl. Passes)</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ circuit }}{% if stat.season_year %} — {{ stat.season_year }}{% endif %}</div>
-          <div class="grid grid-cols-4 gap-2">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
               <div class="mini-label">Poss</div>
               <div class="mini-value">{{ stat.pnr_poss if stat.pnr_poss is not none else '—' }}</div>
@@ -141,7 +141,7 @@
         <div class="card-body">
           <div class="card-title text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-1">{{ circuit }}{% if s.season_year %} — {{ s.season_year }}{% endif %}</div>
           {% if s.team_name %}<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ s.team_name }}</div>{% endif %}
-          <div class="grid grid-cols-4 gap-2">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="mini-card text-center bg-gray-50 dark:bg-gray-700">
               <div class="mini-label">PPG</div>
               <div class="mini-value">{{ '%.1f'|format(s.ppg) if s.ppg is not none else '—' }}</div>
