@@ -101,6 +101,20 @@ def test_money_compare_has_search_and_badge_container(client):
     assert soup.find(id='coach-selected') is not None
 
 
+def test_money_compare_lists_coaches_from_table(client, app):
+    """All coaches in the database appear in the picker."""
+    with app.app_context():
+        from app.models.coach import Coach
+        db.session.add_all([Coach(name='CoachA'), Coach(name='CoachB')])
+        db.session.commit()
+
+    rv = client.get('/recruits/money/compare')
+    soup = BeautifulSoup(rv.data, 'html.parser')
+    options = [o.get_text(strip=True) for o in soup.select('#coach-search option')]
+    assert 'CoachA' in options
+    assert 'CoachB' in options
+
+
 def test_money_compare_limit(client, app):
     with app.app_context():
         from app.models.prospect import Prospect

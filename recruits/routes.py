@@ -677,18 +677,22 @@ def _get_coach_names():
 
     # Collect names from Coach (alphabetical)
     for c in Coach.query.order_by(Coach.name.asc()).all():
+        if not c.name:
+            continue
         key, disp = normalize_coach_name(c.name)
-        seen[key] = disp
+        if key:
+            seen[key] = disp
 
     # Collect distinct Prospect.coach values that are non-null
-    raw = [
-        c
-        for (c,) in db.session.query(Prospect.coach)
+    raw = (
+        db.session.query(Prospect.coach)
         .filter(Prospect.coach.isnot(None))
         .distinct()
         .all()
-    ]
-    for name in raw:
+    )
+    for (name,) in raw:
+        if not name:
+            continue
         key, disp = normalize_coach_name(name)
         if key not in seen:
             seen[key] = disp
