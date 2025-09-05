@@ -41,6 +41,9 @@
     const clear    = document.getElementById(IDS.clear);
     const csvLink  = document.getElementById(IDS.csvLink);
     const noMatch  = document.getElementById(IDS.noMatches);
+    const picker   = document.getElementById('coach-picker');
+    const pickerCount = document.getElementById('coach-picker-count');
+    let pickerClosed = false;
 
     if (!filter || !select) {
       log('elements not present yet');
@@ -91,6 +94,11 @@
 
       // Count
       if (counter) counter.textContent = String(current.length);
+      if (pickerCount) pickerCount.textContent = String(current.length);
+      if (picker && !pickerClosed && current.length > 0) {
+        picker.open = false;
+        pickerClosed = true;
+      }
 
       // Compare enabled
       if (btn) btn.disabled = current.length < 2;
