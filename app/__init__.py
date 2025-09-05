@@ -192,7 +192,7 @@ def create_app():
 
     # Ensure all tables exist when the application starts unless skipped
     if not os.environ.get('SKIP_CREATE_ALL'):
-        from app.models import prospect  # noqa: F401  # ensure models are registered
+        from app.models import prospect, coach  # noqa: F401  # ensure models are registered
         with app.app_context():
             db.create_all()
             # SAFE add: projected/actual pick fields (raw + numeric)
