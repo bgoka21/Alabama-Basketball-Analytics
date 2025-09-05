@@ -5,7 +5,7 @@ import csv
 import io
 import math
 import re
-from collections import defaultdict, Counter
+from collections import Counter
 from flask import render_template, request, redirect, url_for, flash, current_app, abort, Response
 from datetime import date
 from flask_login import login_required, current_user
@@ -505,7 +505,7 @@ def money_board():
     year_max = request.args.get('year_max', type=int)
     sheet = request.args.get('sheet')  # conference tab label, e.g. "SEC"
     conf = request.args.get('conf')    # coach_current_conference
-    min_recruits = request.args.get('min_recruits', default=1, type=int)
+    min_recruits = request.args.get('min_recruits', default=0, type=int)
     sort = request.args.get('sort', default='net_desc')
 
     # Distinct lists for filter controls
@@ -545,9 +545,6 @@ def money_board():
         .group_by(sub.c.coach, sub.c.coach_current_team, sub.c.coach_current_conference)
     )
 
-    if min_recruits:
-        q = q.having(func.count() >= min_recruits)
-
     # Sorting
     if sort == 'actual_desc':
         q = q.order_by(desc('act_sum'))
@@ -586,10 +583,31 @@ def money_board():
             if not entry["coach_conf"] and r.coach_conf:
                 entry["coach_conf"] = r.coach_conf
 
+    # Ensure every coach from the canonical list appears even if they have no data
+    from app.models import Coach
+    all_coaches = {c.name: c for c in Coach.query.all()}
+    rows_by_coach = {e['coach']: e for e in merged.values()}
+    for name, coach in all_coaches.items():
+        if not name:
+            continue
+        _, disp = normalize_coach_name(name)
+        if disp not in rows_by_coach:
+            rows_by_coach[disp] = {
+                'coach': disp,
+                'coach_team': coach.current_team or '',
+                'coach_conf': coach.current_conference or '',
+                'recruits': 0,
+                'proj_sum': 0.0,
+                'act_sum': 0.0,
+                'net_sum': 0.0,
+            }
+
     data = []
-    for e in merged.values():
-        avg_net = (e["net_sum"] / e["recruits"]) if e["recruits"] else 0.0
-        e["avg_net"] = float(avg_net)
+    for e in rows_by_coach.values():
+        if min_recruits and e['recruits'] < min_recruits:
+            continue
+        avg_net = (e['net_sum'] / e['recruits']) if e['recruits'] else 0.0
+        e['avg_net'] = float(avg_net)
         data.append(e)
 
     if sort == 'actual_desc':
@@ -822,12 +840,18 @@ def money_compare():
 
     comps = []
     for name in selected:
-        key, _ = normalize_coach_name(name)
+        key, disp = normalize_coach_name(name)
         e = merged.get(key)
         if not e:
-            continue
-        avg_net = (e["net_sum"] / e["recruits"]) if e["recruits"] else 0
-        e["avg_net"] = float(avg_net or 0)
+            e = {
+                'coach': disp,
+                'recruits': 0,
+                'proj_sum': 0.0,
+                'act_sum': 0.0,
+                'net_sum': 0.0,
+            }
+        avg_net = 0.0 if e['recruits'] == 0 else e['net_sum'] / e['recruits']
+        e['avg_net'] = float(avg_net)
         comps.append(e)
 
     if min_rec:
@@ -849,7 +873,7 @@ def money_compare():
     players_q = players_q.order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
     players = players_q.all()
 
-    players_by_coach: dict[str, list[SimpleNamespace]] = defaultdict(list)
+    players_by_coach: dict[str, list[SimpleNamespace]] = {name: [] for name in selected}
     for src in players:
         _, disp = normalize_coach_name(src.coach)
 
@@ -872,7 +896,7 @@ def money_compare():
             actual_pick_raw=act_raw,
         )
 
-        players_by_coach[disp].append(item)
+        players_by_coach.setdefault(disp, []).append(item)
 
     if min_rec:
         valid = {c["coach"] for c in comps}
