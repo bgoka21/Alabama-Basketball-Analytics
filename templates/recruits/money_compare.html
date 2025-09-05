@@ -27,45 +27,49 @@
     <input type="hidden" name="conf" value="{{ conf or '' }}">
     <input type="hidden" name="min_recruits" value="{{ min_recruits if min_recruits is not none else '' }}">
     <input type="hidden" name="sort" value="{{ sort or '' }}">
-    <label for="coach-filter" class="sr-only">Search coaches</label>
-    <input id="coach-filter"
-           aria-label="Search coaches"
-           type="text"
-           placeholder="Search coaches..."
-           class="input input-sm w-52"
-           autocomplete="off" />
+    <details id="coach-picker" open>
+      <summary class="cursor-pointer select-none">Select coaches (<span id="coach-picker-count">{{ selected|length if selected else 0 }}</span>)</summary>
 
-    <select id="coach-search"
-            name="coaches"
-            multiple
-            size="12"
-            class="w-full max-w-md border rounded p-1 overflow-auto"
-            aria-label="Coaches to compare"
-            data-max="10">
-      {% for coach in coaches %}
-        <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
-      {% endfor %}
-    </select>
+      <label for="coach-filter" class="sr-only">Search coaches</label>
+      <input id="coach-filter"
+             aria-label="Search coaches"
+             type="text"
+             placeholder="Search coaches..."
+             class="input input-sm w-52"
+             autocomplete="off" />
 
-    <div id="coach-no-matches" class="hidden text-sm text-red-600">No matches</div>
+      <select id="coach-search"
+              name="coaches"
+              multiple
+              size="12"
+              class="w-full max-w-md border rounded p-1 overflow-auto"
+              aria-label="Coaches to compare"
+              data-max="10">
+        {% for coach in coaches %}
+          <option value="{{ coach }}" {% if coach in selected %}selected{% endif %}>{{ coach }}</option>
+        {% endfor %}
+      </select>
 
-    <!-- Optional counter + clear link (ids used by JS above) -->
-    <div class="flex items-center gap-3 mt-2 text-sm text-gray-600">
-      <span id="coach-count">{{ selected|length if selected else 0 }}</span>
-      <button id="coach-clear" type="button" class="underline">Clear all</button>
-    </div>
+      <div id="coach-no-matches" class="hidden text-sm text-red-600">No matches</div>
 
-    <div id="coach-selected" class="flex items-center gap-2 flex-wrap mt-2"></div>
+      <!-- Optional counter + clear link (ids used by JS above) -->
+      <div class="flex items-center gap-3 mt-2 text-sm text-gray-600">
+        <span id="coach-count">{{ selected|length if selected else 0 }}</span>
+        <button id="coach-clear" type="button" class="underline">Clear all</button>
+      </div>
 
-    <div id="coach-help" class="text-xs text-gray-500 text-right">Select up to 10 coaches to compare</div>
+      <div id="coach-selected" class="flex items-center gap-2 flex-wrap mt-2"></div>
 
-    <div class="flex justify-end items-center gap-4">
-      <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">Download CSV</a>
-      <button id="compare-btn" type="submit" class="btn btn-primary">Compare</button>
-    </div>
-    {% if not_enough %}
-      <p class="text-sm text-red-600 text-right">Select at least two coaches.</p>
-    {% endif %}
+      <div id="coach-help" class="text-xs text-gray-500 text-right">Select up to 10 coaches to compare</div>
+
+      <div class="flex justify-end items-center gap-4">
+        <a id="compare-csv" class="text-sm underline text-blue-600" href="{{ url_for('recruits.money_compare_csv', coaches=selected, year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_recruits, sort=sort) }}">Download CSV</a>
+        <button id="compare-btn" type="submit" class="btn btn-primary">Compare</button>
+      </div>
+      {% if not_enough %}
+        <p class="text-sm text-red-600 text-right">Select at least two coaches.</p>
+      {% endif %}
+    </details>
   </form>
 
   <noscript>
