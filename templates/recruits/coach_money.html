@@ -93,23 +93,27 @@
           <td class="py-2 pr-4 font-medium">{{ p.player }}</td>
           <td class="py-2 pr-4">{{ p.team if p.team else '—' }}</td>
           <td class="py-2 pr-4">{{ p.year or '—' }}</td>
-          <td class="py-2 pr-4 text-right">
-            {# --- START PATCH: projected pick display fallback --- #}
-            {% set proj_pick =
-                p.projected_pick_raw
-                or (('#' ~ p.projected_pick) if p.projected_pick is not none else '—')
-            %}
+          <td class="py-2 pr-4 text-right" data-sort="{{ p.projected_pick if p.projected_pick is not none else '' }}">
+            {% set proj_pick = (
+                p.projected_pick_raw ~ ' (#' ~ p.projected_pick ~ ')'
+                if (p.projected_pick_raw and p.projected_pick is not none)
+                else (
+                    p.projected_pick_raw
+                    or (('#' ~ p.projected_pick) if p.projected_pick is not none else 'Undrafted')
+                )
+            ) %}
             {{ proj_pick }}
-            {# --- END PATCH --- #}
           </td>
-          <td class="py-2 pr-4 text-right">
-            {# --- START PATCH: actual pick display fallback --- #}
-            {% set act_pick =
-                p.actual_pick_raw
-                or (('#' ~ p.actual_pick) if p.actual_pick is not none else '—')
-            %}
+          <td class="py-2 pr-4 text-right" data-sort="{{ p.actual_pick if p.actual_pick is not none else '' }}">
+            {% set act_pick = (
+                p.actual_pick_raw ~ ' (#' ~ p.actual_pick ~ ')'
+                if (p.actual_pick_raw and p.actual_pick is not none)
+                else (
+                    p.actual_pick_raw
+                    or (('#' ~ p.actual_pick) if p.actual_pick is not none else 'Undrafted')
+                )
+            ) %}
             {{ act_pick }}
-            {# --- END PATCH --- #}
           </td>
           <td class="py-2 pr-4">{{ p.projected_money|fmt_money }}</td>
           <td class="py-2 pr-4">{{ p.actual_money|fmt_money }}</td>
