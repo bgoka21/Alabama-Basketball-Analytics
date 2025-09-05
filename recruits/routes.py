@@ -3,6 +3,8 @@ import json
 import time
 import csv
 import io
+import math
+import re
 from collections import defaultdict, Counter
 from flask import render_template, request, redirect, url_for, flash, current_app, abort, Response
 from datetime import date
@@ -711,6 +713,29 @@ def _get_coach_names():
     return sorted(seen.values())
 
 
+def _parse_pick(cell):
+    """
+    Returns (pick_num:int|None, pick_raw:str|None)
+    - Numeric like 2 or '2.0' -> (2, None)
+    - 'Undrafted'/'UDFA'/blank -> (None, 'Undrafted') for blanks or explicit undrafted
+    - Other strings (e.g. 'Lottery 5', '#21') -> (extracted_int_or_None, original_str)
+    """
+    if cell is None:
+        return None, 'Undrafted'
+    s = str(cell).strip()
+    if s == '' or s.lower() in ('undrafted', 'udfa', 'n/a', 'na'):
+        return None, 'Undrafted'
+    try:
+        n = int(float(s))
+        return n, None
+    except Exception:
+        pass
+    m = re.search(r'(\d+)', s)
+    if m:
+        return int(m.group(1)), s
+    return None, s
+
+
 @recruits_bp.route('/money/compare', methods=['GET'])
 def money_compare():
     """Compare projected/actual money totals for up to ten coaches."""
@@ -819,10 +844,30 @@ def money_compare():
     players_q = players_q.order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
     players = players_q.all()
 
-    players_by_coach = defaultdict(list)
-    for p in players:
-        _, disp = normalize_coach_name(p.coach)
-        players_by_coach[disp].append(p)
+    players_by_coach: dict[str, list[SimpleNamespace]] = defaultdict(list)
+    for src in players:
+        _, disp = normalize_coach_name(src.coach)
+
+        proj_num, proj_raw = _parse_pick(src.projected_pick_raw if src.projected_pick_raw is not None else src.projected_pick)
+        act_num, act_raw = _parse_pick(src.actual_pick_raw if src.actual_pick_raw is not None else src.actual_pick)
+
+        projected_money_value = src.projected_money
+        actual_money_value = src.actual_money
+
+        item = SimpleNamespace(
+            player=src.player,
+            team=src.team,
+            year=int(src.year) if src.year not in (None, '') else None,
+            projected_money=projected_money_value,
+            actual_money=actual_money_value,
+            net=(actual_money_value or 0) - (projected_money_value or 0),
+            projected_pick=proj_num,
+            projected_pick_raw=proj_raw,
+            actual_pick=act_num,
+            actual_pick_raw=act_raw,
+        )
+
+        players_by_coach[disp].append(item)
 
     if min_rec:
         valid = {c["coach"] for c in comps}
@@ -831,6 +876,16 @@ def money_compare():
     coach_list = _get_coach_names()
 
     not_enough = bool(raw_selected) and len(selected) < 2
+
+    all_players = [p for roster in players_by_coach.values() for p in roster]
+    missing_picks = [
+        r for r in all_players
+        if r.actual_money and r.actual_pick is None and r.actual_pick_raw in (None, '', 'Undrafted')
+    ]
+    current_app.logger.info(
+        "Compare: %d rows with $ but no actual pick (will show 'Undrafted')",
+        len(missing_picks),
+    )
 
     return render_template(
         'recruits/money_compare.html',
