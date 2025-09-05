@@ -50,7 +50,84 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
     per_sheet: list[dict] = []
     coach_records: dict[str, dict[str, str | None]] = {}
 
+    # --- First, handle the coaches sheet (case/whitespace-insensitive) ---
+    coaches_sheet = next(
+        (s for s in xl.sheet_names if s.strip().lower() == "coaches"),
+        None,
+    )
+    if coaches_sheet is not None:
+        try:
+            try:
+                df = pd.read_excel(xl, sheet_name=coaches_sheet, dtype=str)
+            except Exception:
+                df = pd.read_excel(
+                    xl, sheet_name=coaches_sheet, dtype=str, engine="openpyxl"
+                )
+            df = normalize_headers(df)
+            strip_cols(df, ["coach", "current_team", "current_conference"])
+            rows = df.to_dict(orient="records")
+            total_rows += len(rows)
+            for row in rows:
+                coach_raw = (row.get("coach") or "").strip()
+                if not coach_raw:
+                    continue
+                _, coach = normalize_coach_name(coach_raw)
+                team = (row.get("current_team") or "").strip() or None
+                conf = (row.get("current_conference") or "").strip() or None
+                info = coach_records.get(coach, {})
+                if team:
+                    info["current_team"] = team
+                if conf:
+                    info["current_conference"] = conf
+                coach_records[coach] = info
+            per_sheet.append(
+                {
+                    "sheet": coaches_sheet,
+                    "rows": len(rows),
+                    "inserted": 0,
+                    "updated": 0,
+                    "skipped": 0,
+                    "status": "ok",
+                }
+            )
+
+            # Upsert coaches before processing other sheets
+            for name, info in coach_records.items():
+                existing = Coach.query.filter_by(name=name).first()
+                if existing:
+                    team = info.get("current_team")
+                    conf = info.get("current_conference")
+                    if team:
+                        existing.current_team = team
+                    if conf:
+                        existing.current_conference = conf
+                else:
+                    db.session.add(
+                        Coach(
+                            name=name,
+                            current_team=info.get("current_team"),
+                            current_conference=info.get("current_conference"),
+                        )
+                    )
+            db.session.commit()
+            # reset to capture any new/updated info from other sheets separately
+            coach_records = {}
+        except Exception as e:
+            current_app.logger.exception(
+                f"[MoneyBoard Import] Sheet '{coaches_sheet}' failed: {e}"
+            )
+            per_sheet.append(
+                {
+                    "sheet": coaches_sheet,
+                    "status": "failed",
+                    "reason": str(e),
+                }
+            )
+
+    # --- Process all remaining sheets ---
     for sheet in xl.sheet_names:
+        if sheet == coaches_sheet:
+            continue
         try:
             try:
                 df = pd.read_excel(xl, sheet_name=sheet, dtype=str)
@@ -58,33 +135,6 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
                 df = pd.read_excel(xl, sheet_name=sheet, dtype=str, engine="openpyxl")
 
             df = normalize_headers(df)
-
-            if sheet.lower() == "coaches":
-                strip_cols(df, ["coach", "current_team", "current_conference"])
-                rows = df.to_dict(orient="records")
-                total_rows += len(rows)
-                for row in rows:
-                    coach_raw = (row.get("coach") or "").strip()
-                    if not coach_raw:
-                        continue
-                    _, coach = normalize_coach_name(coach_raw)
-                    team = (row.get("current_team") or "").strip() or None
-                    conf = (row.get("current_conference") or "").strip() or None
-                    info = coach_records.get(coach, {})
-                    if team:
-                        info["current_team"] = team
-                    if conf:
-                        info["current_conference"] = conf
-                    coach_records[coach] = info
-                per_sheet.append({
-                    "sheet": sheet,
-                    "rows": len(rows),
-                    "inserted": 0,
-                    "updated": 0,
-                    "skipped": 0,
-                    "status": "ok",
-                })
-                continue
 
             ok, missing = validate_required(df)
             if not ok:

@@ -681,7 +681,12 @@ def money_coach(coach_name):
 
 
 def _get_coach_names():
-    """Return sorted canonical coach names for picker UI."""
+    """Return sorted canonical coach names for picker UI.
+
+    Combines names stored in the ``Coach`` table with distinct ``Prospect.coach``
+    values, normalizing and de-duplicating so the dropdown includes the full
+    union of known coaches.
+    """
     from app.models import Coach
     from app.models.prospect import Prospect
 
@@ -710,7 +715,7 @@ def _get_coach_names():
             seen[key] = disp
 
     # Return the sorted union so dropdown includes all known coaches
-    return sorted(seen.values())
+    return sorted(seen.values(), key=str.lower)
 
 
 def _parse_pick(cell):
