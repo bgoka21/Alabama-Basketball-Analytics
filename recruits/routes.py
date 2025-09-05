@@ -671,17 +671,29 @@ def money_coach(coach_name):
 def _get_coach_names():
     """Return sorted canonical coach names for picker UI."""
     from app.models import Coach
-    names = [c.name for c in Coach.query.order_by(Coach.name.asc()).all()]
-    if names:
-        return names
     from app.models.prospect import Prospect
-    raw = [c for (c,) in db.session.query(Prospect.coach)
-                               .filter(Prospect.coach.isnot(None))
-                               .distinct().all()]
+
     seen: dict[str, str] = {}
+
+    # Collect names from Coach (alphabetical)
+    for c in Coach.query.order_by(Coach.name.asc()).all():
+        key, disp = normalize_coach_name(c.name)
+        seen[key] = disp
+
+    # Collect distinct Prospect.coach values that are non-null
+    raw = [
+        c
+        for (c,) in db.session.query(Prospect.coach)
+        .filter(Prospect.coach.isnot(None))
+        .distinct()
+        .all()
+    ]
     for name in raw:
         key, disp = normalize_coach_name(name)
-        seen[key] = disp
+        if key not in seen:
+            seen[key] = disp
+
+    # Return the sorted union so dropdown includes all known coaches
     return sorted(seen.values())
 
 
