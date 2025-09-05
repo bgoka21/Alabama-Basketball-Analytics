@@ -138,8 +138,6 @@
 
       if (noMatch) noMatch.classList.toggle('hidden', !(q && visibleCount === 0));
 
-      // reveal the list when filtering
-      select.classList.remove('hidden');
     }
 
     function selectFirstMatchFromQuery() {
@@ -163,8 +161,7 @@
       }
     }
 
-    // Reveal + filter on interaction
-    filter.addEventListener('focus', () => select.classList.remove('hidden'));
+    // Filter on interaction
     filter.addEventListener('input', applyFilter);
 
     // Enter should select, not submit
@@ -252,7 +249,6 @@
     // Initial paint
     updateUI();
     applyFilter();
-    if (selectedValues().length) select.classList.remove('hidden');
 
     log('compare init OK');
     return true;
