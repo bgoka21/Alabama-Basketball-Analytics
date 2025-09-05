@@ -31,6 +31,10 @@
       <div class="text-sm text-gray-500 mb-2">Upload replacement</div>
       <form method="POST" action="{{ url_for('recruits.money_workbook_upload') }}" enctype="multipart/form-data" class="space-y-3">
         <input type="file" name="file" accept=".xlsx,.xls,.csv" class="file-input file-input-bordered w-full" required>
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="replace" class="checkbox">
+          <span>Replace existing data</span>
+        </label>
         <p class="text-xs text-gray-500">Accepted: .xlsx, .xls, .csv. Upload immediately re-imports Money Board data.</p>
         <button class="btn btn-primary" type="submit">Upload & Import</button>
       </form>
@@ -39,15 +43,19 @@
   {% else %}
   <div class="p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 mb-6">
     <div class="text-sm text-gray-500 mb-2">No workbook on file.</div>
-    <form method="POST" action="{{ url_for('recruits.money_workbook_upload') }}" enctype="multipart/form-data" class="flex items-center gap-3">
+    <form method="POST" action="{{ url_for('recruits.money_workbook_upload') }}" enctype="multipart/form-data" class="flex items-center gap-3 flex-wrap">
       <input type="file" name="file" accept=".xlsx,.xls,.csv" class="file-input file-input-bordered" required>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="replace" class="checkbox">
+        <span>Replace existing data</span>
+      </label>
       <button class="btn btn-primary" type="submit">Upload & Import</button>
     </form>
   </div>
   {% endif %}
 
   <div class="text-xs text-gray-500">
-    <p><b>Note:</b> Deleting the file does not remove previously imported data. Uploading a replacement will re-import and update rows idempotently (per your importer logic).</p>
+    <p><b>Note:</b> Deleting the file does not remove previously imported data. Uploading a replacement will re-import and update rows idempotently (per your importer logic). Check "Replace existing data" to purge matching prospects before importing.</p>
   </div>
 </div>
 

@@ -92,8 +92,12 @@ def _workbook_info():
         "mtime": st.st_mtime,
     }
 
-def _run_import(file_path: str):
-    """Call whichever importer your project exposes."""
+def _run_import(file_path: str, replace: bool = False):
+    """Call whichever importer your project exposes.
+
+    The ``replace`` flag is passed through to the importer if supported,
+    allowing callers to purge existing rows prior to import.
+    """
     global _import_money_board, _import_money_board_alt
     if _import_money_board is None:
         try:
@@ -101,14 +105,20 @@ def _run_import(file_path: str):
         except Exception:
             _import_money_board = None
     if _import_money_board is not None:
-        return _import_money_board(file_path)
+        try:
+            return _import_money_board(file_path, replace=replace)
+        except TypeError:
+            return _import_money_board(file_path)
     if _import_money_board_alt is None:
         try:
             from app.services.draft_stock_importer import import_workbook as _import_money_board_alt  # type: ignore
         except Exception:
             _import_money_board_alt = None
     if _import_money_board_alt is not None:
-        return _import_money_board_alt(file_path)
+        try:
+            return _import_money_board_alt(file_path, replace=replace)
+        except TypeError:
+            return _import_money_board_alt(file_path)
     # If neither importer exists, just log and return
     current_app.logger.warning("[Workbook] No money board importer function found.")
     return None
@@ -932,6 +942,7 @@ def money_workbook_upload():
     """
     Upload a replacement workbook and immediately import it.
     """
+    replace = bool(request.form.get("replace") or request.args.get("replace"))
     f = request.files.get("file")
     if not f or not f.filename:
         flash("Please choose a file.", "warning")
@@ -959,8 +970,11 @@ def money_workbook_upload():
 
     # Run importer
     try:
-        _run_import(dest)
-        flash(f"Workbook '{filename}' uploaded and imported successfully.", "success")
+        _run_import(dest, replace=replace)
+        msg = f"Workbook '{filename}' uploaded and imported successfully."
+        if replace:
+            msg += " Existing data was replaced."
+        flash(msg, "success")
     except Exception as e:
         current_app.logger.exception(f"[Workbook] Import failed: {e}")
         flash(f"Upload saved, but import failed: {e}", "danger")

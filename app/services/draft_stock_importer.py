@@ -32,8 +32,16 @@ def _to_num(x):
     except: return None
 
 
-def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
-    """Import the multi-sheet Excel workbook into Prospect rows."""
+def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batch=500):
+    """Import the multi-sheet Excel workbook into Prospect rows.
+
+    Args:
+        xlsx_path_or_buffer: Path or buffer to the workbook.
+        strict: Whether to error on missing required columns.
+        replace: When True, existing ``Prospect`` rows for a sheet (and
+            year if provided) are deleted before importing new data.
+        commit_batch: Unused; maintained for compatibility.
+    """
     xl = pd.ExcelFile(xlsx_path_or_buffer)
     total_rows = 0
     inserted_total = 0
@@ -93,6 +101,16 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
 
             if "year" in df.columns:
                 df["year"] = df["year"].apply(parse_int)
+
+            if replace:
+                years = []
+                if "year" in df.columns:
+                    years = [int(y) for y in df["year"].dropna().unique().tolist()]
+                q = Prospect.query.filter(Prospect.sheet == sheet)
+                if years:
+                    q = q.filter(Prospect.year.in_(years))
+                q.delete(synchronize_session=False)
+                db.session.commit()
 
             for col in ("projected_pick_raw", "actual_pick_raw"):
                 if col not in df.columns:
