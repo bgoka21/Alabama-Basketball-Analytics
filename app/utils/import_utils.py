@@ -31,7 +31,7 @@ _PARENS_RX = re.compile(r"^\((.*)\)$")
 
 
 def _norm(s: Any) -> str:
-    return re.sub(r"[\s_]+", " ", str(s or "")).strip().lower()
+    return re.sub(r"[^a-z0-9]+", " ", str(s or "").lower()).strip()
 
 
 def normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
