@@ -138,24 +138,18 @@
               <td class="py-1 pr-3" data-cell="year" data-sort="{{ p.year }}">{{ p.year }}</td>
               <td class="py-1 pr-3" data-cell="proj_pick" data-sort="{{ p.projected_pick if p.projected_pick is not none else '' }}">
                 {% set proj_pick = (
-       (p.projected_pick_raw ~ ' (#' ~ p.projected_pick ~ ')')
-       if (p.projected_pick_raw and p.projected_pick is not none)
-       else (
-         p.projected_pick_raw
-         or (('#' ~ p.projected_pick) if p.projected_pick is not none else 'Undrafted')
-       )
-  ) %}
+                    (p.projected_pick_raw ~ ' (' ~ p.projected_pick ~ ')')
+                    if (p.projected_pick_raw and p.projected_pick is not none)
+                    else (p.projected_pick_raw or (p.projected_pick if p.projected_pick is not none else 'Undrafted'))
+                ) %}
                 {{ proj_pick }}
               </td>
               <td class="py-1 pr-3" data-cell="act_pick" data-sort="{{ p.actual_pick if p.actual_pick is not none else '' }}">
                 {% set act_pick = (
-       (p.actual_pick_raw ~ ' (#' ~ p.actual_pick ~ ')')
-       if (p.actual_pick_raw and p.actual_pick is not none)
-       else (
-         p.actual_pick_raw
-         or (('#' ~ p.actual_pick) if p.actual_pick is not none else 'Undrafted')
-       )
-  ) %}
+                    (p.actual_pick_raw ~ ' (' ~ p.actual_pick ~ ')')
+                    if (p.actual_pick_raw and p.actual_pick is not none)
+                    else (p.actual_pick_raw or (p.actual_pick if p.actual_pick is not none else 'Undrafted'))
+                ) %}
                 {{ act_pick }}
               </td>
               <td class="py-1 pr-3 text-right" data-cell="projected" data-sort="{{ p.projected_money }}">{{ p.projected_money|fmt_money }}</td>
