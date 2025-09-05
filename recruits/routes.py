@@ -7,6 +7,7 @@ import math
 import re
 from collections import Counter
 from flask import render_template, request, redirect, url_for, flash, current_app, abort, Response
+import pandas as pd
 from datetime import date
 from flask_login import login_required, current_user
 from types import SimpleNamespace
@@ -26,6 +27,7 @@ from services.circuit_stats import (
 import importlib.util
 from pathlib import Path
 from app.utils.coach_names import normalize_coach_name, get_alias_variants
+from app.recruits.workbook_utils import active_workbook_df, normalize_name, parse_pick, to_int_or_none
 
 # --- START PATCH: imports for workbook manager ---
 import os, json, time
@@ -497,139 +499,130 @@ def money_board():
     Coach leaderboard by money outcomes with filters.
     Defaults: order by NET desc.
     """
-    from app.models.prospect import Prospect
-    # hide Import button if table has any rows
-    has_data = db.session.query(func.count(Prospect.id)).scalar() > 0
-    # ---- Filters from querystring ----
+    from app.utils.import_utils import parse_currency
+
     year_min = request.args.get('year_min', type=int)
     year_max = request.args.get('year_max', type=int)
-    sheet = request.args.get('sheet')  # conference tab label, e.g. "SEC"
-    conf = request.args.get('conf')    # coach_current_conference
+    sheet = request.args.get('sheet')
+    conf = request.args.get('conf')
     min_recruits = request.args.get('min_recruits', default=0, type=int)
     sort = request.args.get('sort', default='net_desc')
 
-    # Distinct lists for filter controls
-    years = [y for (y,) in db.session.query(Prospect.year)
-                                      .filter(Prospect.year.isnot(None))
-                                      .distinct().order_by(Prospect.year).all()]
-    sheets = [s for (s,) in db.session.query(Prospect.sheet)
-                                      .filter(Prospect.sheet.isnot(None))
-                                      .distinct().order_by(Prospect.sheet).all()]
-    confs = [c for (c,) in db.session.query(Prospect.coach_current_conference)
-                                     .filter(Prospect.coach_current_conference.isnot(None))
-                                     .distinct().order_by(Prospect.coach_current_conference).all()]
+    try:
+        df = active_workbook_df()
+    except Exception:
+        df = pd.DataFrame(columns=['Coach','Player','Team','Year','Projected $','Actual $','Projected Pick','Actual Pick','__sheet'])
 
-    # ---- Base query with filters applied BEFORE grouping ----
-    base = db.session.query(Prospect)
-    if year_min is not None:
-        base = base.filter(Prospect.year >= year_min)
-    if year_max is not None:
-        base = base.filter(Prospect.year <= year_max)
-    if sheet:
-        base = base.filter(Prospect.sheet == sheet)
-    if conf:
-        base = base.filter(Prospect.coach_current_conference == conf)
-
-    # ---- Aggregation by coach ----
-    sub = base.subquery()
-    q = (db.session.query(
-            sub.c.coach.label('coach'),
-            func.coalesce(sub.c.coach_current_team, '').label('coach_team'),
-            func.coalesce(sub.c.coach_current_conference, '').label('coach_conf'),
-            func.count(sub.c.id).label('recruits'),
-            func.sum(func.coalesce(sub.c.projected_money, 0)).label('proj_sum'),
-            func.sum(func.coalesce(sub.c.actual_money, 0)).label('act_sum'),
-            func.sum(func.coalesce(sub.c.net, 0)).label('net_sum'),
-        )
-        .select_from(sub)
-        .group_by(sub.c.coach, sub.c.coach_current_team, sub.c.coach_current_conference)
-    )
-
-    # Sorting
-    if sort == 'actual_desc':
-        q = q.order_by(desc('act_sum'))
-    elif sort == 'proj_desc':
-        q = q.order_by(desc('proj_sum'))
-    elif sort == 'avg_net_desc':
-        # We'll sort in Python on avg_net to avoid SQL dialect differences
-        pass
+    has_data = not df.empty
+    if df.empty:
+        years = []
+        sheets = []
+        confs = []
     else:
-        q = q.order_by(desc('net_sum'))
+        df = df[df['Coach'].notna()].copy()
+        df['Coach_norm'] = df['Coach'].map(normalize_name)
+        df['Year_int'] = df['Year'].map(to_int_or_none)
+        years = sorted([y for y in df['Year_int'].dropna().unique()])
+        sheets = sorted([s for s in df['__sheet'].dropna().unique()])
+        confs = sorted(df['Coach Conf'].dropna().unique()) if 'Coach Conf' in df.columns else []
 
-    rows = q.all()
-    # Fold any aliases by canonical coach key
-    merged: dict[str, dict] = {}
-    for r in rows:
-        key, disp = normalize_coach_name(r.coach)
-        entry = merged.get(key)
-        if not entry:
-            entry = {
-                "coach": disp,
-                "coach_team": r.coach_team,
-                "coach_conf": r.coach_conf,
-                "recruits": int(r.recruits),
-                "proj_sum": float(r.proj_sum or 0),
-                "act_sum": float(r.act_sum or 0),
-                "net_sum": float(r.net_sum or 0),
-            }
-            merged[key] = entry
-        else:
-            entry["recruits"] += int(r.recruits)
-            entry["proj_sum"] += float(r.proj_sum or 0)
-            entry["act_sum"] += float(r.act_sum or 0)
-            entry["net_sum"] += float(r.net_sum or 0)
-            if not entry["coach_team"] and r.coach_team:
-                entry["coach_team"] = r.coach_team
-            if not entry["coach_conf"] and r.coach_conf:
-                entry["coach_conf"] = r.coach_conf
+        if year_min is not None:
+            df = df[df['Year_int'].ge(year_min)]
+        if year_max is not None:
+            df = df[df['Year_int'].le(year_max)]
+        if sheet:
+            df = df[df['__sheet'] == sheet]
+        if conf and 'Coach Conf' in df.columns:
+            df = df[df['Coach Conf'] == conf]
 
-    # Ensure every coach from the canonical list appears even if they have no data
-    from app.models import Coach
-    all_coaches = {c.name: c for c in Coach.query.all()}
-    rows_by_coach = {e['coach']: e for e in merged.values()}
-    for name, coach in all_coaches.items():
-        if not name:
-            continue
-        _, disp = normalize_coach_name(name)
-        if disp not in rows_by_coach:
-            rows_by_coach[disp] = {
-                'coach': disp,
-                'coach_team': coach.current_team or '',
-                'coach_conf': coach.current_conference or '',
+        player_df = df[df['Player'].notna()].copy()
+
+        def money_to_float(x):
+            val = parse_currency(x)
+            return val if val is not None else None
+
+        player_df['Projected $'] = player_df['Projected $'].apply(money_to_float)
+        player_df['Actual $'] = player_df['Actual $'].apply(money_to_float)
+        player_df['NET $'] = player_df['Actual $'].fillna(0) - player_df['Projected $'].fillna(0)
+
+        agg = (player_df.groupby(['Coach','Coach_norm'], dropna=False)
+                       .agg(recruits=('Player','nunique'),
+                            proj_sum=('Projected $','sum'),
+                            act_sum=('Actual $','sum'),
+                            net_sum=('NET $','sum'))
+                       .reset_index())
+
+        all_coaches = (df[['Coach','Coach_norm']]
+                         .drop_duplicates('Coach_norm')
+                         .sort_values('Coach')
+                         .to_dict('records'))
+
+        have = set(agg['Coach_norm'])
+        missing = [c for c in all_coaches if c['Coach_norm'] not in have]
+
+        if missing:
+            filler = pd.DataFrame([{
+                'Coach': m['Coach'],
+                'Coach_norm': m['Coach_norm'],
                 'recruits': 0,
                 'proj_sum': 0.0,
                 'act_sum': 0.0,
                 'net_sum': 0.0,
-            }
+            } for m in missing])
+            agg = pd.concat([agg, filler], ignore_index=True)
 
-    data = []
-    for e in rows_by_coach.values():
-        if min_recruits and e['recruits'] < min_recruits:
-            continue
-        avg_net = (e['net_sum'] / e['recruits']) if e['recruits'] else 0.0
-        e['avg_net'] = float(avg_net)
-        data.append(e)
+        team_map = {}
+        if 'Coach Team' in df.columns:
+            team_map = (df[['Coach_norm','Coach Team']]
+                          .dropna()
+                          .drop_duplicates('Coach_norm')
+                          .set_index('Coach_norm')['Coach Team'].to_dict())
+        conf_map = {}
+        if 'Coach Conf' in df.columns:
+            conf_map = (df[['Coach_norm','Coach Conf']]
+                         .dropna()
+                         .drop_duplicates('Coach_norm')
+                         .set_index('Coach_norm')['Coach Conf'].to_dict())
 
-    if sort == 'actual_desc':
-        data.sort(key=lambda x: x['act_sum'], reverse=True)
-    elif sort == 'proj_desc':
-        data.sort(key=lambda x: x['proj_sum'], reverse=True)
-    elif sort == 'avg_net_desc':
-        data.sort(key=lambda x: x['avg_net'], reverse=True)
-    else:
-        data.sort(key=lambda x: x['net_sum'], reverse=True)
+        agg['coach_team'] = agg['Coach_norm'].map(team_map).fillna('')
+        agg['coach_conf'] = agg['Coach_norm'].map(conf_map).fillna('')
 
-    # Top card
-    top = data[0] if data else None
+        agg['avg_net'] = agg.apply(lambda r: (r['net_sum']/r['recruits']) if r['recruits'] else 0.0, axis=1)
+
+        if min_recruits:
+            agg = agg[agg['recruits'] >= min_recruits]
+
+        if sort == 'actual_desc':
+            agg = agg.sort_values('act_sum', ascending=False)
+        elif sort == 'proj_desc':
+            agg = agg.sort_values('proj_sum', ascending=False)
+        elif sort == 'avg_net_desc':
+            agg = agg.sort_values('avg_net', ascending=False)
+        else:
+            agg = agg.sort_values('net_sum', ascending=False)
+
+        rows = []
+        for _, r in agg.iterrows():
+            rows.append({
+                'coach': r['Coach'],
+                'coach_team': r['coach_team'],
+                'coach_conf': r['coach_conf'],
+                'recruits': int(r['recruits']),
+                'proj_sum': float(r['proj_sum'] or 0),
+                'act_sum': float(r['act_sum'] or 0),
+                'net_sum': float(r['net_sum'] or 0),
+                'avg_net': float(r['avg_net'] or 0),
+            })
+
+        top = rows[0] if rows else None
 
     return render_template(
         'recruits/money_board.html',
-        rows=data,
-        top=top,
+        rows=rows if has_data else [],
+        top=top if has_data else None,
         years=years,
         sheets=sheets,
         confs=confs,
-        # echo filters
         f_year_min=year_min, f_year_max=year_max, f_sheet=sheet, f_conf=conf,
         f_min_recruits=min_recruits, f_sort=sort,
         has_data=has_data
@@ -765,27 +758,19 @@ def money_compare():
 
     raw_selected = request.args.getlist('coaches')
     current_app.logger.info(f"[Compare] coaches={raw_selected}")
-    seen_keys: set[str] = set()
-    selected: list[str] = []
+    seen: set[str] = set()
+    selected_display: list[str] = []
     for raw in raw_selected:
-        key, disp = normalize_coach_name(raw)
-        if key in seen_keys:
+        key = normalize_name(raw)
+        if key in seen:
             continue
-        seen_keys.add(key)
-        selected.append(disp)
-
+        seen.add(key)
+        selected_display.append(raw)
     MAX_COMPARE = 10
-    if len(selected) > MAX_COMPARE:
-        selected = selected[:MAX_COMPARE]
+    if len(selected_display) > MAX_COMPARE:
+        selected_display = selected_display[:MAX_COMPARE]
         flash(f"You can compare up to {MAX_COMPARE} coaches at a time.", "warning")
 
-    variant_set: set[str] = set()
-    for name in selected:
-        variant_set.update(get_alias_variants(name))
-
-    from app.models.prospect import Prospect
-
-    # Extract filters
     year_min = request.args.get("year_min", type=int)
     year_max = request.args.get("year_max", type=int)
     sheet    = (request.args.get("sheet") or "").strip()
@@ -793,133 +778,105 @@ def money_compare():
     min_rec  = request.args.get("min_recruits", type=int)
     sort     = request.args.get("sort") or ""
 
-    filters = []
-    if year_min is not None:
-        filters.append(Prospect.year >= year_min)
-    if year_max is not None:
-        filters.append(Prospect.year <= year_max)
-    if sheet:
-        filters.append(Prospect.sheet == sheet)
-    if conf:
-        filters.append(Prospect.coach_current_conference == conf)
+    try:
+        df = active_workbook_df()
+    except Exception:
+        df = pd.DataFrame(columns=['Coach','Player','Team','Year','Projected $','Actual $','Projected Pick','Actual Pick','__sheet'])
 
-    # Totals query with filters
-    agg_q = (
-        db.session.query(
-            Prospect.coach.label('coach'),
-            func.count(Prospect.id).label('recruits'),
-            func.sum(func.coalesce(Prospect.projected_money, 0)).label('proj_sum'),
-            func.sum(func.coalesce(Prospect.actual_money, 0)).label('act_sum'),
-            func.sum(func.coalesce(Prospect.net, 0)).label('net_sum'),
+    if df.empty:
+        coach_list = _get_coach_names()
+        coach_options = [{'Coach': name, 'Coach_norm': normalize_name(name)} for name in coach_list]
+        comps: list[dict] = []
+        players_by_coach: dict[str, list[dict]] = {}
+        not_enough = bool(selected_display) and len(selected_display) < 2
+        return render_template(
+            'recruits/money_compare.html',
+            coach_options=coach_options,
+            selected=selected_display,
+            comps=comps,
+            players_by_coach=players_by_coach,
+            year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_rec, sort=sort,
+            not_enough=not_enough,
         )
-        .filter(func.lower(Prospect.coach).in_(variant_set))
-    )
-    if filters:
-        agg_q = agg_q.filter(and_(*filters))
 
-    rows = agg_q.group_by(Prospect.coach).all()
+    df = df[df['Coach'].notna()].copy()
+    df['Coach_norm'] = df['Coach'].map(normalize_name)
+    df['Year_int'] = df['Year'].map(to_int_or_none)
 
-    merged: dict[str, dict] = {}
-    for r in rows:
-        key, disp = normalize_coach_name(r.coach)
-        entry = merged.get(key)
-        if not entry:
-            entry = {
-                "coach": disp,
-                "recruits": int(r.recruits or 0),
-                "proj_sum": float(r.proj_sum or 0),
-                "act_sum": float(r.act_sum or 0),
-                "net_sum": float(r.net_sum or 0),
+    if year_min is not None:
+        df = df[df['Year_int'].ge(year_min)]
+    if year_max is not None:
+        df = df[df['Year_int'].le(year_max)]
+    if sheet:
+        df = df[df['__sheet'] == sheet]
+    if conf and 'Coach Conf' in df.columns:
+        df = df[df['Coach Conf'] == conf]
+
+    coach_options = (df[['Coach','Coach_norm']]
+                     .drop_duplicates('Coach_norm')
+                     .sort_values('Coach')
+                     .to_dict('records'))
+
+    comps: list[dict] = []
+    players_by_coach: dict[str, list[dict]] = {}
+
+    for disp in selected_display:
+        key = normalize_name(disp)
+        slice_df = df[df['Coach_norm'] == key].copy()
+        player_df = slice_df[slice_df['Player'].notna()].copy()
+
+        def row_to_item(row):
+            proj_num, proj_raw = parse_pick(row.get('Projected Pick'))
+            act_num, act_raw = parse_pick(row.get('Actual Pick'))
+            return {
+                'player': row.get('Player'),
+                'team': row.get('Team'),
+                'year': to_int_or_none(row.get('Year')),
+                'projected_money': row.get('Projected $') or 0.0,
+                'actual_money': row.get('Actual $') or 0.0,
+                'net': (row.get('Actual $') or 0.0) - (row.get('Projected $') or 0.0),
+                'projected_pick': proj_num,
+                'projected_pick_raw': proj_raw,
+                'actual_pick': act_num,
+                'actual_pick_raw': act_raw,
             }
-            merged[key] = entry
-        else:
-            entry["recruits"] += int(r.recruits or 0)
-            entry["proj_sum"] += float(r.proj_sum or 0)
-            entry["act_sum"] += float(r.act_sum or 0)
-            entry["net_sum"] += float(r.net_sum or 0)
 
-    comps = []
-    for name in selected:
-        key, disp = normalize_coach_name(name)
-        e = merged.get(key)
-        if not e:
-            e = {
-                'coach': disp,
-                'recruits': 0,
-                'proj_sum': 0.0,
-                'act_sum': 0.0,
-                'net_sum': 0.0,
-            }
-        avg_net = 0.0 if e['recruits'] == 0 else e['net_sum'] / e['recruits']
-        e['avg_net'] = float(avg_net)
-        comps.append(e)
+        roster = [row_to_item(r) for _, r in player_df.iterrows()] if not player_df.empty else []
+
+        proj_sum = float(player_df['Projected $'].sum()) if not player_df.empty else 0.0
+        act_sum  = float(player_df['Actual $'].sum()) if not player_df.empty else 0.0
+        net_sum  = act_sum - proj_sum
+        recruits = int(player_df['Player'].nunique()) if not player_df.empty else 0
+        avg_net  = (net_sum / recruits) if recruits else 0.0
+
+        comps.append({
+            'coach': disp,
+            'recruits': recruits,
+            'proj_sum': proj_sum,
+            'act_sum': act_sum,
+            'net_sum': net_sum,
+            'avg_net': avg_net,
+        })
+        players_by_coach[disp] = roster
 
     if min_rec:
-        comps = [c for c in comps if c["recruits"] >= min_rec]
+        comps = [c for c in comps if c['recruits'] >= min_rec]
 
     if sort == 'actual_desc':
-        comps.sort(key=lambda c: c["act_sum"], reverse=True)
+        comps.sort(key=lambda c: c['act_sum'], reverse=True)
     elif sort == 'proj_desc':
-        comps.sort(key=lambda c: c["proj_sum"], reverse=True)
+        comps.sort(key=lambda c: c['proj_sum'], reverse=True)
     elif sort == 'avg_net_desc':
-        comps.sort(key=lambda c: c["avg_net"], reverse=True)
+        comps.sort(key=lambda c: c['avg_net'], reverse=True)
     else:
-        comps.sort(key=lambda c: c["net_sum"], reverse=True)
+        comps.sort(key=lambda c: c['net_sum'], reverse=True)
 
-    # Players query
-    players_q = Prospect.query.filter(func.lower(Prospect.coach).in_(variant_set))
-    if filters:
-        players_q = players_q.filter(and_(*filters))
-    players_q = players_q.order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
-    players = players_q.all()
-
-    players_by_coach: dict[str, list[SimpleNamespace]] = {name: [] for name in selected}
-    for src in players:
-        _, disp = normalize_coach_name(src.coach)
-
-        proj_num, proj_raw = _parse_pick(src.projected_pick_raw if src.projected_pick_raw is not None else src.projected_pick)
-        act_num, act_raw = _parse_pick(src.actual_pick_raw if src.actual_pick_raw is not None else src.actual_pick)
-
-        projected_money_value = src.projected_money
-        actual_money_value = src.actual_money
-
-        item = SimpleNamespace(
-            player=src.player,
-            team=src.team,
-            year=int(src.year) if src.year not in (None, '') else None,
-            projected_money=projected_money_value,
-            actual_money=actual_money_value,
-            net=(actual_money_value or 0) - (projected_money_value or 0),
-            projected_pick=proj_num,
-            projected_pick_raw=proj_raw,
-            actual_pick=act_num,
-            actual_pick_raw=act_raw,
-        )
-
-        players_by_coach.setdefault(disp, []).append(item)
-
-    if min_rec:
-        valid = {c["coach"] for c in comps}
-        players_by_coach = {k: v for k, v in players_by_coach.items() if k in valid}
-
-    coach_list = _get_coach_names()
-
-    not_enough = bool(raw_selected) and len(selected) < 2
-
-    all_players = [p for roster in players_by_coach.values() for p in roster]
-    missing_picks = [
-        r for r in all_players
-        if r.actual_money and r.actual_pick is None and r.actual_pick_raw in (None, '', 'Undrafted')
-    ]
-    current_app.logger.info(
-        "Compare: %d rows with $ but no actual pick (will show 'Undrafted')",
-        len(missing_picks),
-    )
+    not_enough = bool(selected_display) and len(selected_display) < 2
 
     return render_template(
         'recruits/money_compare.html',
-        coaches=coach_list,
-        selected=selected,
+        coach_options=coach_options,
+        selected=selected_display,
         comps=comps,
         players_by_coach=players_by_coach,
         year_min=year_min, year_max=year_max, sheet=sheet, conf=conf, min_recruits=min_rec, sort=sort,
