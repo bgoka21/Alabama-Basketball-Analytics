@@ -3,6 +3,7 @@ import pandas as pd
 from flask import current_app
 from app import db
 from app.models.prospect import Prospect
+from app.models.coach import Coach
 from app.utils.measurements import parse_feet_inches
 from app.utils.import_utils import (
     normalize_headers,
@@ -39,6 +40,7 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
     updated_total = 0
     skipped_total = 0
     per_sheet: list[dict] = []
+    coach_records: dict[str, dict[str, str | None]] = {}
 
     for sheet in xl.sheet_names:
         try:
@@ -48,6 +50,33 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
                 df = pd.read_excel(xl, sheet_name=sheet, dtype=str, engine="openpyxl")
 
             df = normalize_headers(df)
+
+            if sheet.lower() == "coaches":
+                strip_cols(df, ["coach", "current_team", "current_conference"])
+                rows = df.to_dict(orient="records")
+                total_rows += len(rows)
+                for row in rows:
+                    coach_raw = (row.get("coach") or "").strip()
+                    if not coach_raw:
+                        continue
+                    _, coach = normalize_coach_name(coach_raw)
+                    team = (row.get("current_team") or "").strip() or None
+                    conf = (row.get("current_conference") or "").strip() or None
+                    info = coach_records.get(coach, {})
+                    if team:
+                        info["current_team"] = team
+                    if conf:
+                        info["current_conference"] = conf
+                    coach_records[coach] = info
+                per_sheet.append({
+                    "sheet": sheet,
+                    "rows": len(rows),
+                    "inserted": 0,
+                    "updated": 0,
+                    "skipped": 0,
+                    "status": "ok",
+                })
+                continue
 
             ok, missing = validate_required(df)
             if not ok:
@@ -98,6 +127,15 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             for idx, row in enumerate(rows):
                 coach_raw = (row.get("coach") or "").strip()
                 _, coach = normalize_coach_name(coach_raw)
+                coach_team = (row.get("coach_current_team") or "").strip() or None
+                coach_conf = (row.get("coach_current_conference") or "").strip() or None
+                if coach:
+                    info = coach_records.get(coach, {})
+                    if coach_team:
+                        info["current_team"] = coach_team
+                    if coach_conf:
+                        info["current_conference"] = coach_conf
+                    coach_records[coach] = info
                 if coach_raw and coach_raw != coach:
                     current_app.logger.info(
                         f"[MoneyBoard Import] normalized coach '{coach_raw}' -> '{coach}'"
@@ -105,20 +143,17 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
                 player = (row.get("player") or "").strip()
                 team = (row.get("team") or "").strip()
                 year = row.get("year")
-
                 if not coach or not player or not team or year is None or (isinstance(year, float) and pd.isna(year)):
                     skipped += 1
                     current_app.logger.warning(
                         f"[MoneyBoard Import] Skipping row {idx}: missing identity fields (coach='{coach}', player='{player}', team='{team}', year='{year}')"
                     )
                     continue
-
                 existing = (
                     Prospect.query.filter_by(
                         coach=coach, player=player, team=team, year=int(year)
                     ).first()
                 )
-
                 proj_money = row.get("projected_money")
                 act_money = row.get("actual_money")
                 net_val = row.get("net")
@@ -126,8 +161,6 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
                 act_pick_raw = row.get("actual_pick_raw")
                 proj_pick = row.get("projected_pick")
                 act_pick = row.get("actual_pick")
-                coach_team = (row.get("coach_current_team") or "").strip() or None
-                coach_conf = (row.get("coach_current_conference") or "").strip() or None
                 sheet_tag = (row.get("sheet") or sheet).strip()
 
                 if existing:
@@ -212,6 +245,25 @@ def import_workbook(xlsx_path_or_buffer, strict=True, commit_batch=500):
             current_app.logger.exception(f"[MoneyBoard Import] Sheet '{sheet}' failed: {e}")
             per_sheet.append({"sheet": sheet, "status": "failed", "reason": str(e)})
             continue
+
+    for name, info in coach_records.items():
+        existing = Coach.query.filter_by(name=name).first()
+        if existing:
+            team = info.get("current_team")
+            conf = info.get("current_conference")
+            if team:
+                existing.current_team = team
+            if conf:
+                existing.current_conference = conf
+        else:
+            db.session.add(
+                Coach(
+                    name=name,
+                    current_team=info.get("current_team"),
+                    current_conference=info.get("current_conference"),
+                )
+            )
+    db.session.commit()
 
     current_app.logger.info(
         f"[MoneyBoard Import] Complete. inserted={inserted_total} updated={updated_total} skipped={skipped_total}"

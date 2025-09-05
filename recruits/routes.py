@@ -670,6 +670,10 @@ def money_coach(coach_name):
 
 def _get_coach_names():
     """Return sorted canonical coach names for picker UI."""
+    from app.models import Coach
+    names = [c.name for c in Coach.query.order_by(Coach.name.asc()).all()]
+    if names:
+        return names
     from app.models.prospect import Prospect
     raw = [c for (c,) in db.session.query(Prospect.coach)
                                .filter(Prospect.coach.isnot(None))
