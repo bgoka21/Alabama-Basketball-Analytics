@@ -5,6 +5,7 @@ import csv
 import io
 import math
 import re
+import numpy as np
 from collections import Counter
 from flask import render_template, request, redirect, url_for, flash, current_app, abort, Response
 import pandas as pd
@@ -541,8 +542,15 @@ def money_board():
             val = parse_currency(x)
             return val if val is not None else None
 
-        player_df['Projected $'] = player_df['Projected $'].apply(money_to_float)
-        player_df['Actual $'] = player_df['Actual $'].apply(money_to_float)
+        if 'Projected $' in player_df.columns:
+            player_df['Projected $'] = player_df['Projected $'].apply(money_to_float)
+        else:
+            player_df['Projected $'] = np.nan
+
+        if 'Actual $' in player_df.columns:
+            player_df['Actual $'] = player_df['Actual $'].apply(money_to_float)
+        else:
+            player_df['Actual $'] = np.nan
         player_df['NET $'] = player_df['Actual $'].fillna(0) - player_df['Projected $'].fillna(0)
 
         agg = (player_df.groupby(['Coach','Coach_norm'], dropna=False)
