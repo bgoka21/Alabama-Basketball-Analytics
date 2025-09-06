@@ -14,7 +14,7 @@ from flask_login import login_required, current_user
 from types import SimpleNamespace
 from io import BytesIO
 from werkzeug.utils import secure_filename
-from sqlalchemy import func, desc, and_
+from sqlalchemy import func, desc, and_, inspect
 from models.database import db
 from models.recruit import Recruit, RecruitShotTypeStat, RecruitTopSchool
 from models.eybl import UnifiedStats
@@ -606,7 +606,17 @@ def money_board():
         agg['coach_team'] = agg['Coach_norm'].map(team_map).fillna('')
         agg['coach_conf'] = agg['Coach_norm'].map(conf_map).fillna('')
 
-        coach_logo_map = {normalize_name(c.name): c.team_logo_url for c in Coach.query.filter(Coach.team_logo_url.isnot(None)).all()}
+        coach_logo_map = {}
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns(Coach.__tablename__)]
+            if 'team_logo_url' in columns:
+                coach_logo_map = {
+                    normalize_name(c.name): c.team_logo_url
+                    for c in Coach.query.filter(Coach.team_logo_url.isnot(None)).all()
+                }
+        except Exception:
+            coach_logo_map = {}
 
         agg['avg_net'] = agg.apply(lambda r: (r['net_sum']/r['recruits']) if r['recruits'] else 0.0, axis=1)
 
