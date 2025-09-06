@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Upload Team Logo for {{ coach.name }}</h2>
+{% if coach.team_logo_url %}
+  <p>Current:</p>
+  <img src="{{ coach.team_logo_url }}" alt="logo" style="max-height:80px">
+{% endif %}
+<form method="post" enctype="multipart/form-data">
+  <input type="file" name="logo" accept=".png,.jpg,.jpeg,.svg" required>
+  <button type="submit" class="btn btn-primary">Upload</button>
+</form>
+{% endblock %}

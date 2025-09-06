@@ -196,6 +196,9 @@ def create_app():
 
     app.register_blueprint(admin_bp, url_prefix='/admin')
 
+    from recruits.admin_logo import bp_logo
+    app.register_blueprint(bp_logo)
+
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
 

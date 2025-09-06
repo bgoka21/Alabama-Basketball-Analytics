@@ -6,8 +6,18 @@
 
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
   <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl sm:text-3xl font-bold">{{ coach_name }}</h1>
-    <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board') }}">← Back to Money Board</a>
+    <div class="flex items-center gap-2">
+      {% if coach and coach.team_logo_url %}
+        <img class="team-logo" src="{{ coach.team_logo_url }}" alt="{{ coach_summary.coach_team }} logo" style="height:40px">
+      {% endif %}
+      <h1 class="text-2xl sm:text-3xl font-bold">{{ coach_name }}</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      {% if current_user.is_authenticated and current_user.is_admin and coach %}
+        <a class="btn btn-sm" href="{{ url_for('coach_logo.upload_logo', coach_id=coach.id) }}">Upload Logo</a>
+      {% endif %}
+      <a class="text-blue-600 hover:underline" href="{{ url_for('recruits.money_board') }}">← Back to Money Board</a>
+    </div>
   </div>
 
   <div class="grid sm:grid-cols-4 gap-3 mb-6">

@@ -111,7 +111,7 @@
       <tbody>
         {% for r in rows %}
         <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-900">
-          <td class="py-2 pr-4 font-medium">{{ r.coach }}</td>
+          <td class="py-2 pr-4 font-medium">{% if r.team_logo_url %}<img src="{{ r.team_logo_url }}" alt="" style="height:18px;vertical-align:middle;margin-right:6px">{% endif %}{{ r.coach }}</td>
           <td class="py-2 pr-4">{{ r.coach_team }}</td>
           <td class="py-2 pr-4">{{ r.coach_conf }}</td>
           <td class="py-2 pr-4 text-right">{{ r.recruits }}</td>

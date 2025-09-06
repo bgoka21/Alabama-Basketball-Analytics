@@ -30,6 +30,7 @@ from pathlib import Path
 from app.utils.coach_names import normalize_coach_name, get_alias_variants
 from app.recruits.workbook_utils import active_workbook_df, normalize_name, parse_pick, to_int_or_none
 from app.recruits.workbook_utils import normalize_money_columns
+from app.models import Coach
 
 # --- START PATCH: imports for workbook manager ---
 import os, json, time
@@ -582,6 +583,8 @@ def money_board():
         agg['coach_team'] = agg['Coach_norm'].map(team_map).fillna('')
         agg['coach_conf'] = agg['Coach_norm'].map(conf_map).fillna('')
 
+        coach_logo_map = {normalize_name(c.name): c.team_logo_url for c in Coach.query.filter(Coach.team_logo_url.isnot(None)).all()}
+
         agg['avg_net'] = agg.apply(lambda r: (r['net_sum']/r['recruits']) if r['recruits'] else 0.0, axis=1)
 
         if min_recruits:
@@ -607,6 +610,7 @@ def money_board():
                 'act_sum': float(r['act_sum'] or 0),
                 'net_sum': float(r['net_sum'] or 0),
                 'avg_net': float(r['avg_net'] or 0),
+                'team_logo_url': coach_logo_map.get(r['Coach_norm'])
             })
 
         top = rows[0] if rows else None
@@ -686,12 +690,15 @@ def money_coach(coach_name):
 
     players = sorted(players, key=_year_key)
 
+    coach = Coach.query.filter_by(name=coach_name).first()
+
     return render_template(
         'recruits/coach_money.html',
         coach_name=coach_name,
         coach_summary=coach_summary,
         by_year=by_year,
         players=players,
+        coach=coach,
     )
 
 
