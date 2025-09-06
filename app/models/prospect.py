@@ -32,6 +32,8 @@ class Prospect(db.Model):
     actual_pick_raw    = sa.Column(sa.String(32))
     projected_pick     = sa.Column(sa.Float)
     actual_pick        = sa.Column(sa.Float)
+    projected_pick_text = sa.Column(sa.String(32))
+    actual_pick_text    = sa.Column(sa.String(32))
 
     # Measurements (raw strings + normalized inches)
     height_raw = sa.Column(sa.String(16))

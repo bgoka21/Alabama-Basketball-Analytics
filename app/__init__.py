@@ -201,6 +201,8 @@ def create_app():
                 ("actual_pick",        "REAL"),
                 ("projected_pick_raw", "TEXT"),
                 ("actual_pick_raw",    "TEXT"),
+                ("projected_pick_text","TEXT"),
+                ("actual_pick_text",   "TEXT"),
             ])
 
     @app.before_request
