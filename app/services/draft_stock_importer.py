@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal
 import pandas as pd
 from flask import current_app
 from app import db
@@ -8,7 +9,6 @@ from app.utils.measurements import parse_feet_inches
 from app.utils.import_utils import (
     normalize_headers,
     strip_cols,
-    parse_currency,
     parse_int,
     validate_required,
 )
@@ -32,36 +32,40 @@ def _to_num(x):
 
 
 UNDRAFTED_TOKENS = {'undrafted'}
-NA_TOKENS = {'n/a', 'na'}
+NA_TOKENS = {'n/a', 'na', 'n\\a'}
+
+
+def _coerce_none_if_nan(v):
+    try:
+        if v is None:
+            return None
+        if isinstance(v, float) and math.isnan(v):
+            return None
+    except Exception:
+        pass
+    return v
 
 
 def parse_pick_field(raw):
     """
-    Returns (num, text):
-      - If raw is numeric (e.g., 23 or "23" or 23.0) -> (23, None)
-      - If raw is "Undrafted" (any case) -> (None, "Undrafted")
-      - If raw is "N/A" (any case) -> (None, "N/A")
-      - If raw is blank/NaN -> (None, None)
-      - If raw is other non-numeric text -> (None, str(raw).strip())
+    Returns (num:int|None, text:str|None).
+    - Numbers ("23", 23, 23.0) -> (23, None)
+    - "Undrafted" (any case) -> (None, "Undrafted")
+    - "N/A"/"NA"/"N\\A" -> (None, "N/A")
+    - Blank/NaN -> (None, None)
+    - Other text -> (None, original text)
     """
+    raw = _coerce_none_if_nan(raw)
     if raw is None:
         return (None, None)
-    try:
-        if isinstance(raw, float) and math.isnan(raw):
-            return (None, None)
-    except Exception:
-        pass
-
     s = str(raw).strip()
     if not s:
         return (None, None)
-
     low = s.lower()
     if low in UNDRAFTED_TOKENS:
         return (None, "Undrafted")
-    if low in NA_TOKENS or low == 'n\\a':
+    if low in NA_TOKENS:
         return (None, "N/A")
-
     try:
         n = float(s)
         if math.isnan(n):
@@ -69,6 +73,28 @@ def parse_pick_field(raw):
         return (int(n), None)
     except Exception:
         return (None, s)
+
+
+def parse_money_field(raw):
+    """
+    Integer dollars (or 0) from workbook money columns.
+    Accepts numbers or strings with $/commas. Blank/NaN -> 0.
+    """
+    raw = _coerce_none_if_nan(raw)
+    if raw is None:
+        return 0
+    if isinstance(raw, (int,)):
+        return int(raw)
+    s = str(raw).replace('$', '').replace(',', '').strip()
+    if not s:
+        return 0
+    try:
+        return int(Decimal(s))
+    except Exception:
+        try:
+            return int(round(float(s)))
+        except Exception:
+            return 0
 
 
 def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batch=500):
@@ -165,9 +191,10 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
 
     # --- Process all remaining sheets ---
     for sheet_name in xl.sheet_names:
-        if sheet_name == coaches_sheet:
+        norm_sheet = sheet_name.strip()
+        if coaches_sheet and norm_sheet.lower() == coaches_sheet.strip().lower():
             continue
-        sheet = sheet_name.strip()
+        sheet = norm_sheet
         try:
             try:
                 df = pd.read_excel(xl, sheet_name=sheet_name, dtype=str)
@@ -184,10 +211,6 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
                     raise ValueError(msg)
 
             strip_cols(df, ["coach", "player", "team", "coach_current_team", "coach_current_conference"])
-
-            for col in ("projected_money", "actual_money", "net"):
-                if col in df.columns:
-                    df[col] = df[col].apply(parse_currency)
 
             if "year" in df.columns:
                 df["year"] = df["year"].apply(parse_int)
@@ -206,18 +229,8 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
                 if col not in df.columns:
                     df[col] = None
 
-            if "net" in df.columns:
-                df["net"] = df["net"].where(df["net"].notna(), None)
-            else:
+            if "net" not in df.columns:
                 df["net"] = None
-
-            if "projected_money" in df.columns and "actual_money" in df.columns:
-                df["net"] = df.apply(
-                    lambda r: (r["actual_money"] - r["projected_money"])
-                    if r.get("actual_money") is not None and r.get("projected_money") is not None
-                    else r.get("net"),
-                    axis=1,
-                )
 
             df["height_in"] = df["Height"].apply(parse_feet_inches) if "Height" in df.columns else None
             df["wingspan_in"] = df["WingSpan"].apply(parse_feet_inches) if "WingSpan" in df.columns else None
@@ -261,19 +274,34 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
                             coach=coach, player=player, team=team, year=int(year)
                         ).first()
                     )
-                    proj_money = row.get("projected_money")
-                    act_money = row.get("actual_money")
-                    net_val = row.get("net")
                     proj_pick_raw = row.get("projected_pick_raw")
                     act_pick_raw = row.get("actual_pick_raw")
                     proj_num, proj_text = parse_pick_field(proj_pick_raw)
                     act_num, act_text = parse_pick_field(act_pick_raw)
+
+                    workbook_proj_money = parse_money_field(row.get("projected_money"))
+                    workbook_act_money = parse_money_field(row.get("actual_money"))
+                    workbook_net_money = parse_money_field(row.get("net"))
+
+                    if (workbook_proj_money == 0) and (proj_num is not None):
+                        try:
+                            workbook_proj_money = compute_projected_money(proj_num)  # type: ignore[name-defined]
+                        except NameError:
+                            pass
+                    if (workbook_act_money == 0) and (act_num is not None):
+                        try:
+                            workbook_act_money = compute_actual_money(act_num)  # type: ignore[name-defined]
+                        except NameError:
+                            pass
+                    if workbook_net_money == 0:
+                        workbook_net_money = (workbook_act_money or 0) - (workbook_proj_money or 0)
+
                     sheet_tag = (row.get("sheet") or sheet).strip()
 
                     if existing:
-                        existing.projected_money = proj_money if proj_money is not None else existing.projected_money
-                        existing.actual_money = act_money if act_money is not None else existing.actual_money
-                        existing.net = net_val if net_val is not None else existing.net
+                        existing.projected_money = workbook_proj_money
+                        existing.actual_money = workbook_act_money
+                        existing.net = workbook_net_money
 
                         if proj_pick_raw is not None:
                             existing.projected_pick_raw = proj_pick_raw
@@ -314,9 +342,9 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
                             player=player,
                             team=team,
                             year=int(year),
-                            projected_money=proj_money,
-                            actual_money=act_money,
-                            net=net_val,
+                            projected_money=workbook_proj_money,
+                            actual_money=workbook_act_money,
+                            net=workbook_net_money,
                             projected_pick_raw=proj_pick_raw,
                             actual_pick_raw=act_pick_raw,
                             projected_pick=proj_num,
