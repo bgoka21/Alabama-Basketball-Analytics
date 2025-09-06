@@ -137,10 +137,10 @@
               <td class="py-1 pr-3" data-cell="team">{{ p.team or '—' }}</td>
               <td class="py-1 pr-3" data-cell="year" data-sort="{{ p.year }}">{{ p.year }}</td>
               <td class="py-1 pr-3" data-cell="proj_pick" data-sort="{{ p.projected_pick if p.projected_pick is not none else '' }}">
-                {{ p.projected_pick|int if p.projected_pick is not none else p.projected_pick_text or '' }}
+                {{ (p.projected_pick, p.projected_pick_text) | display_pick }}
               </td>
               <td class="py-1 pr-3" data-cell="act_pick" data-sort="{{ p.actual_pick if p.actual_pick is not none else '' }}">
-                {{ p.actual_pick|int if p.actual_pick is not none else p.actual_pick_text or '' }}
+                {{ (p.actual_pick, p.actual_pick_text) | display_pick }}
               </td>
               <td class="py-1 pr-3 text-right" data-cell="projected" data-sort="{{ p.projected_money }}">{{ p.projected_money|fmt_money }}</td>
               <td class="py-1 pr-3 text-right" data-cell="actual" data-sort="{{ p.actual_money }}">{{ p.actual_money|fmt_money }}</td>
@@ -160,7 +160,6 @@
     <div class="text-sm text-gray-500">Select coaches and click Compare.</div>
   {% endif %}
 </div>
-<script defer src="{{ url_for('static', filename='js/coach_autocomplete.js') }}?v=2025-09-04"></script>
 <script defer src="{{ url_for('static', filename='js/compare_players_table.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/compare_saved_sets.js') }}"></script>
 {% endblock %}

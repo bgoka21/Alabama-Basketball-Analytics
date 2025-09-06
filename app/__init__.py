@@ -171,6 +171,22 @@ def create_app():
     app.jinja_env.filters["fmt_money"] = fmt_money
     app.jinja_env.filters["posneg"] = posneg_class
 
+    def display_pick(value):
+        try:
+            num, text = value
+        except Exception:
+            num, text = value, None
+        if text and str(text).strip():
+            return str(text).strip()
+        if num is not None:
+            try:
+                return str(int(num))
+            except Exception:
+                return str(num)
+        return ""
+
+    app.jinja_env.filters['display_pick'] = display_pick
+
     # --- Register Blueprints ---
     from public.routes import public_bp
     app.register_blueprint(public_bp)
