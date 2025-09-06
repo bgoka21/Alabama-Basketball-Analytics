@@ -4,6 +4,54 @@ import pandas as pd
 from flask import current_app
 
 
+def _to_int_money(series: pd.Series) -> pd.Series:
+    # Accept numeric or strings with $, commas, or blanks → int (missing → 0)
+    s = series.copy()
+    s = s.astype(str).str.replace(r'[\$,]', '', regex=True).str.strip()
+    s = s.replace({'': None, 'nan': None, 'None': None})
+    return pd.to_numeric(s, errors='coerce').fillna(0).astype(int)
+
+
+def normalize_money_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize workbook monetary columns to canonical:
+      'Projected $', 'Actual $', 'NET $' (all ints).
+    Accepts aliases: 'Projected Money', 'Actual Money', 'NET', 'Net', etc.
+    Does not mutate the original df.
+    """
+    out = df.copy()
+
+    aliases = {
+        'Projected $': ['Projected $', 'Projected Money', 'Proj Money', 'Projected$'],
+        'Actual $'   : ['Actual $', 'Actual Money', 'Act Money', 'Actual$'],
+        'NET $'      : ['NET $', 'NET', 'Net', 'Net $'],
+    }
+
+    def first_col(options):
+        for c in options:
+            if c in out.columns:
+                return c
+        return None
+
+    # Map/copy into canonical names; create if missing
+    for canon, options in aliases.items():
+        src = first_col(options)
+        if src and src != canon:
+            out[canon] = out[src]
+        elif canon not in out:
+            out[canon] = 0
+
+    # Coerce to integer dollars
+    for col in ['Projected $', 'Actual $', 'NET $']:
+        out[col] = _to_int_money(out[col])
+
+    # If NET $ is zero but projected/actual exist, recompute
+    recompute_mask = (out['NET $'] == 0) & (out['Actual $'].notna()) & (out['Projected $'].notna())
+    out.loc[recompute_mask, 'NET $'] = out['Actual $'] - out['Projected $']
+
+    return out
+
+
 def normalize_name(s: str) -> str:
     return re.sub(r'\s+', ' ', (s or '').strip()).lower()
 
