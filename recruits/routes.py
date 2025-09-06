@@ -527,7 +527,19 @@ def money_board():
         df['Year_int'] = df['Year'].map(to_int_or_none)
         years = sorted([y for y in df['Year_int'].dropna().unique()])
         sheets = sorted([s for s in df['__sheet'].dropna().unique()])
-        confs = sorted(df['Coach Conf'].dropna().unique()) if 'Coach Conf' in df.columns else []
+
+        # Determine which column represents the coach's conference. Older
+        # workbooks used ``Coach Conf`` while newer ones store
+        # ``Coach Current Conference``.  We want to support either so the
+        # Money Board shows conference information regardless of the workbook
+        # version.
+        conf_col = None
+        if 'Coach Current Conference' in df.columns:
+            conf_col = 'Coach Current Conference'
+        elif 'Coach Conf' in df.columns:
+            conf_col = 'Coach Conf'
+
+        confs = sorted(df[conf_col].dropna().unique()) if conf_col else []
 
         if year_min is not None:
             df = df[df['Year_int'].ge(year_min)]
@@ -535,8 +547,8 @@ def money_board():
             df = df[df['Year_int'].le(year_max)]
         if sheet:
             df = df[df['__sheet'] == sheet]
-        if conf and 'Coach Conf' in df.columns:
-            df = df[df['Coach Conf'] == conf]
+        if conf and conf_col:
+            df = df[df[conf_col] == conf]
 
         player_df = df[df['Player'].notna()].copy()
         player_df['NET $'] = player_df['Actual $'] - player_df['Projected $']
@@ -567,18 +579,29 @@ def money_board():
             } for m in missing])
             agg = pd.concat([agg, filler], ignore_index=True)
 
+        # Determine the appropriate team and conference columns. Similar to the
+        # conference handling above, we support both the legacy and current
+        # column names so that the Team and Conf values appear on the Money
+        # Board regardless of the workbook schema.
+        team_col = None
+        if 'Coach Current Team' in df.columns:
+            team_col = 'Coach Current Team'
+        elif 'Coach Team' in df.columns:
+            team_col = 'Coach Team'
+
         team_map = {}
-        if 'Coach Team' in df.columns:
-            team_map = (df[['Coach_norm','Coach Team']]
+        if team_col:
+            team_map = (df[['Coach_norm', team_col]]
                           .dropna()
                           .drop_duplicates('Coach_norm')
-                          .set_index('Coach_norm')['Coach Team'].to_dict())
+                          .set_index('Coach_norm')[team_col].to_dict())
+
         conf_map = {}
-        if 'Coach Conf' in df.columns:
-            conf_map = (df[['Coach_norm','Coach Conf']]
+        if conf_col:
+            conf_map = (df[['Coach_norm', conf_col]]
                          .dropna()
                          .drop_duplicates('Coach_norm')
-                         .set_index('Coach_norm')['Coach Conf'].to_dict())
+                         .set_index('Coach_norm')[conf_col].to_dict())
 
         agg['coach_team'] = agg['Coach_norm'].map(team_map).fillna('')
         agg['coach_conf'] = agg['Coach_norm'].map(conf_map).fillna('')
