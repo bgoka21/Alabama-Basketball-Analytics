@@ -29,6 +29,7 @@ import importlib.util
 from pathlib import Path
 from app.utils.coach_names import normalize_coach_name, get_alias_variants
 from app.recruits.workbook_utils import active_workbook_df, normalize_name, parse_pick, to_int_or_none
+from app.recruits.workbook_utils import normalize_money_columns
 
 # --- START PATCH: imports for workbook manager ---
 import os, json, time
@@ -500,8 +501,6 @@ def money_board():
     Coach leaderboard by money outcomes with filters.
     Defaults: order by NET desc.
     """
-    from app.utils.import_utils import parse_currency
-
     year_min = request.args.get('year_min', type=int)
     year_max = request.args.get('year_max', type=int)
     sheet = request.args.get('sheet')
@@ -513,6 +512,8 @@ def money_board():
         df = active_workbook_df()
     except Exception:
         df = pd.DataFrame(columns=['Coach','Player','Team','Year','Projected $','Actual $','Projected Pick','Actual Pick','__sheet'])
+
+    df = normalize_money_columns(df)
 
     has_data = not df.empty
     if df.empty:
@@ -537,21 +538,7 @@ def money_board():
             df = df[df['Coach Conf'] == conf]
 
         player_df = df[df['Player'].notna()].copy()
-
-        def money_to_float(x):
-            val = parse_currency(x)
-            return val if val is not None else None
-
-        if 'Projected $' in player_df.columns:
-            player_df['Projected $'] = player_df['Projected $'].apply(money_to_float)
-        else:
-            player_df['Projected $'] = np.nan
-
-        if 'Actual $' in player_df.columns:
-            player_df['Actual $'] = player_df['Actual $'].apply(money_to_float)
-        else:
-            player_df['Actual $'] = np.nan
-        player_df['NET $'] = player_df['Actual $'].fillna(0) - player_df['Projected $'].fillna(0)
+        player_df['NET $'] = player_df['Actual $'] - player_df['Projected $']
 
         agg = (player_df.groupby(['Coach','Coach_norm'], dropna=False)
                        .agg(recruits=('Player','nunique'),
@@ -790,6 +777,8 @@ def money_compare():
         df = active_workbook_df()
     except Exception:
         df = pd.DataFrame(columns=['Coach','Player','Team','Year','Projected $','Actual $','Projected Pick','Actual Pick','__sheet'])
+
+    df = normalize_money_columns(df)
 
     if df.empty:
         coach_list = _get_coach_names()
