@@ -81,7 +81,8 @@
   <div class="flex justify-end mb-4">
     <a
       class="text-sm underline text-blue-600"
-      href="{{ url_for('recruits.money_compare',
+      href="{{ url_for('recruits.compare',
+                        by='coach',
                         year_min=request.args.get('year_min'),
                         year_max=request.args.get('year_max'),
                         sheet=request.args.get('sheet'),
