@@ -1,4 +1,7 @@
 {% extends 'base.html' %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/moneyboard-detail.css') }}">
+{% endblock %}
 {% block content %}
 
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
@@ -73,41 +76,43 @@
   </div>
 
   <h2 class="text-xl font-semibold mb-2">Players</h2>
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
+  <div class="moneycard">
+    <table class="moneytable">
       <thead>
-        <tr class="text-left border-b">
-          <th class="py-2 pr-4">Player</th>
-          <th class="py-2 pr-4">Team</th>
-          <th class="py-2 pr-4">Year</th>
-          <th class="py-2 pr-4 text-right">Proj Pick</th>
-          <th class="py-2 pr-4 text-right">Actual Pick</th>
-          <th class="py-2 pr-4">Projected $</th>
-          <th class="py-2 pr-4">Actual $</th>
-          <th class="py-2 pr-4">NET $</th>
+        <tr>
+          <th>Player</th>
+          <th>Year</th>
+          <th>Projected Pick</th>
+          <th>Actual Pick</th>
+          <th>Projected $</th>
+          <th>Actual $</th>
+          <th>NET</th>
         </tr>
       </thead>
       <tbody>
         {% for p in players %}
-        <tr class="border-b">
-          <td class="py-2 pr-4 font-medium">{{ p.player }}</td>
-          <td class="py-2 pr-4">{{ p.team if p.team else '—' }}</td>
-          <td class="py-2 pr-4">{{ p.year or '—' }}</td>
-          <td class="py-1 pr-3 text-right" data-sort="{{ p.projected_pick if p.projected_pick is not none else '' }}">
-            {{ (p.projected_pick, p.projected_pick_text) | display_pick }}
+        <tr>
+          <td>{{ p.player }}</td>
+          <td>{{ p.year or '—' }}</td>
+          <td>{{ (p.projected_pick, p.projected_pick_text) | display_pick }}</td>
+          <td>{{ (p.actual_pick, p.actual_pick_text) | display_pick }}</td>
+          <td>${{ "{:,}".format(p.projected_money|int) }}</td>
+          <td>${{ "{:,}".format(p.actual_money|int) }}</td>
+          <td class="{{ 'net-pos' if (p.net|int) >= 0 else 'net-neg' }}">
+            ${{ "{:,}".format(p.net|int) }}
           </td>
-          <td class="py-1 pr-3 text-right" data-sort="{{ p.actual_pick if p.actual_pick is not none else '' }}">
-            {{ (p.actual_pick, p.actual_pick_text) | display_pick }}
-          </td>
-          <td class="py-2 pr-4">{{ p.projected_money|fmt_money }}</td>
-          <td class="py-2 pr-4">{{ p.actual_money|fmt_money }}</td>
-          <td class="py-2 pr-4 font-semibold {{ p.net|posneg }}">{{ p.net|fmt_money }}</td>
         </tr>
         {% endfor %}
         {% if not players %}
-          <tr><td class="py-3 text-gray-500" colspan="8">No players found.</td></tr>
+          <tr><td colspan="7">No players found.</td></tr>
         {% endif %}
       </tbody>
+      <tfoot>
+        <tr>
+          <td class="total-label" colspan="6">TOTAL NET</td>
+          <td class="total-value">${{ "{:,}".format((coach_summary.net_sum or 0)|int) }}</td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 </div>

@@ -30,6 +30,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
     <!-- Our wrapper -->
     <script src="{{ url_for('static', filename='js/pdf-export.js') }}" defer></script>
+    {% block head_extra %}{% endblock %}
 </head>
 <body class="min-h-screen flex">
 
