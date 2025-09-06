@@ -669,13 +669,22 @@ def money_coach(coach_name):
                )
                .filter(Prospect.coach == coach_name)
                .group_by(Prospect.year)
-               .order_by(Prospect.year.asc())
                .all())
+
+    def _year_key(obj):
+        y = getattr(obj, 'year', None)
+        try:
+            return (0, int(y))
+        except (TypeError, ValueError):
+            return (1, 10**9)
+
+    by_year = sorted(by_year, key=_year_key)
 
     players = (Prospect.query
                .filter(Prospect.coach == coach_name)
-               .order_by(desc(Prospect.net), desc(Prospect.actual_money), Prospect.year.desc())
                .all())
+
+    players = sorted(players, key=_year_key)
 
     return render_template(
         'recruits/coach_money.html',
@@ -822,6 +831,12 @@ def money_compare():
         slice_df = df[df['Coach_norm'] == key].copy()
         player_df = slice_df[slice_df['Player'].notna()].copy()
 
+        if not player_df.empty and 'Year' in player_df.columns:
+            _year = pd.to_numeric(player_df['Year'], errors='coerce')
+            player_df = (player_df.assign(_year=_year)
+                                   .sort_values(by=['_year'], ascending=True, na_position='last')
+                                   .drop(columns=['_year']))
+
         def row_to_item(row):
             proj_num, proj_raw = parse_pick(row.get('Projected Pick'))
             act_num, act_raw = parse_pick(row.get('Actual Pick'))
@@ -920,8 +935,16 @@ def money_compare_csv():
     if conf:
         filters.append(Prospect.coach_current_conference == conf)
 
-    q = Prospect.query.filter(and_(*filters)).order_by(Prospect.coach.asc(), Prospect.net.desc().nullslast())
+    q = Prospect.query.filter(and_(*filters))
     rows = q.all()
+
+    def _year_sort_val(y):
+        try:
+            return (0, int(y))
+        except (TypeError, ValueError):
+            return (1, 10**9)
+
+    rows.sort(key=lambda p: (normalize_coach_name(p.coach)[1].lower(), _year_sort_val(p.year)))
 
     if min_rec:
         counts = Counter(normalize_coach_name(p.coach)[0] for p in rows)
