@@ -3,6 +3,9 @@ venv/
 __pycache__/  
 *.pyc  
 uploads/
+!static/uploads/
+!static/uploads/logos/
+!static/uploads/logos/.gitkeep
 .DS_Store
 data/.DS_Store
 templates/.DS_Store
