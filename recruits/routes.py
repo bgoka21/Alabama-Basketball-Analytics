@@ -994,6 +994,80 @@ def money_compare_csv():
         headers={"Content-Disposition": "attachment; filename=money_compare.csv"}
     )
 
+
+def _compare_df(by: str = "coach"):
+    """
+    Build an aggregated table for comparison by coach or team.
+    Returns (df, display_col) where display_col is 'Coach' or 'Team'.
+    """
+    # Load and normalize workbook
+    df = active_workbook_df()
+    df = normalize_money_columns(df)
+
+    # Keep rows that represent actual players
+    df = df[df['Player'].astype(str).str.strip().ne('')]
+
+    display_col = 'Coach' if by == 'coach' else 'Team'
+
+    # Normalize conference column if present
+    if by == 'coach' and 'Coach Conf' in df.columns and 'Conf' not in df.columns:
+        df = df.rename(columns={'Coach Conf': 'Conf'})
+    if by == 'team' and 'Team Conf' in df.columns and 'Conf' not in df.columns:
+        df = df.rename(columns={'Team Conf': 'Conf'})
+
+    group_cols = [display_col, 'Conf'] if 'Conf' in df.columns else [display_col]
+
+    agg = (
+        df.groupby(group_cols, dropna=False)
+          .agg(
+              Recruits=('Player', 'count'),
+              Projected=('Projected $', 'sum'),
+              Actual=('Actual $', 'sum'),
+              NET=('NET $', 'sum')
+          )
+          .reset_index()
+    )
+
+    # Avg NET per recruit (int dollars)
+    agg['Avg NET'] = (agg['NET'] / agg['Recruits']).fillna(0).astype(int)
+
+    # Sort by NET desc by default
+    agg = agg.sort_values(by='NET', ascending=False, kind='mergesort')
+    return agg, display_col
+
+
+@recruits_bp.route("/compare", methods=["GET"])
+def compare():
+    # Backward-compatible: accept old 'coaches' param; prefer unified 'entities'
+    by = (request.args.get("by") or "coach").lower()
+    if by not in {"coach", "team"}:
+        by = "coach"
+
+    selected = request.args.getlist("entities")
+    if not selected:
+        selected = request.args.getlist("coaches")
+
+    df, display_col = _compare_df(by=by)
+
+    # Build options list (unique names) for the select
+    options = sorted(df[display_col].astype(str).unique().tolist())
+
+    # Filter if user picked any entities
+    if selected:
+        df = df[df[display_col].astype(str).isin(selected)]
+
+    # Records for template
+    rows = df.to_dict(orient="records")
+
+    return render_template(
+        "recruits/compare.html",
+        by=by,
+        display_col=display_col,   # 'Coach' or 'Team'
+        options=options,           # list of names for the select
+        selected=selected,         # currently selected in query
+        rows=rows,                 # table rows
+    )
+
 # --- START PATCH: workbook manager routes ---
 
 @recruits_bp.get("/money/workbook")

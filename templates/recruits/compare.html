@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Compare {{ 'Coaches' if by=='coach' else 'Teams' }}</h1>
+
+{# Compare selector #}
+<form method="get" action="{{ url_for('recruits.compare') }}" class="space-y-3">
+  <fieldset>
+    <legend><strong>Compare by</strong></legend>
+    <label>
+      <input type="radio" name="by" value="coach" {{ 'checked' if by=='coach' else '' }}>
+      Coach
+    </label>
+    <label style="margin-left:1rem">
+      <input type="radio" name="by" value="team" {{ 'checked' if by=='team' else '' }}>
+      Team
+    </label>
+  </fieldset>
+
+  <label for="entities"><strong>{{ 'Coaches' if by=='coach' else 'Teams' }}</strong></label>
+  <select id="entities" name="entities" multiple size="16" class="w-full">
+    {% for name in options %}
+      <option value="{{ name }}" {{ 'selected' if name in selected else '' }}>{{ name }}</option>
+    {% endfor %}
+  </select>
+
+  <div>
+    <button type="submit" class="btn btn-primary">Compare</button>
+  </div>
+</form>
+
+{# Results table #}
+{% if rows %}
+  <table class="table mt-4">
+    <thead>
+      <tr>
+        <th>{{ display_col }}</th>
+        {% if 'Conf' in rows[0] %}<th>Conf</th>{% endif %}
+        <th>Recruits</th>
+        <th>Projected $</th>
+        <th>Actual $</th>
+        <th>NET</th>
+        <th>Avg NET</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r[display_col] }}</td>
+          {% if r.get('Conf') is not none %}<td>{{ r['Conf'] }}</td>{% endif %}
+          <td>{{ r['Recruits'] }}</td>
+          <td>${{ "{:,}".format((r['Projected'] or 0)|int) }}</td>
+          <td>${{ "{:,}".format((r['Actual'] or 0)|int) }}</td>
+          <td>${{ "{:,}".format((r['NET'] or 0)|int) }}</td>
+          <td>${{ "{:,}".format((r['Avg NET'] or 0)|int) }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}
