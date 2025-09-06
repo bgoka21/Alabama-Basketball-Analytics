@@ -67,8 +67,12 @@ def active_workbook_df():
             'Year': p.year,
             'Projected $': p.projected_money,
             'Actual $': p.actual_money,
-            'Projected Pick': p.projected_pick_raw if p.projected_pick_raw is not None else p.projected_pick,
-            'Actual Pick': p.actual_pick_raw if p.actual_pick_raw is not None else p.actual_pick,
+            'Projected Pick': p.projected_pick_text or (
+                p.projected_pick_raw if p.projected_pick_raw is not None else p.projected_pick
+            ),
+            'Actual Pick': p.actual_pick_text or (
+                p.actual_pick_raw if p.actual_pick_raw is not None else p.actual_pick
+            ),
             'Coach Team': p.coach_current_team,
             'Coach Conf': p.coach_current_conference,
             '__sheet': p.sheet,

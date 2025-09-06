@@ -10,7 +10,6 @@ from app.utils.import_utils import (
     strip_cols,
     parse_currency,
     parse_int,
-    parse_pick_to_int,
     validate_required,
 )
 from app.utils.coach_names import normalize_coach_name
@@ -30,6 +29,46 @@ def _to_num(x):
     s = str(x).replace("$","" ).replace(",","" ).strip()
     try: return float(s)
     except: return None
+
+
+UNDRAFTED_TOKENS = {'undrafted'}
+NA_TOKENS = {'n/a', 'na'}
+
+
+def parse_pick_field(raw):
+    """
+    Returns (num, text):
+      - If raw is numeric (e.g., 23 or "23" or 23.0) -> (23, None)
+      - If raw is "Undrafted" (any case) -> (None, "Undrafted")
+      - If raw is "N/A" (any case) -> (None, "N/A")
+      - If raw is blank/NaN -> (None, None)
+      - If raw is other non-numeric text -> (None, str(raw).strip())
+    """
+    if raw is None:
+        return (None, None)
+    try:
+        if isinstance(raw, float) and math.isnan(raw):
+            return (None, None)
+    except Exception:
+        pass
+
+    s = str(raw).strip()
+    if not s:
+        return (None, None)
+
+    low = s.lower()
+    if low in UNDRAFTED_TOKENS:
+        return (None, "Undrafted")
+    if low in NA_TOKENS or low == 'n\\a':
+        return (None, "N/A")
+
+    try:
+        n = float(s)
+        if math.isnan(n):
+            return (None, None)
+        return (int(n), None)
+    except Exception:
+        return (None, s)
 
 
 def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batch=500):
@@ -82,7 +121,7 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
                 coach_records[coach] = info
             per_sheet.append(
                 {
-                    "sheet": coaches_sheet,
+                    "sheet": coaches_sheet.strip(),
                     "rows": len(rows),
                     "inserted": 0,
                     "updated": 0,
@@ -118,21 +157,22 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
             )
             per_sheet.append(
                 {
-                    "sheet": coaches_sheet,
+                    "sheet": coaches_sheet.strip(),
                     "status": "failed",
                     "reason": str(e),
                 }
             )
 
     # --- Process all remaining sheets ---
-    for sheet in xl.sheet_names:
-        if sheet == coaches_sheet:
+    for sheet_name in xl.sheet_names:
+        if sheet_name == coaches_sheet:
             continue
+        sheet = sheet_name.strip()
         try:
             try:
-                df = pd.read_excel(xl, sheet_name=sheet, dtype=str)
+                df = pd.read_excel(xl, sheet_name=sheet_name, dtype=str)
             except Exception:
-                df = pd.read_excel(xl, sheet_name=sheet, dtype=str, engine="openpyxl")
+                df = pd.read_excel(xl, sheet_name=sheet_name, dtype=str, engine="openpyxl")
 
             df = normalize_headers(df)
 
@@ -165,8 +205,6 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
             for col in ("projected_pick_raw", "actual_pick_raw"):
                 if col not in df.columns:
                     df[col] = None
-            df["projected_pick"] = df["projected_pick_raw"].apply(parse_pick_to_int)
-            df["actual_pick"] = df["actual_pick_raw"].apply(parse_pick_to_int)
 
             if "net" in df.columns:
                 df["net"] = df["net"].where(df["net"].notna(), None)
@@ -193,108 +231,121 @@ def import_workbook(xlsx_path_or_buffer, strict=True, replace=False, commit_batc
             skipped = 0
 
             for idx, row in enumerate(rows):
-                coach_raw = (row.get("coach") or "").strip()
-                _, coach = normalize_coach_name(coach_raw)
-                coach_team = (row.get("coach_current_team") or "").strip() or None
-                coach_conf = (row.get("coach_current_conference") or "").strip() or None
-                if coach:
-                    info = coach_records.get(coach, {})
-                    if coach_team:
-                        info["current_team"] = coach_team
-                    if coach_conf:
-                        info["current_conference"] = coach_conf
-                    coach_records[coach] = info
-                if coach_raw and coach_raw != coach:
-                    current_app.logger.info(
-                        f"[MoneyBoard Import] normalized coach '{coach_raw}' -> '{coach}'"
+                try:
+                    coach_raw = (row.get("coach") or "").strip()
+                    _, coach = normalize_coach_name(coach_raw)
+                    coach_team = (row.get("coach_current_team") or "").strip() or None
+                    coach_conf = (row.get("coach_current_conference") or "").strip() or None
+                    if coach:
+                        info = coach_records.get(coach, {})
+                        if coach_team:
+                            info["current_team"] = coach_team
+                        if coach_conf:
+                            info["current_conference"] = coach_conf
+                        coach_records[coach] = info
+                    if coach_raw and coach_raw != coach:
+                        current_app.logger.info(
+                            f"[MoneyBoard Import] normalized coach '{coach_raw}' -> '{coach}'"
+                        )
+                    player = (row.get("player") or "").strip()
+                    team = (row.get("team") or "").strip()
+                    year = row.get("year")
+                    if not coach or not player or not team or year is None or (isinstance(year, float) and pd.isna(year)):
+                        skipped += 1
+                        current_app.logger.warning(
+                            f"[MoneyBoard Import] Skipping row {idx}: missing identity fields (coach='{coach}', player='{player}', team='{team}', year='{year}')"
+                        )
+                        continue
+                    existing = (
+                        Prospect.query.filter_by(
+                            coach=coach, player=player, team=team, year=int(year)
+                        ).first()
                     )
-                player = (row.get("player") or "").strip()
-                team = (row.get("team") or "").strip()
-                year = row.get("year")
-                if not coach or not player or not team or year is None or (isinstance(year, float) and pd.isna(year)):
+                    proj_money = row.get("projected_money")
+                    act_money = row.get("actual_money")
+                    net_val = row.get("net")
+                    proj_pick_raw = row.get("projected_pick_raw")
+                    act_pick_raw = row.get("actual_pick_raw")
+                    proj_num, proj_text = parse_pick_field(proj_pick_raw)
+                    act_num, act_text = parse_pick_field(act_pick_raw)
+                    sheet_tag = (row.get("sheet") or sheet).strip()
+
+                    if existing:
+                        existing.projected_money = proj_money if proj_money is not None else existing.projected_money
+                        existing.actual_money = act_money if act_money is not None else existing.actual_money
+                        existing.net = net_val if net_val is not None else existing.net
+
+                        if proj_pick_raw is not None:
+                            existing.projected_pick_raw = proj_pick_raw
+                        if act_pick_raw is not None:
+                            existing.actual_pick_raw = act_pick_raw
+                        if proj_num is not None:
+                            existing.projected_pick = proj_num
+                        if act_num is not None:
+                            existing.actual_pick = act_num
+                        if proj_text is not None:
+                            existing.projected_pick_text = proj_text
+                        if act_text is not None:
+                            existing.actual_pick_text = act_text
+
+                        if coach_team:
+                            existing.coach_current_team = coach_team
+                        if coach_conf:
+                            existing.coach_current_conference = coach_conf
+                        existing.sheet = sheet_tag
+
+                        existing.player_class = _s(row.get("Class")) or existing.player_class
+                        age_val = _to_num(row.get("Age"))
+                        existing.age = age_val if age_val is not None else existing.age
+                        existing.player_conference = _s(row.get("Player Conference")) or existing.player_conference
+                        existing.height_raw = _s(row.get("Height")) or existing.height_raw
+                        existing.wingspan_raw = _s(row.get("WingSpan")) or existing.wingspan_raw
+                        existing.height_in = row.get("height_in") if row.get("height_in") is not None else existing.height_in
+                        existing.wingspan_in = row.get("wingspan_in") if row.get("wingspan_in") is not None else existing.wingspan_in
+                        existing.ws_minus_h_in = row.get("ws_minus_h_in") if row.get("ws_minus_h_in") is not None else existing.ws_minus_h_in
+                        existing.home_city = _s(row.get("Home City")) or existing.home_city
+                        existing.home_state = _s(row.get("Home State")) or existing.home_state
+                        existing.country = _s(row.get("Country")) or existing.country
+
+                        updated += 1
+                    else:
+                        p = Prospect(
+                            coach=coach,
+                            player=player,
+                            team=team,
+                            year=int(year),
+                            projected_money=proj_money,
+                            actual_money=act_money,
+                            net=net_val,
+                            projected_pick_raw=proj_pick_raw,
+                            actual_pick_raw=act_pick_raw,
+                            projected_pick=proj_num,
+                            actual_pick=act_num,
+                            projected_pick_text=proj_text,
+                            actual_pick_text=act_text,
+                            coach_current_team=coach_team,
+                            coach_current_conference=coach_conf,
+                            sheet=sheet_tag,
+                            player_class=_s(row.get("Class")) or None,
+                            age=_to_num(row.get("Age")),
+                            player_conference=_s(row.get("Player Conference")) or None,
+                            height_raw=_s(row.get("Height")) or None,
+                            wingspan_raw=_s(row.get("WingSpan")) or None,
+                            height_in=row.get("height_in"),
+                            wingspan_in=row.get("wingspan_in"),
+                            ws_minus_h_in=row.get("ws_minus_h_in"),
+                            home_city=_s(row.get("Home City")) or None,
+                            home_state=_s(row.get("Home State")) or None,
+                            country=_s(row.get("Country")) or None,
+                        )
+                        db.session.add(p)
+                        inserted += 1
+                except Exception as e:
                     skipped += 1
-                    current_app.logger.warning(
-                        f"[MoneyBoard Import] Skipping row {idx}: missing identity fields (coach='{coach}', player='{player}', team='{team}', year='{year}')"
+                    current_app.logger.exception(
+                        f"[MoneyBoard Import] Skipping row {idx} in sheet '{sheet}': {e}"
                     )
                     continue
-                existing = (
-                    Prospect.query.filter_by(
-                        coach=coach, player=player, team=team, year=int(year)
-                    ).first()
-                )
-                proj_money = row.get("projected_money")
-                act_money = row.get("actual_money")
-                net_val = row.get("net")
-                proj_pick_raw = row.get("projected_pick_raw")
-                act_pick_raw = row.get("actual_pick_raw")
-                proj_pick = row.get("projected_pick")
-                act_pick = row.get("actual_pick")
-                sheet_tag = (row.get("sheet") or sheet).strip()
-
-                if existing:
-                    existing.projected_money = proj_money if proj_money is not None else existing.projected_money
-                    existing.actual_money = act_money if act_money is not None else existing.actual_money
-                    existing.net = net_val if net_val is not None else existing.net
-
-                    if proj_pick_raw:
-                        existing.projected_pick_raw = proj_pick_raw
-                    if act_pick_raw:
-                        existing.actual_pick_raw = act_pick_raw
-                    if proj_pick is not None:
-                        existing.projected_pick = int(proj_pick)
-                    if act_pick is not None:
-                        existing.actual_pick = int(act_pick)
-
-                    if coach_team:
-                        existing.coach_current_team = coach_team
-                    if coach_conf:
-                        existing.coach_current_conference = coach_conf
-                    existing.sheet = sheet_tag
-
-                    existing.player_class = _s(row.get("Class")) or existing.player_class
-                    age_val = _to_num(row.get("Age"))
-                    existing.age = age_val if age_val is not None else existing.age
-                    existing.player_conference = _s(row.get("Player Conference")) or existing.player_conference
-                    existing.height_raw = _s(row.get("Height")) or existing.height_raw
-                    existing.wingspan_raw = _s(row.get("WingSpan")) or existing.wingspan_raw
-                    existing.height_in = row.get("height_in") if row.get("height_in") is not None else existing.height_in
-                    existing.wingspan_in = row.get("wingspan_in") if row.get("wingspan_in") is not None else existing.wingspan_in
-                    existing.ws_minus_h_in = row.get("ws_minus_h_in") if row.get("ws_minus_h_in") is not None else existing.ws_minus_h_in
-                    existing.home_city = _s(row.get("Home City")) or existing.home_city
-                    existing.home_state = _s(row.get("Home State")) or existing.home_state
-                    existing.country = _s(row.get("Country")) or existing.country
-
-                    updated += 1
-                else:
-                    p = Prospect(
-                        coach=coach,
-                        player=player,
-                        team=team,
-                        year=int(year),
-                        projected_money=proj_money,
-                        actual_money=act_money,
-                        net=net_val,
-                        projected_pick_raw=proj_pick_raw,
-                        actual_pick_raw=act_pick_raw,
-                        projected_pick=int(proj_pick) if proj_pick is not None else None,
-                        actual_pick=int(act_pick) if act_pick is not None else None,
-                        coach_current_team=coach_team,
-                        coach_current_conference=coach_conf,
-                        sheet=sheet_tag,
-                        player_class=_s(row.get("Class")) or None,
-                        age=_to_num(row.get("Age")),
-                        player_conference=_s(row.get("Player Conference")) or None,
-                        height_raw=_s(row.get("Height")) or None,
-                        wingspan_raw=_s(row.get("WingSpan")) or None,
-                        height_in=row.get("height_in"),
-                        wingspan_in=row.get("wingspan_in"),
-                        ws_minus_h_in=row.get("ws_minus_h_in"),
-                        home_city=_s(row.get("Home City")) or None,
-                        home_state=_s(row.get("Home State")) or None,
-                        country=_s(row.get("Country")) or None,
-                    )
-                    db.session.add(p)
-                    inserted += 1
 
             db.session.commit()
             inserted_total += inserted

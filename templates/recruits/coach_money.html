@@ -94,32 +94,10 @@
           <td class="py-2 pr-4">{{ p.team if p.team else '—' }}</td>
           <td class="py-2 pr-4">{{ p.year or '—' }}</td>
           <td class="py-1 pr-3 text-right" data-sort="{{ p.projected_pick if p.projected_pick is not none else '' }}">
-            {% if p.projected_pick is not none %}
-              {{ p.projected_pick|int }}
-            {% elif p.projected_pick_raw %}
-              {% set raw = (p.projected_pick_raw|string).strip() %}
-              {% if raw|lower in ['n/a','na'] %}
-                N/A
-              {% else %}
-                Undrafted
-              {% endif %}
-            {% else %}
-              Undrafted
-            {% endif %}
+            {{ p.projected_pick|int if p.projected_pick is not none else p.projected_pick_text or '' }}
           </td>
           <td class="py-1 pr-3 text-right" data-sort="{{ p.actual_pick if p.actual_pick is not none else '' }}">
-            {% if p.actual_pick is not none %}
-              {{ p.actual_pick|int }}
-            {% elif p.actual_pick_raw %}
-              {% set raw = (p.actual_pick_raw|string).strip() %}
-              {% if raw|lower in ['n/a','na'] %}
-                N/A
-              {% else %}
-                Undrafted
-              {% endif %}
-            {% else %}
-              Undrafted
-            {% endif %}
+            {{ p.actual_pick|int if p.actual_pick is not none else p.actual_pick_text or '' }}
           </td>
           <td class="py-2 pr-4">{{ p.projected_money|fmt_money }}</td>
           <td class="py-2 pr-4">{{ p.actual_money|fmt_money }}</td>
