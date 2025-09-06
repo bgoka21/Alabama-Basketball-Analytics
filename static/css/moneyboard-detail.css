@@ -1,0 +1,48 @@
+/* Card container */
+.moneycard {
+  border: 2px solid #c1121f;      /* crimson-like red */
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Table */
+.moneytable { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.moneytable thead th {
+  background: #f3f4f6;
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 8px 10px;
+  text-align: right;
+}
+.moneytable thead th:first-child { text-align: left; }
+
+/* Body rows */
+.moneytable tbody td {
+  padding: 8px 10px;
+  text-align: right;
+  vertical-align: middle;
+}
+.moneytable tbody td:first-child { text-align: left; }
+.moneytable tbody tr:nth-child(odd)  { background: #eeeeee; } /* light gray */
+.moneytable tbody tr:nth-child(even) { background: #d9d9d9; } /* darker gray */
+
+/* NET coloring */
+.net-pos { color: #0a7a1f; font-weight: 700; }  /* green */
+.net-neg { color: #b00020; font-weight: 700; }  /* red */
+
+/* Total bar */
+.moneytable tfoot td {
+  padding: 8px 10px;
+  text-align: right;
+  font-weight: 800;
+}
+.total-label { background: #0a7a1f; color: #fff; text-align: left; }
+.total-value { background: #0a7a1f; color: #fff; }
+
+/* Logo cell (optional left logo like your image) */
+.team-logo {
+  width: 64px; height: 64px; object-fit: contain;
+  display: block;
+}
+.logo-cell { padding: 8px 10px; background: transparent; }
