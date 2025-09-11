@@ -427,6 +427,12 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
         turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
         individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
+        team_turnovers_on = events.get('turnovers_on', 0)
+        individual_team_turnover_pct = (
+            round(person_turnovers.get(player, 0) / team_turnovers_on * 100, 1)
+            if team_turnovers_on
+            else 0.0
+        )
         team_miss = events.get('team_misses_on', 0)
         individual_off_reb_rate = (
             person_off_rebs.get(player, 0) / team_miss
@@ -455,6 +461,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             'turnover_rate': round(turnover_rate * 100, 1),
             'off_reb_rate': round(off_reb_rate * 100, 1),
             'individual_turnover_rate': round(individual_turnover_rate * 100, 1),
+            'individual_team_turnover_pct': individual_team_turnover_pct,
             'individual_off_reb_rate': round(individual_off_reb_rate * 100, 1),
             'fouls_drawn_rate': round(fouls_rate * 100, 1),
             'individual_foul_rate': round(foul_rate_ind * 100, 1),
@@ -633,6 +640,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     base.get('ppp_off', 0.0),
                     base.get('individual_turnover_rate', 0.0),
                     base.get('bamalytics_turnover_rate', 0.0),
+                    base.get('individual_team_turnover_pct', 0.0),
                     base.get('turnover_rate', 0.0),
                     base.get('individual_off_reb_rate', 0.0),
                     off_reb_rate,
@@ -3712,7 +3720,12 @@ def player_session_report(player_name):
         get_player_overall_stats(player.id, labels=labels).__dict__
     )
 
-    lower_better = {'team_turnover_rate_on', 'indiv_turnover_rate', 'bamalytics_turnover_rate'}
+    lower_better = {
+        'team_turnover_rate_on',
+        'indiv_turnover_rate',
+        'bamalytics_turnover_rate',
+        'individual_team_turnover_pct',
+    }
 
     def compute_improved_flag(key, v1, v2):
         if v1 is None or v2 is None or key == 'offensive_poss_on':
@@ -3734,9 +3747,10 @@ def player_session_report(player_name):
       ('adj_ast_to_to', 'Adj AST/TO'),
       ('offensive_poss_on', 'Team Poss'),
       ('ppp_on', 'PPP On'),
-      ('team_turnover_rate_on', 'TO Rate'),
-      ('indiv_turnover_rate', 'Ind TO%'),
+      ('team_turnover_rate_on', 'Team TO Rate'),
+      ('indiv_turnover_rate', 'Ind TO Rate (Poss.)'),
       ('bamalytics_turnover_rate', 'TO % (Bamalytics)'),
+      ('individual_team_turnover_pct', "% of TO's (NBA.com)"),
       ('ind_off_reb_pct', 'Ind Off Reb%'),
       ('ind_fouls_drawn_pct', 'Ind Fouls Drawn%'),
       ('steals', 'Steals'),

@@ -87,6 +87,7 @@ def app():
         db.session.add(poss3)
         db.session.add(PlayerPossession(possession_id=3, player_id=1))
         db.session.add(ShotDetail(possession_id=3, event_type='2FG+'))
+        db.session.add(ShotDetail(possession_id=3, event_type='Turnover'))
 
         db.session.commit()
     yield app
@@ -144,9 +145,13 @@ def test_offense_summary_table(client):
     html = resp.data.decode('utf-8')
     assert 'Offense Stats' in html
     assert 'PPP On' in html
+    assert 'Ind TO Rate (Poss.)' in html
+    assert 'Team TO Rate' in html
     assert 'TO % (Bamalytics)' in html
+    assert "% of TO's (NBA.com)" in html
     # turnovers=1, total_fga=5, pot_assists=2, assists=3 => 1/11*100=9.1
     assert '9.1' in html
+    assert '100.0' in html
 
 
 def test_offensive_metrics_filter(client):
