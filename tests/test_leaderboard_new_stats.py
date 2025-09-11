@@ -61,6 +61,9 @@ def app():
             fg2_makes=2,
             fg3_attempts=1,
             fg3_makes=1,
+            turnovers=1,
+            assists=3,
+            pot_assists=2,
             shot_type_details=json.dumps(shots),
         ))
 
@@ -141,6 +144,9 @@ def test_offense_summary_table(client):
     html = resp.data.decode('utf-8')
     assert 'Offense Stats' in html
     assert 'PPP On' in html
+    assert 'TO % (Bamalytics)' in html
+    # turnovers=1, total_fga=5, pot_assists=2, assists=3 => 1/11*100=9.1
+    assert '9.1' in html
 
 
 def test_offensive_metrics_filter(client):

@@ -483,6 +483,10 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             base['assist_turnover_ratio'] = 0.0
             base['adj_assist_turnover_ratio'] = 0.0
 
+        total_fga = base.get('atr_attempts', 0) + base.get('fg2_attempts', 0) + base.get('fg3_attempts', 0)
+        denominator = to + total_fga + pot_ast + ast
+        base['bamalytics_turnover_rate'] = round(to / denominator * 100, 1) if denominator else 0.0
+
         core_rows[player] = base
 
     shot_rows = (
@@ -628,6 +632,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                     base.get('ppp_on', 0.0),
                     base.get('ppp_off', 0.0),
                     base.get('individual_turnover_rate', 0.0),
+                    base.get('bamalytics_turnover_rate', 0.0),
                     base.get('turnover_rate', 0.0),
                     base.get('individual_off_reb_rate', 0.0),
                     off_reb_rate,
@@ -3707,7 +3712,7 @@ def player_session_report(player_name):
         get_player_overall_stats(player.id, labels=labels).__dict__
     )
 
-    lower_better = {'team_turnover_rate_on', 'indiv_turnover_rate'}
+    lower_better = {'team_turnover_rate_on', 'indiv_turnover_rate', 'bamalytics_turnover_rate'}
 
     def compute_improved_flag(key, v1, v2):
         if v1 is None or v2 is None or key == 'offensive_poss_on':
@@ -3731,6 +3736,7 @@ def player_session_report(player_name):
       ('ppp_on', 'PPP On'),
       ('team_turnover_rate_on', 'TO Rate'),
       ('indiv_turnover_rate', 'Ind TO%'),
+      ('bamalytics_turnover_rate', 'TO % (Bamalytics)'),
       ('ind_off_reb_pct', 'Ind Off Reb%'),
       ('ind_fouls_drawn_pct', 'Ind Fouls Drawn%'),
       ('steals', 'Steals'),

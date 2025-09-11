@@ -35,6 +35,7 @@
         <th class="px-4 py-2 text-center sortable">PPP On</th>
         <th class="px-4 py-2 text-center sortable">PPP Off</th>
         <th class="px-4 py-2 text-center sortable">Ind TO Rate</th>
+        <th class="px-4 py-2 text-center sortable">TO % (Bamalytics)</th>
         <th class="px-4 py-2 text-center sortable">TO Rate</th>
         <th class="px-4 py-2 text-center sortable">Ind Off Reb%</th>
         <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
@@ -63,12 +64,13 @@
           <td class="px-4 py-2 text-center">{{ ratio }}</td>
           <td class="px-4 py-2 text-center">{{ adj }}</td>
         {% elif selected.key == 'offense_summary' %}
-          {% set player, poss, ppp_on, ppp_off, ind_to, to_rate, ind_oreb, oreb_rate, ind_foul, foul_rate = row %}
+          {% set player, poss, ppp_on, ppp_off, ind_to, bama_to, to_rate, ind_oreb, oreb_rate, ind_foul, foul_rate = row %}
           <td class="px-4 py-2 text-left">{{ player }}</td>
           <td class="px-4 py-2 text-center">{{ poss }}</td>
           <td class="px-4 py-2 text-center">{{ ppp_on }}</td>
           <td class="px-4 py-2 text-center">{{ ppp_off }}</td>
           <td class="px-4 py-2 text-center">{{ ind_to }}</td>
+          <td class="px-4 py-2 text-center">{{ bama_to }}</td>
           <td class="px-4 py-2 text-center">{{ to_rate }}</td>
           <td class="px-4 py-2 text-center">{{ ind_oreb }}</td>
           <td class="px-4 py-2 text-center">{{ oreb_rate }}</td>
