@@ -222,6 +222,13 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
     fouls_drawn_on = totals.foul_by
     player_turnovers = totals.turnovers
     team_missed_on = sum(ev_count(ev) for ev in ["ATR-", "2FG-", "3FG-"])
+    total_fga = totals.atr_attempts + totals.fg2_attempts + totals.fg3_attempts
+    denominator = (
+        player_turnovers
+        + total_fga
+        + totals.pot_assists
+        + totals.assists
+    )
 
 
     return {
@@ -229,6 +236,7 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
         'ppp_on': round(ON_pts / ON_poss, 2) if ON_poss else None,
         'team_turnover_rate_on': round(turnovers_on / ON_poss * 100, 1) if ON_poss else None,
         'indiv_turnover_rate': round(player_turnovers / ON_poss * 100, 1) if ON_poss else None,
+        'bamalytics_turnover_rate': round(player_turnovers / denominator * 100, 1) if denominator else None,
         'ind_off_reb_pct': round(off_reb_on / team_missed_on * 100, 1) if team_missed_on else None,
         'ind_fouls_drawn_pct': round(fouls_drawn_on / ON_poss * 100, 1) if ON_poss else None,
     }
