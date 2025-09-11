@@ -229,6 +229,11 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
         + totals.pot_assists
         + totals.assists
     )
+    indiv_team_to_pct = (
+        round(player_turnovers / turnovers_on * 100, 1)
+        if turnovers_on
+        else None
+    )
 
 
     return {
@@ -237,6 +242,7 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
         'team_turnover_rate_on': round(turnovers_on / ON_poss * 100, 1) if ON_poss else None,
         'indiv_turnover_rate': round(player_turnovers / ON_poss * 100, 1) if ON_poss else None,
         'bamalytics_turnover_rate': round(player_turnovers / denominator * 100, 1) if denominator else None,
+        'individual_team_turnover_pct': indiv_team_to_pct,
         'ind_off_reb_pct': round(off_reb_on / team_missed_on * 100, 1) if team_missed_on else None,
         'ind_fouls_drawn_pct': round(fouls_drawn_on / ON_poss * 100, 1) if ON_poss else None,
     }
