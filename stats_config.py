@@ -32,6 +32,9 @@ LEADERBOARD_STATS.extend([
     {"key": "fouls_drawn_rate", "label": "Fouls Drawn Rate", "format": "pct", "hidden": True},
 ])
 
+# New defensive leaderboard metric
+LEADERBOARD_STATS.append({"key": "defense", "label": "Defense"})
+
 # ─── Simple Shot Type FG% Categories ─────────────────────────────────────────
 for sc in ["atr", "fg2", "fg3"]:
     label_map = {

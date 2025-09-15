@@ -20,36 +20,49 @@
 <div class="overflow-x-auto">
 <table class="min-w-full bg-white rounded-lg shadow border text-center">
   <thead>
-    <tr class="bg-gray-100">
-      <th class="px-4 py-2 text-center">#</th>
-      <th class="px-4 py-2 text-left sortable">Player</th>
-      {% if selected.key == 'assist_summary' %}
-        <th class="px-4 py-2 text-center sortable">Ast</th>
-        <th class="px-4 py-2 text-center sortable">Pot Ast</th>
-        <th class="px-4 py-2 text-center sortable">2nd Ast</th>
-        <th class="px-4 py-2 text-center sortable">TO</th>
-        <th class="px-4 py-2 text-center sortable">AST/TO</th>
-        <th class="px-4 py-2 text-center sortable">Adj AST/TO</th>
-      {% elif selected.key == 'offense_summary' %}
-        <th class="px-4 py-2 text-center sortable">Poss</th>
-        <th class="px-4 py-2 text-center sortable">PPP On</th>
-        <th class="px-4 py-2 text-center sortable">PPP Off</th>
-        <th class="px-4 py-2 text-center sortable">Ind TO Rate (Poss.)</th>
-        <th class="px-4 py-2 text-center sortable">TO % (Bamalytics)</th>
-        <th class="px-4 py-2 text-center sortable">% of TO's (NBA.com)</th>
-        <th class="px-4 py-2 text-center sortable">Team TO Rate</th>
-        <th class="px-4 py-2 text-center sortable">Ind Off Reb%</th>
-        <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
-        <th class="px-4 py-2 text-center sortable">Ind Fouls Drawn%</th>
-        <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
-      {% elif selected.key.endswith('_fg_pct') %}
-        <th class="px-4 py-2 text-center sortable">FG</th>
-        <th class="px-4 py-2 text-center sortable">FG%</th>
-        <th class="px-4 py-2 text-center sortable">Freq</th>
-      {% else %}
-        <th class="px-4 py-2 text-center sortable">{{ selected.label }}</th>
-      {% endif %}
-    </tr>
+    {% if selected.key == 'defense' %}
+      <tr class="bg-gray-100">
+        <th class="px-4 py-2 text-center" rowspan="2">#</th>
+        <th class="px-4 py-2 text-left sortable" rowspan="2">Player</th>
+        <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
+      </tr>
+      <tr class="bg-gray-100">
+        <th class="px-4 py-2 text-center sortable">Bump +</th>
+        <th class="px-4 py-2 text-center sortable">Bump Opps</th>
+        <th class="px-4 py-2 text-center sortable">Bump %</th>
+      </tr>
+    {% else %}
+      <tr class="bg-gray-100">
+        <th class="px-4 py-2 text-center">#</th>
+        <th class="px-4 py-2 text-left sortable">Player</th>
+        {% if selected.key == 'assist_summary' %}
+          <th class="px-4 py-2 text-center sortable">Ast</th>
+          <th class="px-4 py-2 text-center sortable">Pot Ast</th>
+          <th class="px-4 py-2 text-center sortable">2nd Ast</th>
+          <th class="px-4 py-2 text-center sortable">TO</th>
+          <th class="px-4 py-2 text-center sortable">AST/TO</th>
+          <th class="px-4 py-2 text-center sortable">Adj AST/TO</th>
+        {% elif selected.key == 'offense_summary' %}
+          <th class="px-4 py-2 text-center sortable">Poss</th>
+          <th class="px-4 py-2 text-center sortable">PPP On</th>
+          <th class="px-4 py-2 text-center sortable">PPP Off</th>
+          <th class="px-4 py-2 text-center sortable">Ind TO Rate (Poss.)</th>
+          <th class="px-4 py-2 text-center sortable">TO % (Bamalytics)</th>
+          <th class="px-4 py-2 text-center sortable">% of TO's (NBA.com)</th>
+          <th class="px-4 py-2 text-center sortable">Team TO Rate</th>
+          <th class="px-4 py-2 text-center sortable">Ind Off Reb%</th>
+          <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
+          <th class="px-4 py-2 text-center sortable">Ind Fouls Drawn%</th>
+          <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
+        {% elif selected.key.endswith('_fg_pct') %}
+          <th class="px-4 py-2 text-center sortable">FG</th>
+          <th class="px-4 py-2 text-center sortable">FG%</th>
+          <th class="px-4 py-2 text-center sortable">Freq</th>
+        {% else %}
+          <th class="px-4 py-2 text-center sortable">{{ selected.label }}</th>
+        {% endif %}
+      </tr>
+    {% endif %}
   </thead>
   <tbody class="divide-y divide-gray-200">
     {% for row in rows %}
@@ -78,6 +91,12 @@
           <td class="px-4 py-2 text-center">{{ oreb_rate }}</td>
           <td class="px-4 py-2 text-center">{{ ind_foul }}</td>
           <td class="px-4 py-2 text-center">{{ foul_rate }}</td>
+        {% elif selected.key == 'defense' %}
+          {% set player, bump_pos, opps, pct = row %}
+          <td class="px-4 py-2 text-left">{{ player }}</td>
+          <td class="px-4 py-2 text-center">{{ bump_pos }}</td>
+          <td class="px-4 py-2 text-center">{{ opps }}</td>
+          <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
         {% elif selected.key.endswith('_fg_pct') %}
           {% set player, makes, attempts, pct, freq = row %}
           <td class="px-4 py-2 text-left">{{ player }}</td>
