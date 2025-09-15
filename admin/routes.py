@@ -649,6 +649,15 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                 )
             )
         leaderboard.sort(key=lambda x: x[2], reverse=True)
+    elif stat_key == 'defense':
+        for player in all_players:
+            base = core_rows.get(player, {})
+            bump_positive = base.get('bump_positive', 0)
+            bump_missed = base.get('bump_missed', 0)
+            total_opps = bump_positive + bump_missed
+            pct = (bump_positive / total_opps * 100) if total_opps else 0
+            leaderboard.append((player, bump_positive, total_opps, pct))
+        leaderboard.sort(key=lambda x: x[3], reverse=True)
     elif stat_key.endswith('_fg_pct'):
         for player in all_players:
             details = shot_details.get(player, {})
