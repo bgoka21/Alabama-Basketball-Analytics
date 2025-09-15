@@ -23,13 +23,13 @@
     {% if selected.key == 'defense' %}
       <tr class="bg-gray-100">
         <th class="px-4 py-2 text-center" rowspan="2">#</th>
-        <th class="px-4 py-2 text-left sortable" rowspan="2">Player</th>
+        <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
         <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
       </tr>
       <tr class="bg-gray-100">
-        <th class="px-4 py-2 text-center sortable">Bump +</th>
-        <th class="px-4 py-2 text-center sortable">Bump Opps</th>
-        <th class="px-4 py-2 text-center sortable">Bump %</th>
+        <th class="px-4 py-2 text-center sortable" data-col="2">Bump +</th>
+        <th class="px-4 py-2 text-center sortable" data-col="3">Bump Opps</th>
+        <th class="px-4 py-2 text-center sortable" data-col="4">Bump %</th>
       </tr>
     {% else %}
       <tr class="bg-gray-100">
@@ -124,7 +124,7 @@
     th.addEventListener('click', () => {
       const table = th.closest('table');
       const tbody = table.querySelector('tbody');
-      const idx = Array.from(th.parentNode.children).indexOf(th);
+      const idx = th.dataset.col ? parseInt(th.dataset.col, 10) : Array.from(th.parentNode.children).indexOf(th);
       const rows = Array.from(tbody.querySelectorAll('tr'));
       const desc = th.dataset.order !== 'desc';
       rows.sort((a,b) => {
