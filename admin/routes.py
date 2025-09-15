@@ -613,6 +613,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
 
     all_players = set(core_rows) | set(shot_details)
     leaderboard = []
+    team_totals = None
     if stat_key == 'assist_summary':
         for player in all_players:
             base = core_rows.get(player, {})
@@ -650,6 +651,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             )
         leaderboard.sort(key=lambda x: x[2], reverse=True)
     elif stat_key == 'defense':
+        total_bump_positive = 0
+        total_bump_missed = 0
         for player in all_players:
             base = core_rows.get(player, {})
             bump_positive = base.get('bump_positive', 0)
@@ -657,8 +660,13 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             total_opps = bump_positive + bump_missed
             pct = (bump_positive / total_opps * 100) if total_opps else 0
             leaderboard.append((player, bump_positive, total_opps, pct))
+            total_bump_positive += bump_positive
+            total_bump_missed += bump_missed
         # Sort by percentage descending, then by total opportunities as a tie-breaker
         leaderboard.sort(key=lambda x: (x[3], x[2]), reverse=True)
+        team_opps = total_bump_positive + total_bump_missed
+        team_pct = (total_bump_positive / team_opps * 100) if team_opps else 0
+        team_totals = (total_bump_positive, team_opps, team_pct)
     elif stat_key.endswith('_fg_pct'):
         for player in all_players:
             details = shot_details.get(player, {})
@@ -677,7 +685,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             leaderboard.append((player, val))
         leaderboard.sort(key=lambda x: x[1], reverse=True)
 
-    return cfg, leaderboard
+    return cfg, leaderboard, team_totals
 
 # Use the top-level templates folder so references like 'admin/base.html'
 # resolve correctly when the blueprint is used in isolation (e.g. tests).
@@ -4410,7 +4418,7 @@ def leaderboard():
     selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    cfg, rows = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
+    cfg, rows, team_totals = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
@@ -4421,6 +4429,7 @@ def leaderboard():
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
         rows=rows,
+        team_totals=team_totals,
         start_date=start_date or '',
         end_date=end_date or '',
         label_options=label_options,

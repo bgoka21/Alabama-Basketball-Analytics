@@ -203,3 +203,17 @@ def test_defense_leaderboard_headers_have_data_col(client):
     assert col_for('Bump +') == '2'
     assert col_for('Bump Opps') == '3'
     assert col_for('Bump %') == '4'
+
+
+def test_defense_leaderboard_team_totals_row(client, app):
+    with app.app_context():
+        db.session.add(PlayerStats(practice_id=1, season_id=1, player_name='#2 Other', bump_positive=2, bump_missed=2))
+        db.session.commit()
+
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'defense'})
+    soup = BeautifulSoup(resp.data, 'html.parser')
+    row = soup.find('td', string='Team Totals').parent
+    cells = [c.text.strip() for c in row.find_all('td')]
+    assert cells[2] == '5'  # bump_positive total
+    assert cells[3] == '8'  # total opportunities
+    assert cells[4] == '62.5%'
