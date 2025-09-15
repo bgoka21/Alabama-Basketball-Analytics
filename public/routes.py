@@ -768,13 +768,14 @@ def season_leaderboard():
     selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    cfg, rows = compute_leaderboard(stat_key, sid, label_set=label_set if label_set else None)
+    cfg, rows, team_totals = compute_leaderboard(stat_key, sid, label_set=label_set if label_set else None)
 
     return render_template(
         'leaderboard.html',
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
         rows=rows,
+        team_totals=team_totals,
         label_options=label_options,
         selected_labels=selected_labels
     )
