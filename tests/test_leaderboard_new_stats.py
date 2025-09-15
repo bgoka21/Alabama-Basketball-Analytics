@@ -64,6 +64,8 @@ def app():
             turnovers=1,
             assists=3,
             pot_assists=2,
+            bump_positive=3,
+            bump_missed=1,
             shot_type_details=json.dumps(shots),
         ))
 
@@ -162,3 +164,15 @@ def test_offensive_metrics_filter(client):
     resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'ppp_on', 'label': '4V4 DRILLS'})
     html = resp.data.decode('utf-8')
     assert '3.0' in html  # filtered PPP On only scrimmage possessions
+
+
+def test_defense_leaderboard(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'defense'})
+    html = resp.data.decode('utf-8')
+    assert 'Collisions' in html
+    assert 'Bump +' in html
+    assert 'Bump Opps' in html
+    assert '75.0%' in html
+    assert 'data-index="2"' in html
+    assert 'data-index="3"' in html
+    assert 'data-index="4"' in html
