@@ -657,7 +657,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             total_opps = bump_positive + bump_missed
             pct = (bump_positive / total_opps * 100) if total_opps else 0
             leaderboard.append((player, bump_positive, total_opps, pct))
-        leaderboard.sort(key=lambda x: x[3], reverse=True)
+        # Sort by percentage descending, then by total opportunities as a tie-breaker
+        leaderboard.sort(key=lambda x: (x[3], x[2]), reverse=True)
     elif stat_key.endswith('_fg_pct'):
         for player in all_players:
             details = shot_details.get(player, {})
