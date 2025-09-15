@@ -5,6 +5,7 @@ from flask import Flask
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 import json
+from bs4 import BeautifulSoup
 
 from models.database import (
     db, Season, Practice, PlayerStats, Roster,
@@ -189,3 +190,16 @@ def test_defense_leaderboard_sorts_by_pct_and_opps(client, app):
 
     # '#3 Tie' has more opportunities than '#2 Other' but the same percentage.
     assert html.index('#1 Test') < html.index('#3 Tie') < html.index('#2 Other')
+
+
+def test_defense_leaderboard_headers_have_data_col(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'defense'})
+    soup = BeautifulSoup(resp.data, 'html.parser')
+
+    def col_for(text):
+        th = soup.find('th', string=lambda s: s and s.strip() == text)
+        return th.get('data-col')
+
+    assert col_for('Bump +') == '2'
+    assert col_for('Bump Opps') == '3'
+    assert col_for('Bump %') == '4'
