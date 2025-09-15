@@ -173,3 +173,19 @@ def test_defense_leaderboard(client):
     assert 'Bump +' in html
     assert 'Bump Opps' in html
     assert '75.0%' in html
+
+
+def test_defense_leaderboard_sorts_by_pct_and_opps(client, app):
+    """Players with equal percentages should be sorted by opportunities."""
+    with app.app_context():
+        # Add two players with identical bump percentages (50%) but different total opportunities
+        db.session.add(PlayerStats(practice_id=1, season_id=1, player_name='#2 Other', bump_positive=1, bump_missed=1))
+        db.session.add(Roster(id=3, season_id=1, player_name='#3 Tie'))
+        db.session.add(PlayerStats(practice_id=1, season_id=1, player_name='#3 Tie', bump_positive=2, bump_missed=2))
+        db.session.commit()
+
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'defense'})
+    html = resp.data.decode('utf-8')
+
+    # '#3 Tie' has more opportunities than '#2 Other' but the same percentage.
+    assert html.index('#1 Test') < html.index('#3 Tie') < html.index('#2 Other')
