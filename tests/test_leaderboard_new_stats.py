@@ -1,11 +1,14 @@
-import pytest
+import json
+import re
 from datetime import date
+from functools import cmp_to_key
 from pathlib import Path
+
+import pytest
+from bs4 import BeautifulSoup
 from flask import Flask
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
-import json
-from bs4 import BeautifulSoup
 
 from models.database import (
     db, Season, Practice, PlayerStats, Roster,
@@ -212,8 +215,60 @@ def test_defense_leaderboard_team_totals_row(client, app):
 
     resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'defense'})
     soup = BeautifulSoup(resp.data, 'html.parser')
+    tbody = soup.find('tbody')
     row = soup.find('td', string='Team Totals').parent
+    assert 'team-totals' in (row.get('class') or [])
     cells = [c.text.strip() for c in row.find_all('td')]
     assert cells[2] == '5'  # bump_positive total
     assert cells[3] == '8'  # total opportunities
     assert cells[4] == '62.5%'
+
+    # Simulate clicking the "Bump +" sortable header to trigger the JS sort logic.
+    def parse_numeric(text):
+        cleaned = re.sub(r'[^0-9.-]', '', text)
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+
+    total_row = tbody.find('tr', class_='team-totals')
+    assert total_row is not None
+    total_row.extract()
+
+    player_rows = tbody.find_all('tr', recursive=False)
+
+    def compare_rows(row_a, row_b):
+        a_cells = row_a.find_all('td')
+        b_cells = row_b.find_all('td')
+        a_text = a_cells[2].get_text(strip=True)
+        b_text = b_cells[2].get_text(strip=True)
+        a_num = parse_numeric(a_text)
+        b_num = parse_numeric(b_text)
+        if a_num is not None and b_num is not None:
+            diff = b_num - a_num
+            if diff > 0:
+                return 1
+            if diff < 0:
+                return -1
+            return 0
+        if b_text > a_text:
+            return 1
+        if b_text < a_text:
+            return -1
+        return 0
+
+    player_rows.sort(key=cmp_to_key(compare_rows))
+
+    for idx, player_row in enumerate(player_rows, start=1):
+        player_row.find_all('td')[0].string = str(idx)
+        tbody.append(player_row)
+
+    tbody.append(total_row)
+
+    sorted_rows = tbody.find_all('tr', recursive=False)
+    assert 'team-totals' in (sorted_rows[-1].get('class') or [])
+    total_cells = [c.get_text(strip=True) for c in sorted_rows[-1].find_all('td')]
+    assert total_cells[0] == ''  # "#" column remains empty
+    assert total_cells[2] == '5'
+    assert total_cells[3] == '8'
+    assert total_cells[4] == '62.5%'
