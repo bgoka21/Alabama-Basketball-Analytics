@@ -33,23 +33,22 @@
 
   {% if not print_mode %}
   <form method="get" class="flex flex-wrap items-end gap-4 no-print">
-    <input type="hidden" name="include_total" value="1" />
     <div>
-      <label class="block text-sm font-medium mb-1">From</label>
-      <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1" />
+      <label for="start-date" class="block text-sm font-medium mb-1">From</label>
+      <input id="start-date" type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1" />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-1">To</label>
-      <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1" />
+      <label for="end-date" class="block text-sm font-medium mb-1">To</label>
+      <input id="end-date" type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1" />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-1">Since</label>
-      <input type="date" name="since_date" value="{{ since_date }}" class="border border-gray-300 rounded px-2 py-1" />
+      <label for="since-date" class="block text-sm font-medium mb-1">Since</label>
+      <input id="since-date" type="date" name="since_date" value="{{ since_date }}" class="border border-gray-300 rounded px-2 py-1" />
     </div>
-    <label class="inline-flex items-center text-sm">
-      <input type="checkbox" name="hide_zeros" value="1" {% if hide_zeros %}checked{% endif %} class="mr-2" />
-      Hide players with 0 FT attempts
-    </label>
+    <div class="flex items-center text-sm">
+      <input id="hide-zeros" type="checkbox" name="hide_zeros" value="1" {% if hide_zeros %}checked{% endif %} class="mr-2" />
+      <label for="hide-zeros">Hide players with 0 FT attempts</label>
+    </div>
     <div>
       <label class="block text-sm font-medium mb-1">Sort</label>
       <select name="sort" class="border border-gray-300 rounded px-2 py-1">
@@ -95,10 +94,8 @@
           <th class="px-4 py-2 text-center text-sm font-medium">
             <a href="{{ sort_urls.pct }}" class="inline-flex items-center">FT %{% if sort == 'pct' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
-          {% set total_next_dir = 'asc' if (sort == 'total' and dir == 'desc') else 'desc' %}
-          {% set total_sort_url = sort_urls.total|default(url_for('admin.ft_daily', start_date=start_date, end_date=end_date, since_date=since_date, include_total='1', hide_zeros='1' if hide_zeros else '0', sort='total', dir=total_next_dir), true) %}
           <th class="px-4 py-2 text-center text-sm font-medium">
-            <a href="{{ total_sort_url }}" class="inline-flex items-center">Weekly Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+            <a href="{{ sort_urls.total }}" class="inline-flex items-center">Weekly Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
           <th class="px-4 py-2 text-center text-sm font-medium">FTM (Since {{ since_date }})</th>
           <th class="px-4 py-2 text-center text-sm font-medium">FTA (Since {{ since_date }})</th>

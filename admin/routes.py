@@ -3873,7 +3873,6 @@ def ft_daily():
         start_date,
         end_date,
         since_date,
-        include_total,
         hide_zeros,
         sort,
         dir_,
@@ -3881,7 +3880,7 @@ def ft_daily():
     ) = _ft_daily_request_args()
 
     rows, totals, has_entries, sort = _ft_daily_data(
-        start_date, end_date, since_date, include_total, hide_zeros, sort, dir_
+        start_date, end_date, since_date, hide_zeros, sort, dir_
     )
 
     start_date_str = start_date.isoformat()
@@ -3931,7 +3930,6 @@ def ft_daily():
         'start_date': start_date_str,
         'end_date': end_date_str,
         'since_date': since_date_str,
-        'include_total': '1' if include_total else '0',
         'hide_zeros': '1' if hide_zeros else '0',
         'sort': sort,
         'dir': dir_,
@@ -3954,9 +3952,8 @@ def ft_daily():
         'makes': _build_url({'sort': 'makes', 'dir': _next_dir('makes')}),
         'attempts': _build_url({'sort': 'attempts', 'dir': _next_dir('attempts')}),
         'pct': _build_url({'sort': 'pct', 'dir': _next_dir('pct')}),
+        'total': _build_url({'sort': 'total', 'dir': _next_dir('total')}),
     }
-    if include_total:
-        sort_urls['total'] = _build_url({'sort': 'total', 'dir': _next_dir('total')})
 
     return render_template(
         'admin/ft_daily.html',
@@ -3964,7 +3961,6 @@ def ft_daily():
         start_date=start_date_str,
         end_date=end_date_str,
         since_date=since_date_str,
-        include_total=include_total,
         hide_zeros=hide_zeros,
         sort=sort,
         dir=dir_,
@@ -3990,7 +3986,6 @@ def ft_daily_pdf():
         start_date,
         end_date,
         since_date,
-        include_total,
         hide_zeros,
         sort,
         dir_,
@@ -3998,7 +3993,7 @@ def ft_daily_pdf():
     ) = _ft_daily_request_args()
 
     rows, totals, has_entries, sort = _ft_daily_data(
-        start_date, end_date, since_date, include_total, hide_zeros, sort, dir_
+        start_date, end_date, since_date, hide_zeros, sort, dir_
     )
 
     start_date_str = start_date.isoformat()
@@ -4011,7 +4006,6 @@ def ft_daily_pdf():
         start_date=start_date_str,
         end_date=end_date_str,
         since_date=since_date_str,
-        include_total=include_total,
         hide_zeros=hide_zeros,
         sort=sort,
         dir=dir_,
@@ -4995,6 +4989,21 @@ def _current_app_today():
     return datetime.now(ZoneInfo(tzname)).date() if tzname else date.today()
 
 
+def _season_anchor_for(reference_date=None):
+    """Return the September 1 anchor date for the season containing ``reference_date``."""
+    if reference_date is None:
+        reference_date = _current_app_today()
+    sept_first = date(reference_date.year, 9, 1)
+    if reference_date >= sept_first:
+        return sept_first
+    return date(reference_date.year - 1, 9, 1)
+
+
+def _normalize_sort_dir(value):
+    """Normalize sort direction strings to 'asc' or 'desc'."""
+    return value if value in {'asc', 'desc'} else 'desc'
+
+
 def _parse_iso(value):
     """Parse a YYYY-MM-DD string into a date or return ``None`` on failure."""
     if value:
@@ -5017,7 +5026,7 @@ def _ft_sort_key(sort):
         'makes': lambda r: r['ft_makes'],
         'attempts': lambda r: r['ft_attempts'],
         'pct': lambda r: r.get('ft_pct') or 0.0,
-        'total': lambda r: r.get('total_shots', 0),
+        'total': lambda r: r.get('total_shots_weekly', 0),
         'name': lambda r: r['player_name'].lower(),
     }
     return mapping.get(sort, lambda r: r['ft_attempts'])
@@ -5025,10 +5034,9 @@ def _ft_sort_key(sort):
 
 def _ft_daily_request_args():
     """Parse shared request arguments for the ft_daily views."""
-    include_total = request.args.get('include_total', type=int, default=0) == 1
     hide_zeros = request.args.get('hide_zeros', type=int, default=0) == 1
     sort = request.args.get('sort', 'attempts')
-    dir_ = request.args.get('dir', 'desc')
+    dir_ = _normalize_sort_dir(request.args.get('dir', 'desc'))
     fmt = request.args.get('format', 'html')
 
     start_date = _parse_iso(request.args.get('start_date'))
@@ -5052,21 +5060,18 @@ def _ft_daily_request_args():
         start_date, end_date = end_date, start_date
 
     if since_date is None:
-        season_anchor_year = today.year if today >= date(today.year, 9, 1) else today.year - 1
-        since_date = date(season_anchor_year, 9, 1)
+        anchor_basis = end_date or start_date or today
+        since_date = _season_anchor_for(anchor_basis)
 
-    return start_date, end_date, since_date, include_total, hide_zeros, sort, dir_, fmt
+    return start_date, end_date, since_date, hide_zeros, sort, dir_, fmt
 
 
-def _ft_daily_data_core(start_date, end_date, since_date, include_total, hide_zeros, sort, dir_):
+def _ft_daily_data_core(start_date, end_date, since_date, hide_zeros, sort, dir_):
     """Collect rows and totals for the ft_daily views."""
-    valid_sorts = {'makes', 'attempts', 'pct', 'name'}
-    if include_total:
-        valid_sorts.add('total')
+    valid_sorts = {'makes', 'attempts', 'pct', 'name', 'total'}
     if sort not in valid_sorts:
         sort = 'attempts'
-    if sort == 'total' and not include_total:
-        sort = 'attempts'
+    dir_ = _normalize_sort_dir(dir_)
 
     current_season = Season.query.order_by(Season.start_date.desc()).first()
     season_id = current_season.id if current_season else None
@@ -5219,26 +5224,25 @@ def _ft_daily_data(*args, **kwargs):
     if legacy_call:
         selected_date = args[0]
         if len(args) >= 5:
-            include_total, hide_zeros, sort, dir_ = args[1:5]
+            _include_total, hide_zeros, sort, dir_ = args[1:5]
         else:
-            include_total = kwargs.get('include_total', False)
+            _include_total = kwargs.get('include_total', False)
             hide_zeros = kwargs.get('hide_zeros', False)
             sort = kwargs.get('sort', 'attempts')
             dir_ = kwargs.get('dir_', 'desc')
 
         start_date = kwargs.get('start_date', selected_date)
         end_date = kwargs.get('end_date', start_date)
+        if end_date is None:
+            end_date = start_date
         since_date = kwargs.get('since_date')
         if since_date is None:
-            today = _current_app_today()
-            season_anchor_year = today.year if today >= date(today.year, 9, 1) else today.year - 1
-            since_date = date(season_anchor_year, 9, 1)
+            since_date = _season_anchor_for(end_date)
 
         return _ft_daily_data_core(
             start_date,
             end_date,
             since_date,
-            include_total,
             hide_zeros,
             sort,
             dir_,
