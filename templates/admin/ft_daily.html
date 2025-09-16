@@ -25,8 +25,7 @@
     </div>
     {% if not print_mode %}
     <div class="space-x-2 no-print">
-      {% set csv_link = url_for('admin.ft_daily', start_date=start_date, end_date=end_date, since_date=since_date, include_total='1', hide_zeros='1' if hide_zeros else '0', sort=sort, dir=dir, format='csv') %}
-      <a href="{{ csv_link }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
+      <a href="{{ csv_url }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
       <button type="button" onclick="window.print()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">Print / Save PDF</button>
     </div>
     {% endif %}
