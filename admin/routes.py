@@ -3869,40 +3869,84 @@ def skill_totals():
 @login_required
 def ft_daily():
     """Display a table of daily free throws with optional totals and CSV export."""
-    selected_date = _parse_date_param(request.args.get('date'))
-    include_total = request.args.get('include_total', type=int, default=0) == 1
-    hide_zeros = request.args.get('hide_zeros', type=int, default=0) == 1
-    sort = request.args.get('sort', 'attempts')
-    dir_ = request.args.get('dir', 'desc')
-    fmt = request.args.get('format', 'html')
+    (
+        start_date,
+        end_date,
+        since_date,
+        include_total,
+        hide_zeros,
+        sort,
+        dir_,
+        fmt,
+    ) = _ft_daily_request_args()
+
     rows, totals, has_entries, sort = _ft_daily_data(
-        selected_date, include_total, hide_zeros, sort, dir_
+        start_date, end_date, since_date, include_total, hide_zeros, sort, dir_
     )
+
+    start_date_str = start_date.isoformat()
+    end_date_str = end_date.isoformat()
+    since_date_str = since_date.isoformat()
 
     if fmt == 'csv':
         output = io.StringIO()
         writer = csv.writer(output)
-        headers = ['Player', 'FT Makes', 'FT Attempts', 'FT %']
+        headers = [
+            'Player',
+            'FT Makes (Weekly)',
+            'FT Attempts (Weekly)',
+            'FT % (Weekly)',
+            'Non-FT Attempts (Weekly)',
+        ]
         if include_total:
-            headers.append('Total Shots')
+            headers.append('Total Shots (Weekly)')
+        headers.extend([
+            'FT Makes (Since)',
+            'FT Attempts (Since)',
+            'FT % (Since)',
+            'Total Shots (Since)',
+        ])
         writer.writerow(headers)
         for r in rows:
-            pct = f"{r['ft_pct']:.1f}" if r['ft_attempts'] else ''
-            row = [r['player_name'], r['ft_makes'], r['ft_attempts'], pct]
+            weekly_pct = f"{r['ft_pct']:.1f}" if r['ft_attempts'] else ''
+            since_pct = f"{r['ft_pct_since']:.1f}" if r['fta_since'] else ''
+            row = [
+                r['player_name'],
+                r['ft_makes'],
+                r['ft_attempts'],
+                weekly_pct,
+                r['non_ft'],
+            ]
             if include_total:
-                row.append(r.get('total_shots', 0))
+                row.append(r['total_shots_weekly'])
+            row.extend([
+                r['ftm_since'],
+                r['fta_since'],
+                since_pct,
+                r['total_shots_since'],
+            ])
             writer.writerow(row)
         response = make_response(output.getvalue())
         response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename=ft-daily-{selected_date}.csv'
+        filename_range = (
+            start_date_str
+            if start_date == end_date
+            else f"{start_date_str}_to_{end_date_str}"
+        )
+        response.headers['Content-Disposition'] = (
+            f'attachment; filename=ft-daily-{filename_range}.csv'
+        )
         return response
 
     base_args = {
-        'date': selected_date.strftime('%Y-%m-%d'),
+        'start_date': start_date_str,
+        'end_date': end_date_str,
+        'since_date': since_date_str,
         'include_total': '1' if include_total else '0',
         'hide_zeros': '1' if hide_zeros else '0',
         'sort': sort,
         'dir': dir_,
+        'date': start_date_str,
     }
 
     def _build_url(overrides=None):
@@ -3927,7 +3971,10 @@ def ft_daily():
 
     return render_template(
         'admin/ft_daily.html',
-        selected_date=selected_date,
+        selected_date=start_date,
+        start_date=start_date_str,
+        end_date=end_date_str,
+        since_date=since_date_str,
         include_total=include_total,
         hide_zeros=hide_zeros,
         sort=sort,
@@ -3950,19 +3997,31 @@ def ft_daily_pdf():
     if not PDFKIT_CONFIG:
         abort(501)
 
-    selected_date = _parse_date_param(request.args.get('date'))
-    include_total = request.args.get('include_total', type=int, default=0) == 1
-    hide_zeros = request.args.get('hide_zeros', type=int, default=0) == 1
-    sort = request.args.get('sort', 'attempts')
-    dir_ = request.args.get('dir', 'desc')
+    (
+        start_date,
+        end_date,
+        since_date,
+        include_total,
+        hide_zeros,
+        sort,
+        dir_,
+        _,
+    ) = _ft_daily_request_args()
 
     rows, totals, has_entries, sort = _ft_daily_data(
-        selected_date, include_total, hide_zeros, sort, dir_
+        start_date, end_date, since_date, include_total, hide_zeros, sort, dir_
     )
+
+    start_date_str = start_date.isoformat()
+    end_date_str = end_date.isoformat()
+    since_date_str = since_date.isoformat()
 
     html = render_template(
         'admin/ft_daily.html',
-        selected_date=selected_date,
+        selected_date=start_date,
+        start_date=start_date_str,
+        end_date=end_date_str,
+        since_date=since_date_str,
         include_total=include_total,
         hide_zeros=hide_zeros,
         sort=sort,
@@ -3977,7 +4036,14 @@ def ft_daily_pdf():
     pdf = pdfkit.from_string(html, False, options=PDF_OPTIONS, configuration=PDFKIT_CONFIG)
     response = make_response(pdf)
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=ft-daily-{selected_date}.pdf'
+    filename_range = (
+        start_date_str
+        if start_date == end_date
+        else f"{start_date_str}_to_{end_date_str}"
+    )
+    response.headers['Content-Disposition'] = (
+        f'attachment; filename=ft-daily-{filename_range}.pdf'
+    )
     return response
 
 
@@ -4934,16 +5000,26 @@ def eybl_synonym_delete(syn_id):
 
 # --- Helpers for ft_daily --------------------------------------------------
 
-def _parse_date_param(value):
-    """Parse YYYY-MM-DD or return today's date in app's timezone."""
+def _current_app_today():
+    """Return today's date using the app's configured timezone."""
     tzname = current_app.config.get('TIMEZONE')
-    today = datetime.now(ZoneInfo(tzname)).date() if tzname else date.today()
+    return datetime.now(ZoneInfo(tzname)).date() if tzname else date.today()
+
+
+def _parse_iso(value):
+    """Parse a YYYY-MM-DD string into a date or return ``None`` on failure."""
     if value:
         try:
             return date.fromisoformat(value)
         except ValueError:
-            pass
-    return today
+            return None
+    return None
+
+
+def _parse_date_param(value):
+    """Parse YYYY-MM-DD or return today's date in app's timezone."""
+    parsed = _parse_iso(value)
+    return parsed if parsed else _current_app_today()
 
 
 def _ft_sort_key(sort):
@@ -4958,7 +5034,42 @@ def _ft_sort_key(sort):
     return mapping.get(sort, lambda r: r['ft_attempts'])
 
 
-def _ft_daily_data(selected_date, include_total, hide_zeros, sort, dir_):
+def _ft_daily_request_args():
+    """Parse shared request arguments for the ft_daily views."""
+    include_total = request.args.get('include_total', type=int, default=0) == 1
+    hide_zeros = request.args.get('hide_zeros', type=int, default=0) == 1
+    sort = request.args.get('sort', 'attempts')
+    dir_ = request.args.get('dir', 'desc')
+    fmt = request.args.get('format', 'html')
+
+    start_date = _parse_iso(request.args.get('start_date'))
+    end_date = _parse_iso(request.args.get('end_date'))
+    since_date = _parse_iso(request.args.get('since_date'))
+    legacy_date = _parse_iso(request.args.get('date'))
+
+    today = _current_app_today()
+
+    if start_date is None and end_date is None:
+        if legacy_date:
+            start_date = end_date = legacy_date
+        else:
+            start_date = end_date = today
+    elif start_date is None:
+        start_date = end_date
+    elif end_date is None:
+        end_date = start_date
+
+    if start_date and end_date and start_date > end_date:
+        start_date, end_date = end_date, start_date
+
+    if since_date is None:
+        season_anchor_year = today.year if today >= date(today.year, 9, 1) else today.year - 1
+        since_date = date(season_anchor_year, 9, 1)
+
+    return start_date, end_date, since_date, include_total, hide_zeros, sort, dir_, fmt
+
+
+def _ft_daily_data_core(start_date, end_date, since_date, include_total, hide_zeros, sort, dir_):
     """Collect rows and totals for the ft_daily views."""
     valid_sorts = {'makes', 'attempts', 'pct', 'name'}
     if include_total:
@@ -4972,43 +5083,112 @@ def _ft_daily_data(selected_date, include_total, hide_zeros, sort, dir_):
     season_id = current_season.id if current_season else None
     roster_entries = Roster.query.filter_by(season_id=season_id).all() if season_id else []
 
-    ft_sq = (
-        db.session.query(
-            SkillEntry.player_id.label('player_id'),
-            func.coalesce(func.sum(SkillEntry.makes), 0).label('makes'),
-            func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
-        )
-        .filter(SkillEntry.shot_class == 'ft', SkillEntry.date == selected_date)
-        .group_by(SkillEntry.player_id)
-    ).subquery()
-    ft_rows = {r.player_id: r for r in db.session.query(ft_sq)}
-
-    total_rows = {}
-    if include_total:
-        total_sq = (
+    weekly_ft_rows = {
+        r.player_id: r
+        for r in (
             db.session.query(
                 SkillEntry.player_id.label('player_id'),
-                func.coalesce(func.sum(SkillEntry.attempts), 0).label('total'),
+                func.coalesce(func.sum(SkillEntry.makes), 0).label('makes'),
+                func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
             )
-            .filter(SkillEntry.date == selected_date, SkillEntry.shot_class != None)
+            .filter(
+                SkillEntry.shot_class == 'ft',
+                SkillEntry.date >= start_date,
+                SkillEntry.date <= end_date,
+            )
             .group_by(SkillEntry.player_id)
-        ).subquery()
-        total_rows = {r.player_id: r.total for r in db.session.query(total_sq)}
+            .all()
+        )
+    }
+
+    weekly_shot_rows = {
+        r.player_id: r
+        for r in (
+            db.session.query(
+                SkillEntry.player_id.label('player_id'),
+                func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
+            )
+            .filter(
+                SkillEntry.shot_class != None,
+                SkillEntry.date >= start_date,
+                SkillEntry.date <= end_date,
+            )
+            .group_by(SkillEntry.player_id)
+            .all()
+        )
+    }
+
+    since_ft_rows = {
+        r.player_id: r
+        for r in (
+            db.session.query(
+                SkillEntry.player_id.label('player_id'),
+                func.coalesce(func.sum(SkillEntry.makes), 0).label('makes'),
+                func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
+            )
+            .filter(
+                SkillEntry.shot_class == 'ft',
+                SkillEntry.date >= since_date,
+            )
+            .group_by(SkillEntry.player_id)
+            .all()
+        )
+    }
+
+    since_shot_rows = {
+        r.player_id: r
+        for r in (
+            db.session.query(
+                SkillEntry.player_id.label('player_id'),
+                func.coalesce(func.sum(SkillEntry.attempts), 0).label('attempts'),
+            )
+            .filter(
+                SkillEntry.shot_class != None,
+                SkillEntry.date >= since_date,
+            )
+            .group_by(SkillEntry.player_id)
+            .all()
+        )
+    }
+
+    def _value(row, attr):
+        if not row:
+            return 0
+        val = getattr(row, attr, 0)
+        return int(val) if val is not None else 0
 
     rows = []
-    for r in roster_entries:
-        ft = ft_rows.get(r.id)
-        makes = ft.makes if ft else 0
-        attempts = ft.attempts if ft else 0
+    for roster_entry in roster_entries:
+        ft_week = weekly_ft_rows.get(roster_entry.id)
+        shots_week = weekly_shot_rows.get(roster_entry.id)
+        ft_since = since_ft_rows.get(roster_entry.id)
+        shots_since = since_shot_rows.get(roster_entry.id)
+
+        ft_makes = _value(ft_week, 'makes')
+        ft_attempts = _value(ft_week, 'attempts')
+        shots_weekly = _value(shots_week, 'attempts')
+        ft_pct = (ft_makes / ft_attempts * 100) if ft_attempts else 0.0
+        non_ft = max(0, shots_weekly - ft_attempts)
+
+        ftm_since = _value(ft_since, 'makes')
+        fta_since = _value(ft_since, 'attempts')
+        shots_since_total = _value(shots_since, 'attempts')
+        ft_pct_since = (ftm_since / fta_since * 100) if fta_since else 0.0
+
         row = {
-            'player_id': r.id,
-            'player_name': r.player_name,
-            'ft_makes': makes,
-            'ft_attempts': attempts,
-            'ft_pct': (makes / attempts * 100) if attempts else 0.0,
+            'player_id': roster_entry.id,
+            'player_name': roster_entry.player_name,
+            'non_ft': non_ft,
+            'ft_makes': ft_makes,
+            'ft_attempts': ft_attempts,
+            'ft_pct': ft_pct,
+            'total_shots_weekly': shots_weekly,
+            'ftm_since': ftm_since,
+            'fta_since': fta_since,
+            'ft_pct_since': ft_pct_since,
+            'total_shots_since': shots_since_total,
         }
-        if include_total:
-            row['total_shots'] = total_rows.get(r.id, 0)
+        row['total_shots'] = row['total_shots_weekly']
         rows.append(row)
 
     has_entries = any(r['ft_attempts'] > 0 for r in rows)
@@ -5018,13 +5198,61 @@ def _ft_daily_data(selected_date, include_total, hide_zeros, sort, dir_):
     rows.sort(key=_ft_sort_key(sort), reverse=(dir_ == 'desc'))
 
     totals = {
+        'non_ft': sum(r['non_ft'] for r in rows),
         'ft_makes': sum(r['ft_makes'] for r in rows),
         'ft_attempts': sum(r['ft_attempts'] for r in rows),
+        'total_shots_weekly': sum(r['total_shots_weekly'] for r in rows),
+        'ftm_since': sum(r['ftm_since'] for r in rows),
+        'fta_since': sum(r['fta_since'] for r in rows),
+        'total_shots_since': sum(r['total_shots_since'] for r in rows),
     }
+
     totals['ft_pct'] = (
         totals['ft_makes'] / totals['ft_attempts'] * 100
     ) if totals['ft_attempts'] else 0.0
-    if include_total:
-        totals['total_shots'] = sum(r.get('total_shots', 0) for r in rows)
+    totals['ft_pct_since'] = (
+        totals['ftm_since'] / totals['fta_since'] * 100
+    ) if totals['fta_since'] else 0.0
+    totals['total_shots'] = totals['total_shots_weekly']
 
     return rows, totals, has_entries, sort
+
+
+def _ft_daily_data(*args, **kwargs):
+    """Compatibility wrapper for ft_daily data aggregation."""
+    legacy_call = False
+    if args and 'start_date' not in kwargs:
+        if len(args) >= 5 and isinstance(args[1], bool):
+            legacy_call = True
+        elif len(args) == 1 and {'include_total', 'hide_zeros'} <= kwargs.keys():
+            legacy_call = True
+
+    if legacy_call:
+        selected_date = args[0]
+        if len(args) >= 5:
+            include_total, hide_zeros, sort, dir_ = args[1:5]
+        else:
+            include_total = kwargs.get('include_total', False)
+            hide_zeros = kwargs.get('hide_zeros', False)
+            sort = kwargs.get('sort', 'attempts')
+            dir_ = kwargs.get('dir_', 'desc')
+
+        start_date = kwargs.get('start_date', selected_date)
+        end_date = kwargs.get('end_date', start_date)
+        since_date = kwargs.get('since_date')
+        if since_date is None:
+            today = _current_app_today()
+            season_anchor_year = today.year if today >= date(today.year, 9, 1) else today.year - 1
+            since_date = date(season_anchor_year, 9, 1)
+
+        return _ft_daily_data_core(
+            start_date,
+            end_date,
+            since_date,
+            include_total,
+            hide_zeros,
+            sort,
+            dir_,
+        )
+
+    return _ft_daily_data_core(*args, **kwargs)
