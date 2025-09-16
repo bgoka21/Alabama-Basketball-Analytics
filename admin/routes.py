@@ -38,7 +38,8 @@ from models.database import (
     Practice,
     SkillEntry,
     PnRStats,
-    PlayerDevelopmentPlan
+    PlayerDevelopmentPlan,
+    Setting,
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -3974,6 +3975,33 @@ def ft_daily():
     )
 
 
+@admin_bp.route('/ft-daily/save-default', methods=['POST'])
+@admin_required
+def ft_daily_save_default():
+    """Persist the submitted since_date as the FT default."""
+    since_date_str = request.form.get('since_date', '')
+    redirect_args = _ft_redirect_args_from_form(request.form)
+
+    if not since_date_str:
+        flash('Please choose a since date before saving.', 'error')
+        return redirect(url_for('admin.ft_daily', **redirect_args))
+
+    parsed_since = _parse_iso(since_date_str)
+    if not parsed_since:
+        flash('Invalid since date. Please use YYYY-MM-DD.', 'error')
+        return redirect(url_for('admin.ft_daily', **redirect_args))
+
+    setting = Setting.query.filter_by(key=_FT_SINCE_DATE_KEY).first()
+    if not setting:
+        setting = Setting(key=_FT_SINCE_DATE_KEY)
+        db.session.add(setting)
+    setting.value = parsed_since.isoformat()
+    db.session.commit()
+
+    flash(f'Default since date saved: {setting.value}.', 'success')
+    return redirect(url_for('admin.ft_daily', **redirect_args))
+
+
 @admin_bp.route('/ft-daily.pdf', methods=['GET'])
 @login_required
 def ft_daily_pdf():
@@ -4983,6 +5011,22 @@ def eybl_synonym_delete(syn_id):
 
 # --- Helpers for ft_daily --------------------------------------------------
 
+_FT_SINCE_DATE_KEY = 'ft_since_date'
+
+
+def _load_saved_ft_since_date():
+    """Return the saved FT default date if available."""
+    setting = Setting.query.filter_by(key=_FT_SINCE_DATE_KEY).first()
+    if setting and setting.value:
+        saved_date = _parse_iso(setting.value)
+        if saved_date:
+            return saved_date
+        current_app.logger.warning(
+            "Ignoring invalid ft_since_date setting value: %s", setting.value
+        )
+    return None
+
+
 def _current_app_today():
     """Return today's date using the app's configured timezone."""
     tzname = current_app.config.get('TIMEZONE')
@@ -5041,7 +5085,8 @@ def _ft_daily_request_args():
 
     start_date = _parse_iso(request.args.get('start_date'))
     end_date = _parse_iso(request.args.get('end_date'))
-    since_date = _parse_iso(request.args.get('since_date'))
+    since_param = request.args.get('since_date')
+    since_date = _parse_iso(since_param)
     legacy_date = _parse_iso(request.args.get('date'))
 
     today = _current_app_today()
@@ -5059,11 +5104,34 @@ def _ft_daily_request_args():
     if start_date and end_date and start_date > end_date:
         start_date, end_date = end_date, start_date
 
+    if since_date is None and since_param is None:
+        saved = _load_saved_ft_since_date()
+        if saved:
+            since_date = saved
+
     if since_date is None:
         anchor_basis = end_date or start_date or today
         since_date = _season_anchor_for(anchor_basis)
 
     return start_date, end_date, since_date, hide_zeros, sort, dir_, fmt
+
+
+def _ft_redirect_args_from_form(form):
+    """Build ft_daily query parameters from submitted form data."""
+    args = {}
+    for key in ('start_date', 'end_date', 'since_date', 'sort', 'dir'):
+        value = form.get(key)
+        if value:
+            args[key] = value
+
+    hide_zeros = form.get('hide_zeros')
+    if hide_zeros:
+        args['hide_zeros'] = hide_zeros
+
+    if args.get('start_date') and 'date' not in args:
+        args['date'] = args['start_date']
+
+    return args
 
 
 def _ft_daily_data_core(start_date, end_date, since_date, hide_zeros, sort, dir_):

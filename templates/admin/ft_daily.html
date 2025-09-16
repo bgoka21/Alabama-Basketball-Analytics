@@ -41,9 +41,14 @@
       <label for="end-date" class="block text-sm font-medium mb-1">To</label>
       <input id="end-date" type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1" />
     </div>
-    <div>
-      <label for="since-date" class="block text-sm font-medium mb-1">Since</label>
-      <input id="since-date" type="date" name="since_date" value="{{ since_date }}" class="border border-gray-300 rounded px-2 py-1" />
+    <div class="flex items-end gap-2">
+      <div>
+        <label for="since-date" class="block text-sm font-medium mb-1">Since</label>
+        <input id="since-date" type="date" name="since_date" value="{{ since_date }}" class="border border-gray-300 rounded px-2 py-1" />
+      </div>
+      {% if current_user.is_admin %}
+      <button type="submit" class="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm" formaction="{{ url_for('admin.ft_daily_save_default') }}" formmethod="post">Save as default</button>
+      {% endif %}
     </div>
     <div class="flex items-center text-sm">
       <input id="hide-zeros" type="checkbox" name="hide_zeros" value="1" {% if hide_zeros %}checked{% endif %} class="mr-2" />
