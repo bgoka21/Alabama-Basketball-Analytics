@@ -12,20 +12,21 @@
 {% endblock %}
 
 {% block content %}
-{% set date_str = selected_date.strftime('%B %d, %Y') %}
+{% set subtitle = 'Daily ' ~ start_date if start_date == end_date else 'From ' ~ start_date ~ ' to ' ~ end_date %}
 
 <div class="flex flex-col gap-4 mb-4">
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold flex items-center">
         Daily Free Throws
-        <span class="ml-3 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">Daily {{ date_str }}</span>
+        <span class="ml-3 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">{{ subtitle }}</span>
       </h1>
-      <p class="text-sm text-gray-600">Report Date: {{ date_str }}</p>
+      <p class="text-sm text-gray-600">Since {{ since_date }}</p>
     </div>
     {% if not print_mode %}
     <div class="space-x-2 no-print">
-      <a href="{{ csv_url }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
+      {% set csv_link = url_for('admin.ft_daily', start_date=start_date, end_date=end_date, since_date=since_date, include_total='1', hide_zeros='1' if hide_zeros else '0', sort=sort, dir=dir, format='csv') %}
+      <a href="{{ csv_link }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
       <button type="button" onclick="window.print()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">Print / Save PDF</button>
     </div>
     {% endif %}
@@ -33,14 +34,19 @@
 
   {% if not print_mode %}
   <form method="get" class="flex flex-wrap items-end gap-4 no-print">
+    <input type="hidden" name="include_total" value="1" />
     <div>
-      <label class="block text-sm font-medium mb-1">Date</label>
-      <input type="date" name="date" value="{{ selected_date.isoformat() }}" class="border border-gray-300 rounded px-2 py-1" />
+      <label class="block text-sm font-medium mb-1">From</label>
+      <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1" />
     </div>
-    <label class="inline-flex items-center text-sm">
-      <input type="checkbox" name="include_total" value="1" {% if include_total %}checked{% endif %} class="mr-2" />
-      Include Total Shots (All Drills)
-    </label>
+    <div>
+      <label class="block text-sm font-medium mb-1">To</label>
+      <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Since</label>
+      <input type="date" name="since_date" value="{{ since_date }}" class="border border-gray-300 rounded px-2 py-1" />
+    </div>
     <label class="inline-flex items-center text-sm">
       <input type="checkbox" name="hide_zeros" value="1" {% if hide_zeros %}checked{% endif %} class="mr-2" />
       Hide players with 0 FT attempts
@@ -48,10 +54,10 @@
     <div>
       <label class="block text-sm font-medium mb-1">Sort</label>
       <select name="sort" class="border border-gray-300 rounded px-2 py-1">
-        <option value="attempts" {% if sort == 'attempts' %}selected{% endif %}>Attempts</option>
-        <option value="makes" {% if sort == 'makes' %}selected{% endif %}>Makes</option>
+        <option value="attempts" {% if sort == 'attempts' %}selected{% endif %}>FT Attempts</option>
+        <option value="makes" {% if sort == 'makes' %}selected{% endif %}>FT Makes</option>
         <option value="pct" {% if sort == 'pct' %}selected{% endif %}>FT %</option>
-        {% if include_total %}<option value="total" {% if sort == 'total' %}selected{% endif %}>Total Shots</option>{% endif %}
+        <option value="total" {% if sort == 'total' %}selected{% endif %}>Weekly Total Shots</option>
         <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
       </select>
     </div>
@@ -80,6 +86,7 @@
           <th class="px-4 py-2 text-left text-sm font-medium">
             <a href="{{ sort_urls.name }}" class="inline-flex items-center">Player{% if sort == 'name' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">Non-FT's</th>
           <th class="px-4 py-2 text-center text-sm font-medium">
             <a href="{{ sort_urls.makes }}" class="inline-flex items-center">FT Makes{% if sort == 'makes' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
@@ -89,31 +96,45 @@
           <th class="px-4 py-2 text-center text-sm font-medium">
             <a href="{{ sort_urls.pct }}" class="inline-flex items-center">FT %{% if sort == 'pct' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
-          {% if include_total %}
+          {% set total_next_dir = 'asc' if (sort == 'total' and dir == 'desc') else 'desc' %}
+          {% set total_sort_url = sort_urls.total|default(url_for('admin.ft_daily', start_date=start_date, end_date=end_date, since_date=since_date, include_total='1', hide_zeros='1' if hide_zeros else '0', sort='total', dir=total_next_dir), true) %}
           <th class="px-4 py-2 text-center text-sm font-medium">
-            <a href="{{ sort_urls.total }}" class="inline-flex items-center">Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+            <a href="{{ total_sort_url }}" class="inline-flex items-center">Weekly Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
-          {% endif %}
+          <th class="px-4 py-2 text-center text-sm font-medium">FTM (Since {{ since_date }})</th>
+          <th class="px-4 py-2 text-center text-sm font-medium">FTA (Since {{ since_date }})</th>
+          <th class="px-4 py-2 text-center text-sm font-medium">FT% (Since {{ since_date }})</th>
+          <th class="px-4 py-2 text-center text-sm font-medium">Total Shots (Since {{ since_date }})</th>
         </tr>
     </thead>
     <tbody>
       {% for row in rows %}
       <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
-        <td class="px-4 py-2 text-sm">{{ row.player_name }}</td>
+        <td class="px-4 py-2 text-sm whitespace-nowrap">{{ row.player_name }}</td>
+        <td class="px-4 py-2 text-center text-sm">{{ row.non_ft }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ row.ft_makes }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ row.ft_attempts }}</td>
-        <td class="px-4 py-2 text-center text-sm">{% if row.ft_attempts %}{{ '%.1f'|format(row.ft_pct) }}{% else %}—{% endif %}</td>
-        {% if include_total %}<td class="px-4 py-2 text-center text-sm">{{ row.total_shots }}</td>{% endif %}
+        <td class="px-4 py-2 text-center text-sm">{% if row.ft_attempts %}{{ '%.1f'|format(row.ft_pct) }}{% else %}&mdash;{% endif %}</td>
+        <td class="px-4 py-2 text-center text-sm">{{ row.total_shots_weekly }}</td>
+        <td class="px-4 py-2 text-center text-sm">{{ row.ftm_since }}</td>
+        <td class="px-4 py-2 text-center text-sm">{{ row.fta_since }}</td>
+        <td class="px-4 py-2 text-center text-sm">{% if row.fta_since %}{{ '%.1f'|format(row.ft_pct_since) }}{% else %}&mdash;{% endif %}</td>
+        <td class="px-4 py-2 text-center text-sm">{{ row.total_shots_since }}</td>
       </tr>
       {% endfor %}
     </tbody>
     <tfoot>
       <tr class="bg-gray-200 font-semibold">
-        <td class="px-4 py-2 text-sm">Totals</td>
-        <td class="px-4 py-2 text-center text-sm">{{ totals.ft_makes }}</td>
-        <td class="px-4 py-2 text-center text-sm">{{ totals.ft_attempts }}</td>
-        <td class="px-4 py-2 text-center text-sm">{% if totals.ft_attempts %}{{ '%.1f'|format(totals.ft_pct) }}{% else %}—{% endif %}</td>
-        {% if include_total %}<td class="px-4 py-2 text-center text-sm">{{ totals.total_shots }}</td>{% endif %}
+        <td class="px-4 py-2 text-sm font-semibold">Totals</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.non_ft }}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.ft_makes }}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.ft_attempts }}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{% if totals.ft_attempts %}{{ '%.1f'|format(totals.ft_pct) }}{% else %}&mdash;{% endif %}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.total_shots_weekly }}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.ftm_since }}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.fta_since }}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{% if totals.fta_since %}{{ '%.1f'|format(totals.ft_pct_since) }}{% else %}&mdash;{% endif %}</td>
+        <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.total_shots_since }}</td>
       </tr>
     </tfoot>
   </table>
