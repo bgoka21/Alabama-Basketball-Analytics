@@ -290,6 +290,14 @@ class PageView(db.Model):
     user_agent = db.Column(db.String(256), nullable=True)
 
 
+class Setting(db.Model):
+    __tablename__ = 'setting'
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(64), unique=True, nullable=False)
+    value = db.Column(db.String(255), nullable=True)
+
+
 class PlayerDraftStock(db.Model):
     __tablename__ = 'player_draft_stock'
     id                = db.Column(db.Integer, primary_key=True)
