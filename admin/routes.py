@@ -3893,48 +3893,37 @@ def ft_daily():
         writer = csv.writer(output)
         headers = [
             'Player',
-            'FT Makes (Weekly)',
-            'FT Attempts (Weekly)',
-            'FT % (Weekly)',
-            'Non-FT Attempts (Weekly)',
+            'Non-FTs',
+            'FT Makes',
+            'FT Attempts',
+            'FT %',
+            'Weekly Total Shots',
+            f'FTM (Since {since_date_str})',
+            f'FTA (Since {since_date_str})',
+            f'FT% (Since {since_date_str})',
+            f'Total Shots (Since {since_date_str})',
         ]
-        if include_total:
-            headers.append('Total Shots (Weekly)')
-        headers.extend([
-            'FT Makes (Since)',
-            'FT Attempts (Since)',
-            'FT % (Since)',
-            'Total Shots (Since)',
-        ])
         writer.writerow(headers)
         for r in rows:
             weekly_pct = f"{r['ft_pct']:.1f}" if r['ft_attempts'] else ''
             since_pct = f"{r['ft_pct_since']:.1f}" if r['fta_since'] else ''
-            row = [
+            writer.writerow([
                 r['player_name'],
+                r['non_ft'],
                 r['ft_makes'],
                 r['ft_attempts'],
                 weekly_pct,
-                r['non_ft'],
-            ]
-            if include_total:
-                row.append(r['total_shots_weekly'])
-            row.extend([
+                r['total_shots_weekly'],
                 r['ftm_since'],
                 r['fta_since'],
                 since_pct,
                 r['total_shots_since'],
             ])
-            writer.writerow(row)
         response = make_response(output.getvalue())
         response.headers['Content-Type'] = 'text/csv'
-        filename_range = (
-            start_date_str
-            if start_date == end_date
-            else f"{start_date_str}_to_{end_date_str}"
-        )
+        filename = f"ft_{start_date_str}_{end_date_str}_since_{since_date_str}.csv"
         response.headers['Content-Disposition'] = (
-            f'attachment; filename=ft-daily-{filename_range}.csv'
+            f'attachment; filename={filename}'
         )
         return response
 
