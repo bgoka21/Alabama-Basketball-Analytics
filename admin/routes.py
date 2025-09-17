@@ -46,6 +46,7 @@ from models.uploaded_file import UploadedFile
 from models.recruit import Recruit, RecruitShotTypeStat
 from models.user import User
 from sqlalchemy import func, and_, or_, case
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import aliased
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
@@ -3473,11 +3474,118 @@ def roster():
                           .order_by(Roster.player_name) \
                           .all()
 
+    rename_error = request.args.get('rename_error')
+    rename_target = request.args.get('rename_target', type=int)
+    rename_success = request.args.get('rename_success')
+    proposed_name = request.args.get('proposed_name')
+
     return render_template(
         'admin/roster.html',
         seasons=seasons,
         selected_season=selected_id,
-        roster_entries=roster_entries
+        roster_entries=roster_entries,
+        rename_error=rename_error,
+        rename_target=rename_target,
+        rename_success=rename_success,
+        proposed_name=proposed_name,
+    )
+
+
+@admin_bp.route('/roster/<int:roster_id>/rename', methods=['POST'])
+@admin_required
+def rename_roster(roster_id):
+    roster_entry = Roster.query.get_or_404(roster_id)
+    season_id = roster_entry.season_id
+    new_name = request.form.get('new_name', '').strip()
+
+    if not new_name:
+        return redirect(
+            url_for(
+                'admin.roster',
+                season_id=season_id,
+                rename_error="Player name cannot be blank.",
+                rename_target=roster_entry.id,
+            )
+        )
+
+    old_name = roster_entry.player_name
+    if new_name == old_name:
+        return redirect(
+            url_for(
+                'admin.roster',
+                season_id=season_id,
+                rename_success=f"{old_name} already uses that name.",
+            )
+        )
+
+    duplicate = (
+        Roster.query
+        .filter(
+            Roster.season_id == season_id,
+            Roster.id != roster_entry.id,
+            func.lower(Roster.player_name) == new_name.lower(),
+        )
+        .first()
+    )
+    if duplicate:
+        return redirect(
+            url_for(
+                'admin.roster',
+                season_id=season_id,
+                rename_error="Another player in this season already uses that name.",
+                rename_target=roster_entry.id,
+                proposed_name=new_name,
+            )
+        )
+
+    try:
+        roster_entry.player_name = new_name
+
+        PlayerStats.query.filter_by(
+            season_id=season_id,
+            player_name=old_name,
+        ).update({PlayerStats.player_name: new_name}, synchronize_session=False)
+
+        PlayerDevelopmentPlan.query.filter(
+            PlayerDevelopmentPlan.season_id == season_id,
+            PlayerDevelopmentPlan.player_name == old_name,
+        ).update({PlayerDevelopmentPlan.player_name: new_name}, synchronize_session=False)
+
+        User.query.filter_by(player_name=old_name).update(
+            {User.player_name: new_name}, synchronize_session=False
+        )
+
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return redirect(
+            url_for(
+                'admin.roster',
+                season_id=season_id,
+                rename_error="Another player in this season already uses that name.",
+                rename_target=roster_entry.id,
+                proposed_name=new_name,
+            )
+        )
+    except SQLAlchemyError:
+        current_app.logger.exception('Failed to rename roster entry %s', roster_id)
+        db.session.rollback()
+        return redirect(
+            url_for(
+                'admin.roster',
+                season_id=season_id,
+                rename_error="Unable to rename player due to a database error.",
+                rename_target=roster_entry.id,
+                proposed_name=new_name,
+            )
+        )
+
+    return redirect(
+        url_for(
+            'admin.roster',
+            season_id=season_id,
+            rename_success=f"Renamed {old_name} to {new_name}.",
+        )
     )
 
 
