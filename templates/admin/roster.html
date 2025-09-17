@@ -3,6 +3,17 @@
 
 <h1 class="text-2xl font-bold mb-4">Roster Management</h1>
 
+{% if rename_success %}
+  <div class="mb-4 rounded border border-green-300 bg-green-50 p-3 text-sm text-green-700">
+    {{ rename_success }}
+  </div>
+{% endif %}
+{% if rename_error and not rename_target %}
+  <div class="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+    {{ rename_error }}
+  </div>
+{% endif %}
+
 <!-- Season Selector -->
 <form method="get" class="mb-4">
   <label for="seasonSelect" class="mr-2 font-semibold">Season:</label>
@@ -28,13 +39,42 @@
     {% for entry in roster_entries %}
       <tr class="border-t">
         <td class="px-4 py-2">{{ entry.player_name }}</td>
-        <td class="px-4 py-2">
-          <a href="{{ url_for('admin.upload_headshot', player_name=entry.player_name) }}" class="text-blue-600 hover:underline mr-2">Headshot</a>
-          <form method="post" action="{{ url_for('admin.delete_roster', id=entry.id) }}" class="inline">
-            <button type="submit" class="text-red-600 hover:underline" onclick="return confirm('Remove {{ entry.player_name }}?');">
-              Delete
-            </button>
+        <td class="px-4 py-2 align-top">
+          <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ url_for('admin.upload_headshot', player_name=entry.player_name) }}" class="text-blue-600 hover:underline">Headshot</a>
+            <form method="post" action="{{ url_for('admin.delete_roster', id=entry.id) }}" class="inline">
+              <button type="submit" class="text-red-600 hover:underline" onclick="return confirm('Remove {{ entry.player_name }}?');">
+                Delete
+              </button>
+            </form>
+          </div>
+          {% set is_target = (rename_target == entry.id) %}
+          {% set input_value = entry.player_name %}
+          {% if is_target and proposed_name is not none %}
+            {% set input_value = proposed_name %}
+          {% endif %}
+          <form
+            method="post"
+            action="{{ url_for('admin.rename_roster', roster_id=entry.id) }}"
+            class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center"
+          >
+            <label for="rename-{{ entry.id }}" class="sr-only">Rename {{ entry.player_name }}</label>
+            <input
+              id="rename-{{ entry.id }}"
+              type="text"
+              name="new_name"
+              value="{{ input_value }}"
+              placeholder="{{ entry.player_name }}"
+              class="border p-2 rounded flex-grow"
+            >
+            <button
+              type="submit"
+              class="bg-[#9E1B32] text-white px-4 py-2 rounded hover:bg-[#7a1526]"
+            >Rename</button>
           </form>
+          {% if rename_error and is_target %}
+            <p class="mt-1 text-sm text-red-600">{{ rename_error }}</p>
+          {% endif %}
         </td>
       </tr>
     {% endfor %}
