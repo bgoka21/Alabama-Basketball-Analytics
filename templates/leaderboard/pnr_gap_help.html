@@ -1,0 +1,27 @@
+{% extends 'admin/base.html' %}
+
+{% block page_controls %}
+  <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
+    <div>
+      <label class="font-semibold mr-2">Season:</label>
+      <select name="season_id" class="border p-2 rounded">
+        {% for s in all_seasons %}
+          <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>
+            {{ s.season_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-semibold mb-2">{{ page_title }}</h1>
+    {% if last_practice_date %}
+      <p class="text-sm text-gray-600 mb-2">Last practice date: {{ last_practice_date }}</p>
+    {% endif %}
+    <p class="text-gray-500">Dual leaderboard tables will render here in a future update.</p>
+  </div>
+{% endblock %}
