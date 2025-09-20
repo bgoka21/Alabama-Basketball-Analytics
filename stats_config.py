@@ -29,11 +29,18 @@ LEADERBOARD_STATS.extend([
     {"key": "three_fg_pct", "label": "3FG%", "format": "pct", "hidden": True},
     {"key": "turnover_rate", "label": "Turnover Rate", "format": "pct", "hidden": True},
     {"key": "off_reb_rate", "label": "Off Reb Rate", "format": "pct", "hidden": True},
+    {"key": "off_rebounding", "label": "Offensive Rebounding"},
+    {"key": "def_rebounding", "label": "Defensive Rebounding"},
     {"key": "fouls_drawn_rate", "label": "Fouls Drawn Rate", "format": "pct", "hidden": True},
 ])
 
-# New defensive leaderboard metric
-LEADERBOARD_STATS.append({"key": "defense", "label": "Defense"})
+# ─── Defensive Leaderboard Metrics ──────────────────────────────────────────
+LEADERBOARD_STATS.extend([
+    {"key": "defense", "label": "Defense"},
+    {"key": "collision_gap_help", "label": "Collision Gap Help"},
+    {"key": "pnr_gap_help", "label": "PnR Gap Help"},
+    {"key": "pnr_grade", "label": "PnR Grade"},
+])
 
 # ─── Simple Shot Type FG% Categories ─────────────────────────────────────────
 for sc in ["atr", "fg2", "fg3"]:
