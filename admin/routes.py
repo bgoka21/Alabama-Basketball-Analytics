@@ -59,7 +59,7 @@ from parse_practice_csv import (
 )  # <— make sure this is here
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
-from admin._leaderboard_helpers import build_dual_context
+from admin._leaderboard_helpers import build_dual_context, prepare_dual_context
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 from services.eybl_ingest import (
@@ -991,6 +991,7 @@ def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key,
         label_set=label_set,
         extra_kwargs=extra_kwargs,
     )
+    ctx = prepare_dual_context(ctx, stat_key)
 
     return render_template(
         template_name,
