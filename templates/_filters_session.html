@@ -1,0 +1,79 @@
+# >>> SESSION FILTER BAR START
+<div class="mb-4 flex items-center justify-between">
+  <!-- Session Buttons -->
+  <form method="GET" class="flex gap-2">
+    {# preserve non-session params (e.g., stat, season_id, label[], pagination) #}
+    {% for key, values in request.args.lists() %}
+      {% if key not in ['session', 'start_date', 'end_date'] %}
+        {% for v in values %}
+          <input type="hidden" name="{{ key }}" value="{{ v }}">
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+
+    {% set _sessions = sessions or ['Summer 1','Summer 2','Fall','Official Practice','All'] %}
+    {% for s in _sessions %}
+      <button type="submit" name="session" value="{{ s }}"
+        class="px-3 py-1 rounded-full text-sm border
+               {% if selected_session==s or (not selected_session and s=='All') %} ring-2 {% endif %}">
+        {{ s }}
+      </button>
+    {% endfor %}
+  </form>
+
+  <!-- Toggle for More Filters -->
+  <button type="button" id="toggle-more-filters" class="text-sm underline">
+    More filters
+  </button>
+</div>
+
+<!-- Collapsible More Filters -->
+<div id="more-filters" class="hidden border rounded p-3 bg-gray-50">
+  <form method="GET" class="flex flex-wrap items-end gap-3">
+    {# preserve current session & other args #}
+    {% if selected_session %}<input type="hidden" name="session" value="{{ selected_session }}">{% endif %}
+    {% for key, values in request.args.lists() %}
+      {% if key not in ['session','start_date','end_date'] %}
+        {% for v in values %}
+          <input type="hidden" name="{{ key }}" value="{{ v }}">
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="flex items-center gap-2">
+      <label class="text-sm font-medium">Date:</label>
+      <input type="date" name="start_date" value="{{ start_date or '' }}" class="border px-2 py-1 text-sm">
+      <span class="text-sm">–</span>
+      <input type="date" name="end_date" value="{{ end_date or '' }}" class="border px-2 py-1 text-sm">
+    </div>
+
+    {% if label_options %}
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-medium">Drills:</span>
+        {% for lbl in label_options %}
+          <label class="text-sm mr-3">
+            <input type="checkbox" name="label" value="{{ lbl }}" 
+              {% if selected_labels and lbl in selected_labels %}checked{% endif %}> {{ lbl }}
+          </label>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <button type="submit" class="px-3 py-1 text-sm border rounded">Apply</button>
+  </form>
+</div>
+
+<script>
+  // >>> SESSION UI JS START
+  (function(){
+    var btn = document.getElementById('toggle-more-filters');
+    var panel = document.getElementById('more-filters');
+    if(btn && panel){
+      btn.addEventListener('click', function(){
+        panel.classList.toggle('hidden');
+      });
+    }
+  })();
+  // <<< SESSION UI JS END
+</script>
+# <<< SESSION FILTER BAR END

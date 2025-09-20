@@ -12,24 +12,13 @@
       {% endfor %}
     </select>
   </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">From</label>
-    <input type="date" name="start_date" value="{{ start_date }}" class="border p-2 rounded" />
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">To</label>
-    <input type="date" name="end_date" value="{{ end_date }}" class="border p-2 rounded" />
-  </div>
-  {% if label_options %}
-  <div class="flex flex-wrap items-center gap-2">
-    {% for lbl in label_options %}
-      <label class="inline-flex items-center text-sm mr-2">
-        <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-        <span class="ml-1">{{ lbl }}</span>
-      </label>
-    {% endfor %}
-  </div>
-  {% endif %}
+  {% for key, values in request.args.lists() %}
+    {% if key not in ['season_id', 'stat'] %}
+      {% for v in values %}
+        <input type="hidden" name="{{ key }}" value="{{ v }}">
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
   <input type="hidden" name="stat" value="{{ selected.key }}">
   <div>
     <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
@@ -38,6 +27,9 @@
     <a href="{{ url_for('admin.leaderboard') }}" class="text-gray-600 hover:underline text-sm">Clear</a>
   </div>
 </form>
+# >>> USE SESSION FILTER BAR START
+{% include "_filters_session.html" %}
+# <<< USE SESSION FILTER BAR END
 {% endblock %}
 
 {% block content %}

@@ -4570,6 +4570,12 @@ def team_totals():
         except ValueError:
             end_date = ''
 
+    # >>> SESSION RANGE INTEGRATION START
+    from utils.filters import apply_session_range
+
+    start_dt, end_dt, selected_session = apply_session_range(request.args, start_dt, end_dt)
+    # >>> SESSION RANGE INTEGRATION END
+
     trend_season_id = request.args.get('trend_season_id', type=int) or season_id
     trend_start_date = request.args.get('trend_start_date', start_date)
     trend_end_date = request.args.get('trend_end_date', end_date)
@@ -4868,6 +4874,10 @@ def team_totals():
         practice_categories=practice_categories,
         trend_selected_categories=trend_selected_categories,
         active_page='team_totals',
+        # >>> TEMPLATE CONTEXT SESSION START
+        selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
+        sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
+        # <<< TEMPLATE CONTEXT SESSION END
     )
 
 
@@ -4961,6 +4971,11 @@ def leaderboard():
         except ValueError:
             end_date = ''
 
+    # >>> SESSION RANGE INTEGRATION START
+    from utils.filters import apply_session_range
+    start_dt, end_dt, selected_session = apply_session_range(request.args, start_dt, end_dt)
+    # >>> SESSION RANGE INTEGRATION END
+
     stat_key = request.args.get('stat') or request.args.get('base_stat')
     if not stat_key:
         stat_key = LEADERBOARD_STATS[0]['key']
@@ -5004,7 +5019,11 @@ def leaderboard():
         end_date=end_date or '',
         label_options=label_options,
         selected_labels=selected_labels,
-        active_page='leaderboard'
+        active_page='leaderboard',
+        # >>> TEMPLATE CONTEXT SESSION START
+        selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
+        sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
+        # <<< TEMPLATE CONTEXT SESSION END
     )
 
 
