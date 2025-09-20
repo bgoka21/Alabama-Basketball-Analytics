@@ -194,6 +194,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # ─── Step B: Loop through each row in the CSV ────────────────────
     for _, row in df.iterrows():
         row_type = str(row.get("Row", "")).strip()
+        row_type_clean = row_type.strip().lower()
         drill_val = row.get("DRILL TYPE")
         if pd.isna(drill_val):
             drill_str = ""
@@ -410,7 +411,10 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                             events[player]['team_misses_on'] += 1
 
         # ─── Practice rebounding & gap metrics ───────────────────────────
-        if row_type == "Offense Rebounding Opportunities":
+        if row_type_clean in (
+            "offense rebounding opportunities",
+            "offense rebound opportunities",
+        ):
             player_cols = [col for col in row.index if is_player_column(str(col))]
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
@@ -437,7 +441,10 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                         details.append({"event": "back_man_missed"})
             continue
 
-        if row_type == "Defense Rebounding Opportunities":
+        if row_type_clean in (
+            "defense rebounding opportunities",
+            "defense rebound opportunities",
+        ):
             player_cols = [col for col in row.index if is_player_column(str(col))]
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
