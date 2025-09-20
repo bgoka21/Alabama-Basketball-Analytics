@@ -52,7 +52,11 @@ from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
-from parse_practice_csv import parse_practice_csv, blue_collar_values  # <— make sure this is here
+from parse_practice_csv import (
+    parse_practice_csv,
+    blue_collar_values,
+    _date_from_filename,
+)  # <— make sure this is here
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from utils.session_helpers import get_player_stats_for_date_range
@@ -1239,8 +1243,11 @@ def parse_file(file_id):
 
         # PRACTICE branch
         if uploaded_file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
-            # use the file_date column (or fallback to today)
-            file_date = uploaded_file.file_date or date.today()
+            parsed_date = _date_from_filename(filename)
+            # use the parsed date if available, otherwise fallback to stored value/today
+            file_date = parsed_date or uploaded_file.file_date or date.today()
+            if parsed_date and uploaded_file.file_date != parsed_date:
+                uploaded_file.file_date = parsed_date
 
             # Check if a practice for this date/category already exists
             practice = Practice.query.filter_by(
@@ -1363,7 +1370,10 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
         uploaded_file.season_id
         or Season.query.order_by(Season.start_date.desc()).first().id
     )
-    file_date = uploaded_file.file_date or date.today()
+    parsed_date = _date_from_filename(uploaded_file.filename)
+    file_date = parsed_date or uploaded_file.file_date or date.today()
+    if parsed_date and uploaded_file.file_date != parsed_date:
+        uploaded_file.file_date = parsed_date
 
     practice = Practice.query.filter_by(
         season_id=season_id,
