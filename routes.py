@@ -149,6 +149,13 @@ def practice_team_totals():
         except ValueError:
             end_date = ''
 
+    # >>> SESSION RANGE INTEGRATION START
+    from utils.filters import apply_session_range
+
+    start_dt, end_dt, selected_session = apply_session_range(request.args, start_dt, end_dt)
+    # If a session is active, it should override manual dates in the actual query constraints below.
+    # >>> SESSION RANGE INTEGRATION END
+
     q = PlayerStats.query.filter(PlayerStats.practice_id != None)
     if start_dt or end_dt:
         q = q.join(Practice, PlayerStats.practice_id == Practice.id)
@@ -242,6 +249,10 @@ def practice_team_totals():
         seasons=[],
         selected_season=None,
         active_page='team_totals',
+        # >>> TEMPLATE CONTEXT SESSION START
+        selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
+        sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
+        # <<< TEMPLATE CONTEXT SESSION END
     )
 
 
