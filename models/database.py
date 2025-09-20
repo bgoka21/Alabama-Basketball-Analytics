@@ -49,8 +49,9 @@ class Practice(db.Model):
     __tablename__   = 'practice'
     id              = db.Column(db.Integer, primary_key=True)
     season_id       = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
-    date            = db.Column(db.Date, nullable=False)
+    date            = db.Column(db.Date, nullable=True)
     category        = db.Column(db.String(20), nullable=False)  # Summer Workouts, Fall Workouts, etc.
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
 
     team_stats      = db.relationship('TeamStats',               backref='practice', lazy=True)
     player_stats    = db.relationship('PlayerStats',             backref='practice', lazy=True)
