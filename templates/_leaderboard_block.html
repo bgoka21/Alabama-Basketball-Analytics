@@ -18,115 +18,380 @@
 </form>
 
 <div class="overflow-x-auto">
-<table class="min-w-full bg-white rounded-lg shadow border text-center">
-  <thead>
-    {% if selected.key == 'defense' %}
-      <tr class="bg-gray-100">
-        <th class="px-4 py-2 text-center" rowspan="2">#</th>
-        <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
-        <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
-      </tr>
-      <tr class="bg-gray-100">
-        <th class="px-4 py-2 text-center sortable" data-col="2">Bump +</th>
-        <th class="px-4 py-2 text-center sortable" data-col="3">Bump Opps</th>
-        <th class="px-4 py-2 text-center sortable" data-col="4">Bump %</th>
-      </tr>
-    {% else %}
-      <tr class="bg-gray-100">
-        <th class="px-4 py-2 text-center">#</th>
-        <th class="px-4 py-2 text-left sortable">Player</th>
-        {% if selected.key == 'assist_summary' %}
-          <th class="px-4 py-2 text-center sortable">Ast</th>
-          <th class="px-4 py-2 text-center sortable">Pot Ast</th>
-          <th class="px-4 py-2 text-center sortable">2nd Ast</th>
-          <th class="px-4 py-2 text-center sortable">TO</th>
-          <th class="px-4 py-2 text-center sortable">AST/TO</th>
-          <th class="px-4 py-2 text-center sortable">Adj AST/TO</th>
-        {% elif selected.key == 'offense_summary' %}
-          <th class="px-4 py-2 text-center sortable">Poss</th>
-          <th class="px-4 py-2 text-center sortable">PPP On</th>
-          <th class="px-4 py-2 text-center sortable">PPP Off</th>
-          <th class="px-4 py-2 text-center sortable">Ind TO Rate (Poss.)</th>
-          <th class="px-4 py-2 text-center sortable">TO % (Bamalytics)</th>
-          <th class="px-4 py-2 text-center sortable">% of TO's (NBA.com)</th>
-          <th class="px-4 py-2 text-center sortable">Team TO Rate</th>
-          <th class="px-4 py-2 text-center sortable">Ind Off Reb%</th>
-          <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
-          <th class="px-4 py-2 text-center sortable">Ind Fouls Drawn%</th>
-          <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
-        {% elif selected.key.endswith('_fg_pct') %}
-          <th class="px-4 py-2 text-center sortable">FG</th>
-          <th class="px-4 py-2 text-center sortable">FG%</th>
-          <th class="px-4 py-2 text-center sortable">Freq</th>
-        {% else %}
-          <th class="px-4 py-2 text-center sortable">{{ selected.label }}</th>
+  {% if selected.key == 'defense' %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead>
+        <tr class="bg-gray-100">
+          <th class="px-4 py-2 text-center" rowspan="2">#</th>
+          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
+          <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
+        </tr>
+        <tr class="bg-gray-100">
+          <th class="px-4 py-2 text-center sortable" data-col="2">Bump +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="3">Bump Opps</th>
+          <th class="px-4 py-2 text-center sortable" data-col="4">Bump %</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for row in rows %}
+          <tr class="even:bg-gray-50">
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            {% set player, bump_pos, opps, pct = row %}
+            <td class="px-4 py-2 text-left">{{ player }}</td>
+            <td class="px-4 py-2 text-center">{{ bump_pos }}</td>
+            <td class="px-4 py-2 text-center">{{ opps }}</td>
+            <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
+          </tr>
+        {% endfor %}
+        {% if team_totals %}
+          <tr class="font-bold bg-gray-100 team-totals">
+            <td class="px-4 py-2 text-center"></td>
+            <td class="px-4 py-2 text-left">Team Totals</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[2]|round(1) }}%</td>
+          </tr>
         {% endif %}
-      </tr>
-    {% endif %}
-  </thead>
-  <tbody class="divide-y divide-gray-200">
-    {% for row in rows %}
-      <tr class="even:bg-gray-50">
-        <td class="px-4 py-2 text-center">{{ loop.index }}</td>
-        {% if selected.key == 'assist_summary' %}
-          {% set player, ast, pot, sec, tos, ratio, adj = row %}
-          <td class="px-4 py-2 text-left">{{ player }}</td>
-          <td class="px-4 py-2 text-center">{{ ast }}</td>
-          <td class="px-4 py-2 text-center">{{ pot }}</td>
-          <td class="px-4 py-2 text-center">{{ sec }}</td>
-          <td class="px-4 py-2 text-center">{{ tos }}</td>
-          <td class="px-4 py-2 text-center">{{ ratio }}</td>
-          <td class="px-4 py-2 text-center">{{ adj }}</td>
-        {% elif selected.key == 'offense_summary' %}
-          {% set player, poss, ppp_on, ppp_off, ind_to, bama_to, team_to_pct, to_rate, ind_oreb, oreb_rate, ind_foul, foul_rate = row %}
-          <td class="px-4 py-2 text-left">{{ player }}</td>
-          <td class="px-4 py-2 text-center">{{ poss }}</td>
-          <td class="px-4 py-2 text-center">{{ ppp_on }}</td>
-          <td class="px-4 py-2 text-center">{{ ppp_off }}</td>
-          <td class="px-4 py-2 text-center">{{ ind_to }}</td>
-          <td class="px-4 py-2 text-center">{{ bama_to }}</td>
-          <td class="px-4 py-2 text-center">{{ team_to_pct }}</td>
-          <td class="px-4 py-2 text-center">{{ to_rate }}</td>
-          <td class="px-4 py-2 text-center">{{ ind_oreb }}</td>
-          <td class="px-4 py-2 text-center">{{ oreb_rate }}</td>
-          <td class="px-4 py-2 text-center">{{ ind_foul }}</td>
-          <td class="px-4 py-2 text-center">{{ foul_rate }}</td>
-        {% elif selected.key == 'defense' %}
-          {% set player, bump_pos, opps, pct = row %}
-          <td class="px-4 py-2 text-left">{{ player }}</td>
-          <td class="px-4 py-2 text-center">{{ bump_pos }}</td>
-          <td class="px-4 py-2 text-center">{{ opps }}</td>
-          <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
-        {% elif selected.key.endswith('_fg_pct') %}
-          {% set player, makes, attempts, pct, freq = row %}
-          <td class="px-4 py-2 text-left">{{ player }}</td>
-          <td class="px-4 py-2 text-center">{{ makes }}-{{ attempts }}</td>
-          <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
-          <td class="px-4 py-2 text-center">{{ freq|round(1) }}%</td>
-        {% else %}
-          {% set player, val = row %}
-          <td class="px-4 py-2 text-left">{{ player }}</td>
-          <td class="px-4 py-2">
-            {% if selected.format=='pct' %}
-              {{ val|round(1) }}%
+      </tbody>
+    </table>
+  {% elif selected.key == 'off_rebounding' %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-center">#</th>
+          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center" colspan="3">Crash</th>
+          <th class="px-4 py-2 text-center" colspan="3">Back Man</th>
+        </tr>
+        <tr>
+          <th></th><th></th>
+          <th class="px-4 py-2 text-center sortable" data-col="2">Crash +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="3">Crash Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="4">Crash %</th>
+          <th class="px-4 py-2 text-center sortable" data-col="5">Back Man +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="6">Back Man Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="7">Back Man %</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for row in rows %}
+          {# row = (player, crash_plus, crash_opp, crash_pct, back_plus, back_opp, back_pct) #}
+          <tr>
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="px-4 py-2 text-left">{{ row[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[1] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[2] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[3] is not none) and (row[3]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ row[4] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[5] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[6] is not none) and (row[6]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endfor %}
+        {% if team_totals %}
+          {# team_totals = (crash_plus, crash_opp, crash_pct, back_plus, back_opp, back_pct) #}
+          <tr class="bg-gray-100 font-semibold team-totals">
+            <td class="px-4 py-2 text-center"></td>
+            <td class="px-4 py-2 text-left">Team Totals</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[2] is not none) and (team_totals[2]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ team_totals[3] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[4] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[5] is not none) and (team_totals[5]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% elif selected.key == 'def_rebounding' %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-center">#</th>
+          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center" colspan="3">Box Out</th>
+          <th class="px-4 py-2 text-center" rowspan="2">Off Reb's<br>Given Up</th>
+        </tr>
+        <tr>
+          <th></th><th></th>
+          <th class="px-4 py-2 text-center sortable" data-col="2">Box Out +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="3">Box Out Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="4">Box Out %</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for row in rows %}
+          {# row = (player, box_plus, box_opp, box_pct, given_up) #}
+          <tr>
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="px-4 py-2 text-left">{{ row[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[1] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[2] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[3] is not none) and (row[3]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ row[4] }}</td>
+          </tr>
+        {% endfor %}
+        {% if team_totals %}
+          {# team_totals = (box_plus, box_opp, box_pct, given_up) #}
+          <tr class="bg-gray-100 font-semibold team-totals">
+            <td class="px-4 py-2 text-center"></td>
+            <td class="px-4 py-2 text-left">Team Totals</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[2] is not none) and (team_totals[2]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ team_totals[3] }}</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% elif selected.key == 'collision_gap_help' %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-center">#</th>
+          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center" colspan="3">Gap Help</th>
+        </tr>
+        <tr>
+          <th></th><th></th>
+          <th class="px-4 py-2 text-center sortable" data-col="2">Gap +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="3">Gap Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="4">Gap %</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for row in rows %}
+          {# row = (player, gap_plus, gap_opp, gap_pct) #}
+          <tr>
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="px-4 py-2 text-left">{{ row[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[1] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[2] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[3] is not none) and (row[3]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endfor %}
+        {% if team_totals %}
+          {# team_totals = (gap_plus, gap_opp, gap_pct) #}
+          <tr class="bg-gray-100 font-semibold team-totals">
+            <td class="px-4 py-2 text-center"></td>
+            <td class="px-4 py-2 text-left">Team Totals</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[2] is not none) and (team_totals[2]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% elif selected.key == 'pnr_gap_help' %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-center">#</th>
+          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center" colspan="3">PnR Gap Help</th>
+          <th class="px-4 py-2 text-center" colspan="3">Low Help</th>
+        </tr>
+        <tr>
+          <th></th><th></th>
+          <th class="px-4 py-2 text-center sortable" data-col="2">PnR Gap +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="3">PnR Gap Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="4">PnR Gap %</th>
+          <th class="px-4 py-2 text-center sortable" data-col="5">Low +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="6">Low Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="7">Low %</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for row in rows %}
+          {# row = (player, gap_plus, gap_opp, gap_pct, low_plus, low_opp, low_pct) #}
+          <tr>
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="px-4 py-2 text-left">{{ row[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[1] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[2] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[3] is not none) and (row[3]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ row[4] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[5] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[6] is not none) and (row[6]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endfor %}
+        {% if team_totals %}
+          {# team_totals = (gap_plus, gap_opp, gap_pct, low_plus, low_opp, low_pct) #}
+          <tr class="bg-gray-100 font-semibold team-totals">
+            <td class="px-4 py-2 text-center"></td>
+            <td class="px-4 py-2 text-left">Team Totals</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[2] is not none) and (team_totals[2]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ team_totals[3] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[4] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[5] is not none) and (team_totals[5]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% elif selected.key == 'pnr_grade' %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-center">#</th>
+          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center" colspan="3">Close Window</th>
+          <th class="px-4 py-2 text-center" colspan="3">Shut Door</th>
+        </tr>
+        <tr>
+          <th></th><th></th>
+          <th class="px-4 py-2 text-center sortable" data-col="2">Close Window +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="3">Close Window Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="4">Close Window %</th>
+          <th class="px-4 py-2 text-center sortable" data-col="5">Shut Door +</th>
+          <th class="px-4 py-2 text-center sortable" data-col="6">Shut Door Opp</th>
+          <th class="px-4 py-2 text-center sortable" data-col="7">Shut Door %</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for row in rows %}
+          {# row = (player, cw_plus, cw_opp, cw_pct, sd_plus, sd_opp, sd_pct) #}
+          <tr>
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="px-4 py-2 text-left">{{ row[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[1] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[2] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[3] is not none) and (row[3]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ row[4] }}</td>
+            <td class="px-4 py-2 text-center">{{ row[5] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (row[6] is not none) and (row[6]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endfor %}
+        {% if team_totals %}
+          {# team_totals = (cw_plus, cw_opp, cw_pct, sd_plus, sd_opp, sd_pct) #}
+          <tr class="bg-gray-100 font-semibold team-totals">
+            <td class="px-4 py-2 text-center"></td>
+            <td class="px-4 py-2 text-left">Team Totals</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[2] is not none) and (team_totals[2]|round(1)|string + '%') or 'NA' }}
+            </td>
+            <td class="px-4 py-2 text-center">{{ team_totals[3] }}</td>
+            <td class="px-4 py-2 text-center">{{ team_totals[4] }}</td>
+            <td class="px-4 py-2 text-center">
+              {{ (team_totals[5] is not none) and (team_totals[5]|round(1)|string + '%') or 'NA' }}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% else %}
+    <table class="min-w-full bg-white rounded-lg shadow border text-center">
+      <thead>
+        <tr class="bg-gray-100">
+          <th class="px-4 py-2 text-center">#</th>
+          <th class="px-4 py-2 text-left sortable">Player</th>
+          {% if selected.key == 'assist_summary' %}
+            <th class="px-4 py-2 text-center sortable">Ast</th>
+            <th class="px-4 py-2 text-center sortable">Pot Ast</th>
+            <th class="px-4 py-2 text-center sortable">2nd Ast</th>
+            <th class="px-4 py-2 text-center sortable">TO</th>
+            <th class="px-4 py-2 text-center sortable">AST/TO</th>
+            <th class="px-4 py-2 text-center sortable">Adj AST/TO</th>
+          {% elif selected.key == 'offense_summary' %}
+            <th class="px-4 py-2 text-center sortable">Poss</th>
+            <th class="px-4 py-2 text-center sortable">PPP On</th>
+            <th class="px-4 py-2 text-center sortable">PPP Off</th>
+            <th class="px-4 py-2 text-center sortable">Ind TO Rate (Poss.)</th>
+            <th class="px-4 py-2 text-center sortable">TO % (Bamalytics)</th>
+            <th class="px-4 py-2 text-center sortable">% of TO's (NBA.com)</th>
+            <th class="px-4 py-2 text-center sortable">Team TO Rate</th>
+            <th class="px-4 py-2 text-center sortable">Ind Off Reb%</th>
+            <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
+            <th class="px-4 py-2 text-center sortable">Ind Fouls Drawn%</th>
+            <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
+          {% elif selected.key.endswith('_fg_pct') %}
+            <th class="px-4 py-2 text-center sortable">FG</th>
+            <th class="px-4 py-2 text-center sortable">FG%</th>
+            <th class="px-4 py-2 text-center sortable">Freq</th>
+          {% else %}
+            <th class="px-4 py-2 text-center sortable">{{ selected.label }}</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for row in rows %}
+          <tr class="even:bg-gray-50">
+            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
+            {% if selected.key == 'assist_summary' %}
+              {% set player, ast, pot, sec, tos, ratio, adj = row %}
+              <td class="px-4 py-2 text-left">{{ player }}</td>
+              <td class="px-4 py-2 text-center">{{ ast }}</td>
+              <td class="px-4 py-2 text-center">{{ pot }}</td>
+              <td class="px-4 py-2 text-center">{{ sec }}</td>
+              <td class="px-4 py-2 text-center">{{ tos }}</td>
+              <td class="px-4 py-2 text-center">{{ ratio }}</td>
+              <td class="px-4 py-2 text-center">{{ adj }}</td>
+            {% elif selected.key == 'offense_summary' %}
+              {% set player, poss, ppp_on, ppp_off, ind_to, bama_to, team_to_pct, to_rate, ind_oreb, oreb_rate, ind_foul, foul_rate = row %}
+              <td class="px-4 py-2 text-left">{{ player }}</td>
+              <td class="px-4 py-2 text-center">{{ poss }}</td>
+              <td class="px-4 py-2 text-center">{{ ppp_on }}</td>
+              <td class="px-4 py-2 text-center">{{ ppp_off }}</td>
+              <td class="px-4 py-2 text-center">{{ ind_to }}</td>
+              <td class="px-4 py-2 text-center">{{ bama_to }}</td>
+              <td class="px-4 py-2 text-center">{{ team_to_pct }}</td>
+              <td class="px-4 py-2 text-center">{{ to_rate }}</td>
+              <td class="px-4 py-2 text-center">{{ ind_oreb }}</td>
+              <td class="px-4 py-2 text-center">{{ oreb_rate }}</td>
+              <td class="px-4 py-2 text-center">{{ ind_foul }}</td>
+              <td class="px-4 py-2 text-center">{{ foul_rate }}</td>
+            {% elif selected.key.endswith('_fg_pct') %}
+              {% set player, makes, attempts, pct, freq = row %}
+              <td class="px-4 py-2 text-left">{{ player }}</td>
+              <td class="px-4 py-2 text-center">{{ makes }}-{{ attempts }}</td>
+              <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
+              <td class="px-4 py-2 text-center">{{ freq|round(1) }}%</td>
             {% else %}
-              {{ val }}
+              {% set player, val = row %}
+              <td class="px-4 py-2 text-left">{{ player }}</td>
+              <td class="px-4 py-2">
+                {% if selected.format=='pct' %}
+                  {{ val|round(1) }}%
+                {% else %}
+                  {{ val }}
+                {% endif %}
+              </td>
             {% endif %}
-          </td>
-        {% endif %}
-      </tr>
-    {% endfor %}
-    {% if selected.key == 'defense' and team_totals %}
-      <tr class="font-bold bg-gray-100 team-totals">
-        <td class="px-4 py-2 text-center"></td>
-        <td class="px-4 py-2 text-left">Team Totals</td>
-        <td class="px-4 py-2 text-center">{{ team_totals[0] }}</td>
-        <td class="px-4 py-2 text-center">{{ team_totals[1] }}</td>
-        <td class="px-4 py-2 text-center">{{ team_totals[2]|round(1) }}%</td>
-      </tr>
-    {% endif %}
-  </tbody>
-</table>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 </div>
 <script>
   document.querySelectorAll('th.sortable').forEach(th => {
