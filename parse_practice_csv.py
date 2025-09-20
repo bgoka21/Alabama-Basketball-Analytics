@@ -1,4 +1,6 @@
 import json
+import math
+import re
 import pandas as pd
 from flask import current_app
 from collections import defaultdict
@@ -66,6 +68,76 @@ def extract_tokens(val):
     return [t.strip() for t in val.split(',') if t.strip()]
 
 
+
+
+# === Helpers for new practice stats (idempotent) ===
+PLAYER_COL_RE = re.compile(r"^#\d+\s")  # e.g., "#12 John Doe"
+
+
+def is_player_column(col_name: str) -> bool:
+    try:
+        return bool(PLAYER_COL_RE.match(col_name or ""))
+    except Exception:
+        return False
+
+
+def split_tokens(cell) -> list[str]:
+    """
+    Robustly split a CSV cell that may contain multiple labels like:
+    "Def -, Given Up" or "Gap +; SD -". Handles commas/semicolons/newlines.
+    """
+    if cell is None:
+        return []
+    try:
+        if math.isnan(cell):
+            return []
+    except Exception:
+        pass
+    s = str(cell).strip()
+    if not s:
+        return []
+    # Normalize separators to comma, then split
+    for sep in [";", "\n", "\r", "\t"]:
+        s = s.replace(sep, ",")
+    return [t.strip() for t in s.split(",") if t.strip()]
+
+
+def bump(d: dict, key: str, amount: int = 1):
+    d[key] = d.get(key, 0) + amount
+
+
+def ensure_player_defaults(slot: dict):
+    """
+    Ensure all new counter fields exist with default 0.
+    Safe to call for any player row before bumping.
+    """
+    defaults = {
+        # Offensive Rebounding Opportunities
+        "crash_positive": 0,     # Off +
+        "crash_missed": 0,       # Off -
+        "back_man_positive": 0,  # BM +
+        "back_man_missed": 0,    # BM -
+        # Defensive Rebounding Opportunities
+        "box_out_positive": 0,   # Def +
+        "box_out_missed": 0,     # Def -
+        "off_reb_given_up": 0,   # Given Up
+        # Collision Gap (Crimson/White)
+        "collision_gap_positive": 0,  # Gap +
+        "collision_gap_missed": 0,    # Gap -
+        # PnR Gap Help / Low
+        "pnr_gap_positive": 0,   # Gap +
+        "pnr_gap_missed": 0,     # Gap -
+        "low_help_positive": 0,  # Low +
+        "low_help_missed": 0,    # Low -
+        # PnR Grade
+        "close_window_positive": 0,  # CW +
+        "close_window_missed": 0,    # CW -
+        "shut_door_positive": 0,     # SD +
+        "shut_door_missed": 0,       # SD -
+    }
+    for k, v in defaults.items():
+        if k not in slot:
+            slot[k] = v
 
 
 def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_date=None):
@@ -336,6 +408,122 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     if label_val in ('ATR-','2FG-','3FG-'):
                         for player in prev_off_players:
                             events[player]['team_misses_on'] += 1
+
+        # ─── Practice rebounding & gap metrics ───────────────────────────
+        if row_type == "Offense Rebounding Opportunities":
+            player_cols = [col for col in row.index if is_player_column(str(col))]
+            for col in player_cols:
+                tokens = split_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                roster_id = get_roster_id(col, season_id)
+                if roster_id is None:
+                    continue
+                slot = player_stats_dict[roster_id]
+                ensure_player_defaults(slot)
+                details = player_detail_list[roster_id]
+                for t in tokens:
+                    if t == "Off +":
+                        bump(slot, "crash_positive", 1)
+                        details.append({"event": "crash_positive"})
+                    elif t == "Off -":
+                        bump(slot, "crash_missed", 1)
+                        details.append({"event": "crash_missed"})
+                    elif t == "BM +":
+                        bump(slot, "back_man_positive", 1)
+                        details.append({"event": "back_man_positive"})
+                    elif t == "BM -":
+                        bump(slot, "back_man_missed", 1)
+                        details.append({"event": "back_man_missed"})
+            continue
+
+        if row_type == "Defense Rebounding Opportunities":
+            player_cols = [col for col in row.index if is_player_column(str(col))]
+            for col in player_cols:
+                tokens = split_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                roster_id = get_roster_id(col, season_id)
+                if roster_id is None:
+                    continue
+                slot = player_stats_dict[roster_id]
+                ensure_player_defaults(slot)
+                details = player_detail_list[roster_id]
+                for t in tokens:
+                    if t == "Def +":
+                        bump(slot, "box_out_positive", 1)
+                        details.append({"event": "box_out_positive"})
+                    elif t == "Def -":
+                        bump(slot, "box_out_missed", 1)
+                        details.append({"event": "box_out_missed"})
+                    elif t == "Given Up":
+                        bump(slot, "off_reb_given_up", 1)
+                        details.append({"event": "off_reb_given_up"})
+            continue
+
+        if row_type in ("Crimson", "White"):
+            player_cols = [col for col in row.index if is_player_column(str(col))]
+            handled = False
+            for col in player_cols:
+                tokens = split_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                roster_id = get_roster_id(col, season_id)
+                if roster_id is None:
+                    continue
+                slot = player_stats_dict[roster_id]
+                ensure_player_defaults(slot)
+                details = player_detail_list[roster_id]
+                for t in tokens:
+                    if t == "Gap +":
+                        bump(slot, "collision_gap_positive", 1)
+                        details.append({"event": "collision_gap_positive", "context": row_type})
+                        handled = True
+                    elif t == "Gap -":
+                        bump(slot, "collision_gap_missed", 1)
+                        details.append({"event": "collision_gap_missed", "context": row_type})
+                        handled = True
+            if handled:
+                continue
+
+        if row_type == "PnR":
+            player_cols = [col for col in row.index if is_player_column(str(col))]
+            for col in player_cols:
+                tokens = split_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                roster_id = get_roster_id(col, season_id)
+                if roster_id is None:
+                    continue
+                slot = player_stats_dict[roster_id]
+                ensure_player_defaults(slot)
+                details = player_detail_list[roster_id]
+                for t in tokens:
+                    if t == "Gap +":
+                        bump(slot, "pnr_gap_positive", 1)
+                        details.append({"event": "pnr_gap_positive"})
+                    elif t == "Gap -":
+                        bump(slot, "pnr_gap_missed", 1)
+                        details.append({"event": "pnr_gap_missed"})
+                    elif t == "Low +":
+                        bump(slot, "low_help_positive", 1)
+                        details.append({"event": "low_help_positive"})
+                    elif t == "Low -":
+                        bump(slot, "low_help_missed", 1)
+                        details.append({"event": "low_help_missed"})
+                    elif t == "CW +":
+                        bump(slot, "close_window_positive", 1)
+                        details.append({"event": "close_window_positive"})
+                    elif t == "CW -":
+                        bump(slot, "close_window_missed", 1)
+                        details.append({"event": "close_window_missed"})
+                    elif t == "SD +":
+                        bump(slot, "shut_door_positive", 1)
+                        details.append({"event": "shut_door_positive"})
+                    elif t == "SD -":
+                        bump(slot, "shut_door_missed", 1)
+                        details.append({"event": "shut_door_missed"})
+            continue
 
         # ─── 1) FREE THROW row: capture FT+ / FT- ─────────────────────────
         if row_type == "FREE THROW":
