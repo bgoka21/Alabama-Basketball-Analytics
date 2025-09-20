@@ -1,0 +1,6 @@
+Row,#1 Alice,#2 Bob,#3 Carol
+Offense Rebounding Opportunities,Off +,Off -,"BM +; Off +,BM -; Off -"
+Defense Rebounding Opportunities,Def +,Def -; Given Up,Given Up
+Crimson,Gap +,Gap -,Gap +
+White,Gap -,Gap +,
+PnR,Gap +; Low +; CW +; SD -,Gap -; Low -; CW -; SD +,Low +; CW +; SD +
