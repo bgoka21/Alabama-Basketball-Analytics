@@ -1,4 +1,5 @@
 {% extends 'admin/base.html' %}
+{% from 'leaderboard/_dual_macros.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -12,16 +13,46 @@
         {% endfor %}
       </select>
     </div>
+    {% for lbl in selected_labels %}
+      <input type="hidden" name="label" value="{{ lbl }}">
+    {% endfor %}
     <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
   </form>
 {% endblock %}
 
 {% block content %}
-  <div class="bg-white p-6 rounded shadow">
-    <h1 class="text-2xl font-semibold mb-2">{{ page_title }}</h1>
-    {% if last_practice_date %}
-      <p class="text-sm text-gray-600 mb-2">Last practice date: {{ last_practice_date }}</p>
-    {% endif %}
-    <p class="text-gray-500">Dual leaderboard tables will render here in a future update.</p>
+  {% set season_by = season_rows_by_subtype or {} %}
+  {% set last_by = last_rows_by_subtype or {} %}
+  <div class="space-y-6">
+    <div class="bg-white p-6 rounded shadow space-y-6">
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900">{{ page_title }}</h1>
+        {% if last_practice_date %}
+          <p class="text-sm text-gray-600">Last practice: {{ last_practice_date.strftime('%b %d, %Y') }}</p>
+        {% endif %}
+      </div>
+
+      {{ render_dual_section(
+        "Gap Help",
+        season_by.get('gap_help'),
+        season_team_totals.get('gap_help') if season_team_totals else None,
+        last_by.get('gap_help'),
+        last_team_totals.get('gap_help') if last_team_totals else None,
+        plus_label='Gap Help +',
+        opps_label='Gap Help Opps',
+        pct_label='Gap Help %'
+      ) }}
+
+      {{ render_dual_section(
+        "Low Help",
+        season_by.get('low_help'),
+        season_team_totals.get('low_help') if season_team_totals else None,
+        last_by.get('low_help'),
+        last_team_totals.get('low_help') if last_team_totals else None,
+        plus_label='Low Help +',
+        opps_label='Low Help Opps',
+        pct_label='Low Help %'
+      ) }}
+    </div>
   </div>
 {% endblock %}
