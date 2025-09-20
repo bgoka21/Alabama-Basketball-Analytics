@@ -1,0 +1,205 @@
+{# Table rendering macros for leaderboard views #}
+
+{% macro fmt_pct(plus, opps, digits=1, default='—') -%}
+  {# Normalize inputs; accept numbers or numeric strings. #}
+  {%- if opps is number -%}
+    {%- set denom = opps -%}
+  {%- else -%}
+    {%- set opps_str = (opps|string).strip() -%}
+    {%- if opps_str and opps_str is match('^-?\\d+(?:\\.\\d+)?$') -%}
+      {%- set denom = opps_str|float -%}
+    {%- else -%}
+      {%- set denom = 0 -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if plus is number -%}
+    {%- set numer = plus -%}
+  {%- else -%}
+    {%- set plus_str = (plus|string).strip() -%}
+    {%- if plus_str and plus_str is match('^-?\\d+(?:\\.\\d+)?$') -%}
+      {%- set numer = plus_str|float -%}
+    {%- else -%}
+      {%- set numer = 0 -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if denom > 0 -%}
+    {%- set pct = (numer / denom) * 100 -%}
+    {{ ('%0.' ~ digits ~ 'f%%') % pct }}
+  {%- else -%}
+    {{ default }}
+  {%- endif -%}
+{%- endmacro %}
+
+
+{% macro cell(row, key, default='') -%}
+  {%- if row is none or key is none -%}
+    {{ default }}
+  {%- elif row is mapping -%}
+    {%- set value = row.get(key) -%}
+    {%- if value is not none -%}
+      {{ value }}
+    {%- else -%}
+      {{ default }}
+    {%- endif -%}
+  {%- else -%}
+    {%- set attr_val = row|attr(key) -%}
+    {%- if attr_val is not undefined and attr_val is not none -%}
+      {{ attr_val }}
+    {%- else -%}
+      {{ default }}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+
+{% macro render_dual(title, columns, season_rows, season_totals, last_rows=None, last_totals=None, last_practice_date=None, empty_text='No data') -%}
+  <section class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <h2 class="text-xl font-semibold">{{ title }}</h2>
+      {%- if last_practice_date -%}
+        <div class="text-sm text-gray-600">Last practice: {{ last_practice_date }}</div>
+      {%- endif -%}
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div>
+        {{ render_table('Season', season_rows, season_totals, columns, empty_text) }}
+      </div>
+
+      {%- if last_rows -%}
+        <div>
+          {{ render_table('Last Practice', last_rows, last_totals, columns, empty_text) }}
+        </div>
+      {%- elif last_practice_date -%}
+        <div class="rounded-2xl border border-gray-200 shadow-sm p-6 text-sm text-gray-500">
+          No stats were recorded for the last practice.
+        </div>
+      {%- endif -%}
+    </div>
+  </section>
+{%- endmacro %}
+
+
+{# NEW: helper to pick the first pct column (used to compute sortable pct) #}
+{% macro _first_pct_col(columns) -%}
+  {%- set pct_cols = columns | selectattr('calc','equalto','pct') | list -%}
+  {%- if pct_cols and (pct_cols|length) > 0 -%}
+    {{ pct_cols[0] }}
+  {%- else -%}
+    {{ None }}
+  {%- endif -%}
+{%- endmacro %}
+
+{# REPLACE render_table with this enhanced version #}
+{% macro render_table(title, rows, totals, columns, empty_text='No data') -%}
+  {%- set pct_col = _first_pct_col(columns) -%}
+  {%- set name_key = 'player_name' -%}
+
+  <div class="rounded-2xl border border-gray-200 shadow-sm">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="text-base font-semibold">{{ title }}</h3>
+
+      {# Sort control (hidden if no rows) #}
+      <div class="text-sm" {% if not rows %}style="display:none"{% endif %}>
+        <label class="mr-2 text-gray-600">Sort:</label>
+        <select class="js-sort border rounded px-2 py-1">
+          <option value="pct:desc" selected>% ↓</option>
+          <option value="pct:asc">% ↑</option>
+          <option value="opps:desc">Opp ↓</option>
+          <option value="opps:asc">Opp ↑</option>
+          <option value="plus:desc">+ ↓</option>
+          <option value="plus:asc">+ ↑</option>
+          <option value="name:asc">Name A→Z</option>
+          <option value="name:desc">Name Z→A</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm js-leaderboard" data-has-pct="{{ 1 if pct_col else 0 }}">
+        <thead class="bg-gray-50">
+          <tr>
+            {%- for col in columns -%}
+              <th class="px-4 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">{{ col.label }}</th>
+            {%- endfor -%}
+          </tr>
+        </thead>
+
+        <tbody class="divide-y divide-gray-100">
+          {%- if rows and rows|length > 0 -%}
+            {%- for r in rows -%}
+              {# pull values for sorting #}
+              {%- set r_name = cell(r, name_key) -%}
+              {%- if not r_name -%}
+                {%- set r_name = cell(r, 'player') -%}
+              {%- endif -%}
+              {%- if pct_col -%}
+                {%- set pk = pct_col.plus_key -%}
+                {%- set ok = pct_col.opps_key -%}
+                {%- set r_plus = (cell(r, pk) | int) -%}
+                {%- set r_opps = (cell(r, ok) | int) -%}
+                {%- set r_pct = ( (r_plus / r_opps) if r_opps > 0 else 0 ) -%}
+              {%- else -%}
+                {%- set r_plus = 0 -%}
+                {%- set r_opps = 0 -%}
+                {%- set r_pct = 0 -%}
+              {%- endif -%}
+
+              <tr class="hover:bg-gray-50"
+                  data-name="{{ (r_name|string)|lower }}"
+                  data-plus="{{ r_plus }}"
+                  data-opps="{{ r_opps }}"
+                  data-pct="{{ '%.6f' % r_pct }}">
+                {%- for col in columns -%}
+                  <td class="px-4 py-2 whitespace-nowrap">
+                    {%- if col.calc == 'pct' -%}
+                      {%- set pk2 = col.plus_key -%}
+                      {%- set ok2 = col.opps_key -%}
+                      {{ fmt_pct(cell(r, pk2), cell(r, ok2)) }}
+                    {%- else -%}
+                      {{ cell(r, col.key) }}
+                    {%- endif -%}
+                  </td>
+                {%- endfor -%}
+              </tr>
+            {%- endfor -%}
+          {%- else -%}
+            <tr>
+              <td colspan="{{ columns|length }}" class="px-4 py-6 text-gray-500 text-center">{{ empty_text }}</td>
+            </tr>
+          {%- endif -%}
+        </tbody>
+
+        {# Team totals row (kept separate; never sorted with body) #}
+        {%- if totals -%}
+          <tfoot class="bg-gray-50">
+            {# compute totals pct using the first pct column (if any) #}
+            {%- if pct_col -%}
+              {%- set t_plus = (cell(totals, pct_col.plus_key) | int) -%}
+              {%- set t_opps = (cell(totals, pct_col.opps_key) | int) -%}
+            {%- else -%}
+              {%- set t_plus = 0 -%}
+              {%- set t_opps = 0 -%}
+            {%- endif -%}
+            <tr class="font-semibold" data-total="1" data-plus="{{ t_plus }}" data-opps="{{ t_opps }}">
+              {%- for col in columns -%}
+                <td class="px-4 py-2 whitespace-nowrap">
+                  {%- if loop.index0 == 0 -%}
+                    Team Total
+                  {%- elif col.calc == 'pct' -%}
+                    {{ fmt_pct(t_plus, t_opps) }}
+                  {%- else -%}
+                    {{ cell(totals, col.key) }}
+                  {%- endif -%}
+                </td>
+              {%- endfor -%}
+            </tr>
+          </tfoot>
+        {%- endif -%}
+      </table>
+    </div>
+  </div>
+{%- endmacro %}
+
