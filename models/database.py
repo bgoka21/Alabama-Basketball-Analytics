@@ -160,6 +160,32 @@ class PlayerStats(db.Model):
     contest_early     = db.Column(db.Integer)
     bump_positive     = db.Column(db.Integer)
     bump_missed       = db.Column(db.Integer)
+    # --- Offensive Rebounding Opportunities ---
+    crash_positive        = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Off +
+    crash_missed          = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Off -
+    back_man_positive     = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # BM +
+    back_man_missed       = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # BM -
+
+    # --- Defensive Rebounding Opportunities ---
+    box_out_positive      = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Def +
+    box_out_missed        = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Def -
+    off_reb_given_up      = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Given Up
+
+    # --- Collision Gap Help (Crimson + White aggregated) ---
+    collision_gap_positive = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Gap +
+    collision_gap_missed   = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Gap -
+
+    # --- PnR Gap Help & Low ---
+    pnr_gap_positive      = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Gap +
+    pnr_gap_missed        = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Gap -
+    low_help_positive     = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Low +
+    low_help_missed       = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # Low -
+
+    # --- PnR Grade (Defense) ---
+    close_window_positive = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # CW +
+    close_window_missed   = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # CW -
+    shut_door_positive    = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # SD +
+    shut_door_missed      = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # SD -
     blowby_total      = db.Column(db.Integer)
     blowby_triple_threat = db.Column(db.Integer)
     blowby_closeout    = db.Column(db.Integer)
