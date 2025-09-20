@@ -59,6 +59,7 @@ from parse_practice_csv import (
 )  # <— make sure this is here
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
+from admin._leaderboard_helpers import build_dual_context
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 from services.eybl_ingest import (
@@ -916,9 +917,92 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
     return cfg, leaderboard, team_totals
 
+
+def _build_stat_compute(default_key):
+    """Return a compute wrapper that adapts :func:`compute_leaderboard`."""
+
+    def _compute(
+        *,
+        stat_key=None,
+        season_id=None,
+        start_dt=None,
+        end_dt=None,
+        label_set=None,
+        **kwargs,
+    ):
+        key = stat_key or default_key
+        _, rows, team_totals = compute_leaderboard(
+            key,
+            season_id,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            label_set=label_set,
+        )
+        return team_totals, rows
+
+    return _compute
+
+
+compute_offensive_rebounding = _build_stat_compute("off_rebounding")
+compute_defensive_rebounding = _build_stat_compute("def_rebounding")
+compute_defense_bumps = _build_stat_compute("defense")
+compute_collisions_gap_help = _build_stat_compute("collision_gap_help")
+compute_pnr_gap_help = _build_stat_compute("pnr_gap_help")
+compute_pnr_grade = _build_stat_compute("pnr_grade")
+
 # Use the top-level templates folder so references like 'admin/base.html'
 # resolve correctly when the blueprint is used in isolation (e.g. tests).
 admin_bp = Blueprint('admin', __name__, template_folder='../templates')
+
+
+def _resolve_season_from_request():
+    """Return the active season id and ordered season list."""
+
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    season_id = request.args.get('season_id', type=int)
+
+    if season_id and not any(s.id == season_id for s in seasons):
+        season_id = None
+
+    if season_id is None and seasons:
+        season_id = seasons[0].id
+
+    return season_id, seasons
+
+
+def _extract_label_filters():
+    """Return selected labels (original + uppercase set for queries)."""
+
+    raw_labels = [lbl for lbl in request.args.getlist('label') if lbl]
+    label_set = {lbl.upper() for lbl in raw_labels} if raw_labels else None
+    return raw_labels, label_set
+
+
+def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key, extra_kwargs=None):
+    """Shared renderer for dual-context leaderboard pages."""
+
+    season_id, seasons = _resolve_season_from_request()
+    selected_labels, label_set = _extract_label_filters()
+
+    ctx = build_dual_context(
+        season_id=season_id,
+        compute_fn=compute_fn,
+        stat_key=stat_key,
+        label_set=label_set,
+        extra_kwargs=extra_kwargs,
+    )
+
+    return render_template(
+        template_name,
+        **ctx,
+        page_title=page_title,
+        stat_key=stat_key,
+        all_seasons=seasons,
+        selected_season=season_id,
+        selected_labels=selected_labels,
+        label_set=label_set,
+        active_page='leaderboard',
+    )
 
 @admin_bp.record
 def register_filters(setup_state):
@@ -4783,6 +4867,73 @@ def team_totals():
         practice_categories=practice_categories,
         trend_selected_categories=trend_selected_categories,
         active_page='team_totals',
+    )
+
+
+
+@admin_bp.route('/leaderboard/rebounding/offense')
+@login_required
+def leaderboard_reb_offense():
+    return _render_dual_leaderboard(
+        'leaderboard/reb_offense.html',
+        page_title='Offensive Rebounding',
+        compute_fn=compute_offensive_rebounding,
+        stat_key='off_rebounding',
+    )
+
+
+@admin_bp.route('/leaderboard/rebounding/defense')
+@login_required
+def leaderboard_reb_defense():
+    return _render_dual_leaderboard(
+        'leaderboard/reb_defense.html',
+        page_title='Defensive Rebounding',
+        compute_fn=compute_defensive_rebounding,
+        stat_key='def_rebounding',
+    )
+
+
+@admin_bp.route('/leaderboard/defense/bumps')
+@login_required
+def leaderboard_defense_bumps():
+    return _render_dual_leaderboard(
+        'leaderboard/defense_bumps.html',
+        page_title='Defense – Bumps',
+        compute_fn=compute_defense_bumps,
+        stat_key='defense',
+    )
+
+
+@admin_bp.route('/leaderboard/collisions/gap-help')
+@login_required
+def leaderboard_collisions_gap_help():
+    return _render_dual_leaderboard(
+        'leaderboard/collisions_gap_help.html',
+        page_title='Collisions – Gap Help',
+        compute_fn=compute_collisions_gap_help,
+        stat_key='collision_gap_help',
+    )
+
+
+@admin_bp.route('/leaderboard/pnr/gap-help')
+@login_required
+def leaderboard_pnr_gap_help():
+    return _render_dual_leaderboard(
+        'leaderboard/pnr_gap_help.html',
+        page_title='PnR – Gap Help',
+        compute_fn=compute_pnr_gap_help,
+        stat_key='pnr_gap_help',
+    )
+
+
+@admin_bp.route('/leaderboard/pnr/grade')
+@login_required
+def leaderboard_pnr_grade():
+    return _render_dual_leaderboard(
+        'leaderboard/pnr_grade.html',
+        page_title='PnR – Grade',
+        compute_fn=compute_pnr_grade,
+        stat_key='pnr_grade',
     )
 
 
