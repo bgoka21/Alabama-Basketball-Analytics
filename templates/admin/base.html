@@ -73,5 +73,9 @@
   </script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+  {% block scripts %}
+    <script src="{{ url_for('static', filename='js/leaderboard_sort.js') }}"></script>
+  {% endblock %}
+
 </body>
 </html>
