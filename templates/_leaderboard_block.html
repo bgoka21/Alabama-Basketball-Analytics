@@ -22,7 +22,7 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead>
         <tr class="bg-gray-100">
-          <th class="px-4 py-2 text-center" rowspan="2">#</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
           <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
         </tr>
@@ -58,13 +58,12 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead class="bg-gray-50">
         <tr>
-          <th class="px-4 py-2 text-center">#</th>
-          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
+          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">Crash</th>
           <th class="px-4 py-2 text-center" colspan="3">Back Man</th>
         </tr>
         <tr>
-          <th></th><th></th>
           <th class="px-4 py-2 text-center sortable" data-col="2">Crash +</th>
           <th class="px-4 py-2 text-center sortable" data-col="3">Crash Opp</th>
           <th class="px-4 py-2 text-center sortable" data-col="4">Crash %</th>
@@ -114,13 +113,12 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead class="bg-gray-50">
         <tr>
-          <th class="px-4 py-2 text-center">#</th>
-          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
+          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">Box Out</th>
-          <th class="px-4 py-2 text-center" rowspan="2">Off Reb's<br>Given Up</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="5">Off Reb's<br>Given Up</th>
         </tr>
         <tr>
-          <th></th><th></th>
           <th class="px-4 py-2 text-center sortable" data-col="2">Box Out +</th>
           <th class="px-4 py-2 text-center sortable" data-col="3">Box Out Opp</th>
           <th class="px-4 py-2 text-center sortable" data-col="4">Box Out %</th>
@@ -159,12 +157,11 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead class="bg-gray-50">
         <tr>
-          <th class="px-4 py-2 text-center">#</th>
-          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
+          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">Gap Help</th>
         </tr>
         <tr>
-          <th></th><th></th>
           <th class="px-4 py-2 text-center sortable" data-col="2">Gap +</th>
           <th class="px-4 py-2 text-center sortable" data-col="3">Gap Opp</th>
           <th class="px-4 py-2 text-center sortable" data-col="4">Gap %</th>
@@ -201,13 +198,12 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead class="bg-gray-50">
         <tr>
-          <th class="px-4 py-2 text-center">#</th>
-          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
+          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">PnR Gap Help</th>
           <th class="px-4 py-2 text-center" colspan="3">Low Help</th>
         </tr>
         <tr>
-          <th></th><th></th>
           <th class="px-4 py-2 text-center sortable" data-col="2">PnR Gap +</th>
           <th class="px-4 py-2 text-center sortable" data-col="3">PnR Gap Opp</th>
           <th class="px-4 py-2 text-center sortable" data-col="4">PnR Gap %</th>
@@ -257,13 +253,12 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead class="bg-gray-50">
         <tr>
-          <th class="px-4 py-2 text-center">#</th>
-          <th class="px-4 py-2 text-left">Player</th>
+          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
+          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">Close Window</th>
           <th class="px-4 py-2 text-center" colspan="3">Shut Door</th>
         </tr>
         <tr>
-          <th></th><th></th>
           <th class="px-4 py-2 text-center sortable" data-col="2">Close Window +</th>
           <th class="px-4 py-2 text-center sortable" data-col="3">Close Window Opp</th>
           <th class="px-4 py-2 text-center sortable" data-col="4">Close Window %</th>
@@ -313,33 +308,33 @@
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
       <thead>
         <tr class="bg-gray-100">
-          <th class="px-4 py-2 text-center">#</th>
-          <th class="px-4 py-2 text-left sortable">Player</th>
+          <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
+          <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
           {% if selected.key == 'assist_summary' %}
-            <th class="px-4 py-2 text-center sortable">Ast</th>
-            <th class="px-4 py-2 text-center sortable">Pot Ast</th>
-            <th class="px-4 py-2 text-center sortable">2nd Ast</th>
-            <th class="px-4 py-2 text-center sortable">TO</th>
-            <th class="px-4 py-2 text-center sortable">AST/TO</th>
-            <th class="px-4 py-2 text-center sortable">Adj AST/TO</th>
+            <th class="px-4 py-2 text-center sortable" data-col="2">Ast</th>
+            <th class="px-4 py-2 text-center sortable" data-col="3">Pot Ast</th>
+            <th class="px-4 py-2 text-center sortable" data-col="4">2nd Ast</th>
+            <th class="px-4 py-2 text-center sortable" data-col="5">TO</th>
+            <th class="px-4 py-2 text-center sortable" data-col="6">AST/TO</th>
+            <th class="px-4 py-2 text-center sortable" data-col="7">Adj AST/TO</th>
           {% elif selected.key == 'offense_summary' %}
-            <th class="px-4 py-2 text-center sortable">Poss</th>
-            <th class="px-4 py-2 text-center sortable">PPP On</th>
-            <th class="px-4 py-2 text-center sortable">PPP Off</th>
-            <th class="px-4 py-2 text-center sortable">Ind TO Rate (Poss.)</th>
-            <th class="px-4 py-2 text-center sortable">TO % (Bamalytics)</th>
-            <th class="px-4 py-2 text-center sortable">% of TO's (NBA.com)</th>
-            <th class="px-4 py-2 text-center sortable">Team TO Rate</th>
-            <th class="px-4 py-2 text-center sortable">Ind Off Reb%</th>
-            <th class="px-4 py-2 text-center sortable">Off Reb Rate</th>
-            <th class="px-4 py-2 text-center sortable">Ind Fouls Drawn%</th>
-            <th class="px-4 py-2 text-center sortable">Fouls Rate</th>
+            <th class="px-4 py-2 text-center sortable" data-col="2">Poss</th>
+            <th class="px-4 py-2 text-center sortable" data-col="3">PPP On</th>
+            <th class="px-4 py-2 text-center sortable" data-col="4">PPP Off</th>
+            <th class="px-4 py-2 text-center sortable" data-col="5">Ind TO Rate (Poss.)</th>
+            <th class="px-4 py-2 text-center sortable" data-col="6">TO % (Bamalytics)</th>
+            <th class="px-4 py-2 text-center sortable" data-col="7">% of TO's (NBA.com)</th>
+            <th class="px-4 py-2 text-center sortable" data-col="8">Team TO Rate</th>
+            <th class="px-4 py-2 text-center sortable" data-col="9">Ind Off Reb%</th>
+            <th class="px-4 py-2 text-center sortable" data-col="10">Off Reb Rate</th>
+            <th class="px-4 py-2 text-center sortable" data-col="11">Ind Fouls Drawn%</th>
+            <th class="px-4 py-2 text-center sortable" data-col="12">Fouls Rate</th>
           {% elif selected.key.endswith('_fg_pct') %}
-            <th class="px-4 py-2 text-center sortable">FG</th>
-            <th class="px-4 py-2 text-center sortable">FG%</th>
-            <th class="px-4 py-2 text-center sortable">Freq</th>
+            <th class="px-4 py-2 text-center sortable" data-col="2">FG</th>
+            <th class="px-4 py-2 text-center sortable" data-col="3">FG%</th>
+            <th class="px-4 py-2 text-center sortable" data-col="4">Freq</th>
           {% else %}
-            <th class="px-4 py-2 text-center sortable">{{ selected.label }}</th>
+            <th class="px-4 py-2 text-center sortable" data-col="2">{{ selected.label }}</th>
           {% endif %}
         </tr>
       </thead>
@@ -394,35 +389,137 @@
   {% endif %}
 </div>
 <script>
-  document.querySelectorAll('th.sortable').forEach(th => {
-    th.addEventListener('click', () => {
-      const table = th.closest('table');
+  (function () {
+    const script = document.currentScript;
+    const container = script && script.previousElementSibling;
+    if (!container) {
+      return;
+    }
+
+    const tables = container.querySelectorAll('table');
+
+    tables.forEach(table => {
       const tbody = table.querySelector('tbody');
-      const idx = th.dataset.col ? parseInt(th.dataset.col, 10) : Array.from(th.parentNode.children).indexOf(th);
-      const totalRow = tbody.querySelector('.team-totals');
-      if (totalRow) {
-        tbody.removeChild(totalRow);
+      if (!tbody) {
+        return;
       }
-      const rows = Array.from(tbody.querySelectorAll('tr'));
-      const desc = th.dataset.order !== 'desc';
-      rows.sort((a,b) => {
-        const aText = a.children[idx].textContent.trim();
-        const bText = b.children[idx].textContent.trim();
-        const aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
-        const bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-          return desc ? bNum - aNum : aNum - bNum;
+
+      const headers = table.querySelectorAll('th.sortable');
+
+      headers.forEach(header => {
+        header.dataset.order = header.dataset.order || 'none';
+        header.classList.add('cursor-pointer', 'select-none');
+
+        let indicator = header.querySelector('.sort-indicator');
+        if (!indicator) {
+          indicator = document.createElement('span');
+          indicator.className = 'ml-1 text-xs text-gray-400 sort-indicator';
+          indicator.textContent = '▲▼';
+          header.appendChild(indicator);
+        } else {
+          indicator.textContent = '▲▼';
+          indicator.classList.remove('text-gray-600');
+          indicator.classList.add('text-gray-400');
         }
-        return desc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+
+        header.addEventListener('click', () => {
+          const columnIndex = header.dataset.col ? parseInt(header.dataset.col, 10) : header.cellIndex;
+          if (Number.isNaN(columnIndex)) {
+            return;
+          }
+
+          const newOrder = header.dataset.order === 'asc' ? 'desc' : 'asc';
+          const descending = newOrder === 'desc';
+          const totalRow = tbody.querySelector('.team-totals');
+
+          if (totalRow) {
+            totalRow.remove();
+          }
+
+          const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => !row.classList.contains('team-totals'));
+
+          rows.sort((rowA, rowB) => compareRows(rowA, rowB, columnIndex, descending));
+
+          const shouldUpdateRank = columnIndex !== 0;
+
+          rows.forEach((row, index) => {
+            if (shouldUpdateRank && row.children[0]) {
+              row.children[0].textContent = index + 1;
+            }
+            tbody.appendChild(row);
+          });
+
+          if (totalRow) {
+            tbody.appendChild(totalRow);
+          }
+
+          updateHeaderStates(headers, header, newOrder);
+        });
       });
-      rows.forEach((row,i) => {
-        row.children[0].textContent = i + 1;
-        tbody.appendChild(row);
-      });
-      if (totalRow) {
-        tbody.appendChild(totalRow);
-      }
-      th.dataset.order = desc ? 'desc' : 'asc';
     });
-  });
+
+    function compareRows(rowA, rowB, columnIndex, descending) {
+      const cellA = rowA.children[columnIndex];
+      const cellB = rowB.children[columnIndex];
+
+      const valueA = extractValue(cellA ? cellA.textContent : '');
+      const valueB = extractValue(cellB ? cellB.textContent : '');
+
+      let comparison;
+      if (valueA.type === 'number' && valueB.type === 'number') {
+        comparison = valueA.value - valueB.value;
+      } else if (valueA.type === 'number') {
+        comparison = -1;
+      } else if (valueB.type === 'number') {
+        comparison = 1;
+      } else {
+        comparison = valueA.value.localeCompare(valueB.value, undefined, { sensitivity: 'base' });
+      }
+
+      if (comparison === 0) {
+        return 0;
+      }
+
+      return descending ? -comparison : comparison;
+    }
+
+    function extractValue(text) {
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.toUpperCase() === 'NA') {
+        return { type: 'number', value: Number.NEGATIVE_INFINITY };
+      }
+
+      const numericText = trimmed.replace(/[^0-9.+-]+/g, '');
+      const numericValue = numericText ? parseFloat(numericText) : NaN;
+
+      if (!Number.isNaN(numericValue)) {
+        return { type: 'number', value: numericValue };
+      }
+
+      return { type: 'string', value: trimmed.toLowerCase() };
+    }
+
+    function updateHeaderStates(headers, activeHeader, order) {
+      headers.forEach(header => {
+        const indicator = header.querySelector('.sort-indicator');
+        if (!indicator) {
+          return;
+        }
+
+        if (header === activeHeader) {
+          header.dataset.order = order;
+          header.setAttribute('aria-sort', order === 'asc' ? 'ascending' : 'descending');
+          indicator.textContent = order === 'asc' ? '▲' : '▼';
+          indicator.classList.remove('text-gray-400');
+          indicator.classList.add('text-gray-600');
+        } else {
+          header.dataset.order = 'none';
+          header.removeAttribute('aria-sort');
+          indicator.textContent = '▲▼';
+          indicator.classList.remove('text-gray-600');
+          indicator.classList.add('text-gray-400');
+        }
+      });
+    }
+  })();
 </script>
