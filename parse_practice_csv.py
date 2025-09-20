@@ -1,9 +1,12 @@
 import json
 import math
+import os
 import re
+from datetime import date
+from collections import defaultdict
+
 import pandas as pd
 from flask import current_app
-from collections import defaultdict
 from utils.lineup import compute_lineup_efficiencies, compute_player_on_off_by_team
 from models.database import (
     db,
@@ -71,14 +74,28 @@ def extract_tokens(val):
 
 
 # === Helpers for new practice stats (idempotent) ===
-PLAYER_COL_RE = re.compile(r"^#\d+\s")  # e.g., "#12 John Doe"
+PLAYER_COL_RE = re.compile(r"^#\d+\s+\S+", re.UNICODE)  # e.g., "#12 John Doe"
 
 
-def is_player_column(col_name: str) -> bool:
+def _is_player_column(col_name: str) -> bool:
     try:
-        return bool(PLAYER_COL_RE.match(col_name or ""))
+        return bool(col_name) and bool(PLAYER_COL_RE.match(str(col_name)))
     except Exception:
         return False
+
+
+def _date_from_filename(fname: str) -> date | None:
+    if not fname:
+        return None
+    basename = os.path.basename(str(fname))
+    match = re.match(r"^(\d{2})_(\d{2})_(\d{2})\b", basename)
+    if not match:
+        return None
+    yy, mm, dd = map(int, match.groups())
+    try:
+        return date(2000 + yy, mm, dd)
+    except ValueError:
+        return None
 
 
 def split_tokens(cell) -> list[str]:
@@ -147,6 +164,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     3) Find existing Practice (routes.py created it).
     4) Insert PlayerStats and BlueCollarStats for that practice.
     """
+    from app.services.csv_tokens import count_bump_tokens_in_cells
+
     # Use utf-8-sig to seamlessly strip any UTF-8 BOM that may be present in
     # practice CSV files exported from Excel. Without this, the first column
     # name becomes '\ufeffRow' and row types are not recognized.
@@ -165,17 +184,19 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         }
     # Normalize column headers to avoid mismatches caused by stray whitespace
     df.columns = [str(c).strip() for c in df.columns]
-    
+
+    practice_date = file_date or _date_from_filename(practice_csv_path)
+
     # ─── Locate the Practice row ───────────────────────────────────
     current_practice = (
         Practice.query
-        .filter_by(season_id=season_id, category=category, date=file_date)
+        .filter_by(season_id=season_id, category=category, date=practice_date)
         .first()
     )
     if current_practice is None:
         raise RuntimeError(
             f"Could not find existing Practice row for season={season_id}, "
-            f"category='{category}', date={file_date}"
+            f"category='{category}', date={practice_date}"
         )
     practice_id = current_practice.id
 
@@ -188,7 +209,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     events              = defaultdict(lambda: defaultdict(int))
     last_offense_possession = {}  # map team name → (Possession, [player names])
     # ── Find all columns beginning with "#" to use for player tokens
-    player_columns = [c for c in df.columns if str(c).strip().startswith("#")]
+    player_columns = [c for c in df.columns if _is_player_column(c)]
     # ─────────────────────────────────────────────────────────────────────
 
     # ─── Step B: Loop through each row in the CSV ────────────────────
@@ -203,6 +224,26 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
 
         labels = [t.strip().upper() for t in drill_str.split(",") if t.strip()]
+
+        # ─── Bump parsing (scan all player columns regardless of row type) ──
+        for col in player_columns:
+            cell_value = row.get(col, "")
+            plus, minus = count_bump_tokens_in_cells([cell_value])
+            if not (plus or minus):
+                continue
+            roster_id = get_roster_id(col, season_id)
+            if roster_id is None:
+                continue
+            stats = player_stats_dict[roster_id]
+            details = player_detail_list[roster_id]
+            if plus:
+                stats["bump_positive"] += plus
+                for _ in range(plus):
+                    details.append({"event": "bump_positive", "drill_labels": labels})
+            if minus:
+                stats["bump_missed"] += minus
+                for _ in range(minus):
+                    details.append({"event": "bump_missed", "drill_labels": labels})
 
         # ─── Possession parsing ─────────────────────────────────────────
         team = row['Row']  # 'Crimson' or 'White'
@@ -415,7 +456,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             "offense rebounding opportunities",
             "offense rebound opportunities",
         ):
-            player_cols = [col for col in row.index if is_player_column(str(col))]
+            player_cols = [col for col in row.index if _is_player_column(str(col))]
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
                 if not tokens:
@@ -445,7 +486,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             "defense rebounding opportunities",
             "defense rebound opportunities",
         ):
-            player_cols = [col for col in row.index if is_player_column(str(col))]
+            player_cols = [col for col in row.index if _is_player_column(str(col))]
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
                 if not tokens:
@@ -469,7 +510,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
             continue
 
         if row_type in ("Crimson", "White"):
-            player_cols = [col for col in row.index if is_player_column(str(col))]
+            player_cols = [col for col in row.index if _is_player_column(str(col))]
             handled = False
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
@@ -494,7 +535,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 continue
 
         if row_type == "PnR":
-            player_cols = [col for col in row.index if is_player_column(str(col))]
+            player_cols = [col for col in row.index if _is_player_column(str(col))]
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
                 if not tokens:
@@ -638,6 +679,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     continue
 
                 for token in tokens:
+                    if token in ("Bump +", "Bump -"):
+                        continue
                     if token in defense_mapping:
                         key = defense_mapping[token]
                         player_stats_dict[roster_id][key] += 1
