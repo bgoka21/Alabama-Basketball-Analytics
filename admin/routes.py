@@ -92,6 +92,280 @@ def make_pct(numer, denom):
 def safe_int(x):
     return int(x or 0)
 
+
+def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
+    """Return ``(rows, team_totals)`` for a leaderboard key.
+
+    ``all_players`` may be any iterable of player identifiers. This helper
+    allows the leaderboard math to be exercised without querying the database.
+    """
+    players = list(all_players)
+    leaderboard = []
+    team_totals = None
+
+    if stat_key == 'assist_summary':
+        for player in players:
+            base = core_rows.get(player, {})
+            leaderboard.append(
+                (
+                    player,
+                    base.get('assists', 0),
+                    base.get('pot_assists', 0),
+                    base.get('second_assists', 0),
+                    base.get('turnovers', 0),
+                    base.get('assist_turnover_ratio', 0.0),
+                    base.get('adj_assist_turnover_ratio', 0.0),
+                )
+            )
+        leaderboard.sort(key=lambda x: x[1], reverse=True)
+    elif stat_key == 'offense_summary':
+        for player in players:
+            base = core_rows.get(player, {})
+            off_reb_rate = base.get('off_reb_rate', 0.0)
+            leaderboard.append(
+                (
+                    player,
+                    base.get('offensive_possessions', 0),
+                    base.get('ppp_on', 0.0),
+                    base.get('ppp_off', 0.0),
+                    base.get('individual_turnover_rate', 0.0),
+                    base.get('bamalytics_turnover_rate', 0.0),
+                    base.get('individual_team_turnover_pct', 0.0),
+                    base.get('turnover_rate', 0.0),
+                    base.get('individual_off_reb_rate', 0.0),
+                    off_reb_rate,
+                    base.get('individual_foul_rate', 0.0),
+                    base.get('fouls_drawn_rate', 0.0),
+                )
+            )
+        leaderboard.sort(key=lambda x: x[2], reverse=True)
+    elif stat_key == 'off_rebounding':
+        team = {
+            "crash_plus": 0, "crash_minus": 0,
+            "back_plus": 0, "back_minus": 0,
+        }
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            crash_plus = safe_int(row.get('crash_positive'))
+            crash_minus = safe_int(row.get('crash_missed'))
+            back_plus = safe_int(row.get('back_man_positive'))
+            back_minus = safe_int(row.get('back_man_missed'))
+
+            crash_opp = crash_plus + crash_minus
+            back_opp = back_plus + back_minus
+
+            crash_pct = make_pct(crash_plus, crash_opp)
+            back_pct = make_pct(back_plus, back_opp)
+
+            leaderboard.append((
+                p,
+                crash_plus, crash_opp, crash_pct,
+                back_plus, back_opp, back_pct,
+            ))
+
+            team["crash_plus"] += crash_plus
+            team["crash_minus"] += crash_minus
+            team["back_plus"] += back_plus
+            team["back_minus"] += back_minus
+
+        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
+
+        team_crash_opp = team["crash_plus"] + team["crash_minus"]
+        team_back_opp = team["back_plus"] + team["back_minus"]
+        team_totals = (
+            team["crash_plus"], team_crash_opp, make_pct(team["crash_plus"], team_crash_opp),
+            team["back_plus"], team_back_opp, make_pct(team["back_plus"], team_back_opp),
+        )
+    elif stat_key == 'def_rebounding':
+        team = {"box_plus": 0, "box_minus": 0, "given_up": 0}
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            box_plus = safe_int(row.get('box_out_positive'))
+            box_minus = safe_int(row.get('box_out_missed'))
+            given_up = safe_int(row.get('off_reb_given_up'))
+
+            box_opp = box_plus + box_minus
+            box_pct = make_pct(box_plus, box_opp)
+
+            leaderboard.append((
+                p,
+                box_plus, box_opp, box_pct,
+                given_up,
+            ))
+
+            team["box_plus"] += box_plus
+            team["box_minus"] += box_minus
+            team["given_up"] += given_up
+
+        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
+
+        team_box_opp = team["box_plus"] + team["box_minus"]
+        team_totals = (
+            team["box_plus"], team_box_opp, make_pct(team["box_plus"], team_box_opp),
+            team["given_up"],
+        )
+    elif stat_key == 'collision_gap_help':
+        team = {"gap_plus": 0, "gap_minus": 0}
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            gap_plus = safe_int(row.get('collision_gap_positive'))
+            gap_minus = safe_int(row.get('collision_gap_missed'))
+            gap_opp = gap_plus + gap_minus
+            gap_pct = make_pct(gap_plus, gap_opp)
+
+            leaderboard.append((p, gap_plus, gap_opp, gap_pct))
+
+            team["gap_plus"] += gap_plus
+            team["gap_minus"] += gap_minus
+
+        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
+
+        team_gap_opp = team["gap_plus"] + team["gap_minus"]
+        team_totals = (team["gap_plus"], team_gap_opp, make_pct(team["gap_plus"], team_gap_opp))
+    elif stat_key == 'pnr_gap_help':
+        team = {
+            "gap_plus": 0, "gap_minus": 0,
+            "low_plus": 0, "low_minus": 0,
+        }
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            gap_plus = safe_int(row.get('pnr_gap_positive'))
+            gap_minus = safe_int(row.get('pnr_gap_missed'))
+            low_plus = safe_int(row.get('low_help_positive'))
+            low_minus = safe_int(row.get('low_help_missed'))
+
+            gap_opp = gap_plus + gap_minus
+            low_opp = low_plus + low_minus
+            gap_pct = make_pct(gap_plus, gap_opp)
+            low_pct = make_pct(low_plus, low_opp)
+
+            leaderboard.append((
+                p,
+                gap_plus, gap_opp, gap_pct,
+                low_plus, low_opp, low_pct,
+            ))
+
+            team["gap_plus"] += gap_plus
+            team["gap_minus"] += gap_minus
+            team["low_plus"] += low_plus
+            team["low_minus"] += low_minus
+
+        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
+
+        team_gap_opp = team["gap_plus"] + team["gap_minus"]
+        team_low_opp = team["low_plus"] + team["low_minus"]
+        team_totals = (
+            team["gap_plus"], team_gap_opp, make_pct(team["gap_plus"], team_gap_opp),
+            team["low_plus"], team_low_opp, make_pct(team["low_plus"], team_low_opp),
+        )
+    elif stat_key == 'pnr_grade':
+        team = {
+            "cw_plus": 0, "cw_minus": 0,
+            "sd_plus": 0, "sd_minus": 0,
+        }
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            cw_plus = safe_int(row.get('close_window_positive'))
+            cw_minus = safe_int(row.get('close_window_missed'))
+            sd_plus = safe_int(row.get('shut_door_positive'))
+            sd_minus = safe_int(row.get('shut_door_missed'))
+
+            cw_opp = cw_plus + cw_minus
+            sd_opp = sd_plus + sd_minus
+            cw_pct = make_pct(cw_plus, cw_opp)
+            sd_pct = make_pct(sd_plus, sd_opp)
+
+            leaderboard.append((
+                p,
+                cw_plus, cw_opp, cw_pct,
+                sd_plus, sd_opp, sd_pct,
+            ))
+
+            team["cw_plus"] += cw_plus
+            team["cw_minus"] += cw_minus
+            team["sd_plus"] += sd_plus
+            team["sd_minus"] += sd_minus
+
+        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
+
+        team_cw_opp = team["cw_plus"] + team["cw_minus"]
+        team_sd_opp = team["sd_plus"] + team["sd_minus"]
+        team_totals = (
+            team["cw_plus"], team_cw_opp, make_pct(team["cw_plus"], team_cw_opp),
+            team["sd_plus"], team_sd_opp, make_pct(team["sd_plus"], team_sd_opp),
+        )
+    elif stat_key == 'defense':
+        total_bump_positive = 0
+        total_bump_missed = 0
+        for player in players:
+            base = core_rows.get(player, {})
+            bump_positive = base.get('bump_positive', 0)
+            bump_missed = base.get('bump_missed', 0)
+            total_opps = bump_positive + bump_missed
+            pct = (bump_positive / total_opps * 100) if total_opps else 0
+            leaderboard.append((player, bump_positive, total_opps, pct))
+            total_bump_positive += bump_positive
+            total_bump_missed += bump_missed
+        leaderboard.sort(key=lambda x: (x[3], x[2]), reverse=True)
+        team_opps = total_bump_positive + total_bump_missed
+        team_pct = (total_bump_positive / team_opps * 100) if team_opps else 0
+        team_totals = (total_bump_positive, team_opps, team_pct)
+    elif stat_key.endswith('_fg_pct'):
+        for player in players:
+            details = shot_details.get(player, {})
+            pct = details.get(stat_key, 0)
+            att_key = stat_key.replace('_fg_pct', '_attempts')
+            make_key = stat_key.replace('_fg_pct', '_makes')
+            freq_key = stat_key.replace('_fg_pct', '_freq_pct')
+            attempts = details.get(att_key, 0)
+            makes = details.get(make_key, 0)
+            freq = details.get(freq_key, 0)
+            leaderboard.append((player, makes, attempts, pct, freq))
+        leaderboard.sort(key=lambda x: x[3], reverse=True)
+    else:
+        for player in players:
+            val = core_rows.get(player, {}).get(stat_key) or shot_details.get(player, {}).get(stat_key, 0)
+            leaderboard.append((player, val))
+        leaderboard.sort(key=lambda x: x[1], reverse=True)
+
+    return leaderboard, team_totals
+
+
+def compute_leaderboard_for_key(stat_key, rows, shot_details=None):
+    """Utility for tests to exercise the leaderboard math without SQL."""
+    if shot_details is None:
+        shot_details = {}
+
+    if isinstance(rows, dict):
+        core_rows = dict(rows)
+        players = list(core_rows.keys())
+    else:
+        core_rows = {}
+        players = []
+        for row in rows:
+            if not isinstance(row, dict):
+                raise TypeError("rows must be a list of dicts or a dict keyed by player")
+            player_name = row.get('player') or row.get('player_name')
+            if not player_name:
+                raise ValueError("Each row must include a 'player' key")
+            players.append(player_name)
+            core_rows[player_name] = dict(row)
+            core_rows[player_name]['player'] = player_name
+
+    leaderboard, team_totals = compute_leaderboard_rows(stat_key, players, core_rows, shot_details or {})
+    return {"rows": leaderboard, "team_totals": team_totals}
+
+
 def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
     """Return (config, rows) for the leaderboard.
 
@@ -635,249 +909,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         shot_details[player] = flat
 
     all_players = set(core_rows) | set(shot_details)
-    leaderboard = []
-    team_totals = None
-    if stat_key == 'assist_summary':
-        for player in all_players:
-            base = core_rows.get(player, {})
-            leaderboard.append(
-                (
-                    player,
-                    base.get('assists', 0),
-                    base.get('pot_assists', 0),
-                    base.get('second_assists', 0),
-                    base.get('turnovers', 0),
-                    base.get('assist_turnover_ratio', 0.0),
-                    base.get('adj_assist_turnover_ratio', 0.0),
-                )
-            )
-        leaderboard.sort(key=lambda x: x[1], reverse=True)
-    elif stat_key == 'offense_summary':
-        for player in all_players:
-            base = core_rows.get(player, {})
-            off_reb_rate = base.get('off_reb_rate', 0.0)
-            leaderboard.append(
-                (
-                    player,
-                    base.get('offensive_possessions', 0),
-                    base.get('ppp_on', 0.0),
-                    base.get('ppp_off', 0.0),
-                    base.get('individual_turnover_rate', 0.0),
-                    base.get('bamalytics_turnover_rate', 0.0),
-                    base.get('individual_team_turnover_pct', 0.0),
-                    base.get('turnover_rate', 0.0),
-                    base.get('individual_off_reb_rate', 0.0),
-                    off_reb_rate,
-                    base.get('individual_foul_rate', 0.0),
-                    base.get('fouls_drawn_rate', 0.0),
-                )
-            )
-        leaderboard.sort(key=lambda x: x[2], reverse=True)
-    elif stat_key == 'off_rebounding':
-        leaderboard = []
-        team = {
-            "crash_plus": 0, "crash_minus": 0,
-            "back_plus": 0, "back_minus": 0,
-        }
-
-        for player in all_players:
-            row = core_rows.get(player, {})
-            p = row.get('player', player)
-            crash_plus = safe_int(row.get('crash_positive'))
-            crash_minus = safe_int(row.get('crash_missed'))
-            back_plus = safe_int(row.get('back_man_positive'))
-            back_minus = safe_int(row.get('back_man_missed'))
-
-            crash_opp = crash_plus + crash_minus
-            back_opp = back_plus + back_minus
-
-            crash_pct = make_pct(crash_plus, crash_opp)
-            back_pct = make_pct(back_plus, back_opp)
-
-            leaderboard.append((
-                p,
-                crash_plus, crash_opp, crash_pct,
-                back_plus, back_opp, back_pct,
-            ))
-
-            team["crash_plus"] += crash_plus
-            team["crash_minus"] += crash_minus
-            team["back_plus"] += back_plus
-            team["back_minus"] += back_minus
-
-        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
-
-        team_crash_opp = team["crash_plus"] + team["crash_minus"]
-        team_back_opp = team["back_plus"] + team["back_minus"]
-        team_totals = (
-            team["crash_plus"], team_crash_opp, make_pct(team["crash_plus"], team_crash_opp),
-            team["back_plus"], team_back_opp, make_pct(team["back_plus"], team_back_opp),
-        )
-    elif stat_key == 'def_rebounding':
-        leaderboard = []
-        team = {"box_plus": 0, "box_minus": 0, "given_up": 0}
-
-        for player in all_players:
-            row = core_rows.get(player, {})
-            p = row.get('player', player)
-            box_plus = safe_int(row.get('box_out_positive'))
-            box_minus = safe_int(row.get('box_out_missed'))
-            given_up = safe_int(row.get('off_reb_given_up'))
-
-            box_opp = box_plus + box_minus
-            box_pct = make_pct(box_plus, box_opp)
-
-            leaderboard.append((
-                p,
-                box_plus, box_opp, box_pct,
-                given_up,
-            ))
-
-            team["box_plus"] += box_plus
-            team["box_minus"] += box_minus
-            team["given_up"] += given_up
-
-        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
-
-        team_box_opp = team["box_plus"] + team["box_minus"]
-        team_totals = (
-            team["box_plus"], team_box_opp, make_pct(team["box_plus"], team_box_opp),
-            team["given_up"],
-        )
-    elif stat_key == 'collision_gap_help':
-        leaderboard = []
-        team = {"gap_plus": 0, "gap_minus": 0}
-
-        for player in all_players:
-            row = core_rows.get(player, {})
-            p = row.get('player', player)
-            gap_plus = safe_int(row.get('collision_gap_positive'))
-            gap_minus = safe_int(row.get('collision_gap_missed'))
-            gap_opp = gap_plus + gap_minus
-            gap_pct = make_pct(gap_plus, gap_opp)
-
-            leaderboard.append((p, gap_plus, gap_opp, gap_pct))
-
-            team["gap_plus"] += gap_plus
-            team["gap_minus"] += gap_minus
-
-        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
-
-        team_gap_opp = team["gap_plus"] + team["gap_minus"]
-        team_totals = (team["gap_plus"], team_gap_opp, make_pct(team["gap_plus"], team_gap_opp))
-    elif stat_key == 'pnr_gap_help':
-        leaderboard = []
-        team = {
-            "gap_plus": 0, "gap_minus": 0,
-            "low_plus": 0, "low_minus": 0,
-        }
-
-        for player in all_players:
-            row = core_rows.get(player, {})
-            p = row.get('player', player)
-            gap_plus = safe_int(row.get('pnr_gap_positive'))
-            gap_minus = safe_int(row.get('pnr_gap_missed'))
-            low_plus = safe_int(row.get('low_help_positive'))
-            low_minus = safe_int(row.get('low_help_missed'))
-
-            gap_opp = gap_plus + gap_minus
-            low_opp = low_plus + low_minus
-            gap_pct = make_pct(gap_plus, gap_opp)
-            low_pct = make_pct(low_plus, low_opp)
-
-            leaderboard.append((
-                p,
-                gap_plus, gap_opp, gap_pct,
-                low_plus, low_opp, low_pct,
-            ))
-
-            team["gap_plus"] += gap_plus
-            team["gap_minus"] += gap_minus
-            team["low_plus"] += low_plus
-            team["low_minus"] += low_minus
-
-        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
-
-        team_gap_opp = team["gap_plus"] + team["gap_minus"]
-        team_low_opp = team["low_plus"] + team["low_minus"]
-        team_totals = (
-            team["gap_plus"], team_gap_opp, make_pct(team["gap_plus"], team_gap_opp),
-            team["low_plus"], team_low_opp, make_pct(team["low_plus"], team_low_opp),
-        )
-    elif stat_key == 'pnr_grade':
-        leaderboard = []
-        team = {
-            "cw_plus": 0, "cw_minus": 0,
-            "sd_plus": 0, "sd_minus": 0,
-        }
-
-        for player in all_players:
-            row = core_rows.get(player, {})
-            p = row.get('player', player)
-            cw_plus = safe_int(row.get('close_window_positive'))
-            cw_minus = safe_int(row.get('close_window_missed'))
-            sd_plus = safe_int(row.get('shut_door_positive'))
-            sd_minus = safe_int(row.get('shut_door_missed'))
-
-            cw_opp = cw_plus + cw_minus
-            sd_opp = sd_plus + sd_minus
-            cw_pct = make_pct(cw_plus, cw_opp)
-            sd_pct = make_pct(sd_plus, sd_opp)
-
-            leaderboard.append((
-                p,
-                cw_plus, cw_opp, cw_pct,
-                sd_plus, sd_opp, sd_pct,
-            ))
-
-            team["cw_plus"] += cw_plus
-            team["cw_minus"] += cw_minus
-            team["sd_plus"] += sd_plus
-            team["sd_minus"] += sd_minus
-
-        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
-
-        team_cw_opp = team["cw_plus"] + team["cw_minus"]
-        team_sd_opp = team["sd_plus"] + team["sd_minus"]
-        team_totals = (
-            team["cw_plus"], team_cw_opp, make_pct(team["cw_plus"], team_cw_opp),
-            team["sd_plus"], team_sd_opp, make_pct(team["sd_plus"], team_sd_opp),
-        )
-    elif stat_key == 'defense':
-        total_bump_positive = 0
-        total_bump_missed = 0
-        for player in all_players:
-            base = core_rows.get(player, {})
-            bump_positive = base.get('bump_positive', 0)
-            bump_missed = base.get('bump_missed', 0)
-            total_opps = bump_positive + bump_missed
-            pct = (bump_positive / total_opps * 100) if total_opps else 0
-            leaderboard.append((player, bump_positive, total_opps, pct))
-            total_bump_positive += bump_positive
-            total_bump_missed += bump_missed
-        # Sort by percentage descending, then by total opportunities as a tie-breaker
-        leaderboard.sort(key=lambda x: (x[3], x[2]), reverse=True)
-        team_opps = total_bump_positive + total_bump_missed
-        team_pct = (total_bump_positive / team_opps * 100) if team_opps else 0
-        team_totals = (total_bump_positive, team_opps, team_pct)
-    elif stat_key.endswith('_fg_pct'):
-        for player in all_players:
-            details = shot_details.get(player, {})
-            pct = details.get(stat_key, 0)
-            att_key = stat_key.replace('_fg_pct', '_attempts')
-            make_key = stat_key.replace('_fg_pct', '_makes')
-            freq_key = stat_key.replace('_fg_pct', '_freq_pct')
-            attempts = details.get(att_key, 0)
-            makes = details.get(make_key, 0)
-            freq = details.get(freq_key, 0)
-            leaderboard.append((player, makes, attempts, pct, freq))
-        leaderboard.sort(key=lambda x: x[3], reverse=True)
-    else:
-        for player in all_players:
-            val = core_rows.get(player, {}).get(stat_key) or shot_details.get(player, {}).get(stat_key, 0)
-            leaderboard.append((player, val))
-        leaderboard.sort(key=lambda x: x[1], reverse=True)
-
+    leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
     return cfg, leaderboard, team_totals
 
 # Use the top-level templates folder so references like 'admin/base.html'
