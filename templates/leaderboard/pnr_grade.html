@@ -16,42 +16,67 @@
     {% for lbl in selected_labels %}
       <input type="hidden" name="label" value="{{ lbl }}">
     {% endfor %}
+    {% if scope %}
+      <input type="hidden" name="scope" value="{{ scope }}">
+    {% endif %}
+    {% if selected_session and selected_session != 'All' %}
+      <input type="hidden" name="session" value="{{ selected_session }}">
+    {% endif %}
     <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
   </form>
 {% endblock %}
 
 {% block content %}
+  # >>> USE PRACTICE SCOPE TABS START
+  {% include "_practice_scope_tabs.html" %}
+  # <<< USE PRACTICE SCOPE TABS END
+  {% set scope_label_map = {'last': 'Last Practice', 'session': 'Session Totals', 'season': 'Season Totals'} %}
+  {% set scope_label_text = scope_label_map.get(scope, 'Season Totals') %}
   {% set season_by = season_rows_by_subtype or {} %}
   {% set last_by = last_rows_by_subtype or {} %}
   <div class="space-y-6">
     <div class="bg-white p-6 rounded shadow space-y-6">
       <div>
         <h1 class="text-2xl font-semibold text-gray-900">{{ page_title }}</h1>
+        <p class="text-sm text-gray-600">
+          {% if scope == 'last' and scope_start %}
+            Showing {{ scope_label_text }} ({{ scope_start.strftime('%b %d, %Y') }})
+          {% elif scope == 'session' and scope_start and scope_end %}
+            Showing {{ scope_label_text }} ({{ scope_start.strftime('%b %d, %Y') }} – {{ scope_end.strftime('%b %d, %Y') }})
+          {% else %}
+            Showing {{ scope_label_text }}
+          {% endif %}
+        </p>
+        {% if not scope_has_data %}
+          <p class="text-sm text-gray-500">No practice data for this scope.</p>
+        {% endif %}
         {% if last_practice_date %}
-          <p class="text-sm text-gray-600">Last practice: {{ last_practice_date.strftime('%b %d, %Y') }}</p>
+          <span class="hidden">Last practice: {{ last_practice_date.strftime('%b %d, %Y') }}</span>
         {% endif %}
       </div>
 
       {{ render_dual_section(
         "Close Window",
-        season_by.get('close_window'),
-        season_team_totals.get('close_window') if season_team_totals else None,
-        last_by.get('close_window'),
-        last_team_totals.get('close_window') if last_team_totals else None,
+        season_rows=season_by.get('close_window'),
+        season_totals=season_team_totals.get('close_window') if season_team_totals else None,
+        last_rows=last_by.get('close_window'),
+        last_totals=last_team_totals.get('close_window') if last_team_totals else None,
         plus_label='Close Window +',
         opps_label='Close Window Opps',
-        pct_label='Close Window %'
+        pct_label='Close Window %',
+        scope=scope
       ) }}
 
       {{ render_dual_section(
         "Shut Door",
-        season_by.get('shut_door'),
-        season_team_totals.get('shut_door') if season_team_totals else None,
-        last_by.get('shut_door'),
-        last_team_totals.get('shut_door') if last_team_totals else None,
+        season_rows=season_by.get('shut_door'),
+        season_totals=season_team_totals.get('shut_door') if season_team_totals else None,
+        last_rows=last_by.get('shut_door'),
+        last_totals=last_team_totals.get('shut_door') if last_team_totals else None,
         plus_label='Shut Door +',
         opps_label='Shut Door Opps',
-        pct_label='Shut Door %'
+        pct_label='Shut Door %',
+        scope=scope
       ) }}
     </div>
   </div>
