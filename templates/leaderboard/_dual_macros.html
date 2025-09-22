@@ -18,31 +18,32 @@
   {%- if not rows and not totals -%}
     <p class="text-sm text-gray-500">No data available.</p>
   {%- else -%}
-    <div class="overflow-x-auto border border-gray-200 rounded-md">
-      <table class="min-w-full divide-y divide-gray-200 text-sm">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-3 py-2 text-left font-semibold text-gray-600">#</th>
-            <th class="px-3 py-2 text-left font-semibold text-gray-600">Player</th>
-            <th class="px-3 py-2 text-right font-semibold text-gray-600">{{ plus_label }}</th>
-            <th class="px-3 py-2 text-right font-semibold text-gray-600">{{ opps_label }}</th>
-            <th class="px-3 py-2 text-right font-semibold text-gray-600">{{ pct_label }}</th>
-            {%- for col in extra_columns -%}
-              <th class="px-3 py-2 text-right font-semibold text-gray-600">{{ col.label }}</th>
-            {%- endfor -%}
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100 bg-white">
-          {%- for row in rows -%}
-            <tr data-plus="{{ row.plus }}" data-opps="{{ row.opps }}" data-pct="{{ row.pct if row.pct is not none else '' }}">
-              <td class="px-3 py-2 text-sm text-gray-600">{{ loop.index }}</td>
-              <td class="px-3 py-2 text-sm text-gray-900">{{ row.player_name }}</td>
-              <td class="px-3 py-2 text-sm text-right">{{ row.plus }}</td>
-              <td class="px-3 py-2 text-sm text-right">{{ row.opps }}</td>
-              <td class="px-3 py-2 text-sm text-right">{{ pct_display(row.pct) }}</td>
+    <div class="bg-white shadow rounded-lg border border-gray-200">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">#</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Player</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600">{{ plus_label }}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600">{{ opps_label }}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600">{{ pct_label }}</th>
+              {%- for col in extra_columns -%}
+                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600">{{ col.label }}</th>
+              {%- endfor -%}
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            {%- for row in rows -%}
+              <tr class="even:bg-gray-50" data-plus="{{ row.plus }}" data-opps="{{ row.opps }}" data-pct="{{ row.pct if row.pct is not none else '' }}">
+                <td class="px-4 py-3 text-sm text-gray-600">{{ loop.index }}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">{{ row.player_name }}</td>
+                <td class="px-4 py-3 text-sm text-right">{{ row.plus }}</td>
+                <td class="px-4 py-3 text-sm text-right">{{ row.opps }}</td>
+                <td class="px-4 py-3 text-sm text-right">{{ pct_display(row.pct) }}</td>
               {%- for col in extra_columns -%}
                 {%- set value = row[col.key] if col.key in row else None -%}
-                <td class="px-3 py-2 text-sm text-right">
+                <td class="px-4 py-3 text-sm text-right">
                   {%- if value is none -%}
                     —
                   {%- else -%}
@@ -53,15 +54,15 @@
             </tr>
           {%- endfor -%}
           {%- if totals -%}
-            <tr class="bg-gray-50 font-semibold" data-plus="{{ totals.plus }}" data-opps="{{ totals.opps }}" data-pct="{{ totals.pct if totals.pct is not none else '' }}">
-              <td class="px-3 py-2"></td>
-              <td class="px-3 py-2 text-gray-900">Team Totals</td>
-              <td class="px-3 py-2 text-right">{{ totals.plus }}</td>
-              <td class="px-3 py-2 text-right">{{ totals.opps }}</td>
-              <td class="px-3 py-2 text-right">{{ pct_display(totals.pct) }}</td>
+            <tr class="bg-gray-100 font-semibold" data-plus="{{ totals.plus }}" data-opps="{{ totals.opps }}" data-pct="{{ totals.pct if totals.pct is not none else '' }}">
+              <td class="px-4 py-3"></td>
+              <td class="px-4 py-3 text-gray-900">Team Totals</td>
+              <td class="px-4 py-3 text-right">{{ totals.plus }}</td>
+              <td class="px-4 py-3 text-right">{{ totals.opps }}</td>
+              <td class="px-4 py-3 text-right">{{ pct_display(totals.pct) }}</td>
               {%- for col in extra_columns -%}
                 {%- set total_val = totals[col.key] if col.key in totals else None -%}
-                <td class="px-3 py-2 text-right">
+                <td class="px-4 py-3 text-right">
                   {%- if total_val is none -%}
                     —
                   {%- else -%}
@@ -71,8 +72,9 @@
               {%- endfor -%}
             </tr>
           {%- endif -%}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   {%- endif -%}
 {%- endmacro %}
