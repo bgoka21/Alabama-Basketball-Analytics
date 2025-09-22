@@ -27,9 +27,7 @@
 {% endblock %}
 
 {% block content %}
-  # >>> USE PRACTICE SCOPE TABS START
   {% include "_practice_scope_tabs.html" %}
-  # <<< USE PRACTICE SCOPE TABS END
   {% set scope_label_map = {'last': 'Last Practice', 'session': 'Session Totals', 'season': 'Season Totals'} %}
   {% set scope_label_text = scope_label_map.get(scope, 'Season Totals') %}
   {% set season_by = season_rows_by_subtype or {} %}

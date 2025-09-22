@@ -1,4 +1,3 @@
-# >>> PRACTICE SCOPE TABS START
 {% set _scope = scope or 'last' %}
 <div class="mb-4 flex items-center gap-3 text-sm">
   {% set sess_q = 'session=' ~ selected_session if selected_session and selected_session != 'All' else '' %}
@@ -28,4 +27,3 @@
   <a href="{{ link_for('session')}}" class="px-3 py-1 rounded-full border {{ 'ring-2' if _scope=='session' else '' }}">Session Totals</a>
   <a href="{{ link_for('season') }}" class="px-3 py-1 rounded-full border {{ 'ring-2' if _scope=='season' else '' }}">Season Totals</a>
 </div>
-# <<< PRACTICE SCOPE TABS END
