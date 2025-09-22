@@ -920,6 +920,56 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     return cfg, leaderboard, team_totals
 
 
+def _split_leaderboard_rows_for_template(stat_key, rows, team_totals):
+    """Return practice-style split data for selected dual leaderboard keys."""
+
+    if stat_key not in {"off_rebounding", "pnr_grade"}:
+        return {}
+
+    normalized = prepare_dual_context(
+        {
+            "season_rows": rows or [],
+            "season_team_totals": team_totals,
+            "last_rows": None,
+            "last_team_totals": None,
+        },
+        stat_key,
+    )
+
+    season_by = normalized.get("season_rows_by_subtype") or {}
+    totals_by = normalized.get("season_team_totals") or {}
+
+    context = {
+        "crash_rows": [],
+        "backman_rows": [],
+        "crash_totals": {},
+        "backman_totals": {},
+        "close_rows": [],
+        "shut_rows": [],
+        "close_totals": {},
+        "shut_totals": {},
+    }
+
+    if stat_key == "off_rebounding":
+        # >>> REB LEADERBOARD SPLIT DATA START
+        context["crash_rows"] = season_by.get("crash") or []
+        context["backman_rows"] = season_by.get("back_man") or []
+        if isinstance(totals_by, dict):
+            context["crash_totals"] = totals_by.get("crash") or {}
+            context["backman_totals"] = totals_by.get("back_man") or {}
+        # >>> REB LEADERBOARD SPLIT DATA END
+    elif stat_key == "pnr_grade":
+        # >>> BLUE COLLAR SPLIT DATA START
+        context["close_rows"] = season_by.get("close_window") or []
+        context["shut_rows"] = season_by.get("shut_door") or []
+        if isinstance(totals_by, dict):
+            context["close_totals"] = totals_by.get("close_window") or {}
+            context["shut_totals"] = totals_by.get("shut_door") or {}
+        # >>> BLUE COLLAR SPLIT DATA END
+
+    return context
+
+
 def _build_stat_compute(default_key):
     """Return a compute wrapper that adapts :func:`compute_leaderboard`."""
 
@@ -5118,6 +5168,7 @@ def leaderboard():
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cfg, rows, team_totals = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
+    split_context = _split_leaderboard_rows_for_template(cfg['key'], rows, team_totals) if cfg else {}
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
@@ -5138,6 +5189,7 @@ def leaderboard():
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
         sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
         # <<< TEMPLATE CONTEXT SESSION END
+        **split_context,
     )
 
 

@@ -15,6 +15,7 @@ from admin.routes import (
     compute_filtered_blue,
     compute_filtered_totals,
     compute_leaderboard,
+    _split_leaderboard_rows_for_template,
 )
 from models.database import (
     db,
@@ -769,6 +770,7 @@ def season_leaderboard():
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cfg, rows, team_totals = compute_leaderboard(stat_key, sid, label_set=label_set if label_set else None)
+    split_context = _split_leaderboard_rows_for_template(cfg['key'], rows, team_totals) if cfg else {}
 
     return render_template(
         'leaderboard.html',
@@ -777,7 +779,8 @@ def season_leaderboard():
         rows=rows,
         team_totals=team_totals,
         label_options=label_options,
-        selected_labels=selected_labels
+        selected_labels=selected_labels,
+        **split_context,
     )
 
 @public_bp.route('/skill_dev')
