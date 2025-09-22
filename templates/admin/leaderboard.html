@@ -27,9 +27,7 @@
     <a href="{{ url_for('admin.leaderboard') }}" class="text-gray-600 hover:underline text-sm">Clear</a>
   </div>
 </form>
-# >>> USE SESSION FILTER BAR START
 {% include "_filters_session.html" %}
-# <<< USE SESSION FILTER BAR END
 {% endblock %}
 
 {% block content %}
