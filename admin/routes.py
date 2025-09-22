@@ -59,9 +59,11 @@ from parse_practice_csv import (
 )  # <— make sure this is here
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
-from admin._leaderboard_helpers import build_dual_context, prepare_dual_context
+from admin._leaderboard_helpers import build_dual_context, prepare_dual_context, _normalize_compute_result
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
+from utils.scope import resolve_scope
+from utils.session_windows import resolve_session_range, SESSION_WINDOWS
 from services.eybl_ingest import (
     load_csvs,
     normalize_and_merge,
@@ -992,6 +994,118 @@ def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key,
         extra_kwargs=extra_kwargs,
     )
     ctx = prepare_dual_context(ctx, stat_key)
+
+    sessions = list(SESSION_WINDOWS.keys()) + ['All']
+    raw_session = request.args.get('session')
+    selected_session = raw_session if raw_session else 'All'
+    if selected_session != 'All' and selected_session not in SESSION_WINDOWS:
+        selected_session = 'All'
+    session_range = resolve_session_range(selected_session) if selected_session != 'All' else None
+
+    scope = 'last'
+    scope_start = scope_end = None
+
+    compute_kwargs = dict(extra_kwargs or {})
+
+    def _compute_for_range(start_dt, end_dt):
+        result = compute_fn(
+            stat_key=stat_key,
+            season_id=season_id,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            label_set=label_set,
+            **compute_kwargs,
+        )
+        totals, rows = _normalize_compute_result(result)
+        normalized = prepare_dual_context(
+            {
+                "season_rows": rows,
+                "season_team_totals": totals,
+                "last_rows": None,
+                "last_team_totals": None,
+            },
+            stat_key,
+        )
+        return (
+            normalized.get("season_rows"),
+            normalized.get("season_team_totals"),
+            normalized.get("season_rows_by_subtype"),
+        )
+
+    def _has_rows_data(rows, totals, by_subtype):
+        if rows:
+            return True
+        if totals:
+            return True
+        if by_subtype:
+            return any(by_subtype.values())
+        return False
+
+    scoped_rows = scoped_team_totals = scoped_rows_by_subtype = None
+    scope_has_data = False
+
+    if season_id:
+        scope, scope_start, scope_end = resolve_scope(request.args, season_id, session_range)
+        if scope == 'season':
+            scope_has_data = _has_rows_data(
+                ctx.get('season_rows'),
+                ctx.get('season_team_totals'),
+                ctx.get('season_rows_by_subtype'),
+            )
+        elif scope == 'last':
+            last_date = ctx.get('last_practice_date')
+            if scope_start and last_date and last_date == scope_start:
+                scope_has_data = _has_rows_data(
+                    ctx.get('last_rows'),
+                    ctx.get('last_team_totals'),
+                    ctx.get('last_rows_by_subtype'),
+                )
+            elif scope_start:
+                scoped_rows, scoped_team_totals, scoped_rows_by_subtype = _compute_for_range(scope_start, scope_end)
+                ctx['last_rows'] = scoped_rows
+                ctx['last_team_totals'] = scoped_team_totals
+                if scoped_rows_by_subtype is not None:
+                    ctx['last_rows_by_subtype'] = scoped_rows_by_subtype
+                if scope_start:
+                    ctx['last_practice_date'] = scope_start
+                scope_has_data = _has_rows_data(scoped_rows, scoped_team_totals, scoped_rows_by_subtype)
+            else:
+                scope = 'season'
+                scope_start = None
+                scope_end = None
+                scope_has_data = _has_rows_data(
+                    ctx.get('season_rows'),
+                    ctx.get('season_team_totals'),
+                    ctx.get('season_rows_by_subtype'),
+                )
+        elif scope == 'session':
+            scoped_rows, scoped_team_totals, scoped_rows_by_subtype = _compute_for_range(scope_start, scope_end)
+            ctx['season_rows'] = scoped_rows
+            ctx['season_team_totals'] = scoped_team_totals
+            if scoped_rows_by_subtype is not None:
+                ctx['season_rows_by_subtype'] = scoped_rows_by_subtype
+            scope_has_data = _has_rows_data(scoped_rows, scoped_team_totals, scoped_rows_by_subtype)
+    else:
+        scope = 'season'
+        scope_has_data = _has_rows_data(
+            ctx.get('season_rows'),
+            ctx.get('season_team_totals'),
+            ctx.get('season_rows_by_subtype'),
+        )
+
+    if scope == 'last' and scope_start:
+        ctx.setdefault('last_practice_date', scope_start)
+
+    ctx.update(
+        {
+            "scope": scope,
+            "scope_start": scope_start,
+            "scope_end": scope_end,
+            "scope_has_data": scope_has_data,
+            "selected_session": selected_session,
+            "sessions": sessions,
+        }
+    )
 
     return render_template(
         template_name,

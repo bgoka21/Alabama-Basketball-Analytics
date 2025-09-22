@@ -1,0 +1,31 @@
+# >>> PRACTICE SCOPE TABS START
+{% set _scope = scope or 'last' %}
+<div class="mb-4 flex items-center gap-3 text-sm">
+  {% set sess_q = 'session=' ~ selected_session if selected_session and selected_session != 'All' else '' %}
+  {% set keep = [] %}
+  {# preserve non-scope, non-session params (labels, sorts, etc.) #}
+  {% for key, val in request.args.items() %}
+    {% if key not in ['scope','session'] %}
+      {% if key == 'label' %}
+        {% for v in request.args.getlist('label') %}
+          {% set _ = keep.append('label=' ~ v) %}
+        {% endfor %}
+      {% else %}
+        {% set _ = keep.append(key ~ '=' ~ val) %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  {% set base_q = (keep | join('&')) %}
+  {% macro link_for(s) -%}
+    {%- set parts = [] -%}
+    {%- if s %}{%- set _ = parts.append('scope=' ~ s) -%}{%- endif -%}
+    {%- if sess_q %}{%- set _ = parts.append(sess_q) -%}{%- endif -%}
+    {%- if base_q %}{%- set _ = parts.append(base_q) -%}{%- endif -%}
+    ?{{ parts | join('&') }}
+  {%- endmacro %}
+
+  <a href="{{ link_for('last')   }}" class="px-3 py-1 rounded-full border {{ 'ring-2' if _scope=='last' else '' }}">Last Practice</a>
+  <a href="{{ link_for('session')}}" class="px-3 py-1 rounded-full border {{ 'ring-2' if _scope=='session' else '' }}">Session Totals</a>
+  <a href="{{ link_for('season') }}" class="px-3 py-1 rounded-full border {{ 'ring-2' if _scope=='season' else '' }}">Season Totals</a>
+</div>
+# <<< PRACTICE SCOPE TABS END

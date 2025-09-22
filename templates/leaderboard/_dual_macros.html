@@ -77,16 +77,25 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro render_dual_section(title, season_rows, season_totals, last_rows, last_totals, plus_label='+', opps_label='Opps', pct_label='%', extra_columns=None) -%}
+{% macro render_dual_section(title, season_rows, season_totals, last_rows, last_totals, plus_label='+', opps_label='Opps', pct_label='%', extra_columns=None, scope=None) -%}
   {%- set extra_columns = extra_columns or [] -%}
+  {% set season_active = scope in ['season', 'session'] %}
+  {% set last_active = scope == 'last' %}
+  {% if scope == 'session' %}
+    {% set left_label = 'Session Totals' %}
+  {% elif scope == 'season' %}
+    {% set left_label = 'Season Totals' %}
+  {% else %}
+    {% set left_label = 'Season to Date' %}
+  {% endif %}
   <section class="space-y-3">
     <h2 class="text-xl font-semibold text-gray-900">{{ title }}</h2>
     <div class="grid gap-6 lg:grid-cols-2">
-      <div class="space-y-2">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Season to Date</h3>
+      <div class="space-y-2 {% if season_active %}ring-2 ring-[#9E1B32] rounded{% endif %}">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">{{ left_label }}</h3>
         {{ _render_ratio_table(season_rows, season_totals, plus_label, opps_label, pct_label, extra_columns) }}
       </div>
-      <div class="space-y-2">
+      <div class="space-y-2 {% if last_active %}ring-2 ring-[#9E1B32] rounded{% endif %}">
         <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Last Practice</h3>
         {{ _render_ratio_table(last_rows, last_totals, plus_label, opps_label, pct_label, extra_columns) }}
       </div>
