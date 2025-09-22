@@ -39,25 +39,15 @@
        class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'development' else 'bg-gray-200 text-black' }}">
       Development
     </a>
-    <form id="filterForm" method="get" action="{{ url_for('admin.player_detail', player_name=player_name) }}" class="flex flex-wrap items-end gap-2">
-      <input type="hidden" name="mode" value="{{ mode }}">
-      <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
-      <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-300 rounded px-2 py-1 text-sm" />
-      {% if mode == 'practice' %}
-        {% for lbl in label_options %}
-          <label class="inline-flex items-center text-sm mr-2">
-            <input type="checkbox" name="label" value="{{ lbl }}" {% if lbl in selected_labels %}checked{% endif %}>
-            <span class="ml-1">{{ lbl }}</span>
-          </label>
-        {% endfor %}
-      {% else %}
-        {% for lbl in selected_labels %}
-          <input type="hidden" name="label" value="{{ lbl }}">
-        {% endfor %}
-      {% endif %}
-      <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
-      <a href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
-    </form>
+  </div>
+
+  <div class="no-print" id="playerDetailFilters">
+    {% with label_options = label_options if mode == 'practice' else [] %}
+      {% include "_filters_session.html" %}
+    {% endwith %}
+    <div class="mt-2 text-sm text-right">
+      <a data-preserve-hash href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode) }}" class="text-gray-600 hover:underline">Clear</a>
+    </div>
   </div>
 
   <div class="flex items-center space-x-2 mb-4 no-print">
@@ -905,10 +895,13 @@ function showShotTypeDetail(detail) {
     }
 
     // Keep active tab when submitting filters
-    const df = document.getElementById('filterForm');
-    if (df) {
-      df.addEventListener('submit', () => {
-        df.action = df.action.split('#')[0] + window.location.hash;
+    const filterContainer = document.getElementById('playerDetailFilters');
+    if (filterContainer) {
+      filterContainer.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', () => {
+          const base = (form.action || window.location.href).split('#')[0];
+          form.action = base + window.location.hash;
+        });
       });
     }
 
@@ -920,6 +913,11 @@ function showShotTypeDetail(detail) {
       } else {
         link.href = base + window.location.hash;
       }
+    });
+
+    document.querySelectorAll('[data-preserve-hash]').forEach(link => {
+      const base = link.href.split('#')[0];
+      link.href = base + window.location.hash;
     });
 
   // 2) Wire up Game‑by‑Game sorting
