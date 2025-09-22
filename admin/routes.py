@@ -64,6 +64,7 @@ from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 from utils.scope import resolve_scope
 from utils.session_windows import resolve_session_range, SESSION_WINDOWS
+from utils.filters import apply_session_range
 from services.eybl_ingest import (
     load_csvs,
     normalize_and_merge,
@@ -2937,20 +2938,28 @@ def player_detail(player_name):
         )
 
     # ─── Read optional date‐range filters ────────────────────────────────
-    start_date = request.args.get('start_date')
-    end_date   = request.args.get('end_date')
+    start_date_arg = request.args.get('start_date')
+    end_date_arg   = request.args.get('end_date')
     start_dt = None
     end_dt   = None
-    if start_date:
+    if start_date_arg:
         try:
-            start_dt = date.fromisoformat(start_date)
+            start_dt = date.fromisoformat(start_date_arg)
         except ValueError:
             start_dt = None
-    if end_date:
+    if end_date_arg:
         try:
-            end_dt = date.fromisoformat(end_date)
+            end_dt = date.fromisoformat(end_date_arg)
         except ValueError:
             end_dt = None
+
+    start_dt, end_dt, selected_session = apply_session_range(request.args, start_dt, end_dt)
+    session_options = list(SESSION_WINDOWS.keys()) + ['All']
+    if selected_session not in session_options:
+        selected_session = 'All'
+
+    start_date = start_dt.isoformat() if start_dt else (start_date_arg or '')
+    end_date = end_dt.isoformat() if end_dt else (end_date_arg or '')
 
     # ─── Load & filter SkillEntry rows ─────────────────────────────────
     q = SkillEntry.query.filter_by(player_id=player.id)
@@ -3578,6 +3587,8 @@ def player_detail(player_name):
         has_stats                          = has_stats,
         label_options                      = label_options,
         selected_labels                    = selected_labels,
+        selected_session                   = selected_session,
+        sessions                           = session_options,
         pnr_totals                         = pnr_totals,
         development_plan                   = development_plan,
         player_stats                       = player_stats_map,
