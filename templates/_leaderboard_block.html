@@ -20,13 +20,13 @@
 <div class="overflow-x-auto">
   {% if selected.key == 'defense' %}
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead>
-        <tr class="bg-gray-100">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
           <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
           <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
           <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
         </tr>
-        <tr class="bg-gray-100">
+        <tr>
           <th class="px-4 py-2 text-center sortable" data-col="2">Bump +</th>
           <th class="px-4 py-2 text-center sortable" data-col="3">Bump Opps</th>
           <th class="px-4 py-2 text-center sortable" data-col="4">Bump %</th>
@@ -61,7 +61,7 @@
           <h3 class="text-lg font-semibold mb-2">Offensive Crash</h3>
           <div class="overflow-x-auto">
             <table class="min-w-full bg-white rounded-lg shadow border text-center">
-              <thead class="bg-gray-50">
+              <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
                 <tr>
                   <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
                   <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
@@ -70,13 +70,13 @@
                   <th class="px-4 py-2 text-center sortable" data-col="4">Crash %</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-200">
                 {% for row in crash_rows or [] %}
                   {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
                   {% set plus = row.get('plus', 0) %}
                   {% set opps = row.get('opps', 0) %}
                   {% set pct = row.get('pct') %}
-                  <tr>
+                  <tr class="even:bg-gray-50">
                     <td class="px-4 py-2 text-center">{{ loop.index }}</td>
                     <td class="px-4 py-2 text-left">{{ name }}</td>
                     <td class="px-4 py-2 text-center">{{ plus }}</td>
@@ -120,7 +120,7 @@
           <h3 class="text-lg font-semibold mb-2">Back Man</h3>
           <div class="overflow-x-auto">
             <table class="min-w-full bg-white rounded-lg shadow border text-center">
-              <thead class="bg-gray-50">
+              <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
                 <tr>
                   <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
                   <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
@@ -129,13 +129,13 @@
                   <th class="px-4 py-2 text-center sortable" data-col="4">Back Man %</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-200">
                 {% for row in backman_rows or [] %}
                   {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
                   {% set plus = row.get('plus', 0) %}
                   {% set opps = row.get('opps', 0) %}
                   {% set pct = row.get('pct') %}
-                  <tr>
+                  <tr class="even:bg-gray-50">
                     <td class="px-4 py-2 text-center">{{ loop.index }}</td>
                     <td class="px-4 py-2 text-left">{{ name }}</td>
                     <td class="px-4 py-2 text-center">{{ plus }}</td>
@@ -180,7 +180,7 @@
     
   {% elif selected.key == 'def_rebounding' %}
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead class="bg-gray-50">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
         <tr>
           <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
           <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
@@ -193,10 +193,10 @@
           <th class="px-4 py-2 text-center sortable" data-col="4">Box Out %</th>
         </tr>
       </thead>
-      <tbody class="bg-white divide-y divide-gray-100">
+      <tbody class="divide-y divide-gray-200">
         {% for row in rows %}
           {# row = (player, box_plus, box_opp, box_pct, given_up) #}
-          <tr>
+          <tr class="even:bg-gray-50">
             <td class="px-4 py-2 text-center">{{ loop.index }}</td>
             <td class="px-4 py-2 text-left">{{ row[0] }}</td>
             <td class="px-4 py-2 text-center">{{ row[1] }}</td>
@@ -224,7 +224,7 @@
     </table>
   {% elif selected.key == 'collision_gap_help' %}
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead class="bg-gray-50">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
         <tr>
           <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
           <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
@@ -236,10 +236,10 @@
           <th class="px-4 py-2 text-center sortable" data-col="4">Gap %</th>
         </tr>
       </thead>
-      <tbody class="bg-white divide-y divide-gray-100">
+      <tbody class="divide-y divide-gray-200">
         {% for row in rows %}
           {# row = (player, gap_plus, gap_opp, gap_pct) #}
-          <tr>
+          <tr class="even:bg-gray-50">
             <td class="px-4 py-2 text-center">{{ loop.index }}</td>
             <td class="px-4 py-2 text-left">{{ row[0] }}</td>
             <td class="px-4 py-2 text-center">{{ row[1] }}</td>
@@ -265,7 +265,7 @@
     </table>
   {% elif selected.key == 'pnr_gap_help' %}
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead class="bg-gray-50">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
         <tr>
           <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
           <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
@@ -281,10 +281,10 @@
           <th class="px-4 py-2 text-center sortable" data-col="7">Low %</th>
         </tr>
       </thead>
-      <tbody class="bg-white divide-y divide-gray-100">
+      <tbody class="divide-y divide-gray-200">
         {% for row in rows %}
           {# row = (player, gap_plus, gap_opp, gap_pct, low_plus, low_opp, low_pct) #}
-          <tr>
+          <tr class="even:bg-gray-50">
             <td class="px-4 py-2 text-center">{{ loop.index }}</td>
             <td class="px-4 py-2 text-left">{{ row[0] }}</td>
             <td class="px-4 py-2 text-center">{{ row[1] }}</td>
@@ -325,7 +325,7 @@
           <h3 class="text-lg font-semibold mb-2">Close Window</h3>
           <div class="overflow-x-auto">
             <table class="min-w-full bg-white rounded-lg shadow border text-center">
-              <thead class="bg-gray-50">
+              <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
                 <tr>
                   <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
                   <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
@@ -334,13 +334,13 @@
                   <th class="px-4 py-2 text-center sortable" data-col="4">Close Window %</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-200">
                 {% for row in close_rows or [] %}
                   {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
                   {% set plus = row.get('plus', 0) %}
                   {% set opps = row.get('opps', 0) %}
                   {% set pct = row.get('pct') %}
-                  <tr>
+                  <tr class="even:bg-gray-50">
                     <td class="px-4 py-2 text-center">{{ loop.index }}</td>
                     <td class="px-4 py-2 text-left">{{ name }}</td>
                     <td class="px-4 py-2 text-center">{{ plus }}</td>
@@ -384,7 +384,7 @@
           <h3 class="text-lg font-semibold mb-2">Shut Door</h3>
           <div class="overflow-x-auto">
             <table class="min-w-full bg-white rounded-lg shadow border text-center">
-              <thead class="bg-gray-50">
+              <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
                 <tr>
                   <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
                   <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
@@ -393,13 +393,13 @@
                   <th class="px-4 py-2 text-center sortable" data-col="4">Shut Door %</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-200">
                 {% for row in shut_rows or [] %}
                   {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
                   {% set plus = row.get('plus', 0) %}
                   {% set opps = row.get('opps', 0) %}
                   {% set pct = row.get('pct') %}
-                  <tr>
+                  <tr class="even:bg-gray-50">
                     <td class="px-4 py-2 text-center">{{ loop.index }}</td>
                     <td class="px-4 py-2 text-left">{{ name }}</td>
                     <td class="px-4 py-2 text-center">{{ plus }}</td>
@@ -444,8 +444,8 @@
     
   {% else %}
     <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead>
-        <tr class="bg-gray-100">
+      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
+        <tr>
           <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
           <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
           {% if selected.key == 'assist_summary' %}
