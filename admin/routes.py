@@ -63,8 +63,6 @@ from admin._leaderboard_helpers import build_dual_context, prepare_dual_context,
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 from utils.scope import resolve_scope
-from utils.session_windows import resolve_session_range, SESSION_WINDOWS
-from utils.filters import apply_session_range
 from services.eybl_ingest import (
     load_csvs,
     normalize_and_merge,
@@ -1029,6 +1027,32 @@ def _resolve_season_from_request():
     return season_id, seasons
 
 
+def _get_session_names_for_season(season_id):
+    """Return ordered session names for the given ``season_id``."""
+
+    if not season_id:
+        return []
+
+    sessions = (
+        Session.query
+        .filter(Session.season_id == season_id)
+        .order_by(Session.start_date.asc())
+        .all()
+    )
+    return [s.name for s in sessions if s.name]
+
+
+def _get_session_window_from_db(season_id, session_name):
+    """Load the session window lazily to avoid circular imports."""
+
+    if not season_id or not session_name:
+        return (None, None)
+
+    from app.utils.session_lookup import get_session_window as _lookup
+
+    return _lookup(db.session, season_id, session_name)
+
+
 def _extract_label_filters():
     """Return selected labels (original + uppercase set for queries)."""
 
@@ -1052,12 +1076,36 @@ def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key,
     )
     ctx = prepare_dual_context(ctx, stat_key)
 
-    sessions = list(SESSION_WINDOWS.keys()) + ['All']
-    raw_session = request.args.get('session')
-    selected_session = raw_session if raw_session else 'All'
-    if selected_session != 'All' and selected_session not in SESSION_WINDOWS:
-        selected_session = 'All'
-    session_range = resolve_session_range(selected_session) if selected_session != 'All' else None
+    session_names = _get_session_names_for_season(season_id)
+    requested_session = request.args.get('session')
+    if requested_session:
+        requested_session = requested_session.strip()
+        if requested_session.lower() == 'all':
+            requested_session = 'All'
+    if (
+        requested_session
+        and requested_session not in ('All', None)
+        and requested_session not in session_names
+    ):
+        session_names = session_names + [requested_session]
+    sessions = list(dict.fromkeys(session_names + ['All']))
+    selected_session = 'All'
+    if requested_session:
+        selected_session = 'All' if requested_session == 'All' else requested_session
+
+    session_start = session_end = None
+    session_range = None
+    if season_id and selected_session != 'All':
+        session_start, session_end = _get_session_window_from_db(
+            season_id, selected_session
+        )
+        if session_start is None and session_end is None:
+            print(
+                f"[WARN] No DB Session window for {selected_session} "
+                f"in season_id={season_id}; skipping date filter."
+            )
+        elif session_start and session_end:
+            session_range = (session_start, session_end)
 
     scope = 'last'
     scope_start = scope_end = None
@@ -2911,6 +2959,16 @@ def player_detail(player_name):
             .first()
         )
 
+    selected_season_id = request.args.get('season_id', type=int)
+    if selected_season_id:
+        if not db.session.get(Season, selected_season_id):
+            selected_season_id = None
+    if selected_season_id is None:
+        if current_season:
+            selected_season_id = current_season.id
+        else:
+            selected_season_id = getattr(player, 'season_id', None)
+
     # Rebuild shot_map/label_map to ensure Free Throws category exists
     local_shot_map = dict(shot_map)
     local_shot_map.setdefault('ft', ['Free Throws'])
@@ -2978,27 +3036,57 @@ def player_detail(player_name):
 
     # ─── Read optional date‐range filters ────────────────────────────────
     start_date_arg = request.args.get('start_date')
-    end_date_arg   = request.args.get('end_date')
+    end_date_arg = request.args.get('end_date')
     start_dt = None
-    end_dt   = None
+    end_dt = None
     if start_date_arg:
         try:
             start_dt = date.fromisoformat(start_date_arg)
         except ValueError:
-            start_dt = None
+            start_date_arg = ''
     if end_date_arg:
         try:
             end_dt = date.fromisoformat(end_date_arg)
         except ValueError:
-            end_dt = None
+            end_date_arg = ''
 
-    start_dt, end_dt, selected_session = apply_session_range(request.args, start_dt, end_dt)
-    session_options = list(SESSION_WINDOWS.keys()) + ['All']
-    if selected_session not in session_options:
-        selected_session = 'All'
+    session_names = _get_session_names_for_season(selected_season_id)
+    requested_session = request.args.get('session')
+    if requested_session:
+        requested_session = requested_session.strip()
+        if requested_session.lower() == 'all':
+            requested_session = 'All'
+    if (
+        requested_session
+        and requested_session not in ('All', None)
+        and requested_session not in session_names
+    ):
+        session_names = session_names + [requested_session]
+    sessions = list(dict.fromkeys(session_names + ['All']))
+    selected_session = 'All'
+    if requested_session:
+        selected_session = 'All' if requested_session == 'All' else requested_session
 
-    start_date = start_dt.isoformat() if start_dt else (start_date_arg or '')
-    end_date = end_dt.isoformat() if end_dt else (end_date_arg or '')
+    if selected_season_id and selected_session != 'All':
+        session_start, session_end = _get_session_window_from_db(
+            selected_season_id, selected_session
+        )
+        if session_start is None and session_end is None:
+            print(
+                f"[WARN] No DB Session window for {selected_session} "
+                f"in season_id={selected_season_id}; skipping date filter."
+            )
+            start_dt = end_dt = None
+            start_date_arg = ''
+            end_date_arg = ''
+        else:
+            start_dt = session_start
+            end_dt = session_end
+
+    start_date_arg = start_date_arg or ''
+    end_date_arg = end_date_arg or ''
+    start_date = start_dt.isoformat() if start_dt else start_date_arg
+    end_date = end_dt.isoformat() if end_dt else end_date_arg
 
     # ─── Load & filter SkillEntry rows ─────────────────────────────────
     q = SkillEntry.query.filter_by(player_id=player.id)
@@ -3033,7 +3121,10 @@ def player_detail(player_name):
             generic_totals[e.skill_name] = generic_totals.get(e.skill_name, 0) + e.value
 
     # ─── Fetch ALL stats for this player ────────────────────────────────
-    all_stats_records = PlayerStats.query.filter_by(player_name=player_name).all()
+    stats_query = PlayerStats.query.filter_by(player_name=player_name)
+    if selected_season_id:
+        stats_query = stats_query.filter(PlayerStats.season_id == selected_season_id)
+    all_stats_records = stats_query.all()
     if start_dt or end_dt:
         filtered_records = []
         for rec in all_stats_records:
@@ -3627,7 +3718,7 @@ def player_detail(player_name):
         label_options                      = label_options,
         selected_labels                    = selected_labels,
         selected_session                   = selected_session,
-        sessions                           = session_options,
+        sessions                           = sessions,
         pnr_totals                         = pnr_totals,
         development_plan                   = development_plan,
         player_stats                       = player_stats_map,
@@ -5189,24 +5280,55 @@ def leaderboard():
         latest = Season.query.order_by(Season.start_date.desc()).first()
         sid = latest.id if latest else None
 
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
+    start_date_arg = request.args.get('start_date')
+    end_date_arg = request.args.get('end_date')
     start_dt = end_dt = None
-    if start_date:
+    if start_date_arg:
         try:
-            start_dt = date.fromisoformat(start_date)
+            start_dt = date.fromisoformat(start_date_arg)
         except ValueError:
-            start_date = ''
-    if end_date:
+            start_date_arg = ''
+    if end_date_arg:
         try:
-            end_dt = date.fromisoformat(end_date)
+            end_dt = date.fromisoformat(end_date_arg)
         except ValueError:
-            end_date = ''
+            end_date_arg = ''
 
-    # >>> SESSION RANGE INTEGRATION START
-    from utils.filters import apply_session_range
-    start_dt, end_dt, selected_session = apply_session_range(request.args, start_dt, end_dt)
-    # >>> SESSION RANGE INTEGRATION END
+    session_names = _get_session_names_for_season(sid)
+    requested_session = request.args.get('session')
+    if requested_session:
+        requested_session = requested_session.strip()
+        if requested_session.lower() == 'all':
+            requested_session = 'All'
+    if (
+        requested_session
+        and requested_session not in ('All', None)
+        and requested_session not in session_names
+    ):
+        session_names = session_names + [requested_session]
+    sessions = list(dict.fromkeys(session_names + ['All']))
+    selected_session = 'All'
+    if requested_session:
+        selected_session = 'All' if requested_session == 'All' else requested_session
+
+    if sid and selected_session != 'All':
+        session_start, session_end = _get_session_window_from_db(
+            sid, selected_session
+        )
+        if session_start is None and session_end is None:
+            print(
+                f"[WARN] No DB Session window for {selected_session} "
+                f"in season_id={sid}; skipping date filter."
+            )
+            start_dt = end_dt = None
+            start_date_arg = ''
+            end_date_arg = ''
+        else:
+            start_dt = session_start
+            end_dt = session_end
+
+    start_date = start_dt.isoformat() if start_dt else (start_date_arg or '')
+    end_date = end_dt.isoformat() if end_dt else (end_date_arg or '')
 
     stat_key = request.args.get('stat') or request.args.get('base_stat')
     if not stat_key:
@@ -5253,10 +5375,8 @@ def leaderboard():
         label_options=label_options,
         selected_labels=selected_labels,
         active_page='leaderboard',
-        # >>> TEMPLATE CONTEXT SESSION START
-        selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
-        sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
-        # <<< TEMPLATE CONTEXT SESSION END
+        selected_session=selected_session,
+        sessions=sessions,
         **split_context,
     )
 
