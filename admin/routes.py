@@ -4141,14 +4141,22 @@ def sessions():
 @admin_required
 def edit_session(id):
     sess = Session.query.get_or_404(id)
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
     if request.method == 'POST':
-        sess.name = request.form['name']
-        sess.start_date = request.form['start_date']
-        sess.end_date = request.form['end_date']
+        name = request.form['name']
+        try:
+            start = datetime_module.date.fromisoformat(request.form['start_date'])
+            end = datetime_module.date.fromisoformat(request.form['end_date'])
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+            return render_template('admin/edit_session.html', sess=sess, seasons=seasons)
+
+        sess.name = name
+        sess.start_date = start
+        sess.end_date = end
         db.session.commit()
         flash(f'Session "{sess.name}" updated.', 'success')
         return redirect(url_for('admin.sessions', season_id=sess.season_id))
-    seasons = Season.query.order_by(Season.start_date.desc()).all()
     return render_template('admin/edit_session.html', sess=sess, seasons=seasons)
 
 
