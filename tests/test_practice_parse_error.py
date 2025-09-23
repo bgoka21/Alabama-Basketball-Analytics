@@ -32,7 +32,7 @@ def test_malformed_csv_logs_error_and_returns_message(app, tmp_path, caplog):
         season = Season(id=1, season_name='2024', start_date=practice_date)
         db.session.add(season)
         db.session.add(Roster(season_id=1, player_name='#1 A'))
-        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practices')
+        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practice')
         db.session.add(practice)
         db.session.commit()
 
@@ -41,7 +41,7 @@ def test_malformed_csv_logs_error_and_returns_message(app, tmp_path, caplog):
             result = parse_practice_csv(
                 str(csv_path),
                 season_id=1,
-                category='Official Practices',
+                category='Official Practice',
                 file_date=practice_date,
             )
 

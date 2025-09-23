@@ -29,7 +29,7 @@ def test_defense_labels(app, tmp_path):
         season = Season(id=1, season_name='2024', start_date=practice_date)
         db.session.add(season)
         db.session.add(Roster(season_id=1, player_name='#1 A'))
-        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practices')
+        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practice')
         db.session.add(practice)
         db.session.commit()
 
@@ -38,7 +38,7 @@ def test_defense_labels(app, tmp_path):
     csv_path.write_text(csv_content)
 
     with app.app_context():
-        parse_practice_csv(str(csv_path), season_id=1, category='Official Practices', file_date=practice_date)
+        parse_practice_csv(str(csv_path), season_id=1, category='Official Practice', file_date=practice_date)
 
         row = PlayerStats.query.filter_by(player_name='#1 A').first()
         assert row.bump_positive == 1

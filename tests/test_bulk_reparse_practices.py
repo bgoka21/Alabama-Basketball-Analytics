@@ -39,8 +39,8 @@ def app(tmp_path):
         ])
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
-        uf1 = UploadedFile(id=1, season_id=1, filename='p1.csv', category='Official Practices', file_date=date(2024, 1, 1))
-        uf2 = UploadedFile(id=2, season_id=1, filename='p2.csv', category='Official Practices', file_date=date(2024, 1, 2))
+        uf1 = UploadedFile(id=1, season_id=1, filename='p1.csv', category='Official Practice', file_date=date(2024, 1, 1))
+        uf2 = UploadedFile(id=2, season_id=1, filename='p2.csv', category='Official Practice', file_date=date(2024, 1, 2))
         db.session.add_all([uf1, uf2])
         db.session.commit()
     yield app

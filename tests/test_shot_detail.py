@@ -31,7 +31,7 @@ def test_practice_shot_details(practice_app, tmp_path):
         r1 = Roster(season_id=1, player_name='#1 A')
         r2 = Roster(season_id=1, player_name='#2 B')
         db.session.add_all([r1, r2])
-        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practices')
+        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practice')
         db.session.add(practice)
         db.session.commit()
 
@@ -40,7 +40,7 @@ def test_practice_shot_details(practice_app, tmp_path):
     csv_path.write_text(csv_content)
 
     with practice_app.app_context():
-        parse_practice_csv(str(csv_path), season_id=1, category='Official Practices', file_date=practice_date)
+        parse_practice_csv(str(csv_path), season_id=1, category='Official Practice', file_date=practice_date)
         off_poss = Possession.query.filter_by(possession_side='Offense').first()
         def_poss = Possession.query.filter_by(possession_side='Defense').first()
         off_events = [d.event_type for d in ShotDetail.query.filter_by(possession_id=off_poss.id)]

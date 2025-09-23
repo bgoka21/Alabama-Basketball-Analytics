@@ -79,9 +79,9 @@ def _create_game(app):
 
 def _create_practice(app):
     with app.app_context():
-        uf = UploadedFile(id=2, season_id=1, filename='p.csv', category='Official Practices', file_date=date.today())
+        uf = UploadedFile(id=2, season_id=1, filename='p.csv', category='Official Practice', file_date=date.today())
         db.session.add(uf)
-        practice = Practice(id=1, season_id=1, date=uf.file_date, category='Official Practices')
+        practice = Practice(id=1, season_id=1, date=uf.file_date, category='Official Practice')
         db.session.add(practice)
         team = TeamStats(practice_id=1, season_id=1)
         db.session.add(team)

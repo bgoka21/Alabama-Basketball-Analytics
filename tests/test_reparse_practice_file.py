@@ -39,7 +39,7 @@ def app(tmp_path):
         ])
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
-        uf = UploadedFile(id=1, season_id=1, filename='p.csv', category='Official Practices', file_date=date(2024, 1, 1))
+        uf = UploadedFile(id=1, season_id=1, filename='p.csv', category='Official Practice', file_date=date(2024, 1, 1))
         db.session.add(uf)
         db.session.commit()
     yield app
