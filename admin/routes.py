@@ -1567,22 +1567,24 @@ def parse_file(file_id):
             if parsed_date and uploaded_file.file_date != parsed_date:
                 uploaded_file.file_date = parsed_date
 
-            # Check if a practice for this date/category already exists
+            # Check if a practice for this date already exists
             practice = Practice.query.filter_by(
                 season_id=season_id,
                 date=file_date,
-                category=category
             ).first()
 
             if not practice:
                 practice = Practice(
                     season_id=season_id,
                     date=file_date,
-                    category=category
+                    category=category,
                 )
                 db.session.add(practice)
                 db.session.flush()  # ensures practice.id is available
             else:
+                if practice.category != category:
+                    practice.category = category
+
                 # Existing practice: clear any previously parsed stats so we can re-parse
                 PlayerStats.query.filter_by(practice_id=practice.id).delete()
                 BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
@@ -1703,7 +1705,6 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     practice = Practice.query.filter_by(
         season_id=season_id,
         date=file_date,
-        category=category,
     ).first()
     if not practice:
         practice = Practice(
@@ -1714,6 +1715,8 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
         db.session.add(practice)
         db.session.flush()
     else:
+        if practice.category != category:
+            practice.category = category
         PlayerStats.query.filter_by(practice_id=practice.id).delete()
         BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
         poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
@@ -1842,9 +1845,10 @@ def delete_data(file_id):
         practice = Practice.query.filter_by(
             season_id=uploaded_file.season_id,
             date=uploaded_file.file_date,
-            category=category
         ).first()
         if practice:
+            if practice.category != category:
+                practice.category = category
             TeamStats.query.filter_by(practice_id=practice.id).delete()
             PlayerStats.query.filter_by(practice_id=practice.id).delete()
             BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
