@@ -165,6 +165,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     4) Insert PlayerStats and BlueCollarStats for that practice.
     """
     from app.services.csv_tokens import count_bump_tokens_in_cells
+    from app.utils.category_normalization import normalize_category
 
     # Use utf-8-sig to seamlessly strip any UTF-8 BOM that may be present in
     # practice CSV files exported from Excel. Without this, the first column
@@ -185,6 +186,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     # Normalize column headers to avoid mismatches caused by stray whitespace
     df.columns = [str(c).strip() for c in df.columns]
 
+    category = normalize_category(category)
     practice_date = file_date or _date_from_filename(practice_csv_path)
 
     # ─── Locate the Practice row ───────────────────────────────────

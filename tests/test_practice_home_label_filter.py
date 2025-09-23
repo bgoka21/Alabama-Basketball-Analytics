@@ -35,7 +35,7 @@ def app():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024,1,1))
         db.session.add(season)
-        practice = Practice(id=1, season_id=1, date=date(2024,1,2), category='Official Practices')
+        practice = Practice(id=1, season_id=1, date=date(2024,1,2), category='Official Practice')
         db.session.add(practice)
         roster = Roster(id=1, season_id=1, player_name='#1 Test')
         db.session.add(roster)

@@ -45,7 +45,7 @@ def test_parser_counts_for_new_stats(app, fixture):
     with app.app_context():
         season = Season(id=1, season_name="2024", start_date=practice_date)
         db.session.add(season)
-        practice = Practice(id=1, season_id=1, date=practice_date, category="Official Practices")
+        practice = Practice(id=1, season_id=1, date=practice_date, category="Official Practice")
         db.session.add(practice)
         roster_entries = [
             Roster(id=1, season_id=1, player_name="#1 Alice"),
@@ -55,7 +55,7 @@ def test_parser_counts_for_new_stats(app, fixture):
         db.session.add_all(roster_entries)
         db.session.commit()
 
-        parse_practice_csv(path, season_id=1, category="Official Practices", file_date=practice_date)
+        parse_practice_csv(path, season_id=1, category="Official Practice", file_date=practice_date)
 
         rows = {ps.player_name: ps for ps in PlayerStats.query.order_by(PlayerStats.player_name).all()}
 

@@ -75,6 +75,12 @@ from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 
 # --- Helper Functions at the top ---
 
+def normalize_category(name: str) -> str:
+    from app.utils.category_normalization import normalize_category as _normalize_category
+
+    return _normalize_category(name)
+
+
 def safe_str(value):
     """Safely convert a value to a string, returning an empty string if the value is None."""
     return "" if value is None else str(value)
@@ -1434,7 +1440,8 @@ def upload_file():
         flash('No selected files', 'error')
         return redirect(url_for('admin.dashboard'))
 
-    category     = request.form.get('category')
+    raw_category = request.form.get('category')
+    category = normalize_category(raw_category)
     recruit_id   = request.form.get('recruit_id', type=int)
     season_id    = request.form.get('season_id', type=int)
     file_date_str = request.form.get('file_date')   # <-- new
@@ -1455,6 +1462,11 @@ def upload_file():
             filename    = secure_filename(file.filename)
             upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             file.save(upload_path)
+
+            if raw_category and raw_category.strip() != category:
+                current_app.logger.info(
+                    "Normalizing uploaded category '%s' -> '%s'", raw_category, category
+                )
 
             new_upload = UploadedFile(
                 filename     = filename,
@@ -1485,6 +1497,14 @@ def parse_file(file_id):
     try:
         current_app.logger.debug(f"Starting parse for file '{filename}' at '{upload_path}'")
 
+        raw_category = uploaded_file.category
+        category = normalize_category(raw_category)
+        if raw_category != category:
+            current_app.logger.info(
+                "Normalizing stored category '%s' -> '%s' during parse", raw_category, category
+            )
+            uploaded_file.category = category
+
         # always pick up season from the upload record (or default to latest)
         season_id = (
             uploaded_file.season_id
@@ -1492,7 +1512,7 @@ def parse_file(file_id):
         )
 
         # PRACTICE branch
-        if uploaded_file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
+        if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
             parsed_date = _date_from_filename(filename)
             # use the parsed date if available, otherwise fallback to stored value/today
             file_date = parsed_date or uploaded_file.file_date or date.today()
@@ -1503,14 +1523,14 @@ def parse_file(file_id):
             practice = Practice.query.filter_by(
                 season_id=season_id,
                 date=file_date,
-                category=uploaded_file.category
+                category=category
             ).first()
 
             if not practice:
                 practice = Practice(
                     season_id=season_id,
                     date=file_date,
-                    category=uploaded_file.category
+                    category=category
                 )
                 db.session.add(practice)
                 db.session.flush()  # ensures practice.id is available
@@ -1524,7 +1544,7 @@ def parse_file(file_id):
             results = parse_practice_csv(
                 upload_path,
                 season_id=season_id,
-                category=uploaded_file.category,
+                category=category,
                 file_date=file_date,
             )
 
@@ -1620,6 +1640,13 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
         uploaded_file.season_id
         or Season.query.order_by(Season.start_date.desc()).first().id
     )
+    raw_category = uploaded_file.category
+    category = normalize_category(raw_category)
+    if raw_category != category:
+        current_app.logger.info(
+            "Normalizing stored category '%s' -> '%s' during reparse", raw_category, category
+        )
+        uploaded_file.category = category
     parsed_date = _date_from_filename(uploaded_file.filename)
     file_date = parsed_date or uploaded_file.file_date or date.today()
     if parsed_date and uploaded_file.file_date != parsed_date:
@@ -1628,13 +1655,13 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     practice = Practice.query.filter_by(
         season_id=season_id,
         date=file_date,
-        category=uploaded_file.category,
+        category=category,
     ).first()
     if not practice:
         practice = Practice(
             season_id=season_id,
             date=file_date,
-            category=uploaded_file.category,
+            category=category,
         )
         db.session.add(practice)
         db.session.flush()
@@ -1652,7 +1679,7 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     results = parse_practice_csv(
         upload_path,
         season_id=season_id,
-        category=uploaded_file.category,
+        category=category,
         file_date=file_date,
     )
 
@@ -1694,14 +1721,16 @@ def reparse_file(file_id):
         return redirect(url_for('admin.files_view_unique'))
 
     try:
-        if uploaded_file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
+        category = normalize_category(uploaded_file.category)
+        uploaded_file.category = category
+        if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
             practice_id, season_id = _reparse_uploaded_practice(uploaded_file, upload_path)
             flash("Practice re-parsed successfully!", "success")
             return redirect(
                 url_for('admin.edit_practice', practice_id=practice_id, season_id=season_id)
             )
 
-        if uploaded_file.category == 'Recruit':
+        if category == 'Recruit':
             rid = _reparse_uploaded_recruit(uploaded_file, upload_path)
             flash('Recruit file re-parsed successfully!', 'success')
             return redirect(url_for('recruits.detail_recruit', id=rid))
@@ -1750,16 +1779,22 @@ def delete_data(file_id):
     filename = uploaded_file.filename
 
     # Determine if this was a practice, recruit, or a game
-    is_practice = uploaded_file.category in [
-        'Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices'
+    category = normalize_category(uploaded_file.category)
+    if category != uploaded_file.category:
+        current_app.logger.info(
+            "Normalizing stored category '%s' -> '%s' during delete", uploaded_file.category, category
+        )
+        uploaded_file.category = category
+    is_practice = category in [
+        'Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice'
     ]
-    is_recruit = uploaded_file.category == 'Recruit'
+    is_recruit = category == 'Recruit'
 
     if is_practice:
         practice = Practice.query.filter_by(
             season_id=uploaded_file.season_id,
             date=uploaded_file.file_date,
-            category=uploaded_file.category
+            category=category
         ).first()
         if practice:
             TeamStats.query.filter_by(practice_id=practice.id).delete()
@@ -1831,10 +1866,12 @@ def bulk_action_view():
         for file in files:
             path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
             if os.path.exists(path):
-                if file.category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practices']:
+                category = normalize_category(file.category)
+                file.category = category
+                if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
                     _reparse_uploaded_practice(file, path)
                     count += 1
-                elif file.category == 'Recruit':
+                elif category == 'Recruit':
                     _reparse_uploaded_recruit(file, path)
                     count += 1
         flash(f"Re-parsed {count} files.", "success")
@@ -1878,6 +1915,8 @@ def game_reports():
 @admin_required
 def files_view():
     category_filter = request.args.get('category')
+    if category_filter:
+        category_filter = normalize_category(category_filter)
     if category_filter:
         files = UploadedFile.query.filter_by(category=category_filter).order_by(UploadedFile.upload_date.desc()).all()
     else:
@@ -4735,9 +4774,17 @@ def team_totals():
         first_season = season_query.first()
         if first_season:
             season_id = first_season.id
-    practice_categories = [
-        r[0] for r in db.session.query(Practice.category).distinct().order_by(Practice.category).all()
+    raw_practice_categories = [
+        r[0]
+        for r in db.session.query(Practice.category).distinct().order_by(Practice.category).all()
     ]
+    practice_categories = []
+    seen_categories = set()
+    for cat in raw_practice_categories:
+        canonical = normalize_category(cat)
+        if canonical not in seen_categories:
+            practice_categories.append(canonical)
+            seen_categories.add(canonical)
 
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -4763,7 +4810,9 @@ def team_totals():
     trend_start_date = request.args.get('trend_start_date', start_date)
     trend_end_date = request.args.get('trend_end_date', end_date)
     trend_window = request.args.get('trend_window', type=int)
-    trend_selected_categories = request.args.getlist('trend_category')
+    trend_selected_categories = [
+        normalize_category(cat) for cat in request.args.getlist('trend_category')
+    ]
     trend_start_dt = trend_end_dt = None
     if trend_start_date:
         try:
