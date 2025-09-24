@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint
+from sqlalchemy.sql import func
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
@@ -51,7 +52,12 @@ class Practice(db.Model):
     season_id       = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
     date            = db.Column(db.Date, nullable=True)
     category        = db.Column(db.String(20), nullable=False)  # Summer Workouts, Fall Workouts, etc.
-    created_at      = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
+    created_at      = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        server_default=func.now(),
+        nullable=True,
+    )
 
     team_stats      = db.relationship('TeamStats',               backref='practice', lazy=True)
     player_stats    = db.relationship('PlayerStats',             backref='practice', lazy=True)

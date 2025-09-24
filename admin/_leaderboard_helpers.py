@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Mapping
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from models.database import Practice, db
 
 
 DualContextResult = Dict[str, Any]
@@ -14,6 +20,102 @@ def _default_context() -> DualContextResult:
         "last_team_totals": None,
         "last_practice_date": None,
     }
+
+
+def get_last_practice(session: Session, season_id: Optional[int]):
+    """Return the latest :class:`Practice` for ``season_id``."""
+
+    if season_id is None:
+        return None
+
+    query = session.query(Practice).filter(Practice.season_id == season_id)
+
+    date_column = getattr(Practice, "date", None)
+    created_at_column = getattr(Practice, "created_at", None)
+
+    if date_column is not None:
+        query = query.filter(date_column.isnot(None))
+
+    order_clauses = []
+
+    if created_at_column is not None or date_column is not None:
+        if created_at_column is not None and date_column is not None:
+            order_clauses.append(func.coalesce(created_at_column, date_column).desc())
+        else:
+            column = created_at_column or date_column
+            if column is not None:
+                order_clauses.append(column.desc())
+
+    if date_column is not None:
+        order_clauses.append(date_column.desc())
+
+    order_clauses.append(Practice.id.desc())
+
+    return query.order_by(*order_clauses).first()
+
+
+def with_last_practice(
+    session: Session,
+    season_id: Optional[int],
+    compute_fn: Callable[..., Any],
+    **kwargs: Any,
+) -> DualContextResult:
+    """Return dual compute results including the most recent practice slice."""
+
+    context = _default_context()
+
+    if season_id is None:
+        return context
+
+    compute_kwargs = dict(kwargs)
+    compute_kwargs.pop("start_dt", None)
+    compute_kwargs.pop("end_dt", None)
+
+    season_result = compute_fn(
+        session=session,
+        season_id=season_id,
+        start_dt=None,
+        end_dt=None,
+        **compute_kwargs,
+    )
+    season_team_totals, season_rows = _normalize_compute_result(season_result)
+    context.update(
+        {
+            "season_rows": season_rows,
+            "season_team_totals": season_team_totals,
+        }
+    )
+
+    last_practice = get_last_practice(session, season_id)
+    if not last_practice:
+        return context
+
+    last_practice_date: Optional[date] = getattr(last_practice, "date", None)
+    if last_practice_date is None:
+        created_at = getattr(last_practice, "created_at", None)
+        if created_at is not None:
+            last_practice_date = created_at.date()
+
+    if last_practice_date is None:
+        return context
+
+    last_result = compute_fn(
+        session=session,
+        season_id=season_id,
+        start_dt=last_practice_date,
+        end_dt=last_practice_date,
+        **compute_kwargs,
+    )
+    last_team_totals, last_rows = _normalize_compute_result(last_result)
+    context.update(
+        {
+            "last_rows": last_rows,
+            "last_team_totals": last_team_totals,
+            "last_practice_date": last_practice_date,
+        }
+    )
+
+    return context
 
 
 def _normalize_compute_result(result: Any) -> Tuple[Any, Any]:
@@ -56,54 +158,26 @@ def build_dual_context(
     stat_key: Optional[str] = None,
     label_set: Optional[Any] = None,
     extra_kwargs: Optional[Dict[str, Any]] = None,
+    session: Optional[Session] = None,
 ) -> DualContextResult:
     """Return combined season and last-practice leaderboard contexts."""
 
-    context = _default_context()
-
     if season_id is None:
-        return context
+        return _default_context()
 
-    extra_kwargs = extra_kwargs or {}
+    active_session = session or db.session
+    compute_kwargs: Dict[str, Any] = dict(extra_kwargs or {})
+    if stat_key is not None:
+        compute_kwargs.setdefault("stat_key", stat_key)
+    if "label_set" not in compute_kwargs:
+        compute_kwargs["label_set"] = label_set
 
-    season_result = compute_fn(
-        stat_key=stat_key,
-        season_id=season_id,
-        start_dt=None,
-        end_dt=None,
-        label_set=label_set,
-        **extra_kwargs,
+    return with_last_practice(
+        active_session,
+        season_id,
+        compute_fn,
+        **compute_kwargs,
     )
-    season_team_totals, season_rows = _normalize_compute_result(season_result)
-    context.update(
-        {
-            "season_rows": season_rows,
-            "season_team_totals": season_team_totals,
-        }
-    )
-
-    from app.services.last_practice import get_last_practice  # inline to avoid circular import
-
-    last_practice = get_last_practice(season_id)
-    if last_practice and getattr(last_practice, "date", None):
-        last_result = compute_fn(
-            stat_key=stat_key,
-            season_id=season_id,
-            start_dt=last_practice.date,
-            end_dt=last_practice.date,
-            label_set=label_set,
-            **extra_kwargs,
-        )
-        last_team_totals, last_rows = _normalize_compute_result(last_result)
-        context.update(
-            {
-                "last_rows": last_rows,
-                "last_team_totals": last_team_totals,
-                "last_practice_date": last_practice.date,
-            }
-        )
-
-    return context
 
 
 # --- Helpers for preparing template-friendly dual leaderboard data ---

@@ -985,6 +985,7 @@ def _build_stat_compute(default_key):
         start_dt=None,
         end_dt=None,
         label_set=None,
+        session=None,
         **kwargs,
     ):
         key = stat_key or default_key
@@ -1073,6 +1074,7 @@ def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key,
         stat_key=stat_key,
         label_set=label_set,
         extra_kwargs=extra_kwargs,
+        session=db.session,
     )
     ctx = prepare_dual_context(ctx, stat_key)
 

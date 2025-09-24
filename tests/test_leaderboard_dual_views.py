@@ -1,11 +1,11 @@
 import pytest
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from flask import Flask
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
-from models.database import db, Season
+from models.database import db, Practice, Season
 from models.user import User
 from admin.routes import admin_bp
 
@@ -53,23 +53,76 @@ def app_client():
 
 
 def _patch_last_practice(monkeypatch):
-    from app.services import last_practice as lp_mod
+    import admin._leaderboard_helpers as helpers
 
     class _Stub:
         def __init__(self, d):
             self.date = d
+            self.created_at = datetime.combine(d, datetime.min.time())
 
-    monkeypatch.setattr(lp_mod, "get_last_practice", lambda season_id, session=None: _Stub(LAST_DT))
+    monkeypatch.setattr(helpers, "get_last_practice", lambda session, season_id: _Stub(LAST_DT))
 
 
 def _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals):
-    def _fake_compute(*, stat_key, season_id, start_dt=None, end_dt=None, label_set=None, **kwargs):
+    def _fake_compute(
+        *,
+        stat_key,
+        season_id,
+        start_dt=None,
+        end_dt=None,
+        label_set=None,
+        session=None,
+        **kwargs,
+    ):
         is_last = start_dt == LAST_DT and end_dt == LAST_DT
         if is_last:
             return last_totals, last_rows
         return season_totals, season_rows
 
     return _fake_compute
+
+
+def test_with_last_practice_returns_last_slice(app_client):
+    from admin import _leaderboard_helpers as helpers
+
+    earlier = LAST_DT - timedelta(days=1)
+    db.session.add_all(
+        [
+            Practice(season_id=1, date=earlier, category="Test"),
+            Practice(season_id=1, date=LAST_DT, category="Test"),
+        ]
+    )
+    db.session.commit()
+
+    calls = []
+
+    def _fake_compute(
+        *,
+        stat_key,
+        season_id,
+        start_dt=None,
+        end_dt=None,
+        label_set=None,
+        session=None,
+        **kwargs,
+    ):
+        calls.append((start_dt, end_dt))
+        if start_dt == LAST_DT and end_dt == LAST_DT:
+            return ({"plus": 2, "opps": 3}, [{"player_name": "P", "plus": 2, "opps": 3}])
+        return ({"plus": 5, "opps": 8}, [{"player_name": "P", "plus": 5, "opps": 8}])
+
+    ctx = helpers.with_last_practice(
+        db.session,
+        season_id=1,
+        compute_fn=_fake_compute,
+        stat_key="defense",
+    )
+
+    assert calls[0] == (None, None)
+    assert calls[1] == (LAST_DT, LAST_DT)
+    assert ctx["season_rows"]
+    assert ctx["last_rows"]
+    assert ctx["last_practice_date"] == LAST_DT
 
 
 def _assert_dual_table_basics(html, section_title, season_plus, season_opps, season_pct_str,
