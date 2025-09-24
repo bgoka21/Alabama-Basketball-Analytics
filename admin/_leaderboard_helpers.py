@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import functools
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Mapping
 
 from sqlalchemy import func
@@ -112,6 +113,68 @@ def with_last_practice(
             "last_rows": last_rows,
             "last_team_totals": last_team_totals,
             "last_practice_date": last_practice_date,
+        }
+    )
+
+    return context
+
+
+def build_pnr_gap_help_context(session: Session, season_id: Optional[int], **kwargs: Any) -> DualContextResult:
+    """Return combined context for PnR Gap Help including the Low-Man slice."""
+
+    compute_fn: Optional[Callable[..., Any]] = kwargs.pop("compute_fn", None)
+    if compute_fn is None:
+        from admin.routes import compute_pnr_gap_help as _compute
+
+        compute_fn = _compute
+
+    extra_kwargs = dict(kwargs.pop("extra_kwargs", {}) or {})
+
+    label_set = kwargs.pop("label_set", None)
+    if label_set is not None and "label_set" not in extra_kwargs:
+        extra_kwargs["label_set"] = label_set
+
+    stat_key = kwargs.pop("stat_key", None)
+    if stat_key is not None and "stat_key" not in extra_kwargs:
+        extra_kwargs["stat_key"] = stat_key
+
+    start_dt = kwargs.pop("start_dt", None)
+    if start_dt is not None:
+        extra_kwargs["start_dt"] = start_dt
+
+    end_dt = kwargs.pop("end_dt", None)
+    if end_dt is not None:
+        extra_kwargs["end_dt"] = end_dt
+
+    if kwargs:
+        extra_kwargs.update(kwargs)
+
+    primary_ctx = with_last_practice(
+        session,
+        season_id,
+        compute_fn=compute_fn,
+        **extra_kwargs,
+    )
+
+    lowman_ctx = with_last_practice(
+        session,
+        season_id,
+        compute_fn=functools.partial(compute_fn, role="low_man"),
+        **extra_kwargs,
+    )
+
+    context = dict(primary_ctx)
+    context.update(
+        {
+            "pnr_rows": primary_ctx.get("season_rows") or [],
+            "pnr_totals": primary_ctx.get("season_team_totals"),
+            "pnr_last_rows": primary_ctx.get("last_rows") or [],
+            "pnr_last_totals": primary_ctx.get("last_team_totals"),
+            "low_rows": lowman_ctx.get("season_rows") or [],
+            "low_totals": lowman_ctx.get("season_team_totals"),
+            "low_last_rows": lowman_ctx.get("last_rows") or [],
+            "low_last_totals": lowman_ctx.get("last_team_totals"),
+            "last_practice_date": primary_ctx.get("last_practice_date"),
         }
     )
 

@@ -264,32 +264,53 @@ class TestDualViews:
 
         _patch_last_practice(monkeypatch)
 
-        season_rows = [
-            {"player_name": "G1", "plus": 5, "opps": 10, "subtype": "gap_help"},
-            {"player_name": "L1", "plus": 6, "opps": 12, "subtype": "low_help"},
+        gap_season_rows = [
+            {"player_name": "G1", "plus": 5, "opps": 10, "pct": 50.0},
         ]
-        season_totals = {
-            "gap_help": {"plus": 5, "opps": 10},
-            "low_help": {"plus": 6, "opps": 12},
-        }
-
-        last_rows = [
-            {"player_name": "G1", "plus": 3, "opps": 5, "subtype": "gap_help"},
-            {"player_name": "L1", "plus": 2, "opps": 4, "subtype": "low_help"},
+        low_season_rows = [
+            {"player_name": "L1", "plus": 6, "opps": 12, "pct": 50.0},
         ]
-        last_totals = {
-            "gap_help": {"plus": 3, "opps": 5},
-            "low_help": {"plus": 2, "opps": 4},
-        }
+        gap_last_rows = [
+            {"player_name": "G1", "plus": 3, "opps": 5, "pct": 60.0},
+        ]
+        low_last_rows = [
+            {"player_name": "L1", "plus": 2, "opps": 4, "pct": 50.0},
+        ]
 
-        fake = _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals)
+        gap_season_totals = {"plus": 5, "opps": 10, "pct": 50.0}
+        low_season_totals = {"plus": 6, "opps": 12, "pct": 50.0}
+        gap_last_totals = {"plus": 3, "opps": 5, "pct": 60.0}
+        low_last_totals = {"plus": 2, "opps": 4, "pct": 50.0}
+
+        def _fake_compute(
+            *,
+            stat_key,
+            season_id,
+            start_dt=None,
+            end_dt=None,
+            label_set=None,
+            session=None,
+            role=None,
+            **kwargs,
+        ):
+            is_last = start_dt == LAST_DT and end_dt == LAST_DT
+            if role == "low_man":
+                rows = low_last_rows if is_last else low_season_rows
+                totals = low_last_totals if is_last else low_season_totals
+            else:
+                rows = gap_last_rows if is_last else gap_season_rows
+                totals = gap_last_totals if is_last else gap_season_totals
+            return totals, rows
+
+        fake = _fake_compute
         monkeypatch.setattr(rmod, "compute_pnr_gap_help", fake)
 
         resp = app_client.get("/admin/leaderboard/pnr/gap-help")
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
 
-        assert "Gap Help" in html and "Low Help" in html
+        assert "PnR Gap Help" in html
+        assert "PnR Gap Help — Low Man" in html
         assert "10" in html and "50.0%" in html
         assert "12" in html and "50.0%" in html
         assert "5" in html and "60.0%" in html

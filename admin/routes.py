@@ -1,5 +1,6 @@
 import os, json
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -65,6 +66,7 @@ from admin._leaderboard_helpers import (
     _normalize_compute_result,
     format_dual_rows,
     format_dual_totals,
+    build_pnr_gap_help_context,
 )
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
@@ -1011,7 +1013,93 @@ compute_offensive_rebounding = _build_stat_compute("off_rebounding")
 compute_defensive_rebounding = _build_stat_compute("def_rebounding")
 compute_defense_bumps = _build_stat_compute("defense")
 compute_collisions_gap_help = _build_stat_compute("collision_gap_help")
-compute_pnr_gap_help = _build_stat_compute("pnr_gap_help")
+
+
+def compute_pnr_gap_help(
+    *,
+    session=None,
+    season_id=None,
+    start_dt=None,
+    end_dt=None,
+    role=None,
+    label_set=None,
+    stat_key=None,
+    **kwargs,
+):
+    """Return PnR Gap Help stats optionally filtered to a specific help role."""
+
+    if season_id is None:
+        return None, []
+
+    key = "pnr_gap_help"
+    _, rows, team_totals = compute_leaderboard(
+        key,
+        season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        label_set=label_set,
+    )
+
+    player_keys = ("player", "player_name", "name")
+
+    if role == "low_man":
+        plus_aliases = ("low_plus", "plus")
+        opp_aliases = ("low_opp", "opps", "low_opps")
+        pct_aliases = ("low_pct", "pct")
+        plus_index, opp_index, pct_index = 4, 5, 6
+        total_plus_index, total_opp_index, total_pct_index = 3, 4, 5
+    else:
+        plus_aliases = ("gap_plus", "plus")
+        opp_aliases = ("gap_opp", "opps", "gap_opps")
+        pct_aliases = ("gap_pct", "pct")
+        plus_index, opp_index, pct_index = 1, 2, 3
+        total_plus_index, total_opp_index, total_pct_index = 0, 1, 2
+
+    def _resolve_value(source, index, aliases):
+        if isinstance(source, Mapping):
+            for alias in aliases:
+                value = source.get(alias)
+                if value is not None:
+                    return value
+        if isinstance(source, Sequence) and not isinstance(source, (str, bytes)):
+            if index is not None and -len(source) <= index < len(source):
+                return source[index]
+        return None
+
+    def _resolve_player(source):
+        return _resolve_value(source, 0, player_keys)
+
+    filtered_rows = []
+    for row in rows or []:
+        player = _resolve_player(row)
+        plus = _resolve_value(row, plus_index, plus_aliases)
+        opps = _resolve_value(row, opp_index, opp_aliases)
+        pct = _resolve_value(row, pct_index, pct_aliases)
+
+        filtered_rows.append(
+            {
+                "player_name": player,
+                "plus": plus,
+                "opps": opps,
+                "pct": pct,
+            }
+        )
+
+    totals_plus = _resolve_value(team_totals, total_plus_index, plus_aliases)
+    totals_opps = _resolve_value(team_totals, total_opp_index, opp_aliases)
+    totals_pct = _resolve_value(team_totals, total_pct_index, pct_aliases)
+
+    filtered_totals = None
+    if any(value is not None for value in (totals_plus, totals_opps, totals_pct)):
+        filtered_totals = {
+            "plus": totals_plus,
+            "opps": totals_opps,
+            "pct": totals_pct,
+        }
+
+    return filtered_totals, filtered_rows
+
+
 compute_pnr_grade = _build_stat_compute("pnr_grade")
 
 # Use the top-level templates folder so references like 'admin/base.html'
@@ -5266,11 +5354,204 @@ def leaderboard_collisions_gap_help():
 @admin_bp.route('/leaderboard/pnr/gap-help')
 @login_required
 def leaderboard_pnr_gap_help():
-    return _render_dual_leaderboard(
-        'leaderboard/pnr_gap_help.html',
-        page_title='PnR – Gap Help',
+    season_id, seasons = _resolve_season_from_request()
+    selected_labels, label_set = _extract_label_filters()
+
+    session_names = _get_session_names_for_season(season_id)
+    requested_session = request.args.get('session')
+    if requested_session:
+        requested_session = requested_session.strip()
+        if requested_session.lower() == 'all':
+            requested_session = 'All'
+    if (
+        requested_session
+        and requested_session not in ('All', None)
+        and requested_session not in session_names
+    ):
+        session_names = session_names + [requested_session]
+    sessions = list(dict.fromkeys(session_names + ['All']))
+    selected_session = 'All'
+    if requested_session:
+        selected_session = 'All' if requested_session == 'All' else requested_session
+
+    session_start = session_end = None
+    session_range = None
+    if season_id and selected_session != 'All':
+        session_start, session_end = _get_session_window_from_db(season_id, selected_session)
+        if session_start is None and session_end is None:
+            print(
+                f"[WARN] No DB Session window for {selected_session} "
+                f"in season_id={season_id}; skipping date filter."
+            )
+        elif session_start and session_end:
+            session_range = (session_start, session_end)
+
+    scope = 'last'
+    scope_start = scope_end = None
+    if season_id:
+        scope, scope_start, scope_end = resolve_scope(request.args, season_id, session_range)
+    else:
+        scope = 'season'
+
+    base_ctx = build_pnr_gap_help_context(
+        db.session,
+        season_id,
         compute_fn=compute_pnr_gap_help,
         stat_key='pnr_gap_help',
+        label_set=label_set,
+    )
+
+    season_slice = {
+        'pnr_rows': base_ctx.get('pnr_rows') or [],
+        'pnr_totals': base_ctx.get('pnr_totals'),
+        'low_rows': base_ctx.get('low_rows') or [],
+        'low_totals': base_ctx.get('low_totals'),
+    }
+    last_slice = {
+        'pnr_rows': base_ctx.get('pnr_last_rows') or [],
+        'pnr_totals': base_ctx.get('pnr_last_totals'),
+        'low_rows': base_ctx.get('low_last_rows') or [],
+        'low_totals': base_ctx.get('low_last_totals'),
+    }
+
+    last_practice_date = base_ctx.get('last_practice_date')
+
+    def _compute_slice(start_dt, end_dt):
+        if not season_id or start_dt is None or end_dt is None:
+            return {
+                'pnr_rows': [],
+                'pnr_totals': None,
+                'low_rows': [],
+                'low_totals': None,
+            }
+
+        compute_kwargs = {
+            'stat_key': 'pnr_gap_help',
+            'season_id': season_id,
+            'start_dt': start_dt,
+            'end_dt': end_dt,
+            'label_set': label_set,
+            'session': db.session,
+        }
+        pnr_totals, pnr_rows = _normalize_compute_result(
+            compute_pnr_gap_help(**compute_kwargs)
+        )
+        low_totals, low_rows = _normalize_compute_result(
+            compute_pnr_gap_help(role='low_man', **compute_kwargs)
+        )
+        return {
+            'pnr_rows': pnr_rows or [],
+            'pnr_totals': pnr_totals,
+            'low_rows': low_rows or [],
+            'low_totals': low_totals,
+        }
+
+    display_season_slice = dict(season_slice)
+    display_last_slice = dict(last_slice)
+
+    if scope == 'session' and scope_start and scope_end:
+        display_season_slice = _compute_slice(scope_start, scope_end)
+    if scope == 'last' and scope_start:
+        display_last_slice = _compute_slice(scope_start, scope_end or scope_start)
+        last_practice_date = scope_start
+
+    def _slice_has_data(slice_data):
+        return bool(
+            slice_data.get('pnr_rows')
+            or slice_data.get('pnr_totals')
+            or slice_data.get('low_rows')
+            or slice_data.get('low_totals')
+        )
+
+    if scope == 'session':
+        scope_has_data = _slice_has_data(display_season_slice)
+    elif scope == 'last':
+        scope_has_data = _slice_has_data(display_last_slice)
+    else:
+        scope_has_data = _slice_has_data(display_season_slice)
+
+    columns = ["Gap +", "Gap Opp", "Gap %"]
+    pct_columns = ["Gap %"]
+    column_map = {
+        "Gap +": ("plus",),
+        "Gap Opp": ("opps",),
+        "Gap %": ("pct",),
+    }
+
+    pnr_rows = format_dual_rows(
+        display_season_slice.get('pnr_rows'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+    pnr_totals = format_dual_totals(
+        display_season_slice.get('pnr_totals'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+    low_rows = format_dual_rows(
+        display_season_slice.get('low_rows'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+    low_totals = format_dual_totals(
+        display_season_slice.get('low_totals'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+
+    pnr_last_rows = format_dual_rows(
+        display_last_slice.get('pnr_rows'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+    pnr_last_totals = format_dual_totals(
+        display_last_slice.get('pnr_totals'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+    low_last_rows = format_dual_rows(
+        display_last_slice.get('low_rows'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+    low_last_totals = format_dual_totals(
+        display_last_slice.get('low_totals'),
+        columns,
+        column_map=column_map,
+        pct_columns=pct_columns,
+    )
+
+    return render_template(
+        'leaderboard/pnr_gap_help.html',
+        page_title='PnR – Gap Help',
+        stat_key='pnr_gap_help',
+        all_seasons=seasons,
+        selected_season=season_id,
+        selected_labels=selected_labels,
+        label_set=label_set,
+        active_page='leaderboard',
+        scope=scope,
+        scope_start=scope_start,
+        scope_end=scope_end,
+        scope_has_data=scope_has_data,
+        selected_session=selected_session,
+        sessions=sessions,
+        last_practice_date=last_practice_date,
+        pnr_rows=pnr_rows,
+        pnr_totals=pnr_totals,
+        pnr_last_rows=pnr_last_rows,
+        pnr_last_totals=pnr_last_totals,
+        low_rows=low_rows,
+        low_totals=low_totals,
+        low_last_rows=low_last_rows,
+        low_last_totals=low_last_totals,
     )
 
 
