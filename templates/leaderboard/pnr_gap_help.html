@@ -46,33 +46,31 @@
         {% if not scope_has_data %}
           <p class="text-sm text-gray-500">No practice data for this scope.</p>
         {% endif %}
-        {% if last_practice_date %}
-          {% set last_practice_date = last_practice_date.strftime('%b %d, %Y') %}
-        {% endif %}
+        {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
       </div>
 
       {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
 
       {{ render_dual_section(
-        title="PnR Gap Help",
-        season_rows=pnr_rows,
-        season_totals=pnr_totals,
-        last_rows=pnr_last_rows,
-        last_totals=pnr_last_totals,
-        columns=columns,
-        note_date=last_practice_date
+        "PnR Gap Help",
+        pnr_rows,
+        pnr_totals,
+        pnr_last_rows,
+        pnr_last_totals,
+        columns,
+        practice_note
       ) }}
 
       <div class="h-6"></div>
 
       {{ render_dual_section(
-        title="PnR Gap Help — Low Man",
-        season_rows=low_rows,
-        season_totals=low_totals,
-        last_rows=low_last_rows,
-        last_totals=low_last_totals,
-        columns=columns,
-        note_date=last_practice_date
+        "PnR Gap Help — Low Man",
+        low_rows,
+        low_totals,
+        low_last_rows,
+        low_last_totals,
+        columns,
+        practice_note
       ) }}
     </div>
   </div>
