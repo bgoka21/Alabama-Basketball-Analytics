@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'leaderboard/_dual_macros.html' import render_dual_section %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -53,28 +53,50 @@
         {% endif %}
       </div>
 
+      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+
+      {% set crash_columns = ["Crash +", "Crash Att", "Crash %"] %}
+      {% set crash_map = {
+        "Crash +": ("plus", "crash_plus"),
+        "Crash Att": ("opps", "crash_opp", "crash_opps"),
+        "Crash %": ("pct", "crash_pct"),
+      } %}
+      {% set crash_pct_columns = ["Crash %"] %}
+      {% set season_crash_rows = (season_by.get('crash') or [])|format_dual_rows(crash_columns, crash_map, crash_pct_columns) %}
+      {% set last_crash_rows = (last_by.get('crash') or [])|format_dual_rows(crash_columns, crash_map, crash_pct_columns) %}
+      {% set season_crash_totals = (season_team_totals.get('crash') if season_team_totals else None)|format_dual_totals(crash_columns, crash_map, crash_pct_columns) %}
+      {% set last_crash_totals = (last_team_totals.get('crash') if last_team_totals else None)|format_dual_totals(crash_columns, crash_map, crash_pct_columns) %}
+
       {{ render_dual_section(
         "Crash",
-        season_rows=season_by.get('crash'),
-        season_totals=season_team_totals.get('crash') if season_team_totals else None,
-        last_rows=last_by.get('crash'),
-        last_totals=last_team_totals.get('crash') if last_team_totals else None,
-        plus_label='Crash +',
-        opps_label='Crash Opps',
-        pct_label='Crash %',
-        scope=scope
+        season_rows=season_crash_rows,
+        season_totals=season_crash_totals,
+        last_rows=last_crash_rows,
+        last_totals=last_crash_totals,
+        columns=crash_columns,
+        note_date=practice_note
       ) }}
+
+      {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
+      {% set back_map = {
+        "Back Man +": ("plus", "back_plus"),
+        "Back Man Att": ("opps", "back_opp", "back_opps"),
+        "Back Man %": ("pct", "back_pct"),
+      } %}
+      {% set back_pct_columns = ["Back Man %"] %}
+      {% set season_back_rows = (season_by.get('back_man') or [])|format_dual_rows(back_columns, back_map, back_pct_columns) %}
+      {% set last_back_rows = (last_by.get('back_man') or [])|format_dual_rows(back_columns, back_map, back_pct_columns) %}
+      {% set season_back_totals = (season_team_totals.get('back_man') if season_team_totals else None)|format_dual_totals(back_columns, back_map, back_pct_columns) %}
+      {% set last_back_totals = (last_team_totals.get('back_man') if last_team_totals else None)|format_dual_totals(back_columns, back_map, back_pct_columns) %}
 
       {{ render_dual_section(
         "Back Man",
-        season_rows=season_by.get('back_man'),
-        season_totals=season_team_totals.get('back_man') if season_team_totals else None,
-        last_rows=last_by.get('back_man'),
-        last_totals=last_team_totals.get('back_man') if last_team_totals else None,
-        plus_label='Back Man +',
-        opps_label='Back Man Opps',
-        pct_label='Back Man %',
-        scope=scope
+        season_rows=season_back_rows,
+        season_totals=season_back_totals,
+        last_rows=last_back_rows,
+        last_totals=last_back_totals,
+        columns=back_columns,
+        note_date=practice_note
       ) }}
     </div>
   </div>

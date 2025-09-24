@@ -1,0 +1,85 @@
+{% macro render_dual_section(title, season_rows, season_totals, last_rows, last_totals, columns, note_date=None) %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="rounded-xl border p-4">
+    <div class="flex items-baseline justify-between mb-2">
+      <h3 class="text-lg font-semibold">{{ title }} — Practice Totals</h3>
+    </div>
+    <table class="w-full text-sm">
+      <thead>
+        <tr>
+          <th class="text-left pr-2">#</th>
+          <th class="text-left pr-2">Player</th>
+          {% for col in columns %}
+            <th class="text-right pl-2">{{ col }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in season_rows %}
+        <tr>
+          <td class="pr-2">{{ r.jersey }}</td>
+          <td class="pr-2">{{ r.player }}</td>
+          {% for col in columns %}
+            <td class="text-right pl-2">{{ r[col] }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if season_totals %}
+      <tfoot>
+        <tr class="font-semibold">
+          <td class="pr-2">{{ season_totals.jersey }}</td>
+          <td class="pr-2">{{ season_totals.player }}</td>
+          {% for col in columns %}
+            <td class="text-right pl-2">{{ season_totals[col] }}</td>
+          {% endfor %}
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+  <div class="rounded-xl border p-4">
+    <div class="flex items-baseline justify-between mb-2">
+      <h3 class="text-lg font-semibold">{{ title }} — Last Practice</h3>
+      {% if note_date %}<span class="text-xs opacity-70">({{ note_date }})</span>{% endif %}
+    </div>
+    {% if last_rows and last_rows|length %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr>
+          <th class="text-left pr-2">#</th>
+          <th class="text-left pr-2">Player</th>
+          {% for col in columns %}
+            <th class="text-right pl-2">{{ col }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in last_rows %}
+        <tr>
+          <td class="pr-2">{{ r.jersey }}</td>
+          <td class="pr-2">{{ r.player }}</td>
+          {% for col in columns %}
+            <td class="text-right pl-2">{{ r[col] }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if last_totals %}
+      <tfoot>
+        <tr class="font-semibold">
+          <td class="pr-2">{{ last_totals.jersey }}</td>
+          <td class="pr-2">{{ last_totals.player }}</td>
+          {% for col in columns %}
+            <td class="text-right pl-2">{{ last_totals[col] }}</td>
+          {% endfor %}
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+    {% else %}
+      <div class="text-sm opacity-70">No stats for the most recent practice.</div>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}

@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'leaderboard/_dual_macros.html' import render_dual_section %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -51,17 +51,28 @@
         {% endif %}
       </div>
 
+      {% set box_columns = ["Box Out +", "Box Out Att", "Box Out %", "Off Reb Given Up"] %}
+      {% set box_map = {
+        "Box Out +": ("plus", "box_plus"),
+        "Box Out Att": ("opps", "box_opp", "box_opps"),
+        "Box Out %": ("pct", "box_pct"),
+        "Off Reb Given Up": ("off_reb_given_up", "given_up"),
+      } %}
+      {% set pct_columns = ["Box Out %"] %}
+      {% set season_box_rows = (season_rows or [])|format_dual_rows(box_columns, box_map, pct_columns) %}
+      {% set last_box_rows = (last_rows or [])|format_dual_rows(box_columns, box_map, pct_columns) %}
+      {% set season_box_totals = season_team_totals|format_dual_totals(box_columns, box_map, pct_columns) %}
+      {% set last_box_totals = last_team_totals|format_dual_totals(box_columns, box_map, pct_columns) %}
+      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+
       {{ render_dual_section(
         "Box Outs",
-        season_rows=season_rows,
-        season_totals=season_team_totals,
-        last_rows=last_rows,
-        last_totals=last_team_totals,
-        plus_label='Box Out +',
-        opps_label='Box Out Opps',
-        pct_label='Box Out %',
-        extra_columns=[{'key': 'off_reb_given_up', 'label': "Off Reb Given Up"}],
-        scope=scope
+        season_rows=season_box_rows,
+        season_totals=season_box_totals,
+        last_rows=last_box_rows,
+        last_totals=last_box_totals,
+        columns=box_columns,
+        note_date=practice_note
       ) }}
     </div>
   </div>

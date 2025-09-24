@@ -59,7 +59,13 @@ from parse_practice_csv import (
 )  # <— make sure this is here
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
-from admin._leaderboard_helpers import build_dual_context, prepare_dual_context, _normalize_compute_result
+from admin._leaderboard_helpers import (
+    build_dual_context,
+    prepare_dual_context,
+    _normalize_compute_result,
+    format_dual_rows,
+    format_dual_totals,
+)
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
 from utils.scope import resolve_scope
@@ -1011,6 +1017,8 @@ compute_pnr_grade = _build_stat_compute("pnr_grade")
 # Use the top-level templates folder so references like 'admin/base.html'
 # resolve correctly when the blueprint is used in isolation (e.g. tests).
 admin_bp = Blueprint('admin', __name__, template_folder='../templates')
+admin_bp.add_app_template_filter(format_dual_rows, name="format_dual_rows")
+admin_bp.add_app_template_filter(format_dual_totals, name="format_dual_totals")
 
 
 def _resolve_season_from_request():

@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'leaderboard/_dual_macros.html' import render_dual_section %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -51,16 +51,27 @@
         {% endif %}
       </div>
 
+      {% set bump_columns = ["Bump +", "Bump Opps", "Bump %"] %}
+      {% set bump_map = {
+        "Bump +": ("plus", "bump_positive"),
+        "Bump Opps": ("opps", "total_opps"),
+        "Bump %": ("pct",),
+      } %}
+      {% set pct_columns = ["Bump %"] %}
+      {% set season_bump_rows = (season_rows or [])|format_dual_rows(bump_columns, bump_map, pct_columns) %}
+      {% set last_bump_rows = (last_rows or [])|format_dual_rows(bump_columns, bump_map, pct_columns) %}
+      {% set season_bump_totals = season_team_totals|format_dual_totals(bump_columns, bump_map, pct_columns) %}
+      {% set last_bump_totals = last_team_totals|format_dual_totals(bump_columns, bump_map, pct_columns) %}
+      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+
       {{ render_dual_section(
         "Bumps (Collisions)",
-        season_rows=season_rows,
-        season_totals=season_team_totals,
-        last_rows=last_rows,
-        last_totals=last_team_totals,
-        plus_label='Plus',
-        opps_label='Opps',
-        pct_label='%',
-        scope=scope
+        season_rows=season_bump_rows,
+        season_totals=season_bump_totals,
+        last_rows=last_bump_rows,
+        last_totals=last_bump_totals,
+        columns=bump_columns,
+        note_date=practice_note
       ) }}
     </div>
   </div>

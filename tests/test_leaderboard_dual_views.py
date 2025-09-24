@@ -127,21 +127,15 @@ def test_with_last_practice_returns_last_slice(app_client):
 
 def _assert_dual_table_basics(html, section_title, season_plus, season_opps, season_pct_str,
                               last_plus, last_opps, last_pct_str):
-    assert section_title in html
+    assert f"{section_title} — Practice Totals" in html
+    assert f"{section_title} — Last Practice" in html
     assert str(season_plus) in html
     assert str(season_opps) in html
     assert season_pct_str in html
     assert str(last_plus) in html
     assert str(last_opps) in html
     assert last_pct_str in html
-    assert "Last practice:" in html
     assert "Sep 18, 2025" in html
-
-
-def _assert_has_data_attrs(html):
-    assert 'data-plus="' in html
-    assert 'data-opps="' in html
-    assert 'data-pct="' in html
 
 
 @pytest.mark.usefixtures("app_client")
@@ -177,7 +171,6 @@ class TestDualViews:
             season_plus=5, season_opps=8, season_pct_str="62.5%",
             last_plus=3, last_opps=4, last_pct_str="75.0%",
         )
-        _assert_has_data_attrs(html)
 
     def test_reb_offense_split_crash_back(self, monkeypatch, app_client):
         import admin.routes as rmod
@@ -216,7 +209,6 @@ class TestDualViews:
         assert "5" in html and "10" in html and "50.0%" in html
         assert "1" in html and "2" in html and "50.0%" in html
         assert "3" in html and "5" in html and "60.0%" in html
-        _assert_has_data_attrs(html)
 
     def test_reb_defense_with_given_up(self, monkeypatch, app_client):
         import admin.routes as rmod
@@ -246,7 +238,6 @@ class TestDualViews:
         assert ">3<" in html
         assert "2" in html and "3" in html and "66.7%" in html
         assert ">1<" in html
-        _assert_has_data_attrs(html)
 
     def test_collisions_gap_help(self, monkeypatch, app_client):
         import admin.routes as rmod
@@ -267,7 +258,6 @@ class TestDualViews:
         html = resp.get_data(as_text=True)
 
         _assert_dual_table_basics(html, "Gap Help", 4, 5, "80.0%", 2, 2, "100.0%")
-        _assert_has_data_attrs(html)
 
     def test_pnr_gap_help_split(self, monkeypatch, app_client):
         import admin.routes as rmod
@@ -304,7 +294,6 @@ class TestDualViews:
         assert "12" in html and "50.0%" in html
         assert "5" in html and "60.0%" in html
         assert "4" in html and "50.0%" in html
-        _assert_has_data_attrs(html)
 
     def test_pnr_grade_split(self, monkeypatch, app_client):
         import admin.routes as rmod
@@ -341,4 +330,3 @@ class TestDualViews:
         assert "18" in html and "50.0%" in html
         assert "5" in html and "80.0%" in html
         assert "6" in html and "50.0%" in html
-        _assert_has_data_attrs(html)

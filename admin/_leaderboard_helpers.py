@@ -183,6 +183,14 @@ def build_dual_context(
 # --- Helpers for preparing template-friendly dual leaderboard data ---
 
 _PLAYER_KEYS = ("player_name", "player", "name")
+_JERSEY_KEYS = (
+    "jersey",
+    "jersey_number",
+    "uniform_number",
+    "number",
+    "num",
+    "player_number",
+)
 _PLUS_KEYS = (
     "plus",
     "bump_positive",
@@ -632,3 +640,158 @@ def prepare_dual_context(context: DualContextResult, stat_key: Optional[str]) ->
         return ctx
 
     return ctx
+
+
+def _clean_display_value(value: Any) -> Any:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return value
+
+
+def _format_pct_value(value: Any) -> str:
+    cleaned = _clean_display_value(value)
+    if cleaned is None:
+        return "NA"
+
+    if isinstance(cleaned, str):
+        if cleaned.endswith("%"):
+            return cleaned
+        try:
+            return f"{float(cleaned):.1f}%"
+        except (TypeError, ValueError):
+            return cleaned
+
+    try:
+        return f"{float(cleaned):.1f}%"
+    except (TypeError, ValueError):
+        return "NA"
+
+
+def _resolve_column_value(row: Any, keys: Tuple[str, ...]) -> Any:
+    for key in keys:
+        if not key:
+            continue
+        value = _resolve_value(row, (key,))
+        cleaned = _clean_display_value(value)
+        if cleaned is not None:
+            return cleaned
+    return None
+
+
+def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optional[str], Any]:
+    formatter: Optional[str] = None
+    default_value: Any = None
+
+    if spec is None:
+        keys: Tuple[str, ...] = (column,)
+    elif isinstance(spec, Mapping):
+        raw_keys = spec.get("keys") or spec.get("key") or ()
+        if isinstance(raw_keys, str):
+            keys = (raw_keys,)
+        else:
+            keys = tuple(raw_keys)
+        formatter = spec.get("format")
+        default_value = spec.get("default")
+    else:
+        if isinstance(spec, str):
+            keys = (spec,)
+        else:
+            keys = tuple(spec)
+
+    if not keys:
+        keys = (column,)
+
+    return keys, formatter, default_value
+
+
+def _format_columns_for_source(
+    source: Any,
+    columns: Sequence[str],
+    mapping: Mapping[str, Any],
+    pct_set: set[str],
+    default_placeholder: str,
+    *,
+    jersey: Any,
+    player: Any,
+) -> Dict[str, Any]:
+    entry: Dict[str, Any] = {"jersey": jersey, "player": player}
+
+    for column in columns:
+        spec = mapping.get(column)
+        keys, formatter, default_value = _parse_column_spec(column, spec)
+        value = _resolve_column_value(source, keys)
+        if value is None and default_value is not None:
+            value = default_value
+
+        if (column in pct_set) or (formatter == "pct"):
+            value = _format_pct_value(value)
+        elif value is None:
+            value = default_placeholder
+
+        entry[column] = value
+
+    return entry
+
+
+def format_dual_rows(
+    rows: Any,
+    columns: Sequence[str],
+    column_map: Optional[Mapping[str, Sequence[str]]] = None,
+    pct_columns: Optional[Sequence[str]] = None,
+    *,
+    default_placeholder: str = "—",
+) -> list[Dict[str, Any]]:
+    """Return display-friendly rows for the dual leaderboard tables."""
+
+    pct_set = {col for col in (pct_columns or [])}
+    mapping: Mapping[str, Any] = column_map or {}
+    formatted: list[Dict[str, Any]] = []
+
+    for index, row in enumerate(rows or [], start=1):
+        if row is None:
+            continue
+
+        jersey = _resolve_column_value(row, _JERSEY_KEYS)
+        player_name = _resolve_column_value(row, _PLAYER_KEYS)
+        entry = _format_columns_for_source(
+            row,
+            columns,
+            mapping,
+            pct_set,
+            default_placeholder,
+            jersey=jersey if jersey is not None else index,
+            player=player_name or "",
+        )
+
+        formatted.append(entry)
+
+    return formatted
+
+
+def format_dual_totals(
+    totals: Any,
+    columns: Sequence[str],
+    column_map: Optional[Mapping[str, Sequence[str]]] = None,
+    pct_columns: Optional[Sequence[str]] = None,
+    *,
+    label: str = "Team Totals",
+    default_placeholder: str = "—",
+) -> Optional[Dict[str, Any]]:
+    """Return a formatted totals row for dual leaderboard tables."""
+
+    if not totals:
+        return None
+
+    pct_set = {col for col in (pct_columns or [])}
+    mapping: Mapping[str, Any] = column_map or {}
+
+    return _format_columns_for_source(
+        totals,
+        columns,
+        mapping,
+        pct_set,
+        default_placeholder,
+        jersey="",
+        player=label,
+    )
