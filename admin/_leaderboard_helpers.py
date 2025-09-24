@@ -17,7 +17,7 @@ def _default_context() -> DualContextResult:
     return {
         "season_rows": [],
         "season_team_totals": None,
-        "last_rows": None,
+        "last_rows": [],
         "last_team_totals": None,
         "last_practice_date": None,
     }
