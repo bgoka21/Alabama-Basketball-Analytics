@@ -51,27 +51,27 @@
         {% endif %}
       </div>
 
-      {% set gap_columns = ["Gap +", "Gap Opp", "Gap %"] %}
-      {% set gap_map = {
+      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+      {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+      {% set column_map = {
         "Gap +": ("plus", "gap_plus"),
         "Gap Opp": ("opps", "gap_opp", "gap_opps"),
         "Gap %": ("pct", "gap_pct"),
       } %}
       {% set pct_columns = ["Gap %"] %}
-      {% set season_gap_rows = (season_rows or [])|format_dual_rows(gap_columns, gap_map, pct_columns) %}
-      {% set last_gap_rows = (last_rows or [])|format_dual_rows(gap_columns, gap_map, pct_columns) %}
-      {% set season_gap_totals = season_team_totals|format_dual_totals(gap_columns, gap_map, pct_columns) %}
-      {% set last_gap_totals = last_team_totals|format_dual_totals(gap_columns, gap_map, pct_columns) %}
-      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+      {% set season_gap_rows = (season_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
+      {% set last_gap_rows = (last_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
+      {% set season_gap_totals = season_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
+      {% set last_gap_totals = last_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
 
       {{ render_dual_section(
-        "Gap Help",
-        season_rows=season_gap_rows,
-        season_totals=season_gap_totals,
-        last_rows=last_gap_rows,
-        last_totals=last_gap_totals,
-        columns=gap_columns,
-        note_date=practice_note
+        "Collisions — Gap Help",
+        season_gap_rows,
+        season_gap_totals,
+        last_gap_rows,
+        last_gap_totals,
+        columns,
+        practice_note
       ) }}
     </div>
   </div>
