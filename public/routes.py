@@ -16,6 +16,7 @@ from admin.routes import (
     compute_filtered_totals,
     compute_leaderboard,
     _split_leaderboard_rows_for_template,
+    get_practice_dual_context,
 )
 from models.database import (
     db,
@@ -770,7 +771,29 @@ def season_leaderboard():
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cfg, rows, team_totals = compute_leaderboard(stat_key, sid, label_set=label_set if label_set else None)
-    split_context = _split_leaderboard_rows_for_template(cfg['key'], rows, team_totals) if cfg else {}
+    practice_dual_ctx = (
+        get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
+        if cfg
+        else None
+    )
+    season_rows_for_split = (
+        practice_dual_ctx.get('season_rows') if practice_dual_ctx else rows
+    )
+    season_totals_for_split = (
+        practice_dual_ctx.get('season_team_totals') if practice_dual_ctx else team_totals
+    )
+    split_context = (
+        _split_leaderboard_rows_for_template(
+            cfg['key'],
+            season_rows_for_split,
+            season_totals_for_split,
+            last_rows=practice_dual_ctx.get('last_rows') if practice_dual_ctx else None,
+            last_team_totals=practice_dual_ctx.get('last_team_totals') if practice_dual_ctx else None,
+            last_practice_date=practice_dual_ctx.get('last_practice_date') if practice_dual_ctx else None,
+        )
+        if cfg
+        else {}
+    )
 
     return render_template(
         'leaderboard.html',

@@ -67,6 +67,7 @@ from admin._leaderboard_helpers import (
     format_dual_rows,
     format_dual_totals,
     build_pnr_gap_help_context,
+    with_last_practice,
 )
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
@@ -933,52 +934,106 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     return cfg, leaderboard, team_totals
 
 
-def _split_leaderboard_rows_for_template(stat_key, rows, team_totals):
+_PRACTICE_DUAL_MAP = {
+    "off_rebounding": lambda: compute_offensive_rebounding,
+    "def_rebounding": lambda: compute_defensive_rebounding,
+    "defense": lambda: compute_defense_bumps,
+}
+
+
+def get_practice_dual_context(stat_key, season_id, *, label_set=None):
+    """Return prepared season/last-practice context for practice leaderboards."""
+
+    factory = _PRACTICE_DUAL_MAP.get(stat_key)
+    if factory is None or season_id is None:
+        return None
+
+    compute_fn = factory()
+    ctx = with_last_practice(
+        db.session,
+        season_id,
+        compute_fn,
+        stat_key=stat_key,
+        label_set=label_set,
+    )
+    return prepare_dual_context(ctx, stat_key)
+
+
+def _split_leaderboard_rows_for_template(
+    stat_key,
+    rows,
+    team_totals,
+    *,
+    last_rows=None,
+    last_team_totals=None,
+    last_practice_date=None,
+):
     """Return practice-style split data for selected dual leaderboard keys."""
 
-    if stat_key not in {"off_rebounding", "pnr_grade"}:
+    practice_keys = {"off_rebounding", "def_rebounding", "defense"}
+    if stat_key not in practice_keys | {"pnr_grade"}:
         return {}
 
     normalized = prepare_dual_context(
         {
             "season_rows": rows or [],
             "season_team_totals": team_totals,
-            "last_rows": None,
-            "last_team_totals": None,
+            "last_rows": last_rows or [],
+            "last_team_totals": last_team_totals,
+            "last_practice_date": last_practice_date,
         },
         stat_key,
     )
 
+    if stat_key == "off_rebounding":
+        season_by = normalized.get("season_rows_by_subtype") or {}
+        last_by = normalized.get("last_rows_by_subtype") or {}
+        totals_by = normalized.get("season_team_totals") or {}
+        last_totals_by = normalized.get("last_team_totals") or {}
+        return {
+            "crash_rows": season_by.get("crash") or [],
+            "backman_rows": season_by.get("back_man") or [],
+            "crash_totals": totals_by.get("crash") or {},
+            "backman_totals": totals_by.get("back_man") or {},
+            "crash_last_rows": last_by.get("crash") or [],
+            "backman_last_rows": last_by.get("back_man") or [],
+            "crash_last_totals": last_totals_by.get("crash") or {},
+            "backman_last_totals": last_totals_by.get("back_man") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
+
+    if stat_key == "def_rebounding":
+        return {
+            "box_rows": normalized.get("season_rows") or [],
+            "box_totals": normalized.get("season_team_totals") or {},
+            "box_last_rows": normalized.get("last_rows") or [],
+            "box_last_totals": normalized.get("last_team_totals") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
+
+    if stat_key == "defense":
+        return {
+            "bump_rows": normalized.get("season_rows") or [],
+            "bump_totals": normalized.get("season_team_totals") or {},
+            "bump_last_rows": normalized.get("last_rows") or [],
+            "bump_last_totals": normalized.get("last_team_totals") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
+
+    # >>> BLUE COLLAR SPLIT DATA START
     season_by = normalized.get("season_rows_by_subtype") or {}
     totals_by = normalized.get("season_team_totals") or {}
 
     context = {
-        "crash_rows": [],
-        "backman_rows": [],
-        "crash_totals": {},
-        "backman_totals": {},
-        "close_rows": [],
-        "shut_rows": [],
+        "close_rows": season_by.get("close_window") or [],
+        "shut_rows": season_by.get("shut_door") or [],
         "close_totals": {},
         "shut_totals": {},
     }
-
-    if stat_key == "off_rebounding":
-        # >>> REB LEADERBOARD SPLIT DATA START
-        context["crash_rows"] = season_by.get("crash") or []
-        context["backman_rows"] = season_by.get("back_man") or []
-        if isinstance(totals_by, dict):
-            context["crash_totals"] = totals_by.get("crash") or {}
-            context["backman_totals"] = totals_by.get("back_man") or {}
-        # >>> REB LEADERBOARD SPLIT DATA END
-    elif stat_key == "pnr_grade":
-        # >>> BLUE COLLAR SPLIT DATA START
-        context["close_rows"] = season_by.get("close_window") or []
-        context["shut_rows"] = season_by.get("shut_door") or []
-        if isinstance(totals_by, dict):
-            context["close_totals"] = totals_by.get("close_window") or {}
-            context["shut_totals"] = totals_by.get("shut_door") or {}
-        # >>> BLUE COLLAR SPLIT DATA END
+    if isinstance(totals_by, dict):
+        context["close_totals"] = totals_by.get("close_window") or {}
+        context["shut_totals"] = totals_by.get("shut_door") or {}
+    # >>> BLUE COLLAR SPLIT DATA END
 
     return context
 
@@ -5653,7 +5708,29 @@ def leaderboard():
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cfg, rows, team_totals = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
-    split_context = _split_leaderboard_rows_for_template(cfg['key'], rows, team_totals) if cfg else {}
+    practice_dual_ctx = (
+        get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
+        if cfg
+        else None
+    )
+    season_rows_for_split = (
+        practice_dual_ctx.get('season_rows') if practice_dual_ctx else rows
+    )
+    season_totals_for_split = (
+        practice_dual_ctx.get('season_team_totals') if practice_dual_ctx else team_totals
+    )
+    split_context = (
+        _split_leaderboard_rows_for_template(
+            cfg['key'],
+            season_rows_for_split,
+            season_totals_for_split,
+            last_rows=practice_dual_ctx.get('last_rows') if practice_dual_ctx else None,
+            last_team_totals=practice_dual_ctx.get('last_team_totals') if practice_dual_ctx else None,
+            last_practice_date=practice_dual_ctx.get('last_practice_date') if practice_dual_ctx else None,
+        )
+        if cfg
+        else {}
+    )
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
