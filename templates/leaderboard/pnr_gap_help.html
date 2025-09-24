@@ -30,8 +30,6 @@
   {% include "_practice_scope_tabs.html" %}
   {% set scope_label_map = {'last': 'Last Practice', 'session': 'Session Totals', 'season': 'Season Totals'} %}
   {% set scope_label_text = scope_label_map.get(scope, 'Season Totals') %}
-  {% set season_by = season_rows_by_subtype or {} %}
-  {% set last_by = last_rows_by_subtype or {} %}
   <div class="space-y-6">
     <div class="bg-white p-6 rounded shadow space-y-6">
       <div>
@@ -49,54 +47,32 @@
           <p class="text-sm text-gray-500">No practice data for this scope.</p>
         {% endif %}
         {% if last_practice_date %}
-          <span class="hidden">Last practice: {{ last_practice_date.strftime('%b %d, %Y') }}</span>
+          {% set last_practice_date = last_practice_date.strftime('%b %d, %Y') %}
         {% endif %}
       </div>
 
-      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-
-      {% set gap_columns = ["Gap +", "Gap Opp", "Gap %"] %}
-      {% set gap_map = {
-        "Gap +": ("plus", "gap_plus"),
-        "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-        "Gap %": ("pct", "gap_pct"),
-      } %}
-      {% set gap_pct_columns = ["Gap %"] %}
-      {% set season_gap_rows = (season_by.get('gap_help') or [])|format_dual_rows(gap_columns, gap_map, gap_pct_columns) %}
-      {% set last_gap_rows = (last_by.get('gap_help') or [])|format_dual_rows(gap_columns, gap_map, gap_pct_columns) %}
-      {% set season_gap_totals = (season_team_totals.get('gap_help') if season_team_totals else None)|format_dual_totals(gap_columns, gap_map, gap_pct_columns) %}
-      {% set last_gap_totals = (last_team_totals.get('gap_help') if last_team_totals else None)|format_dual_totals(gap_columns, gap_map, gap_pct_columns) %}
+      {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
 
       {{ render_dual_section(
-        "Gap Help",
-        season_rows=season_gap_rows,
-        season_totals=season_gap_totals,
-        last_rows=last_gap_rows,
-        last_totals=last_gap_totals,
-        columns=gap_columns,
-        note_date=practice_note
+        title="PnR Gap Help",
+        season_rows=pnr_rows,
+        season_totals=pnr_totals,
+        last_rows=pnr_last_rows,
+        last_totals=pnr_last_totals,
+        columns=columns,
+        note_date=last_practice_date
       ) }}
 
-      {% set low_columns = ["Low +", "Low Opp", "Low %"] %}
-      {% set low_map = {
-        "Low +": ("plus", "low_plus"),
-        "Low Opp": ("opps", "low_opp", "low_opps"),
-        "Low %": ("pct", "low_pct"),
-      } %}
-      {% set low_pct_columns = ["Low %"] %}
-      {% set season_low_rows = (season_by.get('low_help') or [])|format_dual_rows(low_columns, low_map, low_pct_columns) %}
-      {% set last_low_rows = (last_by.get('low_help') or [])|format_dual_rows(low_columns, low_map, low_pct_columns) %}
-      {% set season_low_totals = (season_team_totals.get('low_help') if season_team_totals else None)|format_dual_totals(low_columns, low_map, low_pct_columns) %}
-      {% set last_low_totals = (last_team_totals.get('low_help') if last_team_totals else None)|format_dual_totals(low_columns, low_map, low_pct_columns) %}
+      <div class="h-6"></div>
 
       {{ render_dual_section(
-        "Low Help",
-        season_rows=season_low_rows,
-        season_totals=season_low_totals,
-        last_rows=last_low_rows,
-        last_totals=last_low_totals,
-        columns=low_columns,
-        note_date=practice_note
+        title="PnR Gap Help — Low Man",
+        season_rows=low_rows,
+        season_totals=low_totals,
+        last_rows=low_last_rows,
+        last_totals=low_last_totals,
+        columns=columns,
+        note_date=last_practice_date
       ) }}
     </div>
   </div>
