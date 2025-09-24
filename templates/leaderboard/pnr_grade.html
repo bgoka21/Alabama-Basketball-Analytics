@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'leaderboard/_dual_macros.html' import render_dual_section %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -53,28 +53,50 @@
         {% endif %}
       </div>
 
+      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+
+      {% set close_columns = ["Close Window +", "Close Window Att", "Close Window %"] %}
+      {% set close_map = {
+        "Close Window +": ("plus", "close_window_plus", "cw_plus"),
+        "Close Window Att": ("opps", "close_window_opp", "cw_opp"),
+        "Close Window %": ("pct", "close_window_pct", "cw_pct"),
+      } %}
+      {% set close_pct_columns = ["Close Window %"] %}
+      {% set season_close_rows = (season_by.get('close_window') or [])|format_dual_rows(close_columns, close_map, close_pct_columns) %}
+      {% set last_close_rows = (last_by.get('close_window') or [])|format_dual_rows(close_columns, close_map, close_pct_columns) %}
+      {% set season_close_totals = (season_team_totals.get('close_window') if season_team_totals else None)|format_dual_totals(close_columns, close_map, close_pct_columns) %}
+      {% set last_close_totals = (last_team_totals.get('close_window') if last_team_totals else None)|format_dual_totals(close_columns, close_map, close_pct_columns) %}
+
       {{ render_dual_section(
         "Close Window",
-        season_rows=season_by.get('close_window'),
-        season_totals=season_team_totals.get('close_window') if season_team_totals else None,
-        last_rows=last_by.get('close_window'),
-        last_totals=last_team_totals.get('close_window') if last_team_totals else None,
-        plus_label='Close Window +',
-        opps_label='Close Window Opps',
-        pct_label='Close Window %',
-        scope=scope
+        season_rows=season_close_rows,
+        season_totals=season_close_totals,
+        last_rows=last_close_rows,
+        last_totals=last_close_totals,
+        columns=close_columns,
+        note_date=practice_note
       ) }}
+
+      {% set shut_columns = ["Shut Door +", "Shut Door Att", "Shut Door %"] %}
+      {% set shut_map = {
+        "Shut Door +": ("plus", "shut_door_plus", "sd_plus"),
+        "Shut Door Att": ("opps", "shut_door_opp", "sd_opp"),
+        "Shut Door %": ("pct", "shut_door_pct", "sd_pct"),
+      } %}
+      {% set shut_pct_columns = ["Shut Door %"] %}
+      {% set season_shut_rows = (season_by.get('shut_door') or [])|format_dual_rows(shut_columns, shut_map, shut_pct_columns) %}
+      {% set last_shut_rows = (last_by.get('shut_door') or [])|format_dual_rows(shut_columns, shut_map, shut_pct_columns) %}
+      {% set season_shut_totals = (season_team_totals.get('shut_door') if season_team_totals else None)|format_dual_totals(shut_columns, shut_map, shut_pct_columns) %}
+      {% set last_shut_totals = (last_team_totals.get('shut_door') if last_team_totals else None)|format_dual_totals(shut_columns, shut_map, shut_pct_columns) %}
 
       {{ render_dual_section(
         "Shut Door",
-        season_rows=season_by.get('shut_door'),
-        season_totals=season_team_totals.get('shut_door') if season_team_totals else None,
-        last_rows=last_by.get('shut_door'),
-        last_totals=last_team_totals.get('shut_door') if last_team_totals else None,
-        plus_label='Shut Door +',
-        opps_label='Shut Door Opps',
-        pct_label='Shut Door %',
-        scope=scope
+        season_rows=season_shut_rows,
+        season_totals=season_shut_totals,
+        last_rows=last_shut_rows,
+        last_totals=last_shut_totals,
+        columns=shut_columns,
+        note_date=practice_note
       ) }}
     </div>
   </div>
