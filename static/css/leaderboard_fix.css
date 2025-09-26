@@ -1,7 +1,45 @@
 /* Enforce consistent, equal stat-column widths and predictable layout */
 .table-leaderboard {
-  table-layout: fixed; /* makes width assignments deterministic */
+  table-layout: fixed;        /* makes width assignments deterministic */
   width: 100%;
+  border-collapse: separate;  /* for rounded corners + shadows */
+  border-spacing: 0;
+}
+
+/* --- layout & scroll --- */
+.table-wrap {
+  overflow-x: auto;           /* allow horizontal scroll on small screens */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* --- sticky header (2-row THEAD) --- */
+.table-leaderboard thead tr:nth-child(1) th,
+.table-leaderboard thead tr:nth-child(2) th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: white;          /* match card color */
+}
+
+/* --- row zebra & hover --- */
+.table-leaderboard tbody tr:nth-child(odd) {
+  background-color: #fafafa;
+}
+.table-leaderboard tbody tr:hover {
+  background-color: #f1f5f9;  /* slate-100-ish */
+}
+
+/* --- borders that align with Tailwind "divide" look --- */
+.table-leaderboard th,
+.table-leaderboard td {
+  border-bottom: 1px solid #e5e7eb; /* gray-200 */
+}
+
+/* --- numeric consistency: prevent jitter when sorting --- */
+.table-leaderboard,
+.th-num, .td-num,
+.th-stat, .td-stat {
+  font-variant-numeric: tabular-nums; /* monospaced digits */
 }
 
 /* First two columns */
@@ -25,9 +63,23 @@
   white-space: nowrap;
 }
 
-/* Group labels row: center “Totals” and “Last Practice” */
+.table-leaderboard td {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* --- group header cells --- */
 .th-group {
   text-align: center;
   white-space: nowrap;
   font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;       /* match px-4 py-2 */
+}
+
+/* --- utility: clamp overly long player names on small screens --- */
+@media (max-width: 768px) {
+  .th-player, .td-player {
+    width: 16rem;
+  }
 }
