@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'macros/dual_tables.html' import render_dual_section %}
+{% from "macros/dual_tables.html" import render_grouped_last_practice_header, td_stat %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -46,32 +46,95 @@
         {% if not scope_has_data %}
           <p class="text-sm text-gray-500">No practice data for this scope.</p>
         {% endif %}
-        {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
       </div>
 
-      {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+      {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+      {% set GAP_HELP_LABELS = ["Gap +", "Gap Opp", "Gap %"] %}
+      {% set LOW_MAN_LABELS = ["Gap +", "Gap Opp", "Gap %"] %}
 
-      {{ render_dual_section(
-        "PnR Gap Help",
-        pnr_rows,
-        pnr_totals,
-        pnr_last_rows,
-        pnr_last_totals,
-        columns,
-        practice_note
-      ) }}
+      {% set gap_rows = pnr_rows or [] %}
+      {% set gap_last_rows = pnr_last_rows or [] %}
+      <section class="mb-8">
+        <div class="flex items-baseline justify-between mb-3">
+          <h2 class="text-xl font-semibold">PnR Gap Help</h2>
+          {% if practice_note %}
+            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
+          {% endif %}
+        </div>
+        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
+          <table class="table-leaderboard min-w-full">
+            {{ render_grouped_last_practice_header(GAP_HELP_LABELS, "Totals", "Last Practice") }}
+            <tbody class="divide-y divide-gray-100">
+              {% for row in gap_rows %}
+                {% set last = gap_last_rows[loop.index0] if gap_last_rows|length > loop.index0 else none %}
+                {% set jersey = row.get('jersey') %}
+                {% if jersey is none and row.jersey is defined %}
+                  {% set jersey = row.jersey %}
+                {% endif %}
+                {% if jersey is none %}
+                  {% set jersey = loop.index %}
+                {% endif %}
+                {% set player_name = row.get('player') %}
+                {% if player_name is none and row.player is defined %}
+                  {% set player_name = row.player %}
+                {% endif %}
+                <tr>
+                  <td class="td-num px-4 py-2 text-center">{{ jersey }}</td>
+                  <td class="td-player px-4 py-2 text-left">{{ player_name }}</td>
+                  {{ td_stat(row.get('Gap +')) }}
+                  {{ td_stat(row.get('Gap Opp')) }}
+                  {{ td_stat(row.get('Gap %')) }}
+                  {{ td_stat(last.get('Gap +') if last else '—') }}
+                  {{ td_stat(last.get('Gap Opp') if last else '—') }}
+                  {{ td_stat(last.get('Gap %') if last else '—') }}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <div class="h-6"></div>
-
-      {{ render_dual_section(
-        "PnR Gap Help — Low Man",
-        low_rows,
-        low_totals,
-        low_last_rows,
-        low_last_totals,
-        columns,
-        practice_note
-      ) }}
+      {% set low_rows_list = low_rows or [] %}
+      {% set low_last_rows_list = low_last_rows or [] %}
+      <section aria-label="PnR Gap Help — Low Man">
+        <div class="flex items-baseline justify-between mb-3">
+          <h2 class="text-xl font-semibold">PnR Low Man</h2>
+          {% if practice_note %}
+            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
+          {% endif %}
+        </div>
+        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
+          <table class="table-leaderboard min-w-full">
+            {{ render_grouped_last_practice_header(LOW_MAN_LABELS, "Totals", "Last Practice") }}
+            <tbody class="divide-y divide-gray-100">
+              {% for row in low_rows_list %}
+                {% set last = low_last_rows_list[loop.index0] if low_last_rows_list|length > loop.index0 else none %}
+                {% set jersey = row.get('jersey') %}
+                {% if jersey is none and row.jersey is defined %}
+                  {% set jersey = row.jersey %}
+                {% endif %}
+                {% if jersey is none %}
+                  {% set jersey = loop.index %}
+                {% endif %}
+                {% set player_name = row.get('player') %}
+                {% if player_name is none and row.player is defined %}
+                  {% set player_name = row.player %}
+                {% endif %}
+                <tr>
+                  <td class="td-num px-4 py-2 text-center">{{ jersey }}</td>
+                  <td class="td-player px-4 py-2 text-left">{{ player_name }}</td>
+                  {{ td_stat(row.get('Gap +')) }}
+                  {{ td_stat(row.get('Gap Opp')) }}
+                  {{ td_stat(row.get('Gap %')) }}
+                  {{ td_stat(last.get('Gap +') if last else '—') }}
+                  {{ td_stat(last.get('Gap Opp') if last else '—') }}
+                  {{ td_stat(last.get('Gap %') if last else '—') }}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   </div>
 {% endblock %}
