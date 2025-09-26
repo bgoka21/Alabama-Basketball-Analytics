@@ -118,11 +118,33 @@
     </div>
 
     <div class="overflow-x-auto">
-      <table class="min-w-full text-sm js-leaderboard" data-has-pct="{{ 1 if pct_col else 0 }}">
+      <table class="table-leaderboard min-w-full text-sm js-leaderboard" data-has-pct="{{ 1 if pct_col else 0 }}">
         <thead class="bg-gray-50">
           <tr>
             {%- for col in columns -%}
-              <th class="px-4 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">{{ col.label }}</th>
+              {%- set key_lower = (col.key|string|lower) if col.key is defined else '' -%}
+              {%- set align_from_col = col.header_align if col.header_align is defined and col.header_align else (col.align if col.align is defined and col.align else None) -%}
+              {%- set header_align = 'text-center' -%}
+              {%- if align_from_col -%}
+                {%- set align_str = align_from_col|string -%}
+                {%- if align_str[:5] == 'text-' -%}
+                  {%- set header_align = align_str -%}
+                {%- else -%}
+                  {%- set header_align = 'text-' ~ align_str -%}
+                {%- endif -%}
+              {%- elif loop.index0 == 0 or ('name' in key_lower) or ('player' in key_lower) or ('drill' in key_lower) or ('label' in key_lower) -%}
+                {%- set header_align = 'text-left' -%}
+              {%- endif -%}
+              {%- set th_classes = 'px-4 py-2 font-semibold text-gray-700 whitespace-nowrap ' ~ header_align -%}
+              {%- if col.header_classes is defined and col.header_classes -%}
+                {%- if col.header_classes is sequence and not (col.header_classes is string) -%}
+                  {%- set header_extra = col.header_classes|join(' ') -%}
+                {%- else -%}
+                  {%- set header_extra = col.header_classes|string -%}
+                {%- endif -%}
+                {%- set th_classes = th_classes ~ ' ' ~ header_extra -%}
+              {%- endif -%}
+              <th class="{{ th_classes|trim }}">{{ col.label }}</th>
             {%- endfor -%}
           </tr>
         </thead>
@@ -153,7 +175,29 @@
                   data-opps="{{ r_opps }}"
                   data-pct="{{ '%.6f' % r_pct }}">
                 {%- for col in columns -%}
-                  <td class="px-4 py-2 whitespace-nowrap">
+                  {%- set key_lower = (col.key|string|lower) if col.key is defined else '' -%}
+                  {%- set align_from_col = col.cell_align if col.cell_align is defined and col.cell_align else (col.align if col.align is defined and col.align else None) -%}
+                  {%- set cell_align = 'text-center' -%}
+                  {%- if align_from_col -%}
+                    {%- set align_str = align_from_col|string -%}
+                    {%- if align_str[:5] == 'text-' -%}
+                      {%- set cell_align = align_str -%}
+                    {%- else -%}
+                      {%- set cell_align = 'text-' ~ align_str -%}
+                    {%- endif -%}
+                  {%- elif loop.index0 == 0 or ('name' in key_lower) or ('player' in key_lower) or ('drill' in key_lower) or ('label' in key_lower) -%}
+                    {%- set cell_align = 'text-left' -%}
+                  {%- endif -%}
+                  {%- set td_classes = 'px-4 py-2 whitespace-nowrap ' ~ cell_align -%}
+                  {%- if col.cell_classes is defined and col.cell_classes -%}
+                    {%- if col.cell_classes is sequence and not (col.cell_classes is string) -%}
+                      {%- set cell_extra = col.cell_classes|join(' ') -%}
+                    {%- else -%}
+                      {%- set cell_extra = col.cell_classes|string -%}
+                    {%- endif -%}
+                    {%- set td_classes = td_classes ~ ' ' ~ cell_extra -%}
+                  {%- endif -%}
+                  <td class="{{ td_classes|trim }}">
                     {%- if col.calc == 'pct' -%}
                       {%- set pk2 = col.plus_key -%}
                       {%- set ok2 = col.opps_key -%}
@@ -185,7 +229,29 @@
             {%- endif -%}
             <tr class="font-semibold" data-total="1" data-plus="{{ t_plus }}" data-opps="{{ t_opps }}">
               {%- for col in columns -%}
-                <td class="px-4 py-2 whitespace-nowrap">
+                {%- set key_lower = (col.key|string|lower) if col.key is defined else '' -%}
+                {%- set align_from_col = col.cell_align if col.cell_align is defined and col.cell_align else (col.align if col.align is defined and col.align else None) -%}
+                {%- set cell_align = 'text-center' -%}
+                {%- if align_from_col -%}
+                  {%- set align_str = align_from_col|string -%}
+                  {%- if align_str[:5] == 'text-' -%}
+                    {%- set cell_align = align_str -%}
+                  {%- else -%}
+                    {%- set cell_align = 'text-' ~ align_str -%}
+                  {%- endif -%}
+                {%- elif loop.index0 == 0 or ('name' in key_lower) or ('player' in key_lower) or ('drill' in key_lower) or ('label' in key_lower) -%}
+                  {%- set cell_align = 'text-left' -%}
+                {%- endif -%}
+                {%- set td_classes = 'px-4 py-2 whitespace-nowrap ' ~ cell_align -%}
+                {%- if col.cell_classes is defined and col.cell_classes -%}
+                  {%- if col.cell_classes is sequence and not (col.cell_classes is string) -%}
+                    {%- set cell_extra = col.cell_classes|join(' ') -%}
+                  {%- else -%}
+                    {%- set cell_extra = col.cell_classes|string -%}
+                  {%- endif -%}
+                  {%- set td_classes = td_classes ~ ' ' ~ cell_extra -%}
+                {%- endif -%}
+                <td class="{{ td_classes|trim }}">
                   {%- if loop.index0 == 0 -%}
                     Team Total
                   {%- elif col.calc == 'pct' -%}
