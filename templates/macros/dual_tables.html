@@ -71,22 +71,62 @@
   “Totals” and “Last Practice” with matching stat labels.
   Use with .table-leaderboard + the CSS widths we added.
 #}
-{% macro render_grouped_last_practice_header(base_stat_labels, left_title='Totals', right_title='Last Practice') %}
-  <thead>
+{% macro render_grouped_last_practice_header(base_stat_labels, left_title='Totals', right_title='Last Practice', extra_headers=None, thead_class='bg-gray-100 border-b-4 border-[#9E1B32]') %}
+  {% set stat_count = base_stat_labels|length %}
+  {% set extras = extra_headers or [] %}
+  {% set ns = namespace(items=[], next_col=2 + stat_count * 2) %}
+  {% for header in extras %}
+    {% set colspan = header.get('colspan', 1) %}
+    {% set data_col = header.get('data_col') %}
+    {% if data_col is none %}
+      {% set data_col = ns.next_col %}
+    {% endif %}
+    {% set item = {
+      'label': header.get('label'),
+      'classes': header.get('classes'),
+      'colspan': colspan,
+      'rowspan': header.get('rowspan', 1),
+      'data_col': data_col,
+      'second_row_label': header.get('second_row_label'),
+      'second_row_classes': header.get('second_row_classes')
+    } %}
+    {% set _ = ns.items.append(item) %}
+    {% set ns.next_col = data_col + colspan %}
+  {% endfor %}
+  {% set extra_items = ns.items %}
+  <thead{% if thead_class %} class="{{ thead_class }}"{% endif %}>
     <tr>
-      <th class="th-num px-4 py-2" rowspan="2">#</th>
-      <th class="th-player px-4 py-2" rowspan="2">Player</th>
-      <th class="th-group px-4 py-2" colspan="{{ base_stat_labels|length }}">{{ left_title }}</th>
-      <th class="th-group px-4 py-2" colspan="{{ base_stat_labels|length }}">{{ right_title }}</th>
+      <th class="th-num px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
+      <th class="th-player px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
+      <th class="th-group px-4 py-2" colspan="{{ stat_count }}">{{ left_title }}</th>
+      <th class="th-group px-4 py-2" colspan="{{ stat_count }}">{{ right_title }}</th>
+      {% for item in extra_items %}
+        {% set classes = item.classes or 'th-stat px-4 py-2 text-center sortable' %}
+        <th class="{{ classes }}{% if 'sortable' not in classes %} sortable{% endif %}"
+            {% if item.rowspan != 1 %}rowspan="{{ item.rowspan }}"{% endif %}
+            {% if item.colspan != 1 %}colspan="{{ item.colspan }}"{% endif %}
+            data-col="{{ item.data_col }}">
+          {{ item.label }}
+        </th>
+      {% endfor %}
     </tr>
     <tr>
-      {# left group column labels #}
       {% for label in base_stat_labels %}
-        <th class="th-stat px-4 py-2">{{ label }}</th>
+        {% set data_col = 2 + loop.index0 %}
+        <th class="th-stat px-4 py-2 text-center sortable" data-col="{{ data_col }}">{{ label }}</th>
       {% endfor %}
-      {# right group (Last Practice) uses the SAME labels — no “(Last Practice)” suffix #}
       {% for label in base_stat_labels %}
-        <th class="th-stat px-4 py-2">{{ label }}</th>
+        {% set data_col = 2 + stat_count + loop.index0 %}
+        <th class="th-stat px-4 py-2 text-center sortable" data-col="{{ data_col }}">{{ label }}</th>
+      {% endfor %}
+      {% set extra_index = 0 %}
+      {% for item in extra_items %}
+        {% if item.rowspan == 1 %}
+          {% set classes = item.second_row_classes or item.classes or 'th-stat px-4 py-2 text-center sortable' %}
+          <th class="{{ classes }}{% if 'sortable' not in classes %} sortable{% endif %}" data-col="{{ item.data_col }}">
+            {{ item.second_row_label or item.label }}
+          </th>
+        {% endif %}
       {% endfor %}
     </tr>
   </thead>

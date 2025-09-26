@@ -1,3 +1,5 @@
+{% from "macros/dual_tables.html" import render_grouped_last_practice_header, td_stat %}
+
 <h1 class="text-3xl font-bold mb-6">Season Leaderboard</h1>
 
 <form method="get" class="mb-4">
@@ -26,23 +28,8 @@
         {% set _ = bump_last_ns.rows.update({name: entry}) %}
       {% endif %}
     {% endfor %}
-    <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
-          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
-          <th class="px-4 py-2 text-center" colspan="3">Collisions</th>
-          <th class="px-4 py-2 text-center" colspan="3">Collisions (Last Practice)</th>
-        </tr>
-        <tr>
-          <th class="px-4 py-2 text-center sortable" data-col="2">Bump +</th>
-          <th class="px-4 py-2 text-center sortable" data-col="3">Bump Opps</th>
-          <th class="px-4 py-2 text-center sortable" data-col="4">Bump %</th>
-          <th class="px-4 py-2 text-center sortable" data-col="5">Bump + (Last Practice)</th>
-          <th class="px-4 py-2 text-center sortable" data-col="6">Bump Opps (Last Practice)</th>
-          <th class="px-4 py-2 text-center sortable" data-col="7">Bump % (Last Practice)</th>
-        </tr>
-      </thead>
+    <table class="table-leaderboard min-w-full bg-white rounded-lg shadow border text-center">
+      {{ render_grouped_last_practice_header(["Bump +", "Bump Opps", "Bump %"], "Collisions", "Last Practice") }}
       <tbody class="divide-y divide-gray-200">
         {% for row in bump_rows or [] %}
           {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
@@ -53,31 +40,29 @@
           {% set last_plus = last.get('plus', 0) if last else 0 %}
           {% set last_opps = last.get('opps', 0) if last else 0 %}
           {% set last_pct = last.get('pct') if last else None %}
+          {% if pct is not none %}
+            {% set pct_display = pct|round(1) ~ '%' %}
+          {% elif opps %}
+            {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set pct_display = 'NA' %}
+          {% endif %}
+          {% if last_pct is not none %}
+            {% set last_pct_display = last_pct|round(1) ~ '%' %}
+          {% elif last_opps %}
+            {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set last_pct_display = 'NA' %}
+          {% endif %}
           <tr class="even:bg-gray-50">
-            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
-            <td class="px-4 py-2 text-left">{{ name }}</td>
-            <td class="px-4 py-2 text-center">{{ plus }}</td>
-            <td class="px-4 py-2 text-center">{{ opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if pct is not none %}
-                {{ pct|round(1) }}%
-              {% elif opps %}
-                {{ (plus / opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
-            <td class="px-4 py-2 text-center">{{ last_plus }}</td>
-            <td class="px-4 py-2 text-center">{{ last_opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if last_pct is not none %}
-                {{ last_pct|round(1) }}%
-              {% elif last_opps %}
-                {{ (last_plus / last_opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
+            <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+            {{ td_stat(plus) }}
+            {{ td_stat(opps) }}
+            {{ td_stat(pct_display) }}
+            {{ td_stat(last_plus) }}
+            {{ td_stat(last_opps) }}
+            {{ td_stat(last_pct_display) }}
           </tr>
         {% endfor %}
         {% if bump_totals or bump_last_totals %}
@@ -87,31 +72,29 @@
           {% set lp_plus = (bump_last_totals or {}).get('plus', 0) %}
           {% set lp_opps = (bump_last_totals or {}).get('opps', 0) %}
           {% set lp_pct = (bump_last_totals or {}).get('pct') %}
+          {% if season_pct is not none %}
+            {% set season_pct_display = season_pct|round(1) ~ '%' %}
+          {% elif season_opps %}
+            {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set season_pct_display = 'NA' %}
+          {% endif %}
+          {% if lp_pct is not none %}
+            {% set lp_pct_display = lp_pct|round(1) ~ '%' %}
+          {% elif lp_opps %}
+            {% set lp_pct_display = (lp_plus / lp_opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set lp_pct_display = 'NA' %}
+          {% endif %}
           <tr class="font-bold bg-gray-100 team-totals">
-            <td class="px-4 py-2 text-center"></td>
-            <td class="px-4 py-2 text-left">Team Totals</td>
-            <td class="px-4 py-2 text-center">{{ season_plus }}</td>
-            <td class="px-4 py-2 text-center">{{ season_opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if season_pct is not none %}
-                {{ season_pct|round(1) }}%
-              {% elif season_opps %}
-                {{ (season_plus / season_opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
-            <td class="px-4 py-2 text-center">{{ lp_plus }}</td>
-            <td class="px-4 py-2 text-center">{{ lp_opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if lp_pct is not none %}
-                {{ lp_pct|round(1) }}%
-              {% elif lp_opps %}
-                {{ (lp_plus / lp_opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
+            <td class="td-num px-4 py-2 text-center"></td>
+            <td class="td-player px-4 py-2 text-left">Team Totals</td>
+            {{ td_stat(season_plus) }}
+            {{ td_stat(season_opps) }}
+            {{ td_stat(season_pct_display) }}
+            {{ td_stat(lp_plus) }}
+            {{ td_stat(lp_opps) }}
+            {{ td_stat(lp_pct_display) }}
           </tr>
         {% endif %}
       </tbody>
@@ -129,19 +112,8 @@
             {% endif %}
           {% endfor %}
           <div class="flex-1 overflow-x-auto min-h-0">
-            <table class="min-w-full bg-white rounded-lg shadow border text-center h-full">
-              <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
-                  <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="2">Crash +</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="3">Crash Att</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="4">Crash %</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="5">Crash + (Last Practice)</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="6">Crash Att (Last Practice)</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="7">Crash % (Last Practice)</th>
-                </tr>
-              </thead>
+            <table class="table-leaderboard min-w-full bg-white rounded-lg shadow border text-center h-full">
+              {{ render_grouped_last_practice_header(["Crash +", "Crash Att", "Crash %"], "Totals", "Last Practice") }}
               <tbody class="divide-y divide-gray-200">
                 {% for row in crash_rows or [] %}
                   {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
@@ -152,31 +124,29 @@
                   {% set last_plus = last.get('plus', 0) if last else 0 %}
                   {% set last_opps = last.get('opps', 0) if last else 0 %}
                   {% set last_pct = last.get('pct') if last else None %}
+                  {% if pct is not none %}
+                    {% set pct_display = pct|round(1) ~ '%' %}
+                  {% elif opps %}
+                    {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set pct_display = 'NA' %}
+                  {% endif %}
+                  {% if last_pct is not none %}
+                    {% set last_pct_display = last_pct|round(1) ~ '%' %}
+                  {% elif last_opps %}
+                    {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set last_pct_display = 'NA' %}
+                  {% endif %}
                   <tr class="even:bg-gray-50">
-                    <td class="px-4 py-2 text-center">{{ loop.index }}</td>
-                    <td class="px-4 py-2 text-left">{{ name }}</td>
-                    <td class="px-4 py-2 text-center">{{ plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if pct is not none %}
-                        {{ pct|round(1) }}%
-                      {% elif opps %}
-                        {{ (plus / opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                    <td class="px-4 py-2 text-center">{{ last_plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ last_opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if last_pct is not none %}
-                        {{ last_pct|round(1) }}%
-                      {% elif last_opps %}
-                        {{ (last_plus / last_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
+                    <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+                    <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+                    {{ td_stat(plus) }}
+                    {{ td_stat(opps) }}
+                    {{ td_stat(pct_display) }}
+                    {{ td_stat(last_plus) }}
+                    {{ td_stat(last_opps) }}
+                    {{ td_stat(last_pct_display) }}
                   </tr>
                 {% endfor %}
                 {% if crash_totals or crash_last_totals %}
@@ -186,31 +156,29 @@
                   {% set lt_plus = (crash_last_totals or {}).get('plus', 0) %}
                   {% set lt_opps = (crash_last_totals or {}).get('opps', 0) %}
                   {% set lt_pct = (crash_last_totals or {}).get('pct') %}
+                  {% if t_pct is not none %}
+                    {% set t_pct_display = t_pct|round(1) ~ '%' %}
+                  {% elif t_opps %}
+                    {% set t_pct_display = (t_plus / t_opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set t_pct_display = 'NA' %}
+                  {% endif %}
+                  {% if lt_pct is not none %}
+                    {% set lt_pct_display = lt_pct|round(1) ~ '%' %}
+                  {% elif lt_opps %}
+                    {% set lt_pct_display = (lt_plus / lt_opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set lt_pct_display = 'NA' %}
+                  {% endif %}
                   <tr class="bg-gray-100 font-semibold team-totals">
-                    <td class="px-4 py-2 text-center"></td>
-                    <td class="px-4 py-2 text-left">Team Totals</td>
-                    <td class="px-4 py-2 text-center">{{ t_plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ t_opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if t_pct is not none %}
-                        {{ t_pct|round(1) }}%
-                      {% elif t_opps %}
-                        {{ (t_plus / t_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                    <td class="px-4 py-2 text-center">{{ lt_plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ lt_opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if lt_pct is not none %}
-                        {{ lt_pct|round(1) }}%
-                      {% elif lt_opps %}
-                        {{ (lt_plus / lt_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
+                    <td class="td-num px-4 py-2 text-center"></td>
+                    <td class="td-player px-4 py-2 text-left">Team Totals</td>
+                    {{ td_stat(t_plus) }}
+                    {{ td_stat(t_opps) }}
+                    {{ td_stat(t_pct_display) }}
+                    {{ td_stat(lt_plus) }}
+                    {{ td_stat(lt_opps) }}
+                    {{ td_stat(lt_pct_display) }}
                   </tr>
                 {% endif %}
               </tbody>
@@ -227,19 +195,8 @@
             {% endif %}
           {% endfor %}
           <div class="flex-1 overflow-x-auto min-h-0">
-            <table class="min-w-full bg-white rounded-lg shadow border text-center h-full">
-              <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-center sortable" data-col="0">#</th>
-                  <th class="px-4 py-2 text-left sortable" data-col="1">Player</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="2">Back Man +</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="3">Back Man Att</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="4">Back Man %</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="5">Back Man + (Last Practice)</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="6">Back Man Att (Last Practice)</th>
-                  <th class="px-4 py-2 text-center sortable" data-col="7">Back Man % (Last Practice)</th>
-                </tr>
-              </thead>
+            <table class="table-leaderboard min-w-full bg-white rounded-lg shadow border text-center h-full">
+              {{ render_grouped_last_practice_header(["Back Man +", "Back Man Att", "Back Man %"], "Totals", "Last Practice") }}
               <tbody class="divide-y divide-gray-200">
                 {% for row in backman_rows or [] %}
                   {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
@@ -250,31 +207,29 @@
                   {% set last_plus = last.get('plus', 0) if last else 0 %}
                   {% set last_opps = last.get('opps', 0) if last else 0 %}
                   {% set last_pct = last.get('pct') if last else None %}
+                  {% if pct is not none %}
+                    {% set pct_display = pct|round(1) ~ '%' %}
+                  {% elif opps %}
+                    {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set pct_display = 'NA' %}
+                  {% endif %}
+                  {% if last_pct is not none %}
+                    {% set last_pct_display = last_pct|round(1) ~ '%' %}
+                  {% elif last_opps %}
+                    {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set last_pct_display = 'NA' %}
+                  {% endif %}
                   <tr class="even:bg-gray-50">
-                    <td class="px-4 py-2 text-center">{{ loop.index }}</td>
-                    <td class="px-4 py-2 text-left">{{ name }}</td>
-                    <td class="px-4 py-2 text-center">{{ plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if pct is not none %}
-                        {{ pct|round(1) }}%
-                      {% elif opps %}
-                        {{ (plus / opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                    <td class="px-4 py-2 text-center">{{ last_plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ last_opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if last_pct is not none %}
-                        {{ last_pct|round(1) }}%
-                      {% elif last_opps %}
-                        {{ (last_plus / last_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
+                    <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+                    <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+                    {{ td_stat(plus) }}
+                    {{ td_stat(opps) }}
+                    {{ td_stat(pct_display) }}
+                    {{ td_stat(last_plus) }}
+                    {{ td_stat(last_opps) }}
+                    {{ td_stat(last_pct_display) }}
                   </tr>
                 {% endfor %}
                 {% if backman_totals or backman_last_totals %}
@@ -284,31 +239,29 @@
                   {% set lt_plus = (backman_last_totals or {}).get('plus', 0) %}
                   {% set lt_opps = (backman_last_totals or {}).get('opps', 0) %}
                   {% set lt_pct = (backman_last_totals or {}).get('pct') %}
+                  {% if t_pct is not none %}
+                    {% set t_pct_display = t_pct|round(1) ~ '%' %}
+                  {% elif t_opps %}
+                    {% set t_pct_display = (t_plus / t_opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set t_pct_display = 'NA' %}
+                  {% endif %}
+                  {% if lt_pct is not none %}
+                    {% set lt_pct_display = lt_pct|round(1) ~ '%' %}
+                  {% elif lt_opps %}
+                    {% set lt_pct_display = (lt_plus / lt_opps * 100)|round(1) ~ '%' %}
+                  {% else %}
+                    {% set lt_pct_display = 'NA' %}
+                  {% endif %}
                   <tr class="bg-gray-100 font-semibold team-totals">
-                    <td class="px-4 py-2 text-center"></td>
-                    <td class="px-4 py-2 text-left">Team Totals</td>
-                    <td class="px-4 py-2 text-center">{{ t_plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ t_opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if t_pct is not none %}
-                        {{ t_pct|round(1) }}%
-                      {% elif t_opps %}
-                        {{ (t_plus / t_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                    <td class="px-4 py-2 text-center">{{ lt_plus }}</td>
-                    <td class="px-4 py-2 text-center">{{ lt_opps }}</td>
-                    <td class="px-4 py-2 text-center">
-                      {% if lt_pct is not none %}
-                        {{ lt_pct|round(1) }}%
-                      {% elif lt_opps %}
-                        {{ (lt_plus / lt_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
+                    <td class="td-num px-4 py-2 text-center"></td>
+                    <td class="td-player px-4 py-2 text-left">Team Totals</td>
+                    {{ td_stat(t_plus) }}
+                    {{ td_stat(t_opps) }}
+                    {{ td_stat(t_pct_display) }}
+                    {{ td_stat(lt_plus) }}
+                    {{ td_stat(lt_opps) }}
+                    {{ td_stat(lt_pct_display) }}
                   </tr>
                 {% endif %}
               </tbody>
@@ -326,24 +279,13 @@
         {% set _ = box_last_ns.rows.update({name: entry}) %}
       {% endif %}
     {% endfor %}
-    <table class="min-w-full bg-white rounded-lg shadow border text-center">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
-          <th class="px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
-          <th class="px-4 py-2 text-center" colspan="3">Box Out</th>
-          <th class="px-4 py-2 text-center" colspan="3">Box Out (Last Practice)</th>
-          <th class="px-4 py-2 text-center sortable" rowspan="2" data-col="8">Off Reb's<br>Given Up</th>
-        </tr>
-        <tr>
-          <th class="px-4 py-2 text-center sortable" data-col="2">Box Out +</th>
-          <th class="px-4 py-2 text-center sortable" data-col="3">Box Out Opp</th>
-          <th class="px-4 py-2 text-center sortable" data-col="4">Box Out %</th>
-          <th class="px-4 py-2 text-center sortable" data-col="5">Box Out + (Last Practice)</th>
-          <th class="px-4 py-2 text-center sortable" data-col="6">Box Out Opp (Last Practice)</th>
-          <th class="px-4 py-2 text-center sortable" data-col="7">Box Out % (Last Practice)</th>
-        </tr>
-      </thead>
+    <table class="table-leaderboard min-w-full bg-white rounded-lg shadow border text-center">
+      {{ render_grouped_last_practice_header(
+        ["Box Out +", "Box Out Opp", "Box Out %"],
+        "Box Out",
+        "Last Practice",
+        [{'label': "Off Reb's<br>Given Up", 'rowspan': 2, 'classes': 'th-stat px-4 py-2 text-center sortable'}]
+      ) }}
       <tbody class="divide-y divide-gray-200">
         {% for row in box_rows or [] %}
           {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
@@ -355,32 +297,30 @@
           {% set last_plus = last.get('plus', 0) if last else 0 %}
           {% set last_opps = last.get('opps', 0) if last else 0 %}
           {% set last_pct = last.get('pct') if last else None %}
+          {% if pct is not none %}
+            {% set pct_display = pct|round(1) ~ '%' %}
+          {% elif opps %}
+            {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set pct_display = 'NA' %}
+          {% endif %}
+          {% if last_pct is not none %}
+            {% set last_pct_display = last_pct|round(1) ~ '%' %}
+          {% elif last_opps %}
+            {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set last_pct_display = 'NA' %}
+          {% endif %}
           <tr class="even:bg-gray-50">
-            <td class="px-4 py-2 text-center">{{ loop.index }}</td>
-            <td class="px-4 py-2 text-left">{{ name }}</td>
-            <td class="px-4 py-2 text-center">{{ plus }}</td>
-            <td class="px-4 py-2 text-center">{{ opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if pct is not none %}
-                {{ pct|round(1) }}%
-              {% elif opps %}
-                {{ (plus / opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
-            <td class="px-4 py-2 text-center">{{ last_plus }}</td>
-            <td class="px-4 py-2 text-center">{{ last_opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if last_pct is not none %}
-                {{ last_pct|round(1) }}%
-              {% elif last_opps %}
-                {{ (last_plus / last_opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
-            <td class="px-4 py-2 text-center">{{ given_up }}</td>
+            <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+            <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+            {{ td_stat(plus) }}
+            {{ td_stat(opps) }}
+            {{ td_stat(pct_display) }}
+            {{ td_stat(last_plus) }}
+            {{ td_stat(last_opps) }}
+            {{ td_stat(last_pct_display) }}
+            {{ td_stat(given_up) }}
           </tr>
         {% endfor %}
         {% if box_totals or box_last_totals %}
@@ -391,32 +331,30 @@
           {% set lt_plus = (box_last_totals or {}).get('plus', 0) %}
           {% set lt_opps = (box_last_totals or {}).get('opps', 0) %}
           {% set lt_pct = (box_last_totals or {}).get('pct') %}
+          {% if t_pct is not none %}
+            {% set t_pct_display = t_pct|round(1) ~ '%' %}
+          {% elif t_opps %}
+            {% set t_pct_display = (t_plus / t_opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set t_pct_display = 'NA' %}
+          {% endif %}
+          {% if lt_pct is not none %}
+            {% set lt_pct_display = lt_pct|round(1) ~ '%' %}
+          {% elif lt_opps %}
+            {% set lt_pct_display = (lt_plus / lt_opps * 100)|round(1) ~ '%' %}
+          {% else %}
+            {% set lt_pct_display = 'NA' %}
+          {% endif %}
           <tr class="bg-gray-100 font-semibold team-totals">
-            <td class="px-4 py-2 text-center"></td>
-            <td class="px-4 py-2 text-left">Team Totals</td>
-            <td class="px-4 py-2 text-center">{{ t_plus }}</td>
-            <td class="px-4 py-2 text-center">{{ t_opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if t_pct is not none %}
-                {{ t_pct|round(1) }}%
-              {% elif t_opps %}
-                {{ (t_plus / t_opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
-            <td class="px-4 py-2 text-center">{{ lt_plus }}</td>
-            <td class="px-4 py-2 text-center">{{ lt_opps }}</td>
-            <td class="px-4 py-2 text-center">
-              {% if lt_pct is not none %}
-                {{ lt_pct|round(1) }}%
-              {% elif lt_opps %}
-                {{ (lt_plus / lt_opps * 100)|round(1) }}%
-              {% else %}
-                NA
-              {% endif %}
-            </td>
-            <td class="px-4 py-2 text-center">{{ t_given }}</td>
+            <td class="td-num px-4 py-2 text-center"></td>
+            <td class="td-player px-4 py-2 text-left">Team Totals</td>
+            {{ td_stat(t_plus) }}
+            {{ td_stat(t_opps) }}
+            {{ td_stat(t_pct_display) }}
+            {{ td_stat(lt_plus) }}
+            {{ td_stat(lt_opps) }}
+            {{ td_stat(lt_pct_display) }}
+            {{ td_stat(t_given) }}
           </tr>
         {% endif %}
       </tbody>
