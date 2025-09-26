@@ -624,6 +624,12 @@
             <th class="th-stat px-4 py-2 text-center sortable" data-col="2">FG</th>
             <th class="th-stat px-4 py-2 text-center sortable" data-col="3">FG%</th>
             <th class="th-stat px-4 py-2 text-center sortable" data-col="4">Freq</th>
+            {% if selected.key == 'fg3_fg_pct' %}
+              <th class="th-stat px-4 py-2 text-center sortable" data-col="5">Shrink 3FG (Att)</th>
+              <th class="th-stat px-4 py-2 text-center sortable" data-col="6">Shrink 3FG (%)</th>
+              <th class="th-stat px-4 py-2 text-center sortable" data-col="7">Non-Shrink 3FG (Att)</th>
+              <th class="th-stat px-4 py-2 text-center sortable" data-col="8">Non-Shrink 3FG (%)</th>
+            {% endif %}
           {% else %}
             <th class="th-stat px-4 py-2 text-center sortable" data-col="2">{{ selected.label }}</th>
           {% endif %}
@@ -657,11 +663,23 @@
               {{ td_stat(ind_foul) }}
               {{ td_stat(foul_rate) }}
             {% elif selected.key.endswith('_fg_pct') %}
-              {% set player, makes, attempts, pct, freq = row %}
-              <td class="td-player px-4 py-2 text-left">{{ player }}</td>
-              {{ td_stat(makes ~ '-' ~ attempts) }}
-              <td class="px-4 py-2">{{ pct|round(1) }}%</td>
-              <td class="px-4 py-2">{{ freq|round(1) }}%</td>
+              {% if selected.key == 'fg3_fg_pct' %}
+                {% set player, makes, attempts, pct, freq, shrink_att, shrink_pct, nonshrink_att, nonshrink_pct = row %}
+                <td class="td-player px-4 py-2 text-left">{{ player }}</td>
+                {{ td_stat(makes ~ '-' ~ attempts) }}
+                <td class="px-4 py-2 text-center">{{ pct|round(1) }}%</td>
+                <td class="px-4 py-2 text-center">{{ freq|round(1) }}%</td>
+                <td class="px-4 py-2 text-center">{{ shrink_att }}</td>
+                <td class="px-4 py-2 text-center">{{ shrink_pct|round(1) }}%</td>
+                <td class="px-4 py-2 text-center">{{ nonshrink_att }}</td>
+                <td class="px-4 py-2 text-center">{{ nonshrink_pct|round(1) }}%</td>
+              {% else %}
+                {% set player, makes, attempts, pct, freq = row %}
+                <td class="td-player px-4 py-2 text-left">{{ player }}</td>
+                {{ td_stat(makes ~ '-' ~ attempts) }}
+                <td class="px-4 py-2">{{ pct|round(1) }}%</td>
+                <td class="px-4 py-2">{{ freq|round(1) }}%</td>
+              {% endif %}
             {% else %}
               {% set player, val = row %}
               <td class="td-player px-4 py-2 text-left">{{ player }}</td>

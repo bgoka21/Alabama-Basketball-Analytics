@@ -351,7 +351,22 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
             attempts = details.get(att_key, 0)
             makes = details.get(make_key, 0)
             freq = details.get(freq_key, 0)
-            leaderboard.append((player, makes, attempts, pct, freq))
+            if stat_key == 'fg3_fg_pct':
+                leaderboard.append(
+                    (
+                        player,
+                        makes,
+                        attempts,
+                        pct,
+                        freq,
+                        details.get('fg3_shrink_att', 0),
+                        details.get('fg3_shrink_pct', 0.0),
+                        details.get('fg3_nonshrink_att', 0),
+                        details.get('fg3_nonshrink_pct', 0.0),
+                    )
+                )
+            else:
+                leaderboard.append((player, makes, attempts, pct, freq))
         leaderboard.sort(key=lambda x: x[3], reverse=True)
     else:
         for player in players:
@@ -885,6 +900,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     shot_details = {}
     for player, shot_list in new_shot_rows:
         detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
+        fg3_shrink_attempts = 0
+        fg3_nonshrink_attempts = 0
         for shot in shot_list:
             raw_sc = shot.get('shot_class', '').lower()
             sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
@@ -898,6 +915,55 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                 ctx = 'total'
             if sc not in ['atr', 'fg2', 'fg3']:
                 continue
+
+            if sc == 'fg3':
+                shrink_candidates = []
+
+                def _add_value(val):
+                    if val is None:
+                        return
+                    if isinstance(val, str):
+                        parts = re.split(r",", val)
+                    elif isinstance(val, Sequence) and not isinstance(val, (str, bytes)):
+                        parts = []
+                        for item in val:
+                            if item is None:
+                                continue
+                            if isinstance(item, str):
+                                parts.extend(re.split(r",", item))
+                            else:
+                                parts.append(str(item))
+                    else:
+                        parts = [val]
+                    for part in parts:
+                        text = str(part).strip()
+                        if text:
+                            shrink_candidates.append(text)
+
+                candidate_keys = []
+                if raw_sc:
+                    candidate_keys.append(f"{raw_sc}_shrink")
+                candidate_keys.extend([f"{sc}_shrink", "shrink"])
+                for key in candidate_keys:
+                    _add_value(shot.get(key))
+
+                _add_value(shot.get('drill_labels', []))
+
+                shrink_tag = None
+                for cand in shrink_candidates:
+                    norm = cand.strip().lower()
+                    plain = norm.replace('-', '').replace(' ', '')
+                    if plain == 'shrink':
+                        shrink_tag = 'shrink'
+                        break
+                    if plain == 'nonshrink':
+                        shrink_tag = 'nonshrink'
+
+                if shrink_tag == 'shrink':
+                    fg3_shrink_attempts += 1
+                else:
+                    fg3_nonshrink_attempts += 1
+
             bucket = detail_counts[(sc, label, ctx)]
             bucket['attempts'] += 1
             bucket['makes'] += (shot.get('result') == 'made')
@@ -926,6 +992,21 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             flat[f"{sc}_fg_pct"] = (m / a * 100 if a else 0)
             flat[f"{sc}_pps"] = (pts * m / a if a else 0)
             flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
+
+        fg3_totals = totals_by_sc.get('fg3') or {'attempts': 0}
+        fg3_attempts = fg3_totals.get('attempts', 0) if isinstance(fg3_totals, Mapping) else 0
+        if fg3_attempts and (fg3_shrink_attempts + fg3_nonshrink_attempts) != fg3_attempts:
+            fg3_nonshrink_attempts = max(0, fg3_attempts - fg3_shrink_attempts)
+            if fg3_shrink_attempts > fg3_attempts:
+                fg3_shrink_attempts = fg3_attempts
+
+        shrink_pct = (fg3_shrink_attempts / fg3_attempts * 100.0) if fg3_attempts else 0.0
+        nonshrink_pct = (fg3_nonshrink_attempts / fg3_attempts * 100.0) if fg3_attempts else 0.0
+
+        flat["fg3_shrink_att"] = fg3_shrink_attempts
+        flat["fg3_nonshrink_att"] = fg3_nonshrink_attempts
+        flat["fg3_shrink_pct"] = shrink_pct
+        flat["fg3_nonshrink_pct"] = nonshrink_pct
 
         shot_details[player] = flat
 
