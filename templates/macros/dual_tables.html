@@ -65,3 +65,35 @@
   </div>
 </div>
 {% endmacro %}
+
+{# 
+  Renders a two-row table header that groups stat columns into
+  “Totals” and “Last Practice” with matching stat labels.
+  Use with .table-leaderboard + the CSS widths we added.
+#}
+{% macro render_grouped_last_practice_header(base_stat_labels, left_title='Totals', right_title='Last Practice') %}
+  <thead>
+    <tr>
+      <th class="th-num px-4 py-2" rowspan="2">#</th>
+      <th class="th-player px-4 py-2" rowspan="2">Player</th>
+      <th class="th-group px-4 py-2" colspan="{{ base_stat_labels|length }}">{{ left_title }}</th>
+      <th class="th-group px-4 py-2" colspan="{{ base_stat_labels|length }}">{{ right_title }}</th>
+    </tr>
+    <tr>
+      {# left group column labels #}
+      {% for label in base_stat_labels %}
+        <th class="th-stat px-4 py-2">{{ label }}</th>
+      {% endfor %}
+      {# right group (Last Practice) uses the SAME labels — no “(Last Practice)” suffix #}
+      {% for label in base_stat_labels %}
+        <th class="th-stat px-4 py-2">{{ label }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+{% endmacro %}
+
+{% macro td_stat(value) -%}
+  <td class="td-stat px-4 py-2 text-center">
+    {{ value }}
+  </td>
+{%- endmacro %}
