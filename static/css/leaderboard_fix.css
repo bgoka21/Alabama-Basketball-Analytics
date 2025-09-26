@@ -1,0 +1,33 @@
+/* Enforce consistent, equal stat-column widths and predictable layout */
+.table-leaderboard {
+  table-layout: fixed; /* makes width assignments deterministic */
+  width: 100%;
+}
+
+/* First two columns */
+.th-num, .td-num {
+  width: 4.5rem;        /* jersey # */
+  text-align: center;
+  white-space: nowrap;
+}
+.th-player, .td-player {
+  width: 22rem;         /* player column can be tuned later if needed */
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stat columns (applies to BOTH Totals and Last Practice) */
+.th-stat, .td-stat {
+  width: 8rem;          /* <-- this makes every stat col identical width */
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Group labels row: center “Totals” and “Last Practice” */
+.th-group {
+  text-align: center;
+  white-space: nowrap;
+  font-weight: 600;
+}
