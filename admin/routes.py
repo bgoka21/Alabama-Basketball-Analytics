@@ -114,6 +114,57 @@ def safe_int(x):
     return int(x or 0)
 
 
+def gather_labels_for_shot(shot):
+    """Return a set of normalized labels for ``shot``.
+
+    This mirrors the logic used on the player detail view so any consumer can
+    reason about tags (e.g. Shrink/Non-Shrink) in a consistent way.
+    """
+
+    labels = []
+
+    if shot.get("Assisted"):
+        labels.append("Assisted")
+    else:
+        labels.append("Non-Assisted")
+
+    raw_sc = (shot.get("shot_class") or "").lower()
+
+    suffix_map = {
+        "atr": ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"],
+        "2fg": ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"],
+        "3fg": ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"],
+    }
+
+    def _extend_from_value(val):
+        if not val:
+            return
+        if isinstance(val, str):
+            values = [val]
+        elif isinstance(val, Sequence) and not isinstance(val, (str, bytes)):
+            values = val
+        else:
+            values = [val]
+
+        for item in values:
+            if item is None:
+                continue
+            for lbl in re.split(r",", str(item)):
+                cleaned = lbl.strip()
+                if cleaned:
+                    labels.append(cleaned)
+
+    for suffix in suffix_map.get(raw_sc, []):
+        key = f"{raw_sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
+        _extend_from_value(shot.get(key, ""))
+
+    for scheme in ("scheme_attack", "scheme_drive", "scheme_pass"):
+        key = f"{raw_sc}_{scheme}"
+        _extend_from_value(shot.get(key, ""))
+
+    return set(labels)
+
+
 def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
     """Return ``(rows, team_totals)`` for a leaderboard key.
 
@@ -901,11 +952,12 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     for player, shot_list in new_shot_rows:
         detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
         fg3_shrink_attempts = 0
+        fg3_shrink_makes = 0
         fg3_nonshrink_attempts = 0
+        fg3_nonshrink_makes = 0
         for shot in shot_list:
             raw_sc = shot.get('shot_class', '').lower()
             sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
-            label = 'Assisted' if shot.get('Assisted') else 'Non-Assisted'
             raw_ctx = shot.get('possession_type', '').strip().lower()
             if 'trans' in raw_ctx:
                 ctx = 'transition'
@@ -916,42 +968,14 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             if sc not in ['atr', 'fg2', 'fg3']:
                 continue
 
+            labels_for_this_shot = gather_labels_for_shot(shot)
+            label = 'Assisted' if 'Assisted' in labels_for_this_shot else 'Non-Assisted'
+            made = (shot.get('result') == 'made')
+
             if sc == 'fg3':
-                shrink_candidates = []
-
-                def _add_value(val):
-                    if val is None:
-                        return
-                    if isinstance(val, str):
-                        parts = re.split(r",", val)
-                    elif isinstance(val, Sequence) and not isinstance(val, (str, bytes)):
-                        parts = []
-                        for item in val:
-                            if item is None:
-                                continue
-                            if isinstance(item, str):
-                                parts.extend(re.split(r",", item))
-                            else:
-                                parts.append(str(item))
-                    else:
-                        parts = [val]
-                    for part in parts:
-                        text = str(part).strip()
-                        if text:
-                            shrink_candidates.append(text)
-
-                candidate_keys = []
-                if raw_sc:
-                    candidate_keys.append(f"{raw_sc}_shrink")
-                candidate_keys.extend([f"{sc}_shrink", "shrink"])
-                for key in candidate_keys:
-                    _add_value(shot.get(key))
-
-                _add_value(shot.get('drill_labels', []))
-
                 shrink_tag = None
-                for cand in shrink_candidates:
-                    norm = cand.strip().lower()
+                for cand in labels_for_this_shot:
+                    norm = str(cand).strip().lower()
                     plain = norm.replace('-', '').replace(' ', '')
                     if plain == 'shrink':
                         shrink_tag = 'shrink'
@@ -961,12 +985,16 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
 
                 if shrink_tag == 'shrink':
                     fg3_shrink_attempts += 1
+                    if made:
+                        fg3_shrink_makes += 1
                 else:
                     fg3_nonshrink_attempts += 1
+                    if made:
+                        fg3_nonshrink_makes += 1
 
             bucket = detail_counts[(sc, label, ctx)]
             bucket['attempts'] += 1
-            bucket['makes'] += (shot.get('result') == 'made')
+            bucket['makes'] += made
         flat = {}
         totals_by_sc = defaultdict(lambda: {'attempts': 0, 'makes': 0})
         for (sc, label, ctx), data in detail_counts.items():
@@ -993,20 +1021,12 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             flat[f"{sc}_pps"] = (pts * m / a if a else 0)
             flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
 
-        fg3_totals = totals_by_sc.get('fg3') or {'attempts': 0}
-        fg3_attempts = fg3_totals.get('attempts', 0) if isinstance(fg3_totals, Mapping) else 0
-        if fg3_attempts and (fg3_shrink_attempts + fg3_nonshrink_attempts) != fg3_attempts:
-            fg3_nonshrink_attempts = max(0, fg3_attempts - fg3_shrink_attempts)
-            if fg3_shrink_attempts > fg3_attempts:
-                fg3_shrink_attempts = fg3_attempts
-
-        shrink_pct = (fg3_shrink_attempts / fg3_attempts * 100.0) if fg3_attempts else 0.0
-        nonshrink_pct = (fg3_nonshrink_attempts / fg3_attempts * 100.0) if fg3_attempts else 0.0
-
         flat["fg3_shrink_att"] = fg3_shrink_attempts
+        flat["fg3_shrink_makes"] = fg3_shrink_makes
         flat["fg3_nonshrink_att"] = fg3_nonshrink_attempts
-        flat["fg3_shrink_pct"] = shrink_pct
-        flat["fg3_nonshrink_pct"] = nonshrink_pct
+        flat["fg3_nonshrink_makes"] = fg3_nonshrink_makes
+        flat["fg3_shrink_pct"] = (fg3_shrink_makes / fg3_shrink_attempts * 100.0) if fg3_shrink_attempts else 0.0
+        flat["fg3_nonshrink_pct"] = (fg3_nonshrink_makes / fg3_nonshrink_attempts * 100.0) if fg3_nonshrink_attempts else 0.0
 
         shot_details[player] = flat
 
@@ -3052,32 +3072,9 @@ def compute_team_shot_details(stats_records, label_set):
         else:
             ctx = "total"
 
-        labels_for_this_shot = []
-        if shot.get("Assisted"):
-            labels_for_this_shot.append("Assisted")
-        else:
-            labels_for_this_shot.append("Non-Assisted")
+        labels_for_this_shot = gather_labels_for_shot(shot)
 
-        if sc in ("atr", "2fg"):
-            suffix_keys = ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]
-            for suffix in suffix_keys:
-                val = shot.get(f"{sc}_{suffix.lower().replace(' ', '_')}", "")
-                if val:
-                    labels_for_this_shot.extend([lbl.strip() for lbl in re.split(r",", str(val)) if lbl.strip()])
-        else:
-            suffix_keys = ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]
-            for suffix in suffix_keys:
-                key = f"{sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
-                val = shot.get(key, "")
-                if val:
-                    labels_for_this_shot.extend([lbl.strip() for lbl in re.split(r",", str(val)) if lbl.strip()])
-
-        for scheme in ("scheme_attack", "scheme_drive", "scheme_pass"):
-            val = shot.get(f"{sc}_{scheme}", "")
-            if val:
-                labels_for_this_shot.extend([lbl.strip() for lbl in re.split(r",", str(val)) if lbl.strip()])
-
-        for lbl in set(labels_for_this_shot):
+        for lbl in labels_for_this_shot:
             ent = detail_counts[shot_cls].setdefault(
                 lbl,
                 {
@@ -3681,52 +3678,10 @@ def player_detail(player_name):
         else:
             ctx = 'total'
 
-        # 1) Collect all labels for this shot
-        labels_for_this_shot = []
+        labels_for_this_shot = gather_labels_for_shot(shot)
 
-        # a) Assisted vs Non-Assisted
-        if shot.get('Assisted'):
-            labels_for_this_shot.append('Assisted')
-        else:
-            labels_for_this_shot.append('Non-Assisted')
-
-        # b) All HUDL suffix fields for this shot
-        if sc in ('atr', '2fg'):
-            # The parser stored all ATR & 2FG subfields under "2FG (...)" columns,
-            # with prefix "2fg_" in JSON. So we look up keys under "2fg_*"
-            suffix_keys = ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]
-            for suffix in suffix_keys:
-                old_key = f"{sc}_{suffix.lower().replace(' ', '_')}"
-                val = shot.get(old_key, "")
-                if val:
-                    sublabels = [lbl.strip() for lbl in re.split(r',', str(val)) if lbl.strip()]
-                    labels_for_this_shot.extend(sublabels)
-        else:  # sc == '3fg'
-            suffix_keys = ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]
-            for suffix in suffix_keys:
-                old_key = f"{sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
-                val = shot.get(old_key, "")
-                if val:
-                    sublabels = [lbl.strip() for lbl in re.split(r',', str(val)) if lbl.strip()]
-                    labels_for_this_shot.extend(sublabels)
-
-        # ─── Now pull in every “_scheme_attack” / “_scheme_drive” / “_scheme_pass” tag ───────────
-        #   e.g. "2fg_scheme_attack", "2fg_scheme_drive", "2fg_scheme_pass" or
-        #   "3fg_scheme_attack", "3fg_scheme_drive", "3fg_scheme_pass"
-
-        for scheme in ("scheme_attack", "scheme_drive", "scheme_pass"):
-            old_key = f"{sc}_{scheme}"
-            val = shot.get(old_key, "")
-            if val:
-                sublabels = [lbl.strip() for lbl in re.split(r',', str(val)) if lbl.strip()]
-                labels_for_this_shot.extend(sublabels)
-
-
-        # 2) Use a set() so each distinct label is counted once
-        unique_labels = set(labels_for_this_shot)
-
-        # 3) Increment each label exactly once
-        for lbl in unique_labels:
+        # Count each distinct label only once per shot
+        for lbl in labels_for_this_shot:
             ent = detail_counts[shot_cls].setdefault(lbl, {
                 'total':     {'attempts': 0, 'makes': 0},
                 'transition':{'attempts': 0, 'makes': 0},
