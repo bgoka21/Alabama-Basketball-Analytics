@@ -84,21 +84,22 @@ def compute_3fg_breakdown_from_shots(shot_list: Iterable[Mapping]) -> MutableMap
         if made:
             total_makes += 1
 
-        shrink_tag = None
+        has_shrink = False
+        has_nonshrink = False
         for cand in gather_labels_for_shot(shot):
             norm = str(cand).strip().lower()
             plain = norm.replace("-", "").replace(" ", "")
             if plain == "shrink":
-                shrink_tag = "shrink"
+                has_shrink = True
                 break
             if plain == "nonshrink":
-                shrink_tag = "nonshrink"
+                has_nonshrink = True
 
-        if shrink_tag == "shrink":
+        if has_shrink:
             shrink_att += 1
             if made:
                 shrink_makes += 1
-        else:
+        elif has_nonshrink:
             non_att += 1
             if made:
                 non_makes += 1
