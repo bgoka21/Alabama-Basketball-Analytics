@@ -907,6 +907,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     shot_details = {}
     for player, shot_list in new_shot_rows:
         detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
+        filtered_shots = []
         for shot in shot_list:
             raw_sc = shot.get('shot_class', '').lower()
             sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
@@ -921,6 +922,32 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                 continue
 
             labels_for_this_shot = gather_labels_for_shot(shot)
+            normalized_labels = {
+                str(lbl).strip().upper()
+                for lbl in labels_for_this_shot
+                if str(lbl).strip()
+            }
+            normalized_labels.update(
+                lbl.strip().upper()
+                for lbl in re.split(r",", shot.get("possession_type", ""))
+                if lbl.strip()
+            )
+            drill_labels = shot.get('drill_labels', [])
+            if isinstance(drill_labels, str):
+                drill_iter = re.split(r",", drill_labels)
+            else:
+                drill_iter = drill_labels or []
+            normalized_labels.update(
+                lbl.strip().upper()
+                for lbl in drill_iter
+                if isinstance(lbl, str) and lbl.strip()
+            )
+
+            if label_set and not (normalized_labels & label_set):
+                continue
+
+            filtered_shots.append(shot)
+
             label = 'Assisted' if 'Assisted' in labels_for_this_shot else 'Non-Assisted'
             made = (shot.get('result') == 'made')
 
@@ -953,7 +980,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             flat[f"{sc}_pps"] = (pts * m / a if a else 0)
             flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
 
-        breakdown = compute_3fg_breakdown_from_shots(shot_list)
+        breakdown = compute_3fg_breakdown_from_shots(filtered_shots)
         # Single source of truth for Shrink/Non-Shrink 3FG (mirrors player Shot Type tab).
         flat.update({
             "fg3_shrink_att": breakdown["fg3_shrink_att"],
