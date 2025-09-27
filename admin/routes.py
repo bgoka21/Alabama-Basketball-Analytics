@@ -1,3 +1,4 @@
+import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -51,6 +52,11 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import aliased
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
+from utils.shottype import (
+    compute_3fg_breakdown_from_shots,
+    gather_labels_for_shot,
+    get_player_shottype_3fg_breakdown,
+)
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import (
@@ -112,58 +118,6 @@ def make_pct(numer, denom):
 
 def safe_int(x):
     return int(x or 0)
-
-
-def gather_labels_for_shot(shot):
-    """Return a set of normalized labels for ``shot``.
-
-    This mirrors the logic used on the player detail view so any consumer can
-    reason about tags (e.g. Shrink/Non-Shrink) in a consistent way.
-    """
-
-    labels = []
-
-    if shot.get("Assisted"):
-        labels.append("Assisted")
-    else:
-        labels.append("Non-Assisted")
-
-    raw_sc = (shot.get("shot_class") or "").lower()
-
-    suffix_map = {
-        "atr": ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"],
-        "2fg": ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"],
-        "3fg": ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"],
-    }
-
-    def _extend_from_value(val):
-        if not val:
-            return
-        if isinstance(val, str):
-            values = [val]
-        elif isinstance(val, Sequence) and not isinstance(val, (str, bytes)):
-            values = val
-        else:
-            values = [val]
-
-        for item in values:
-            if item is None:
-                continue
-            for lbl in re.split(r",", str(item)):
-                cleaned = lbl.strip()
-                if cleaned:
-                    labels.append(cleaned)
-
-    for suffix in suffix_map.get(raw_sc, []):
-        key = f"{raw_sc}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
-        _extend_from_value(shot.get(key, ""))
-
-    for scheme in ("scheme_attack", "scheme_drive", "scheme_pass"):
-        key = f"{raw_sc}_{scheme}"
-        _extend_from_value(shot.get(key, ""))
-
-    return set(labels)
-
 
 def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
     """Return ``(rows, team_totals)`` for a leaderboard key.
@@ -410,8 +364,10 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
                         attempts,
                         pct,
                         freq,
+                        details.get('fg3_shrink_makes', 0),
                         details.get('fg3_shrink_att', 0),
                         details.get('fg3_shrink_pct', 0.0),
+                        details.get('fg3_nonshrink_makes', 0),
                         details.get('fg3_nonshrink_att', 0),
                         details.get('fg3_nonshrink_pct', 0.0),
                     )
@@ -951,10 +907,6 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     shot_details = {}
     for player, shot_list in new_shot_rows:
         detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
-        fg3_shrink_attempts = 0
-        fg3_shrink_makes = 0
-        fg3_nonshrink_attempts = 0
-        fg3_nonshrink_makes = 0
         for shot in shot_list:
             raw_sc = shot.get('shot_class', '').lower()
             sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
@@ -971,26 +923,6 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             labels_for_this_shot = gather_labels_for_shot(shot)
             label = 'Assisted' if 'Assisted' in labels_for_this_shot else 'Non-Assisted'
             made = (shot.get('result') == 'made')
-
-            if sc == 'fg3':
-                shrink_tag = None
-                for cand in labels_for_this_shot:
-                    norm = str(cand).strip().lower()
-                    plain = norm.replace('-', '').replace(' ', '')
-                    if plain == 'shrink':
-                        shrink_tag = 'shrink'
-                        break
-                    if plain == 'nonshrink':
-                        shrink_tag = 'nonshrink'
-
-                if shrink_tag == 'shrink':
-                    fg3_shrink_attempts += 1
-                    if made:
-                        fg3_shrink_makes += 1
-                else:
-                    fg3_nonshrink_attempts += 1
-                    if made:
-                        fg3_nonshrink_makes += 1
 
             bucket = detail_counts[(sc, label, ctx)]
             bucket['attempts'] += 1
@@ -1021,14 +953,76 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             flat[f"{sc}_pps"] = (pts * m / a if a else 0)
             flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
 
-        flat["fg3_shrink_att"] = fg3_shrink_attempts
-        flat["fg3_shrink_makes"] = fg3_shrink_makes
-        flat["fg3_nonshrink_att"] = fg3_nonshrink_attempts
-        flat["fg3_nonshrink_makes"] = fg3_nonshrink_makes
-        flat["fg3_shrink_pct"] = (fg3_shrink_makes / fg3_shrink_attempts * 100.0) if fg3_shrink_attempts else 0.0
-        flat["fg3_nonshrink_pct"] = (fg3_nonshrink_makes / fg3_nonshrink_attempts * 100.0) if fg3_nonshrink_attempts else 0.0
+        breakdown = compute_3fg_breakdown_from_shots(shot_list)
+        # Single source of truth for Shrink/Non-Shrink 3FG (mirrors player Shot Type tab).
+        flat.update({
+            "fg3_shrink_att": breakdown["fg3_shrink_att"],
+            "fg3_shrink_makes": breakdown["fg3_shrink_makes"],
+            "fg3_shrink_pct": breakdown["fg3_shrink_pct"],
+            "fg3_nonshrink_att": breakdown["fg3_nonshrink_att"],
+            "fg3_nonshrink_makes": breakdown["fg3_nonshrink_makes"],
+            "fg3_nonshrink_pct": breakdown["fg3_nonshrink_pct"],
+        })
 
         shot_details[player] = flat
+
+    if current_app.debug and stat_key == 'fg3_fg_pct':
+        checked = 0
+        for player_name, details in shot_details.items():
+            if checked >= 2:
+                break
+            roster_entry = (
+                Roster.query.filter_by(player_name=player_name, season_id=season_id).first()
+                if season_id
+                else Roster.query.filter_by(player_name=player_name).first()
+            )
+            if not roster_entry:
+                continue
+            helper_breakdown = get_player_shottype_3fg_breakdown(
+                roster_entry.id,
+                season_id=season_id,
+                practice=None,
+                start_date=start_dt,
+                end_date=end_dt,
+                label_set=label_set,
+            )
+            if not helper_breakdown:
+                continue
+
+            shrink_att = helper_breakdown.get('fg3_shrink_att')
+            shrink_makes = helper_breakdown.get('fg3_shrink_makes')
+            non_att = helper_breakdown.get('fg3_nonshrink_att')
+            non_makes = helper_breakdown.get('fg3_nonshrink_makes')
+
+            if shrink_att != details.get('fg3_shrink_att') or shrink_makes != details.get('fg3_shrink_makes'):
+                current_app.logger.debug(
+                    "3FG shrink totals mismatch for %s", player_name
+                )
+            if non_att != details.get('fg3_nonshrink_att') or non_makes != details.get('fg3_nonshrink_makes'):
+                current_app.logger.debug(
+                    "3FG non-shrink totals mismatch for %s", player_name
+                )
+
+            pct_a = helper_breakdown.get('fg3_nonshrink_pct', 0.0)
+            pct_b = details.get('fg3_nonshrink_pct', 0.0)
+            if not math.isclose(pct_a, pct_b, rel_tol=1e-3, abs_tol=1e-3):
+                current_app.logger.debug(
+                    "3FG non-shrink pct mismatch for %s: helper=%s computed=%s",
+                    player_name,
+                    pct_a,
+                    pct_b,
+                )
+
+            shrink_pct_a = helper_breakdown.get('fg3_shrink_pct', 0.0)
+            shrink_pct_b = details.get('fg3_shrink_pct', 0.0)
+            if not math.isclose(shrink_pct_a, shrink_pct_b, rel_tol=1e-3, abs_tol=1e-3):
+                current_app.logger.debug(
+                    "3FG shrink pct mismatch for %s: helper=%s computed=%s",
+                    player_name,
+                    shrink_pct_a,
+                    shrink_pct_b,
+                )
+            checked += 1
 
     all_players = set(core_rows) | set(shot_details)
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
@@ -3625,6 +3619,8 @@ def player_detail(player_name):
                     continue
                 all_details.append(shot)
 
+    fg3_breakdown = compute_3fg_breakdown_from_shots(all_details)
+
     # ─── Compute raw season totals directly from all_details ─────────────────
     makes_atr  = sum(1 for shot in all_details if shot.get('shot_class','').lower() == 'atr' and shot.get('result') == 'made')
     att_atr    = sum(1 for shot in all_details if shot.get('shot_class','').lower() == 'atr')
@@ -3896,6 +3892,7 @@ def player_detail(player_name):
         shot_map                           = local_shot_map,
         label_map                          = local_label_map,
         generic_totals                     = generic_totals,   # e.g. {"Free Throws":123}
+        fg3_breakdown                      = fg3_breakdown,
 
         # ── all your existing context for stats, shot summaries, etc. ─────────
         start_date                         = start_date or '',
