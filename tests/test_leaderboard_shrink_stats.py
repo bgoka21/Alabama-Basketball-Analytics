@@ -76,7 +76,9 @@ def test_leaderboard_shrink_percentages_use_fg_pct(app):
 
     row = next(r for r in rows if r[0] == "Test Player")
 
-    assert row[5] == 1  # shrink attempts
-    assert row[6] == pytest.approx(100.0)
-    assert row[7] == 2  # non-shrink attempts
-    assert row[8] == pytest.approx(50.0)
+    assert row[5] == 1  # shrink makes
+    assert row[6] == 1  # shrink attempts
+    assert row[7] == pytest.approx(100.0)
+    assert row[8] == 1  # non-shrink makes
+    assert row[9] == 2  # non-shrink attempts
+    assert row[10] == pytest.approx(50.0)
