@@ -255,7 +255,7 @@ class TestDualViews:
             html,
             section_title="Defensive Rebounding",
             expected_texts=[
-                "Given Up",
+                "Off Reb&#39;s Given Up",
                 "7",
                 "10",
                 "3",
