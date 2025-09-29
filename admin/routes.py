@@ -5895,7 +5895,7 @@ def leaderboard_collisions_gap_help():
 @login_required
 def leaderboard_overall_gap_help():
     return _render_dual_leaderboard(
-        'leaderboard/overall_help.html',
+        'leaderboard/gap_help_overall.html',
         page_title='Overall – Gap Help',
         compute_fn=compute_overall_gap_help,
         stat_key='overall_gap_help',
@@ -5906,7 +5906,7 @@ def leaderboard_overall_gap_help():
 @login_required
 def leaderboard_overall_low_man():
     return _render_dual_leaderboard(
-        'leaderboard/overall_help.html',
+        'leaderboard/low_man_overall.html',
         page_title='Overall – Low Man',
         compute_fn=compute_overall_low_man,
         stat_key='overall_low_man',
