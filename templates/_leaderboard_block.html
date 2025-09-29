@@ -410,61 +410,108 @@
       </table>
     </div>
   {% elif selected.key == 'pnr_gap_help' %}
-    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-      <table class="table-leaderboard min-w-full">
-        <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-          <tr>
-            <th class="th-num px-4 py-2 text-center sortable" rowspan="2" data-col="0">#</th>
-            <th class="th-player px-4 py-2 text-left sortable" rowspan="2" data-col="1">Player</th>
-            <th class="th-group px-4 py-2" colspan="3">PnR Gap Help</th>
-            <th class="th-group px-4 py-2" colspan="3">Low Help</th>
-          </tr>
-          <tr>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="2">PnR Gap +</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="3">PnR Gap Opp</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="4">PnR Gap %</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="5">Low +</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="6">Low Opp</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="7">Low %</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in rows %}
-            {# row = (player, gap_plus, gap_opp, gap_pct, low_plus, low_opp, low_pct) #}
-          <tr>
-            <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-            <td class="td-player px-4 py-2 text-left">{{ row[0] }}</td>
-            {{ td_stat(row[1]) }}
-            {{ td_stat(row[2]) }}
-            <td class="px-4 py-2">
-              {{ (row[3] is not none) and (row[3]|round(1)|string + '%') or 'NA' }}
-            </td>
-            {{ td_stat(row[4]) }}
-            {{ td_stat(row[5]) }}
-            <td class="px-4 py-2">
-              {{ (row[6] is not none) and (row[6]|round(1)|string + '%') or 'NA' }}
-            </td>
-          </tr>
+    {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+    <div class="space-y-8">
+      <div class="flex flex-col h-full">
+        <div class="flex items-baseline justify-between mb-3">
+          <h3 class="text-lg font-semibold">PnR Gap Help</h3>
+          {% if practice_note %}
+            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
+          {% endif %}
+        </div>
+        {% set gap_last_ns = namespace(rows={}) %}
+        {% for entry in gap_last_rows or [] %}
+          {% set name = entry.get('player_name') or entry.get('player') %}
+          {% if name %}
+            {% set _ = gap_last_ns.rows.update({name: entry}) %}
+          {% endif %}
         {% endfor %}
-        {% if team_totals %}
-          {# team_totals = (gap_plus, gap_opp, gap_pct, low_plus, low_opp, low_pct) #}
-          <tr class="bg-gray-100 font-semibold team-totals">
-            <td class="td-num px-4 py-2 text-center"></td>
-            <td class="td-player px-4 py-2 text-left">Team Totals</td>
-            {{ td_stat(team_totals[0]) }}
-            {{ td_stat(team_totals[1]) }}
-            <td class="px-4 py-2">
-              {{ (team_totals[2] is not none) and (team_totals[2]|round(1)|string + '%') or 'NA' }}
-            </td>
-            {{ td_stat(team_totals[3]) }}
-            {{ td_stat(team_totals[4]) }}
-            <td class="px-4 py-2">
-              {{ (team_totals[5] is not none) and (team_totals[5]|round(1)|string + '%') or 'NA' }}
-            </td>
-          </tr>
-        {% endif %}
-        </tbody>
-      </table>
+        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
+          <table class="table-leaderboard min-w-full">
+            {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
+            <tbody>
+              {% for row in gap_rows or [] %}
+                {% set name = row.get('player_name') or row.get('player') %}
+                {% set last = gap_last_ns.rows.get(name) %}
+                <tr>
+                  <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+                  <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+                  {{ td_stat(row.get('Gap +', '—')) }}
+                  {{ td_stat(row.get('Gap Opp', '—')) }}
+                  {{ td_stat(row.get('Gap %', '—')) }}
+                  {{ td_stat(last.get('Gap +', '—') if last else '—') }}
+                  {{ td_stat(last.get('Gap Opp', '—') if last else '—') }}
+                  {{ td_stat(last.get('Gap %', '—') if last else '—') }}
+                </tr>
+              {% endfor %}
+              {% if gap_totals or gap_last_totals %}
+                {% set season_totals = gap_totals or {} %}
+                {% set last_totals = gap_last_totals or {} %}
+                <tr class="bg-gray-100 font-semibold team-totals">
+                  <td class="td-num px-4 py-2 text-center"></td>
+                  <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
+                  {{ td_stat(season_totals.get('Gap +', '—')) }}
+                  {{ td_stat(season_totals.get('Gap Opp', '—')) }}
+                  {{ td_stat(season_totals.get('Gap %', '—')) }}
+                  {{ td_stat(last_totals.get('Gap +', '—')) }}
+                  {{ td_stat(last_totals.get('Gap Opp', '—')) }}
+                  {{ td_stat(last_totals.get('Gap %', '—')) }}
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="flex flex-col h-full">
+        <div class="flex items-baseline justify-between mb-3">
+          <h3 class="text-lg font-semibold">PnR Low Man</h3>
+          {% if practice_note %}
+            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
+          {% endif %}
+        </div>
+        {% set low_last_ns = namespace(rows={}) %}
+        {% for entry in low_last_rows or [] %}
+          {% set name = entry.get('player_name') or entry.get('player') %}
+          {% if name %}
+            {% set _ = low_last_ns.rows.update({name: entry}) %}
+          {% endif %}
+        {% endfor %}
+        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
+          <table class="table-leaderboard min-w-full">
+            {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
+            <tbody>
+              {% for row in low_rows or [] %}
+                {% set name = row.get('player_name') or row.get('player') %}
+                {% set last = low_last_ns.rows.get(name) %}
+                <tr>
+                  <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+                  <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+                  {{ td_stat(row.get('Gap +', '—')) }}
+                  {{ td_stat(row.get('Gap Opp', '—')) }}
+                  {{ td_stat(row.get('Gap %', '—')) }}
+                  {{ td_stat(last.get('Gap +', '—') if last else '—') }}
+                  {{ td_stat(last.get('Gap Opp', '—') if last else '—') }}
+                  {{ td_stat(last.get('Gap %', '—') if last else '—') }}
+                </tr>
+              {% endfor %}
+              {% if low_totals or low_last_totals %}
+                {% set season_totals = low_totals or {} %}
+                {% set last_totals = low_last_totals or {} %}
+                <tr class="bg-gray-100 font-semibold team-totals">
+                  <td class="td-num px-4 py-2 text-center"></td>
+                  <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
+                  {{ td_stat(season_totals.get('Gap +', '—')) }}
+                  {{ td_stat(season_totals.get('Gap Opp', '—')) }}
+                  {{ td_stat(season_totals.get('Gap %', '—')) }}
+                  {{ td_stat(last_totals.get('Gap +', '—')) }}
+                  {{ td_stat(last_totals.get('Gap Opp', '—')) }}
+                  {{ td_stat(last_totals.get('Gap %', '—')) }}
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   {% elif selected.key == 'pnr_grade' %}
     <div class="space-y-8">
