@@ -1074,6 +1074,7 @@ _PRACTICE_DUAL_MAP = {
     "def_rebounding": lambda: compute_defensive_rebounding,
     "defense": lambda: compute_defense_bumps,
     "collision_gap_help": lambda: compute_collisions_gap_help,
+    "pnr_grade": lambda: compute_pnr_grade,
 }
 
 
