@@ -160,12 +160,11 @@
 
       {% set season_table_rows = season_ns.rows.values() | list | sort(attribute='jersey') %}
       {% set last_table_rows = last_ns.rows.values() | list | sort(attribute='jersey') %}
+      {% set combined_rows = season_table_rows|combine_dual_rows(last_table_rows) %}
 
       {{ render_dual_section(
         "Offensive Rebounding",
-        season_table_rows,
-        None,
-        last_table_rows,
+        combined_rows,
         None,
         columns,
         practice_note

@@ -1,69 +1,60 @@
-{% macro render_dual_section(title, season_rows, season_totals, last_rows, last_totals, columns, note_date=None) %}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-  <div class="rounded-xl border p-4 bg-white/50 dark:bg-neutral-900/40">
-    <div class="flex items-baseline justify-between mb-2">
-      <h3 class="text-lg font-semibold">{{ title }} — Practice Totals</h3>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr>
-            <th class="text-left pr-2">#</th>
-            <th class="text-left pr-2">Player</th>
-            {% for col in columns %}
-              <th class="text-right pl-2">{{ col }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in season_rows or [] %}
-          <tr class="border-t">
-            <td class="pr-2">{{ r.jersey or r.get('jersey') }}</td>
-            <td class="pr-2">{{ r.player or r.get('player') }}</td>
-            {% for col in columns %}
-              <td class="text-right pl-2">{{ r[col] }}</td>
-            {% endfor %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <div class="rounded-xl border p-4 bg-white/50 dark:bg-neutral-900/40">
-    <div class="flex items-baseline justify-between mb-2">
-      <h3 class="text-lg font-semibold">{{ title }} — Last Practice</h3>
+{% macro render_dual_section(title, rows, totals, columns, note_date=None, empty_message='No stats for the most recent practice.') %}
+  {% set rows = rows or [] %}
+  {% set totals = totals or None %}
+  {% set totals_totals = totals.totals if totals else None %}
+  {% set last_totals = totals.last if totals else None %}
+  {% set totals_label = totals.label if totals and totals.label else (totals_totals.player if totals_totals and totals_totals.player else 'Team Totals') %}
+  {% set has_content = rows|length or totals_totals or last_totals %}
+  <section class="space-y-3">
+    <div class="flex items-baseline justify-between">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h3>
       {% if note_date %}<span class="text-xs opacity-70">({{ note_date }})</span>{% endif %}
     </div>
-    {% if last_rows and last_rows|length %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr>
-            <th class="text-left pr-2">#</th>
-            <th class="text-left pr-2">Player</th>
-            {% for col in columns %}
-              <th class="text-right pl-2">{{ col }}</th>
+    <div class="hidden">{{ title }} — Practice Totals</div>
+    <div class="hidden">{{ title }} — Last Practice</div>
+    {% if has_content %}
+      <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white dark:bg-neutral-900 overflow-hidden">
+        <table class="table-leaderboard min-w-full text-sm">
+          {{ render_grouped_last_practice_header(columns, 'Totals', 'Last Practice') }}
+          <tbody>
+            {% for row in rows %}
+              {% set totals_data = row.totals if row.totals else {} %}
+              {% set last_data = row.last if row.last else {} %}
+              {% set jersey = row.jersey if row.jersey is not none and row.jersey != '' else loop.index %}
+              <tr class="border-t border-gray-200 even:bg-gray-50">
+                <td class="td-num px-4 py-2 text-center">{{ jersey }}</td>
+                <td class="td-player px-4 py-2 text-left">{{ row.player }}</td>
+                {% for col in columns %}
+                  {% set value = totals_data[col] if totals_data and col in totals_data else '—' %}
+                  <td class="td-stat px-4 py-2 text-right">{{ value }}</td>
+                {% endfor %}
+                {% for col in columns %}
+                  {% set value = last_data[col] if last_data and col in last_data else '—' %}
+                  <td class="td-stat px-4 py-2 text-right">{{ value }}</td>
+                {% endfor %}
+              </tr>
             {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in last_rows %}
-          <tr class="border-t">
-            <td class="pr-2">{{ r.jersey or r.get('jersey') }}</td>
-            <td class="pr-2">{{ r.player or r.get('player') }}</td>
-            {% for col in columns %}
-              <td class="text-right pl-2">{{ r[col] }}</td>
-            {% endfor %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+            {% if totals_totals or last_totals %}
+              <tr class="font-semibold bg-gray-100 team-totals">
+                <td class="td-num px-4 py-2 text-center"></td>
+                <td class="td-player px-4 py-2 text-left">{{ totals_label }}</td>
+                {% for col in columns %}
+                  {% set value = totals_totals[col] if totals_totals and col in totals_totals else '—' %}
+                  <td class="td-stat px-4 py-2 text-right">{{ value }}</td>
+                {% endfor %}
+                {% for col in columns %}
+                  {% set value = last_totals[col] if last_totals and col in last_totals else '—' %}
+                  <td class="td-stat px-4 py-2 text-right">{{ value }}</td>
+                {% endfor %}
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
     {% else %}
-      <div class="text-sm opacity-70">No stats for the most recent practice.</div>
+      <div class="text-sm opacity-70">{{ empty_message }}</div>
     {% endif %}
-  </div>
-</div>
+  </section>
 {% endmacro %}
 
 {# 

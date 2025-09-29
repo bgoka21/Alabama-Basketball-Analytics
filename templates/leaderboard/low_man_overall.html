@@ -63,13 +63,13 @@
       {% set last_low_rows = (last_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
       {% set season_low_totals = season_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
       {% set last_low_totals = last_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
+      {% set combined_rows = season_low_rows|combine_dual_rows(last_low_rows) %}
+      {% set combined_totals = season_low_totals|combine_dual_totals(last_low_totals) %}
 
       {{ render_dual_section(
         page_title,
-        season_low_rows,
-        season_low_totals,
-        last_low_rows,
-        last_low_totals,
+        combined_rows,
+        combined_totals,
         columns,
         practice_note
       ) }}
