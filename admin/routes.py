@@ -1341,6 +1341,97 @@ compute_defense_bumps = _build_stat_compute("defense")
 compute_collisions_gap_help = _build_stat_compute("collision_gap_help")
 
 
+_PLAYER_KEY_ALIASES = ("player_name", "player", "name")
+_GAP_PLUS_ALIASES = ("gap_plus", "plus")
+_GAP_OPP_ALIASES = ("gap_opp", "opps", "gap_opps")
+_LOW_PLUS_ALIASES = ("low_plus",)
+_LOW_OPP_ALIASES = ("low_opp", "low_opps")
+
+
+def _resolve_stat_value(source, aliases, *, index=None):
+    if source is None:
+        return None
+
+    if isinstance(aliases, str):  # pragma: no cover - defensive guard
+        aliases = (aliases,)
+
+    if isinstance(source, Mapping):
+        for key in aliases:
+            if key in source and source[key] is not None:
+                return source[key]
+
+    for key in aliases:
+        if hasattr(source, key):
+            value = getattr(source, key)
+            if value is not None:
+                return value
+
+    if isinstance(source, Sequence) and not isinstance(source, (str, bytes)):
+        if index is not None and -len(source) <= index < len(source):
+            return source[index]
+
+    return None
+
+
+def _safe_pct(numer, denom):
+    try:
+        numer_val = float(numer)
+        denom_val = float(denom)
+    except (TypeError, ValueError):
+        return None
+
+    if denom_val == 0:
+        return None
+
+    return (numer_val / denom_val) * 100.0
+
+
+def _collect_player_totals(rows, *, plus_aliases, opp_aliases, plus_index=None, opp_index=None):
+    stats = {}
+
+    for row in rows or []:
+        player = _resolve_stat_value(row, _PLAYER_KEY_ALIASES, index=0)
+        if not player:
+            continue
+
+        plus_val = _resolve_stat_value(row, plus_aliases, index=plus_index)
+        opp_val = _resolve_stat_value(row, opp_aliases, index=opp_index)
+
+        plus = safe_int(plus_val)
+        opps = safe_int(opp_val)
+
+        entry = stats.setdefault(
+            player,
+            {
+                "player_name": player,
+                "plus": 0,
+                "opps": 0,
+            },
+        )
+        entry["plus"] += plus
+        entry["opps"] += opps
+
+    return stats
+
+
+def _extract_totals(total, *, plus_aliases, opp_aliases, plus_index=None, opp_index=None):
+    plus_val = _resolve_stat_value(total, plus_aliases, index=plus_index)
+    opp_val = _resolve_stat_value(total, opp_aliases, index=opp_index)
+    return safe_int(plus_val), safe_int(opp_val)
+
+
+def _finalize_rows(stats):
+    rows = []
+    for entry in stats.values():
+        plus = entry.get("plus", 0)
+        opps = entry.get("opps", 0)
+        entry["pct"] = _safe_pct(plus, opps)
+        rows.append(entry)
+
+    rows.sort(key=lambda r: (r.get("opps", 0), r.get("plus", 0)), reverse=True)
+    return rows
+
+
 def compute_pnr_gap_help(
     *,
     session=None,
@@ -1424,6 +1515,191 @@ def compute_pnr_gap_help(
         }
 
     return filtered_totals, filtered_rows
+
+
+def compute_overall_gap_help(
+    *,
+    session=None,
+    season_id=None,
+    start_dt=None,
+    end_dt=None,
+    stat_key=None,
+    label_set=None,
+    **kwargs,
+):
+    """Return combined Collision + PnR Gap Help results."""
+
+    if season_id is None:
+        return None, []
+
+    shared_kwargs = dict(kwargs)
+    shared_kwargs.pop("role", None)
+
+    collision_result = compute_collisions_gap_help(
+        session=session,
+        season_id=season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stat_key=stat_key,
+        label_set=label_set,
+        **shared_kwargs,
+    )
+    collision_totals, collision_rows = _normalize_compute_result(collision_result)
+
+    pnr_result = compute_pnr_gap_help(
+        session=session,
+        season_id=season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stat_key=stat_key,
+        label_set=label_set,
+        **shared_kwargs,
+    )
+    pnr_totals, pnr_rows = _normalize_compute_result(pnr_result)
+
+    stats = {}
+    for source_rows, plus_index, opp_index in (
+        (collision_rows, 1, 2),
+        (pnr_rows, 1, 2),
+    ):
+        player_totals = _collect_player_totals(
+            source_rows,
+            plus_aliases=_GAP_PLUS_ALIASES,
+            opp_aliases=_GAP_OPP_ALIASES,
+            plus_index=plus_index,
+            opp_index=opp_index,
+        )
+        for player, entry in player_totals.items():
+            combined = stats.setdefault(
+                player,
+                {
+                    "player_name": player,
+                    "plus": 0,
+                    "opps": 0,
+                },
+            )
+            combined["plus"] += entry["plus"]
+            combined["opps"] += entry["opps"]
+
+    rows = _finalize_rows(stats)
+
+    collision_plus, collision_opps = _extract_totals(
+        collision_totals,
+        plus_aliases=_GAP_PLUS_ALIASES,
+        opp_aliases=_GAP_OPP_ALIASES,
+        plus_index=0,
+        opp_index=1,
+    )
+    pnr_plus, pnr_opps = _extract_totals(
+        pnr_totals,
+        plus_aliases=_GAP_PLUS_ALIASES,
+        opp_aliases=_GAP_OPP_ALIASES,
+        plus_index=0,
+        opp_index=1,
+    )
+
+    total_plus = collision_plus + pnr_plus
+    total_opps = collision_opps + pnr_opps
+    totals = {
+        "plus": total_plus,
+        "opps": total_opps,
+        "pct": _safe_pct(total_plus, total_opps),
+    }
+
+    return totals, rows
+
+
+def compute_overall_low_man(
+    *,
+    session=None,
+    season_id=None,
+    start_dt=None,
+    end_dt=None,
+    stat_key=None,
+    label_set=None,
+    **kwargs,
+):
+    """Return combined Collision + PnR Low Man help results."""
+
+    if season_id is None:
+        return None, []
+
+    shared_kwargs = dict(kwargs)
+    shared_kwargs.pop("role", None)
+
+    collision_result = compute_collisions_gap_help(
+        session=session,
+        season_id=season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stat_key=stat_key,
+        label_set=label_set,
+        **shared_kwargs,
+    )
+    collision_totals, collision_rows = _normalize_compute_result(collision_result)
+
+    pnr_result = compute_pnr_gap_help(
+        session=session,
+        season_id=season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stat_key=stat_key,
+        label_set=label_set,
+        role="low_man",
+        **shared_kwargs,
+    )
+    pnr_totals, pnr_rows = _normalize_compute_result(pnr_result)
+
+    stats = {}
+    for source_rows, plus_aliases, opp_aliases, plus_index, opp_index in (
+        (collision_rows, _LOW_PLUS_ALIASES, _LOW_OPP_ALIASES, 4, 5),
+        (pnr_rows, _GAP_PLUS_ALIASES, _GAP_OPP_ALIASES, 1, 2),
+    ):
+        player_totals = _collect_player_totals(
+            source_rows,
+            plus_aliases=plus_aliases,
+            opp_aliases=opp_aliases,
+            plus_index=plus_index,
+            opp_index=opp_index,
+        )
+        for player, entry in player_totals.items():
+            combined = stats.setdefault(
+                player,
+                {
+                    "player_name": player,
+                    "plus": 0,
+                    "opps": 0,
+                },
+            )
+            combined["plus"] += entry["plus"]
+            combined["opps"] += entry["opps"]
+
+    rows = _finalize_rows(stats)
+
+    collision_plus, collision_opps = _extract_totals(
+        collision_totals,
+        plus_aliases=_LOW_PLUS_ALIASES,
+        opp_aliases=_LOW_OPP_ALIASES,
+        plus_index=3,
+        opp_index=4,
+    )
+    pnr_plus, pnr_opps = _extract_totals(
+        pnr_totals,
+        plus_aliases=_GAP_PLUS_ALIASES,
+        opp_aliases=_GAP_OPP_ALIASES,
+        plus_index=0,
+        opp_index=1,
+    )
+
+    total_plus = collision_plus + pnr_plus
+    total_opps = collision_opps + pnr_opps
+    totals = {
+        "plus": total_plus,
+        "opps": total_opps,
+        "pct": _safe_pct(total_plus, total_opps),
+    }
+
+    return totals, rows
 
 
 compute_pnr_grade = _build_stat_compute("pnr_grade")
