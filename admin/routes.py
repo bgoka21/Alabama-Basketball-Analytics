@@ -1073,6 +1073,7 @@ _PRACTICE_DUAL_MAP = {
     "off_rebounding": lambda: compute_offensive_rebounding,
     "def_rebounding": lambda: compute_defensive_rebounding,
     "defense": lambda: compute_defense_bumps,
+    "collision_gap_help": lambda: compute_collisions_gap_help,
 }
 
 
@@ -1214,7 +1215,7 @@ def _split_leaderboard_rows_for_template(
             "last_practice_date": last_practice_date,
         }
 
-    practice_keys = {"off_rebounding", "def_rebounding", "defense"}
+    practice_keys = {"off_rebounding", "def_rebounding", "defense", "collision_gap_help"}
     if stat_key not in practice_keys | {"pnr_grade"}:
         return {}
 
@@ -1261,6 +1262,15 @@ def _split_leaderboard_rows_for_template(
             "bump_totals": normalized.get("season_team_totals") or {},
             "bump_last_rows": normalized.get("last_rows") or [],
             "bump_last_totals": normalized.get("last_team_totals") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
+
+    if stat_key == "collision_gap_help":
+        return {
+            "collision_rows": normalized.get("season_rows") or [],
+            "collision_totals": normalized.get("season_team_totals") or {},
+            "collision_last_rows": normalized.get("last_rows") or [],
+            "collision_last_totals": normalized.get("last_team_totals") or {},
             "last_practice_date": normalized.get("last_practice_date"),
         }
 
