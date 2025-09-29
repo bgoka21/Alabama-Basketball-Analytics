@@ -15,6 +15,19 @@ import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
 import pdfkit
 
+try:
+    from bs4.element import ResultSet as _BeautifulSoupResultSet
+except ImportError:  # pragma: no cover - BeautifulSoup not installed in some contexts
+    _BeautifulSoupResultSet = None
+else:  # pragma: no cover - executed when BeautifulSoup is available
+    if _BeautifulSoupResultSet is not None and not hasattr(_BeautifulSoupResultSet, "sort"):
+        def _resultset_sort(self, *args, **kwargs):
+            if not isinstance(self.result, list):
+                self.result = list(self.result)
+            self.result.sort(*args, **kwargs)
+
+        _BeautifulSoupResultSet.sort = _resultset_sort
+
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, send_file, current_app, session, make_response, abort
@@ -1066,8 +1079,39 @@ _PRACTICE_DUAL_MAP = {
 def get_practice_dual_context(stat_key, season_id, *, label_set=None):
     """Return prepared season/last-practice context for practice leaderboards."""
 
+    if season_id is None:
+        return None
+
+    if stat_key == "pnr_gap_help":
+        base_ctx = build_pnr_gap_help_context(
+            db.session,
+            season_id,
+            compute_fn=compute_pnr_gap_help,
+            stat_key=stat_key,
+            label_set=label_set,
+        )
+        return {
+            "season_rows": {
+                "gap": base_ctx.get("pnr_rows") or [],
+                "low": base_ctx.get("low_rows") or [],
+            },
+            "season_team_totals": {
+                "gap": base_ctx.get("pnr_totals"),
+                "low": base_ctx.get("low_totals"),
+            },
+            "last_rows": {
+                "gap": base_ctx.get("pnr_last_rows") or [],
+                "low": base_ctx.get("low_last_rows") or [],
+            },
+            "last_team_totals": {
+                "gap": base_ctx.get("pnr_last_totals"),
+                "low": base_ctx.get("low_last_totals"),
+            },
+            "last_practice_date": base_ctx.get("last_practice_date"),
+        }
+
     factory = _PRACTICE_DUAL_MAP.get(stat_key)
-    if factory is None or season_id is None:
+    if factory is None:
         return None
 
     compute_fn = factory()
@@ -1091,6 +1135,84 @@ def _split_leaderboard_rows_for_template(
     last_practice_date=None,
 ):
     """Return practice-style split data for selected dual leaderboard keys."""
+
+    if stat_key == "pnr_gap_help":
+        columns = ["Gap +", "Gap Opp", "Gap %"]
+        pct_columns = ["Gap %"]
+        column_map = {
+            "Gap +": ("plus",),
+            "Gap Opp": ("opps",),
+            "Gap %": ("pct",),
+        }
+
+        season_rows = rows if isinstance(rows, Mapping) else {}
+        season_totals = team_totals if isinstance(team_totals, Mapping) else {}
+        last_rows_map = last_rows if isinstance(last_rows, Mapping) else {}
+        last_totals_map = (
+            last_team_totals if isinstance(last_team_totals, Mapping) else {}
+        )
+
+        gap_rows = format_dual_rows(
+            season_rows.get("gap"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+        gap_last_rows = format_dual_rows(
+            last_rows_map.get("gap"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+        gap_totals = format_dual_totals(
+            season_totals.get("gap"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+        gap_last_totals = format_dual_totals(
+            last_totals_map.get("gap"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+
+        low_rows = format_dual_rows(
+            season_rows.get("low"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+        low_last_rows = format_dual_rows(
+            last_rows_map.get("low"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+        low_totals = format_dual_totals(
+            season_totals.get("low"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+        low_last_totals = format_dual_totals(
+            last_totals_map.get("low"),
+            columns,
+            column_map=column_map,
+            pct_columns=pct_columns,
+        )
+
+        return {
+            "gap_rows": gap_rows,
+            "gap_totals": gap_totals,
+            "gap_last_rows": gap_last_rows,
+            "gap_last_totals": gap_last_totals,
+            "low_rows": low_rows,
+            "low_totals": low_totals,
+            "low_last_rows": low_last_rows,
+            "low_last_totals": low_last_totals,
+            "last_practice_date": last_practice_date,
+        }
 
     practice_keys = {"off_rebounding", "def_rebounding", "defense"}
     if stat_key not in practice_keys | {"pnr_grade"}:
