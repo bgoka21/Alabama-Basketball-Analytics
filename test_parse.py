@@ -389,6 +389,8 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         "None": "contest_no",
         "Bump +": "bump_positive",
         "Bump -": "bump_missed",
+        "Low Man +": "low_help_positive",
+        "Low Man -": "low_help_missed",
         "Blowby": "blowby_total",
         "Triple Threat": "blowby_triple_threat",
         "Closeout": "blowby_closeout",

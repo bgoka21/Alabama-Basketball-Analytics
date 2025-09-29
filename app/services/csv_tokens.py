@@ -22,6 +22,8 @@ def _normalize(s: str) -> str:
 # Compile patterns once (case-insensitive, tolerate extra spaces)
 PAT_BUMP_PLUS = re.compile(r"\bBump\s*\+(?=\W|$)", re.IGNORECASE)
 PAT_BUMP_MINUS = re.compile(r"\bBump\s*-(?=\W|$)", re.IGNORECASE)
+PAT_LOW_MAN_PLUS = re.compile(r"\bLow\s*Man\s*\+(?=\W|$)", re.IGNORECASE)
+PAT_LOW_MAN_MINUS = re.compile(r"\bLow\s*Man\s*-(?=\W|$)", re.IGNORECASE)
 
 
 def count_bump_tokens_in_cells(cells: Iterable[str]) -> Tuple[int, int]:
@@ -36,4 +38,16 @@ def count_bump_tokens_in_cells(cells: Iterable[str]) -> Tuple[int, int]:
             continue
         plus += len(PAT_BUMP_PLUS.findall(s))
         minus += len(PAT_BUMP_MINUS.findall(s))
+    return plus, minus
+
+
+def count_low_man_tokens_in_cells(cells: Iterable[str]) -> Tuple[int, int]:
+    """Count Low Man + and Low Man - occurrences across iterable cell strings."""
+    plus = minus = 0
+    for raw in cells:
+        s = _normalize(raw)
+        if not s:
+            continue
+        plus += len(PAT_LOW_MAN_PLUS.findall(s))
+        minus += len(PAT_LOW_MAN_MINUS.findall(s))
     return plus, minus

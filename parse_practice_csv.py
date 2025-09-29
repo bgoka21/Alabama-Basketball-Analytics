@@ -164,7 +164,10 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
     3) Find existing Practice (routes.py created it).
     4) Insert PlayerStats and BlueCollarStats for that practice.
     """
-    from app.services.csv_tokens import count_bump_tokens_in_cells
+    from app.services.csv_tokens import (
+        count_bump_tokens_in_cells,
+        count_low_man_tokens_in_cells,
+    )
     from app.utils.category_normalization import normalize_category
 
     # Use utf-8-sig to seamlessly strip any UTF-8 BOM that may be present in
@@ -231,7 +234,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         for col in player_columns:
             cell_value = row.get(col, "")
             plus, minus = count_bump_tokens_in_cells([cell_value])
-            if not (plus or minus):
+            low_plus, low_minus = count_low_man_tokens_in_cells([cell_value])
+            if not (plus or minus or low_plus or low_minus):
                 continue
             roster_id = get_roster_id(col, season_id)
             if roster_id is None:
@@ -246,6 +250,14 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 stats["bump_missed"] += minus
                 for _ in range(minus):
                     details.append({"event": "bump_missed", "drill_labels": labels})
+            if low_plus:
+                stats["low_help_positive"] += low_plus
+                for _ in range(low_plus):
+                    details.append({"event": "low_help_positive", "drill_labels": labels})
+            if low_minus:
+                stats["low_help_missed"] += low_minus
+                for _ in range(low_minus):
+                    details.append({"event": "low_help_missed", "drill_labels": labels})
 
         # ─── Possession parsing ─────────────────────────────────────────
         team = row['Row']  # 'Crimson' or 'White'
@@ -681,7 +693,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     continue
 
                 for token in tokens:
-                    if token in ("Bump +", "Bump -"):
+                    if token in ("Bump +", "Bump -", "Low Man +", "Low Man -"):
                         continue
                     if token in defense_mapping:
                         key = defense_mapping[token]
