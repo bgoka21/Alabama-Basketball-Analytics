@@ -858,3 +858,84 @@ def format_dual_totals(
         jersey="",
         player=label,
     )
+
+
+def combine_dual_rows(
+    season_rows: Optional[Sequence[Mapping[str, Any]]],
+    last_rows: Optional[Sequence[Mapping[str, Any]]],
+) -> list[Dict[str, Any]]:
+    """Merge season and last-practice rows into paired entries for templates."""
+
+    combined: list[Dict[str, Any]] = []
+    last_lookup: dict[tuple[Any, Any], Mapping[str, Any]] = {}
+
+    for entry in last_rows or []:
+        if not entry:
+            continue
+        name = entry.get("player") or entry.get("player_name") or entry.get("name")
+        jersey = entry.get("jersey")
+        key = (jersey, name)
+        if name is None and jersey is None:
+            continue
+        last_lookup[key] = entry
+        if name is not None:
+            last_lookup.setdefault((None, name), entry)
+
+    for index, row in enumerate(season_rows or [], start=1):
+        if not row:
+            continue
+        name = row.get("player") or row.get("player_name") or row.get("name") or ""
+        jersey = row.get("jersey")
+        key = (jersey, name if name else None)
+        fallback_key = (None, name if name else None)
+        combined.append(
+            {
+                "jersey": jersey if jersey not in (None, "") else index,
+                "player": name,
+                "totals": row,
+                "last": last_lookup.get(key) or last_lookup.get(fallback_key),
+            }
+        )
+        last_lookup.pop(key, None)
+        if fallback_key != key:
+            last_lookup.pop(fallback_key, None)
+
+    for key, entry in list(last_lookup.items()):
+        if key[0] is not None:
+            continue
+        name = entry.get("player") or entry.get("player_name") or entry.get("name") or ""
+        combined.append(
+            {
+                "jersey": entry.get("jersey") or "",
+                "player": name,
+                "totals": None,
+                "last": entry,
+            }
+        )
+        last_lookup.pop(key, None)
+
+    return combined
+
+
+def combine_dual_totals(
+    season_totals: Optional[Mapping[str, Any]],
+    last_totals: Optional[Mapping[str, Any]],
+    *,
+    label: str = "Team Totals",
+) -> Optional[Dict[str, Any]]:
+    """Return a combined totals payload for the dual leaderboard macro."""
+
+    if not season_totals and not last_totals:
+        return None
+
+    totals_label = label
+    if season_totals and season_totals.get("player"):
+        totals_label = season_totals.get("player")
+    elif last_totals and last_totals.get("player"):
+        totals_label = last_totals.get("player")
+
+    return {
+        "label": totals_label,
+        "totals": season_totals,
+        "last": last_totals,
+    }

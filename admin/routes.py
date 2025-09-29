@@ -83,6 +83,8 @@ from admin._leaderboard_helpers import (
     build_dual_context,
     prepare_dual_context,
     _normalize_compute_result,
+    combine_dual_rows,
+    combine_dual_totals,
     format_dual_rows,
     format_dual_totals,
     build_pnr_gap_help_context,
@@ -1725,6 +1727,8 @@ compute_pnr_grade = _build_stat_compute("pnr_grade")
 admin_bp = Blueprint('admin', __name__, template_folder='../templates')
 admin_bp.add_app_template_filter(format_dual_rows, name="format_dual_rows")
 admin_bp.add_app_template_filter(format_dual_totals, name="format_dual_totals")
+admin_bp.add_app_template_filter(combine_dual_rows, name="combine_dual_rows")
+admin_bp.add_app_template_filter(combine_dual_totals, name="combine_dual_totals")
 
 
 def _resolve_season_from_request():

@@ -63,13 +63,13 @@
       {% set last_bump_rows = (last_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
       {% set season_bump_totals = season_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
       {% set last_bump_totals = last_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
+      {% set combined_rows = season_bump_rows|combine_dual_rows(last_bump_rows) %}
+      {% set combined_totals = season_bump_totals|combine_dual_totals(last_bump_totals) %}
 
       {{ render_dual_section(
         "Defense — Bumps",
-        season_bump_rows,
-        season_bump_totals,
-        last_bump_rows,
-        last_bump_totals,
+        combined_rows,
+        combined_totals,
         columns,
         practice_note
       ) }}
