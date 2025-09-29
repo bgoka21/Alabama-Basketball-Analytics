@@ -38,6 +38,8 @@ LEADERBOARD_STATS.extend([
 LEADERBOARD_STATS.extend([
     {"key": "defense", "label": "Defense"},
     {"key": "collision_gap_help", "label": "Collision Gap Help"},
+    {"key": "overall_gap_help", "label": "Overall Gap Help"},
+    {"key": "overall_low_man", "label": "Overall Low Man"},
     {"key": "pnr_gap_help", "label": "PnR Gap Help"},
     {"key": "pnr_grade", "label": "PnR Grade"},
 ])

@@ -583,7 +583,7 @@ def prepare_dual_context(context: DualContextResult, stat_key: Optional[str]) ->
 
     ctx = dict(context)
 
-    if stat_key in {"defense", "collision_gap_help"}:
+    if stat_key in {"defense", "collision_gap_help", "overall_gap_help", "overall_low_man"}:
         row_indexes = {"player": 0, "plus": 1, "opps": 2, "pct": 3}
         total_indexes = {"plus": 0, "opps": 1, "pct": 2}
         ctx["season_rows"] = _normalize_simple_rows(ctx.get("season_rows"), indexes=row_indexes)

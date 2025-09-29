@@ -292,6 +292,29 @@ class TestDualViews:
             expected_texts=["4", "5", "2", "2", "80.0%", "100.0%"],
         )
 
+    def test_overall_gap_help_leaderboard_block(self, monkeypatch, app_client):
+        import admin.routes as rmod
+
+        _patch_last_practice(monkeypatch)
+
+        season_rows = [{"player_name": "G", "plus": 8, "opps": 10}]
+        season_totals = {"plus": 8, "opps": 10}
+
+        last_rows = [{"player_name": "G", "plus": 3, "opps": 5}]
+        last_totals = {"plus": 3, "opps": 5}
+
+        fake = _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals)
+        monkeypatch.setattr(rmod, "compute_overall_gap_help", fake)
+
+        resp = app_client.get("/admin/leaderboard?season_id=1&stat=overall_gap_help")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+
+        assert '<option value="overall_gap_help"' in html
+        assert 'Overall Gap Help' in html
+        for text in ["Gap +", "Gap Opp", "Gap %", "8", "10", "3", "5", "80.0%", "60.0%"]:
+            assert text in html
+
     def test_pnr_gap_help_split(self, monkeypatch, app_client):
         import admin.routes as rmod
 
@@ -348,6 +371,29 @@ class TestDualViews:
         assert "12" in html and "50.0%" in html
         assert "5" in html and "60.0%" in html
         assert "4" in html and "50.0%" in html
+
+    def test_overall_low_man_leaderboard_block(self, monkeypatch, app_client):
+        import admin.routes as rmod
+
+        _patch_last_practice(monkeypatch)
+
+        season_rows = [{"player_name": "L", "plus": 7, "opps": 10}]
+        season_totals = {"plus": 7, "opps": 10}
+
+        last_rows = [{"player_name": "L", "plus": 4, "opps": 6}]
+        last_totals = {"plus": 4, "opps": 6}
+
+        fake = _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals)
+        monkeypatch.setattr(rmod, "compute_overall_low_man", fake)
+
+        resp = app_client.get("/admin/leaderboard?season_id=1&stat=overall_low_man")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+
+        assert '<option value="overall_low_man"' in html
+        assert 'Overall Low Man' in html
+        for text in ["Low +", "Low Opp", "Low %", "7", "10", "4", "6", "70.0%", "66.7%"]:
+            assert text in html
 
     def test_pnr_grade_split(self, monkeypatch, app_client):
         import admin.routes as rmod

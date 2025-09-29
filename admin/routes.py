@@ -1074,6 +1074,8 @@ _PRACTICE_DUAL_MAP = {
     "def_rebounding": lambda: compute_defensive_rebounding,
     "defense": lambda: compute_defense_bumps,
     "collision_gap_help": lambda: compute_collisions_gap_help,
+    "overall_gap_help": lambda: compute_overall_gap_help,
+    "overall_low_man": lambda: compute_overall_low_man,
     "pnr_grade": lambda: compute_pnr_grade,
 }
 
@@ -1216,7 +1218,14 @@ def _split_leaderboard_rows_for_template(
             "last_practice_date": last_practice_date,
         }
 
-    practice_keys = {"off_rebounding", "def_rebounding", "defense", "collision_gap_help"}
+    practice_keys = {
+        "off_rebounding",
+        "def_rebounding",
+        "defense",
+        "collision_gap_help",
+        "overall_gap_help",
+        "overall_low_man",
+    }
     if stat_key not in practice_keys | {"pnr_grade"}:
         return {}
 
@@ -1266,12 +1275,19 @@ def _split_leaderboard_rows_for_template(
             "last_practice_date": normalized.get("last_practice_date"),
         }
 
-    if stat_key == "collision_gap_help":
+    simple_dual_prefix = {
+        "collision_gap_help": "collision",
+        "overall_gap_help": "overall_gap",
+        "overall_low_man": "overall_low",
+    }
+
+    if stat_key in simple_dual_prefix:
+        prefix = simple_dual_prefix[stat_key]
         return {
-            "collision_rows": normalized.get("season_rows") or [],
-            "collision_totals": normalized.get("season_team_totals") or {},
-            "collision_last_rows": normalized.get("last_rows") or [],
-            "collision_last_totals": normalized.get("last_team_totals") or {},
+            f"{prefix}_rows": normalized.get("season_rows") or [],
+            f"{prefix}_totals": normalized.get("season_team_totals") or {},
+            f"{prefix}_last_rows": normalized.get("last_rows") or [],
+            f"{prefix}_last_totals": normalized.get("last_team_totals") or {},
             "last_practice_date": normalized.get("last_practice_date"),
         }
 

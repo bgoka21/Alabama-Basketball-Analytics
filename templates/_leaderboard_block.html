@@ -452,6 +452,172 @@
         </tbody>
       </table>
     </div>
+  {% elif selected.key == 'overall_gap_help' %}
+    {% set overall_gap_last_ns = namespace(rows={}) %}
+    {% for entry in overall_gap_last_rows or [] %}
+      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
+      {% if name %}
+        {% set _ = overall_gap_last_ns.rows.update({name: entry}) %}
+      {% endif %}
+    {% endfor %}
+    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
+      <table class="table-leaderboard min-w-full">
+        {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
+        <tbody>
+          {% for row in overall_gap_rows or [] %}
+            {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
+            {% set plus = row.get('plus', 0) %}
+            {% set opps = row.get('opps', 0) %}
+            {% set pct = row.get('pct') %}
+            {% if pct is not none %}
+              {% set pct_display = pct|round(1) ~ '%' %}
+            {% elif opps %}
+              {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set pct_display = 'NA' %}
+            {% endif %}
+            {% set last = overall_gap_last_ns.rows.get(name) %}
+            {% set last_plus = last.get('plus', 0) if last else 0 %}
+            {% set last_opps = last.get('opps', 0) if last else 0 %}
+            {% set last_pct = last.get('pct') if last else None %}
+            {% if last_pct is not none %}
+              {% set last_pct_display = last_pct|round(1) ~ '%' %}
+            {% elif last_opps %}
+              {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set last_pct_display = 'NA' %}
+            {% endif %}
+            <tr>
+              <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+              <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+              {{ td_stat(plus) }}
+              {{ td_stat(opps) }}
+              {{ td_stat(pct_display) }}
+              {{ td_stat(last_plus) }}
+              {{ td_stat(last_opps) }}
+              {{ td_stat(last_pct_display) }}
+            </tr>
+          {% endfor %}
+          {% if overall_gap_totals or overall_gap_last_totals %}
+            {% set season_totals = overall_gap_totals or {} %}
+            {% set last_totals = overall_gap_last_totals or {} %}
+            {% set season_plus = season_totals.get('plus', 0) %}
+            {% set season_opps = season_totals.get('opps', 0) %}
+            {% set season_pct = season_totals.get('pct') %}
+            {% if season_pct is not none %}
+              {% set season_pct_display = season_pct|round(1) ~ '%' %}
+            {% elif season_opps %}
+              {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set season_pct_display = 'NA' %}
+            {% endif %}
+            {% set last_plus_total = last_totals.get('plus', 0) %}
+            {% set last_opps_total = last_totals.get('opps', 0) %}
+            {% set last_pct_total = last_totals.get('pct') %}
+            {% if last_pct_total is not none %}
+              {% set last_pct_display = last_pct_total|round(1) ~ '%' %}
+            {% elif last_opps_total %}
+              {% set last_pct_display = (last_plus_total / last_opps_total * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set last_pct_display = 'NA' %}
+            {% endif %}
+            <tr class="bg-gray-100 font-semibold team-totals">
+              <td class="td-num px-4 py-2 text-center"></td>
+              <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
+              {{ td_stat(season_plus) }}
+              {{ td_stat(season_opps) }}
+              {{ td_stat(season_pct_display) }}
+              {{ td_stat(last_plus_total) }}
+              {{ td_stat(last_opps_total) }}
+              {{ td_stat(last_pct_display) }}
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  {% elif selected.key == 'overall_low_man' %}
+    {% set overall_low_last_ns = namespace(rows={}) %}
+    {% for entry in overall_low_last_rows or [] %}
+      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
+      {% if name %}
+        {% set _ = overall_low_last_ns.rows.update({name: entry}) %}
+      {% endif %}
+    {% endfor %}
+    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
+      <table class="table-leaderboard min-w-full">
+        {{ render_grouped_last_practice_header(["Low +", "Low Opp", "Low %"], "Totals", "Last Practice") }}
+        <tbody>
+          {% for row in overall_low_rows or [] %}
+            {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
+            {% set plus = row.get('plus', 0) %}
+            {% set opps = row.get('opps', 0) %}
+            {% set pct = row.get('pct') %}
+            {% if pct is not none %}
+              {% set pct_display = pct|round(1) ~ '%' %}
+            {% elif opps %}
+              {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set pct_display = 'NA' %}
+            {% endif %}
+            {% set last = overall_low_last_ns.rows.get(name) %}
+            {% set last_plus = last.get('plus', 0) if last else 0 %}
+            {% set last_opps = last.get('opps', 0) if last else 0 %}
+            {% set last_pct = last.get('pct') if last else None %}
+            {% if last_pct is not none %}
+              {% set last_pct_display = last_pct|round(1) ~ '%' %}
+            {% elif last_opps %}
+              {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set last_pct_display = 'NA' %}
+            {% endif %}
+            <tr>
+              <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+              <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+              {{ td_stat(plus) }}
+              {{ td_stat(opps) }}
+              {{ td_stat(pct_display) }}
+              {{ td_stat(last_plus) }}
+              {{ td_stat(last_opps) }}
+              {{ td_stat(last_pct_display) }}
+            </tr>
+          {% endfor %}
+          {% if overall_low_totals or overall_low_last_totals %}
+            {% set season_totals = overall_low_totals or {} %}
+            {% set last_totals = overall_low_last_totals or {} %}
+            {% set season_plus = season_totals.get('plus', 0) %}
+            {% set season_opps = season_totals.get('opps', 0) %}
+            {% set season_pct = season_totals.get('pct') %}
+            {% if season_pct is not none %}
+              {% set season_pct_display = season_pct|round(1) ~ '%' %}
+            {% elif season_opps %}
+              {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set season_pct_display = 'NA' %}
+            {% endif %}
+            {% set last_plus_total = last_totals.get('plus', 0) %}
+            {% set last_opps_total = last_totals.get('opps', 0) %}
+            {% set last_pct_total = last_totals.get('pct') %}
+            {% if last_pct_total is not none %}
+              {% set last_pct_display = last_pct_total|round(1) ~ '%' %}
+            {% elif last_opps_total %}
+              {% set last_pct_display = (last_plus_total / last_opps_total * 100)|round(1) ~ '%' %}
+            {% else %}
+              {% set last_pct_display = 'NA' %}
+            {% endif %}
+            <tr class="bg-gray-100 font-semibold team-totals">
+              <td class="td-num px-4 py-2 text-center"></td>
+              <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
+              {{ td_stat(season_plus) }}
+              {{ td_stat(season_opps) }}
+              {{ td_stat(season_pct_display) }}
+              {{ td_stat(last_plus_total) }}
+              {{ td_stat(last_opps_total) }}
+              {{ td_stat(last_pct_display) }}
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
   {% elif selected.key == 'pnr_gap_help' %}
     {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
     <div class="space-y-8">
