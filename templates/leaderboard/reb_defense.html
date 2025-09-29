@@ -52,12 +52,12 @@
       </div>
 
       {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-      {% set columns = ["Box Out +", "Box Out Att", "Box Out %", "Given Up"] %}
+      {% set columns = ["Box Out +", "Box Out Att", "Box Out %", "Off Reb's Given Up"] %}
       {% set column_map = {
         "Box Out +": ("plus", "box_plus"),
         "Box Out Att": ("opps", "box_opp", "box_opps"),
         "Box Out %": ("pct", "box_pct"),
-        "Given Up": ("off_reb_given_up", "given_up"),
+        "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
       } %}
       {% set pct_columns = ["Box Out %"] %}
       {% set season_box_rows = (season_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}

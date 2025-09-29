@@ -287,10 +287,9 @@
     <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
       <table class="table-leaderboard min-w-full">
       {{ render_grouped_last_practice_header(
-        ["Box Out +", "Box Out Opp", "Box Out %"],
+        ["Box Out +", "Box Out Opp", "Box Out %", "Off Reb's Given Up"],
         "Box Out",
-        "Last Practice",
-        [{'label': "Off Reb's<br>Given Up", 'rowspan': 2, 'classes': 'th-stat px-4 py-2 text-center sortable'}]
+        "Last Practice"
       ) }}
       <tbody>
         {% for row in box_rows or [] %}
@@ -303,6 +302,7 @@
           {% set last_plus = last.get('plus', 0) if last else 0 %}
           {% set last_opps = last.get('opps', 0) if last else 0 %}
           {% set last_pct = last.get('pct') if last else None %}
+          {% set last_given = last.get('off_reb_given_up', 0) if last else 0 %}
           {% if pct is not none %}
             {% set pct_display = pct|round(1) ~ '%' %}
           {% elif opps %}
@@ -323,10 +323,11 @@
             {{ td_stat(plus) }}
             {{ td_stat(opps) }}
             {{ td_stat(pct_display) }}
+            {{ td_stat(given_up) }}
             {{ td_stat(last_plus) }}
             {{ td_stat(last_opps) }}
             {{ td_stat(last_pct_display) }}
-            {{ td_stat(given_up) }}
+            {{ td_stat(last_given) }}
           </tr>
         {% endfor %}
         {% if box_totals or box_last_totals %}
@@ -337,6 +338,7 @@
           {% set lt_plus = (box_last_totals or {}).get('plus', 0) %}
           {% set lt_opps = (box_last_totals or {}).get('opps', 0) %}
           {% set lt_pct = (box_last_totals or {}).get('pct') %}
+          {% set lt_given = (box_last_totals or {}).get('off_reb_given_up', 0) %}
           {% if t_pct is not none %}
             {% set t_pct_display = t_pct|round(1) ~ '%' %}
           {% elif t_opps %}
@@ -357,10 +359,11 @@
             {{ td_stat(t_plus) }}
             {{ td_stat(t_opps) }}
             {{ td_stat(t_pct_display) }}
+            {{ td_stat(t_given) }}
             {{ td_stat(lt_plus) }}
             {{ td_stat(lt_opps) }}
             {{ td_stat(lt_pct_display) }}
-            {{ td_stat(t_given) }}
+            {{ td_stat(lt_given) }}
           </tr>
         {% endif %}
       </tbody>
