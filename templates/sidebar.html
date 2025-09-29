@@ -84,6 +84,16 @@
       Leaderboard
     </a>
   </li>
+  <li class="nav-item{% if request.endpoint == 'admin.leaderboard_overall_gap_help' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.leaderboard_overall_gap_help') }}">
+      Gap Help (Overall)
+    </a>
+  </li>
+  <li class="nav-item{% if request.endpoint == 'admin.leaderboard_overall_low_man' %} active{% endif %}">
+    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.leaderboard_overall_low_man') }}">
+      Low Man (Overall)
+    </a>
+  </li>
   {% set summer_url = url_for('public.summer_stats') if view_exists('public.summer_stats') else '#' %}
   <li class="nav-item{% if request.endpoint == 'public.summer_stats' %} active{% endif %}">
     <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ summer_url }}">

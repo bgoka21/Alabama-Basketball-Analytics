@@ -31,5 +31,29 @@
 {% endblock %}
 
 {% block content %}
+  {% set practice_links = [
+    ('Defense – Bumps', 'admin.leaderboard_defense_bumps'),
+    ('Offensive Rebounding', 'admin.leaderboard_reb_offense'),
+    ('Defensive Rebounding', 'admin.leaderboard_reb_defense'),
+    ('Collisions – Gap Help', 'admin.leaderboard_collisions_gap_help'),
+    ('Gap Help (Overall)', 'admin.leaderboard_overall_gap_help'),
+    ('Low Man (Overall)', 'admin.leaderboard_overall_low_man'),
+    ('PnR Gap Help', 'admin.leaderboard_pnr_gap_help'),
+    ('PnR Grade', 'admin.leaderboard_pnr_grade'),
+  ] %}
+  <section class="mb-6">
+    <h2 class="text-lg font-semibold text-gray-900">Practice Leaderboards</h2>
+    <div class="mt-3 flex flex-wrap gap-3 text-sm">
+      {% for label, endpoint in practice_links %}
+        {% set is_active = request.endpoint == endpoint %}
+        <a
+          class="px-3 py-1 rounded-full border transition {{ 'bg-[#9E1B32] text-white border-[#9E1B32]' if is_active else 'border-gray-300 text-gray-700 hover:bg-white hover:text-[#9E1B32]' }}"
+          href="{{ url_for(endpoint) }}"
+        >
+          {{ label }}
+        </a>
+      {% endfor %}
+    </div>
+  </section>
   {% include "_leaderboard_block.html" %}
 {% endblock %}
