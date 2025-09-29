@@ -1268,15 +1268,31 @@ def _split_leaderboard_rows_for_template(
     season_by = normalized.get("season_rows_by_subtype") or {}
     totals_by = normalized.get("season_team_totals") or {}
 
+    last_by = normalized.get("last_rows_by_subtype") or {}
+    last_totals_by = normalized.get("last_team_totals") or {}
+
+    if not isinstance(last_by, Mapping):
+        last_by = {}
+    if not isinstance(last_totals_by, Mapping):
+        last_totals_by = {}
+
     context = {
         "close_rows": season_by.get("close_window") or [],
         "shut_rows": season_by.get("shut_door") or [],
         "close_totals": {},
         "shut_totals": {},
+        "close_last_rows": last_by.get("close_window") or [],
+        "shut_last_rows": last_by.get("shut_door") or [],
+        "close_last_totals": {},
+        "shut_last_totals": {},
+        "last_practice_date": normalized.get("last_practice_date"),
     }
     if isinstance(totals_by, dict):
         context["close_totals"] = totals_by.get("close_window") or {}
         context["shut_totals"] = totals_by.get("shut_door") or {}
+    if isinstance(last_totals_by, dict):
+        context["close_last_totals"] = last_totals_by.get("close_window") or {}
+        context["shut_last_totals"] = last_totals_by.get("shut_door") or {}
     # >>> BLUE COLLAR SPLIT DATA END
 
     return context

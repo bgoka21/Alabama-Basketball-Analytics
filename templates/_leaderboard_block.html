@@ -514,125 +514,188 @@
       </div>
     </div>
   {% elif selected.key == 'pnr_grade' %}
+    {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
     <div class="space-y-8">
       <div class="grid grid-cols-1 gap-8">
         <div class="flex flex-col h-full">
-          <h3 class="text-lg font-semibold mb-2">Close Window</h3>
+          <div class="flex items-baseline justify-between mb-3">
+            <h3 class="text-lg font-semibold">Close Window</h3>
+            {% if practice_note %}
+              <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
+            {% endif %}
+          </div>
+          {% set close_last_ns = namespace(rows={}) %}
+          {% for entry in close_last_rows or [] %}
+            {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
+            {% if name %}
+              {% set _ = close_last_ns.rows.update({name: entry}) %}
+            {% endif %}
+          {% endfor %}
           <div class="flex-1 min-h-0">
             <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white h-full">
               <table class="table-leaderboard min-w-full">
-                <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-                  <tr>
-                    <th class="th-num px-4 py-2 text-center sortable" data-col="0">#</th>
-                    <th class="th-player px-4 py-2 text-left sortable" data-col="1">Player</th>
-                    <th class="th-stat px-4 py-2 text-center sortable" data-col="2">Close Window +</th>
-                    <th class="th-stat px-4 py-2 text-center sortable" data-col="3">Close Window Att</th>
-                    <th class="th-stat px-4 py-2 text-center sortable" data-col="4">Close Window %</th>
-                  </tr>
-                </thead>
+                {{ render_grouped_last_practice_header(["Close Window +", "Close Window Att", "Close Window %"], "Totals", "Last Practice") }}
                 <tbody>
                   {% for row in close_rows or [] %}
                     {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
                     {% set plus = row.get('plus', 0) %}
                     {% set opps = row.get('opps', 0) %}
                     {% set pct = row.get('pct') %}
-                  <tr>
-                    <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                    <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                    {{ td_stat(plus) }}
-                    {{ td_stat(opps) }}
-                    <td class="px-4 py-2">
-                      {% if pct is not none %}
-                        {{ pct|round(1) }}%
-                      {% elif opps %}
-                        {{ (plus / opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-                {% if close_totals %}
-                  {% set t_plus = close_totals.get('plus', 0) %}
-                  {% set t_opps = close_totals.get('opps', 0) %}
-                  {% set t_pct = close_totals.get('pct') %}
-                  <tr class="bg-gray-100 font-semibold team-totals">
-                    <td class="td-num px-4 py-2 text-center"></td>
-                    <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                    {{ td_stat(t_plus) }}
-                    {{ td_stat(t_opps) }}
-                    <td class="px-4 py-2">
-                      {% if t_pct is not none %}
-                        {{ t_pct|round(1) }}%
-                      {% elif t_opps %}
-                        {{ (t_plus / t_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endif %}
+                    {% if pct is not none %}
+                      {% set pct_display = pct|round(1) ~ '%' %}
+                    {% elif opps %}
+                      {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set pct_display = 'NA' %}
+                    {% endif %}
+                    {% set last = close_last_ns.rows.get(name) %}
+                    {% set last_plus = last.get('plus', 0) if last else 0 %}
+                    {% set last_opps = last.get('opps', 0) if last else 0 %}
+                    {% set last_pct = last.get('pct') if last else None %}
+                    {% if last_pct is not none %}
+                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
+                    {% elif last_opps %}
+                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set last_pct_display = 'NA' %}
+                    {% endif %}
+                    <tr>
+                      <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+                      <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+                      {{ td_stat(plus) }}
+                      {{ td_stat(opps) }}
+                      {{ td_stat(pct_display) }}
+                      {{ td_stat(last_plus) }}
+                      {{ td_stat(last_opps) }}
+                      {{ td_stat(last_pct_display) }}
+                    </tr>
+                  {% endfor %}
+                  {% if close_totals or close_last_totals %}
+                    {% set season_totals = close_totals or {} %}
+                    {% set last_totals = close_last_totals or {} %}
+                    {% set season_plus = season_totals.get('plus', 0) %}
+                    {% set season_opps = season_totals.get('opps', 0) %}
+                    {% set season_pct = season_totals.get('pct') %}
+                    {% if season_pct is not none %}
+                      {% set season_pct_display = season_pct|round(1) ~ '%' %}
+                    {% elif season_opps %}
+                      {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set season_pct_display = 'NA' %}
+                    {% endif %}
+                    {% set last_plus = last_totals.get('plus', 0) %}
+                    {% set last_opps = last_totals.get('opps', 0) %}
+                    {% set last_pct = last_totals.get('pct') %}
+                    {% if last_pct is not none %}
+                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
+                    {% elif last_opps %}
+                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set last_pct_display = 'NA' %}
+                    {% endif %}
+                    <tr class="bg-gray-100 font-semibold team-totals">
+                      <td class="td-num px-4 py-2 text-center"></td>
+                      <td class="td-player px-4 py-2 text-left">Team Totals</td>
+                      {{ td_stat(season_plus) }}
+                      {{ td_stat(season_opps) }}
+                      {{ td_stat(season_pct_display) }}
+                      {{ td_stat(last_plus) }}
+                      {{ td_stat(last_opps) }}
+                      {{ td_stat(last_pct_display) }}
+                    </tr>
+                  {% endif %}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
         <div class="flex flex-col h-full">
-          <h3 class="text-lg font-semibold mb-2">Shut Door</h3>
+          <div class="flex items-baseline justify-between mb-3">
+            <h3 class="text-lg font-semibold">Shut Door</h3>
+            {% if practice_note %}
+              <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
+            {% endif %}
+          </div>
+          {% set shut_last_ns = namespace(rows={}) %}
+          {% for entry in shut_last_rows or [] %}
+            {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
+            {% if name %}
+              {% set _ = shut_last_ns.rows.update({name: entry}) %}
+            {% endif %}
+          {% endfor %}
           <div class="flex-1 min-h-0">
             <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white h-full">
               <table class="table-leaderboard min-w-full">
-                <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-                  <tr>
-                    <th class="th-num px-4 py-2 text-center sortable" data-col="0">#</th>
-                    <th class="th-player px-4 py-2 text-left sortable" data-col="1">Player</th>
-                    <th class="th-stat px-4 py-2 text-center sortable" data-col="2">Shut Door +</th>
-                    <th class="th-stat px-4 py-2 text-center sortable" data-col="3">Shut Door Att</th>
-                    <th class="th-stat px-4 py-2 text-center sortable" data-col="4">Shut Door %</th>
-                  </tr>
-                </thead>
+                {{ render_grouped_last_practice_header(["Shut Door +", "Shut Door Att", "Shut Door %"], "Totals", "Last Practice") }}
                 <tbody>
                   {% for row in shut_rows or [] %}
                     {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
                     {% set plus = row.get('plus', 0) %}
                     {% set opps = row.get('opps', 0) %}
                     {% set pct = row.get('pct') %}
-                  <tr>
-                    <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                    <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                    {{ td_stat(plus) }}
-                    {{ td_stat(opps) }}
-                    <td class="px-4 py-2">
-                      {% if pct is not none %}
-                        {{ pct|round(1) }}%
-                      {% elif opps %}
-                        {{ (plus / opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-                {% if shut_totals %}
-                  {% set t_plus = shut_totals.get('plus', 0) %}
-                  {% set t_opps = shut_totals.get('opps', 0) %}
-                  {% set t_pct = shut_totals.get('pct') %}
-                  <tr class="bg-gray-100 font-semibold team-totals">
-                    <td class="td-num px-4 py-2 text-center"></td>
-                    <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                    {{ td_stat(t_plus) }}
-                    {{ td_stat(t_opps) }}
-                    <td class="px-4 py-2">
-                      {% if t_pct is not none %}
-                        {{ t_pct|round(1) }}%
-                      {% elif t_opps %}
-                        {{ (t_plus / t_opps * 100)|round(1) }}%
-                      {% else %}
-                        NA
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endif %}
+                    {% if pct is not none %}
+                      {% set pct_display = pct|round(1) ~ '%' %}
+                    {% elif opps %}
+                      {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set pct_display = 'NA' %}
+                    {% endif %}
+                    {% set last = shut_last_ns.rows.get(name) %}
+                    {% set last_plus = last.get('plus', 0) if last else 0 %}
+                    {% set last_opps = last.get('opps', 0) if last else 0 %}
+                    {% set last_pct = last.get('pct') if last else None %}
+                    {% if last_pct is not none %}
+                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
+                    {% elif last_opps %}
+                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set last_pct_display = 'NA' %}
+                    {% endif %}
+                    <tr>
+                      <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
+                      <td class="td-player px-4 py-2 text-left">{{ name }}</td>
+                      {{ td_stat(plus) }}
+                      {{ td_stat(opps) }}
+                      {{ td_stat(pct_display) }}
+                      {{ td_stat(last_plus) }}
+                      {{ td_stat(last_opps) }}
+                      {{ td_stat(last_pct_display) }}
+                    </tr>
+                  {% endfor %}
+                  {% if shut_totals or shut_last_totals %}
+                    {% set season_totals = shut_totals or {} %}
+                    {% set last_totals = shut_last_totals or {} %}
+                    {% set season_plus = season_totals.get('plus', 0) %}
+                    {% set season_opps = season_totals.get('opps', 0) %}
+                    {% set season_pct = season_totals.get('pct') %}
+                    {% if season_pct is not none %}
+                      {% set season_pct_display = season_pct|round(1) ~ '%' %}
+                    {% elif season_opps %}
+                      {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set season_pct_display = 'NA' %}
+                    {% endif %}
+                    {% set last_plus = last_totals.get('plus', 0) %}
+                    {% set last_opps = last_totals.get('opps', 0) %}
+                    {% set last_pct = last_totals.get('pct') %}
+                    {% if last_pct is not none %}
+                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
+                    {% elif last_opps %}
+                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
+                    {% else %}
+                      {% set last_pct_display = 'NA' %}
+                    {% endif %}
+                    <tr class="bg-gray-100 font-semibold team-totals">
+                      <td class="td-num px-4 py-2 text-center"></td>
+                      <td class="td-player px-4 py-2 text-left">Team Totals</td>
+                      {{ td_stat(season_plus) }}
+                      {{ td_stat(season_opps) }}
+                      {{ td_stat(season_pct_display) }}
+                      {{ td_stat(last_plus) }}
+                      {{ td_stat(last_opps) }}
+                      {{ td_stat(last_pct_display) }}
+                    </tr>
+                  {% endif %}
                 </tbody>
               </table>
             </div>
