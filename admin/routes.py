@@ -1552,6 +1552,7 @@ def compute_overall_gap_help(
 
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
+    shared_kwargs.pop("stat_key", None)
 
     collision_result = compute_collisions_gap_help(
         session=session,
@@ -1642,6 +1643,7 @@ def compute_overall_low_man(
 
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
+    shared_kwargs.pop("stat_key", None)
 
     collision_result = compute_collisions_gap_help(
         session=session,
