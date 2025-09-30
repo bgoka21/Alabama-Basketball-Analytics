@@ -5907,28 +5907,6 @@ def leaderboard_collisions_gap_help():
     )
 
 
-@admin_bp.route('/leaderboard/gap-help')
-@login_required
-def leaderboard_overall_gap_help():
-    return _render_dual_leaderboard(
-        'leaderboard/gap_help_overall.html',
-        page_title='Overall – Gap Help',
-        compute_fn=compute_overall_gap_help,
-        stat_key='overall_gap_help',
-    )
-
-
-@admin_bp.route('/leaderboard/low-man')
-@login_required
-def leaderboard_overall_low_man():
-    return _render_dual_leaderboard(
-        'leaderboard/low_man_overall.html',
-        page_title='Overall – Low Man',
-        compute_fn=compute_overall_low_man,
-        stat_key='overall_low_man',
-    )
-
-
 @admin_bp.route('/leaderboard/pnr/gap-help')
 @login_required
 def leaderboard_pnr_gap_help():
