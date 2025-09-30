@@ -1,0 +1,126 @@
+{%- macro render_table(
+  id,
+  columns,
+  rows,
+  totals=None,
+  dense=True,
+  sticky_header=False,
+  caption=None
+) -%}
+  {%- set container_classes = 'rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden' -%}
+  {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
+  <div class="{{ container_classes }}">
+    <div class="overflow-x-auto">
+      <table id="{{ id }}" role="table" class="min-w-full text-sm table-auto">
+        {%- if caption %}
+        <caption class="sr-only">{{ caption }}</caption>
+        {%- endif %}
+        {%- set thead_classes = 'bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700' -%}
+        <thead class="{{ thead_classes }}{% if sticky_header %} sticky top-0 z-10{% endif %}">
+          <tr>
+            {%- for col in columns %}
+              {%- set align = col.align | default('left') -%}
+              {%- set align_class = {
+                'left': 'text-left',
+                'right': 'text-right',
+                'center': 'text-center'
+              }[align] -%}
+              {%- set justify_class = {
+                'left': 'justify-start',
+                'right': 'justify-end',
+                'center': 'justify-center'
+              }[align] -%}
+              {%- set width_class = col.width if col.width is defined and col.width else '' -%}
+              {%- set sticky_class = ' sticky top-0 z-10 bg-gray-50 dark:bg-gray-800/60' if sticky_header else '' -%}
+              {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_class -%}
+              <th scope="col"
+                  class="{{ th_base_classes }} {{ width_class }}"
+                  data-sortable="{{ 'true' if col.sortable else 'false' }}"
+                  data-key="{{ col.key }}"
+                  aria-sort="none">
+                {%- if col.sortable -%}
+                  <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group">
+                    <span>{{ col.label }}</span>
+                    <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true">↕</span>
+                    <span class="sr-only sort-state">unsorted</span>
+                  </button>
+                {%- else -%}
+                  <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                    <span>{{ col.label }}</span>
+                    <span class="sort-caret opacity-0 transition" aria-hidden="true">↕</span>
+                    <span class="sr-only sort-state">unsorted</span>
+                  </div>
+                {%- endif -%}
+              </th>
+            {%- endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {%- for row in rows %}
+          <tr class="odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors">
+            {%- for col in columns %}
+              {%- set align = col.align | default('left') -%}
+              {%- set align_class = {
+                'left': 'text-left',
+                'right': 'text-right',
+                'center': 'text-center'
+              }[align] -%}
+              {%- set numeric_class = ' text-right tabular-nums' if align == 'right' else '' -%}
+              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}" data-key="{{ col.key }}">
+                {{ row.get(col.key, '') }}
+              </td>
+            {%- endfor %}
+          </tr>
+          {%- endfor %}
+        </tbody>
+        {%- if totals %}
+        <tfoot>
+          <tr class="bg-gray-50 dark:bg-gray-800/60 font-semibold border-t border-gray-200 dark:border-gray-700">
+            {%- for col in columns %}
+              {%- set align = col.align | default('left') -%}
+              {%- set align_class = {
+                'left': 'text-left',
+                'right': 'text-right',
+                'center': 'text-center'
+              }[align] -%}
+              {%- set numeric_class = ' text-right tabular-nums' if align == 'right' else '' -%}
+              {%- set total_value = totals.get(col.key) -%}
+              {%- if loop.first -%}
+                <th scope="row" class="{{ padding_class }} {{ align_class }}{{ numeric_class }}">
+                  {{ total_value if total_value is not none and total_value != '' else 'Totals' }}
+                </th>
+              {%- else -%}
+                <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}">
+                  {{ total_value if total_value is not none else '' }}
+                </td>
+              {%- endif -%}
+            {%- endfor %}
+          </tr>
+        </tfoot>
+        {%- endif %}
+      </table>
+    </div>
+  </div>
+{%- endmacro %}
+
+{# Example usage:
+{% from 'macros/table.html' import render_table %}
+
+{% set columns = [
+  {'key':'rank','label':'#','sortable':true, 'align':'right', 'width':'w-12'},
+  {'key':'player','label':'Player','sortable':true, 'align':'left'},
+  {'key':'bump_plus','label':'Bump +','sortable':true, 'align':'right'},
+  {'key':'bump_opp','label':'Bump Opp','sortable':true, 'align':'right'},
+  {'key':'bump_pct','label':'Bump %','sortable':true, 'align':'right'},
+] %}
+
+{{ render_table(
+  id='defense-bumps',
+  columns=columns,
+  rows=rows,                 # list of dicts
+  totals=totals,             # dict or None
+  dense=True,
+  sticky_header=False,
+  caption='Defense — Bumps'
+) }}
+#}
