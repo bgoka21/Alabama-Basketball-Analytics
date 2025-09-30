@@ -1558,7 +1558,6 @@ def compute_overall_gap_help(
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         **shared_kwargs,
     )
@@ -1569,7 +1568,6 @@ def compute_overall_gap_help(
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         **shared_kwargs,
     )
@@ -1650,7 +1648,6 @@ def compute_overall_low_man(
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         **shared_kwargs,
     )
@@ -1661,7 +1658,6 @@ def compute_overall_low_man(
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         role="low_man",
         **shared_kwargs,
