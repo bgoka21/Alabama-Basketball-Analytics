@@ -250,25 +250,55 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
             team["given_up"],
         )
     elif stat_key == 'collision_gap_help':
-        team = {"gap_plus": 0, "gap_minus": 0}
+        team = {
+            "gap_plus": 0,
+            "gap_minus": 0,
+            "low_plus": 0,
+            "low_minus": 0,
+        }
 
         for player in players:
             row = core_rows.get(player, {})
             p = row.get('player', player)
             gap_plus = safe_int(row.get('collision_gap_positive'))
             gap_minus = safe_int(row.get('collision_gap_missed'))
-            gap_opp = gap_plus + gap_minus
-            gap_pct = make_pct(gap_plus, gap_opp)
+            low_plus = safe_int(row.get('low_help_positive'))
+            low_minus = safe_int(row.get('low_help_missed'))
 
-            leaderboard.append((p, gap_plus, gap_opp, gap_pct))
+            gap_opp = gap_plus + gap_minus
+            low_opp = low_plus + low_minus
+            gap_pct = make_pct(gap_plus, gap_opp)
+            low_pct = make_pct(low_plus, low_opp)
+
+            leaderboard.append(
+                (
+                    p,
+                    gap_plus,
+                    gap_opp,
+                    gap_pct,
+                    low_plus,
+                    low_opp,
+                    low_pct,
+                )
+            )
 
             team["gap_plus"] += gap_plus
             team["gap_minus"] += gap_minus
+            team["low_plus"] += low_plus
+            team["low_minus"] += low_minus
 
         leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
 
         team_gap_opp = team["gap_plus"] + team["gap_minus"]
-        team_totals = (team["gap_plus"], team_gap_opp, make_pct(team["gap_plus"], team_gap_opp))
+        team_low_opp = team["low_plus"] + team["low_minus"]
+        team_totals = (
+            team["gap_plus"],
+            team_gap_opp,
+            make_pct(team["gap_plus"], team_gap_opp),
+            team["low_plus"],
+            team_low_opp,
+            make_pct(team["low_plus"], team_low_opp),
+        )
     elif stat_key == 'pnr_gap_help':
         team = {
             "gap_plus": 0, "gap_minus": 0,

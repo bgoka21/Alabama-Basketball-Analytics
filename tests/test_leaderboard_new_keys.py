@@ -24,9 +24,27 @@ def rows_for_def_reb():
 
 def rows_for_collision_gap():
     return [
-        {"player": ALICE, "collision_gap_positive": 1, "collision_gap_missed": 1},
-        {"player": BOB, "collision_gap_positive": 1, "collision_gap_missed": 1},
-        {"player": CAROL, "collision_gap_positive": 1, "collision_gap_missed": 0},
+        {
+            "player": ALICE,
+            "collision_gap_positive": 1,
+            "collision_gap_missed": 1,
+            "low_help_positive": 1,
+            "low_help_missed": 0,
+        },
+        {
+            "player": BOB,
+            "collision_gap_positive": 1,
+            "collision_gap_missed": 1,
+            "low_help_positive": 0,
+            "low_help_missed": 1,
+        },
+        {
+            "player": CAROL,
+            "collision_gap_positive": 1,
+            "collision_gap_missed": 0,
+            "low_help_positive": 2,
+            "low_help_missed": 0,
+        },
     ]
 
 
@@ -69,6 +87,7 @@ def test_leaderboard_new_keys_sanity(key, rows):
     elif key == "collision_gap_help":
         r2 = next(r for r in out["rows"] if r[0] == CAROL)
         assert r2[1] == 1 and r2[2] == 1 and r2[3] == 100.0
+        assert r2[4] == 2 and r2[5] == 2 and r2[6] == 100.0
     elif key == "pnr_gap_help":
         r0 = next(r for r in out["rows"] if r[0] == ALICE)
         assert r0[1] == 1 and r0[2] == 1 and r0[3] == 100.0

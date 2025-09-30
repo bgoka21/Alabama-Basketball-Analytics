@@ -85,16 +85,26 @@ def test_compute_overall_low_man_combines_sources(monkeypatch):
     assert totals["pct"] == pytest.approx(75.0)
 
     assert [row["player_name"] for row in rows] == ["Player A", "Player C", "Player B"]
-    assert rows[0]["plus"] == 5
-    assert rows[0]["opps"] == 7
+
+    row_map = {row["player_name"]: row for row in rows}
+    player_a = row_map["Player A"]
+    player_b = row_map["Player B"]
+
+    assert player_a["plus"] == 5
+    assert player_a["opps"] == 7
     expected_pct = (5 / 7) * 100
-    assert rows[0]["pct"] == pytest.approx(expected_pct)
+    assert player_a["pct"] == pytest.approx(expected_pct)
+
+    # Player B should reflect only the collision totals since no PnR stats were provided.
+    assert player_b["plus"] == 2
+    assert player_b["opps"] == 2
+    assert player_b["pct"] == pytest.approx(100.0)
 
 
 def test_compute_overall_low_man_handles_missing_collisions(monkeypatch):
     def fake_collisions(**kwargs):
-        rows = [("Player A", 4, 6, 0.0)]
-        totals = (4, 6, 0.0)
+        rows = [("Player A", 4, 6, 0.0, 0, 0, None)]
+        totals = (4, 6, 0.0, 0, 0, None)
         return totals, rows
 
     def fake_pnr(**kwargs):
