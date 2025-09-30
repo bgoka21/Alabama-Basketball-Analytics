@@ -1552,13 +1552,13 @@ def compute_overall_gap_help(
 
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
+    shared_kwargs.pop("stat_key", None)
 
     collision_result = compute_collisions_gap_help(
         session=session,
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         **shared_kwargs,
     )
@@ -1569,7 +1569,6 @@ def compute_overall_gap_help(
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         **shared_kwargs,
     )
@@ -1644,13 +1643,13 @@ def compute_overall_low_man(
 
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
+    shared_kwargs.pop("stat_key", None)
 
     collision_result = compute_collisions_gap_help(
         session=session,
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         **shared_kwargs,
     )
@@ -1661,7 +1660,6 @@ def compute_overall_low_man(
         season_id=season_id,
         start_dt=start_dt,
         end_dt=end_dt,
-        stat_key=stat_key,
         label_set=label_set,
         role="low_man",
         **shared_kwargs,
