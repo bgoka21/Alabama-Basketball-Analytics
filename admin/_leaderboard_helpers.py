@@ -1120,11 +1120,13 @@ def build_dual_table(
             for key in spec_keys
             if isinstance(key, str)
         ]
+        is_pct = column in pct_set or formatter == "pct"
         column_info = {
             "label": column,
             "slug": slug,
             "keys": canonical_keys,
             "formatter": formatter,
+            "is_pct": is_pct,
         }
         column_specs.append(column_info)
         for key in canonical_keys:
@@ -1152,32 +1154,37 @@ def build_dual_table(
             "label": "Player",
             "align": "left",
             "sortable": True,
+            "cell_class": "font-semibold",
         },
     ]
 
     for spec in column_specs:
-        columns.append(
-            {
-                "key": f"totals_{spec['slug']}",
-                "label": spec["label"],
-                "align": "right",
-                "sortable": True,
-                "value_key": f"totals_{spec['slug']}_value",
-                "group": left_label,
-            }
-        )
+        cell_class = "font-semibold" if spec.get("is_pct") else None
+        column_entry = {
+            "key": f"totals_{spec['slug']}",
+            "label": spec["label"],
+            "align": "right",
+            "sortable": True,
+            "value_key": f"totals_{spec['slug']}_value",
+            "group": left_label,
+        }
+        if cell_class:
+            column_entry["cell_class"] = cell_class
+        columns.append(column_entry)
 
     for spec in column_specs:
-        columns.append(
-            {
-                "key": f"last_{spec['slug']}",
-                "label": spec["label"],
-                "align": "right",
-                "sortable": True,
-                "value_key": f"last_{spec['slug']}_value",
-                "group": right_label,
-            }
-        )
+        cell_class = "font-semibold" if spec.get("is_pct") else None
+        column_entry = {
+            "key": f"last_{spec['slug']}",
+            "label": spec["label"],
+            "align": "right",
+            "sortable": True,
+            "value_key": f"last_{spec['slug']}_value",
+            "group": right_label,
+        }
+        if cell_class:
+            column_entry["cell_class"] = cell_class
+        columns.append(column_entry)
 
     rows: list[Dict[str, Any]] = []
     for index, display in enumerate(display_rows):
@@ -1588,6 +1595,7 @@ def build_leaderboard_table(
             "label": "Player",
             "align": "left",
             "sortable": True,
+            "cell_class": "font-semibold",
         },
     ]
 
@@ -1595,15 +1603,17 @@ def build_leaderboard_table(
         key = spec["slug"]
         spec["key"] = key
         spec["value_key"] = f"{key}_value"
-        columns.append(
-            {
-                "key": key,
-                "label": spec["label"],
-                "align": spec["align"],
-                "sortable": True,
-                "value_key": spec["value_key"],
-            }
-        )
+        cell_class = "font-semibold" if spec.get("format") == "pct" else None
+        column_entry = {
+            "key": key,
+            "label": spec["label"],
+            "align": spec["align"],
+            "sortable": True,
+            "value_key": spec["value_key"],
+        }
+        if cell_class:
+            column_entry["cell_class"] = cell_class
+        columns.append(column_entry)
 
     def _format_composed(
         source: Any,
