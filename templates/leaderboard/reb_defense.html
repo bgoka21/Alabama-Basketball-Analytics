@@ -60,18 +60,24 @@
         "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
       } %}
       {% set pct_columns = ["Box Out %"] %}
-      {% set season_box_rows = (season_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
-      {% set last_box_rows = (last_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
-      {% set season_box_totals = season_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
-      {% set last_box_totals = last_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
-      {% set combined_rows = season_box_rows|combine_dual_rows(last_box_rows) %}
-      {% set combined_totals = season_box_totals|combine_dual_totals(last_box_totals) %}
+      {% set table = build_dual_table(
+        base_columns=columns,
+        season_rows=season_rows,
+        last_rows=last_rows,
+        season_totals=season_team_totals,
+        last_totals=last_team_totals,
+        column_map=column_map,
+        pct_columns=pct_columns,
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='defensive-rebounding',
+        default_sort=['pct', 'opps', 'plus']
+      ) %}
 
       {{ render_dual_section(
         "Defensive Rebounding",
-        combined_rows,
-        combined_totals,
-        columns,
+        table,
         practice_note
       ) }}
     </div>

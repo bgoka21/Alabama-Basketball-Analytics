@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from "macros/dual_tables.html" import render_grouped_last_practice_header, td_stat %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -52,165 +52,32 @@
       </div>
 
       {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-      {% set GRADE_LABELS = ["A", "B", "C", "D", "F", "Grade"] %}
-      {% set grade_rows = season_rows or [] %}
-      {% set grade_last_rows = last_rows or [] %}
-      {% set grade_totals = season_team_totals %}
-      {% set grade_last_totals = last_team_totals %}
+      {% set columns = ["A", "B", "C", "D", "F", "Grade"] %}
+      {% set column_map = {
+        "A": ("A", "a"),
+        "B": ("B", "b"),
+        "C": ("C", "c"),
+        "D": ("D", "d"),
+        "F": ("F", "f"),
+        "Grade": ("Grade", "grade"),
+      } %}
 
-      <section>
-        <div class="flex items-baseline justify-between mb-3">
-          <h2 class="text-xl font-semibold">PnR Grade</h2>
-          {% if practice_note %}
-            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-          {% endif %}
-        </div>
-        <span class="hidden">PnR Grade — Practice Totals</span>
-        <span class="hidden">PnR Grade — Last Practice</span>
-        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-          <table class="table-leaderboard min-w-full">
-            {{ render_grouped_last_practice_header(GRADE_LABELS, "Totals", "Last Practice") }}
-            <tbody class="divide-y divide-gray-100">
-              {% for row in grade_rows %}
-                {% set jersey = none %}
-                {% if row.get is defined %}
-                  {% set jersey = row.get('jersey') %}
-                {% endif %}
-                {% if jersey is none and row.jersey is defined %}
-                  {% set jersey = row.jersey %}
-                {% endif %}
-                {% if jersey is none %}
-                  {% set jersey = loop.index %}
-                {% endif %}
+      {% set table = build_dual_table(
+        base_columns=columns,
+        season_rows=season_rows,
+        last_rows=last_rows,
+        season_totals=season_team_totals,
+        last_totals=last_team_totals,
+        column_map=column_map,
+        pct_columns=[],
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='pnr-grade',
+        default_sort=['Grade', 'player']
+      ) %}
 
-                {% set player_name = none %}
-                {% if row.get is defined %}
-                  {% set player_name = row.get('player') %}
-                {% endif %}
-                {% if player_name is none and row.player is defined %}
-                  {% set player_name = row.player %}
-                {% endif %}
-                {% if player_name is none and row.get is defined %}
-                  {% set player_name = row.get('player_name') %}
-                {% endif %}
-                {% if player_name is none and row.player_name is defined %}
-                  {% set player_name = row.player_name %}
-                {% endif %}
-                {% if player_name is none and row.get is defined %}
-                  {% set player_name = row.get('name') %}
-                {% endif %}
-                {% if player_name is none and row.name is defined %}
-                  {% set player_name = row.name %}
-                {% endif %}
-
-                {% set player_key = none %}
-                {% if row.get is defined %}
-                  {% set player_key = row.get('player_id') %}
-                {% endif %}
-                {% if player_key is none and row.player_id is defined %}
-                  {% set player_key = row.player_id %}
-                {% endif %}
-                {% if player_key is none %}
-                  {% set player_key = player_name %}
-                {% endif %}
-
-                {% set last = none %}
-                {% if grade_last_rows %}
-                  {% for candidate in grade_last_rows %}
-                    {% set candidate_key = none %}
-                    {% if candidate.get is defined %}
-                      {% set candidate_key = candidate.get('player_id') %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.player_id is defined %}
-                      {% set candidate_key = candidate.player_id %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.get is defined %}
-                      {% set candidate_key = candidate.get('player') %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.player is defined %}
-                      {% set candidate_key = candidate.player %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.get is defined %}
-                      {% set candidate_key = candidate.get('player_name') %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.player_name is defined %}
-                      {% set candidate_key = candidate.player_name %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.get is defined %}
-                      {% set candidate_key = candidate.get('name') %}
-                    {% endif %}
-                    {% if candidate_key is none and candidate.name is defined %}
-                      {% set candidate_key = candidate.name %}
-                    {% endif %}
-                    {% if player_key is not none and candidate_key is not none and candidate_key == player_key %}
-                      {% set last = candidate %}
-                    {% endif %}
-                  {% endfor %}
-                {% endif %}
-                {% if last is none and grade_last_rows|length > loop.index0 %}
-                  {% set last = grade_last_rows[loop.index0] %}
-                {% endif %}
-
-                <tr>
-                  <td class="td-num px-4 py-2 text-center">{{ jersey }}</td>
-                  <td class="td-player px-4 py-2 text-left">{{ player_name }}</td>
-
-                  {% for label in GRADE_LABELS %}
-                    {% set stat_val = none %}
-                    {% if row.get is defined %}
-                      {% set stat_val = row.get(label) %}
-                    {% elif row[label] is defined %}
-                      {% set stat_val = row[label] %}
-                    {% endif %}
-                    {{ td_stat(stat_val if stat_val is not none else '—') }}
-                  {% endfor %}
-
-                  {% for label in GRADE_LABELS %}
-                    {% set last_val = none %}
-                    {% if last %}
-                      {% if last.get is defined %}
-                        {% set last_val = last.get(label) %}
-                      {% elif last[label] is defined %}
-                        {% set last_val = last[label] %}
-                      {% endif %}
-                    {% endif %}
-                    {{ td_stat(last_val if last_val is not none else '—') }}
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-
-              {% if grade_totals or grade_last_totals %}
-                <tr class="bg-gray-50 font-semibold">
-                  <td class="td-num px-4 py-2 text-center">—</td>
-                  <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                  {% for label in GRADE_LABELS %}
-                    {% set total_val = none %}
-                    {% if grade_totals %}
-                      {% if grade_totals.get is defined %}
-                        {% set total_val = grade_totals.get(label) %}
-                      {% elif grade_totals[label] is defined %}
-                        {% set total_val = grade_totals[label] %}
-                      {% endif %}
-                    {% endif %}
-                    {{ td_stat(total_val if total_val is not none else '—') }}
-                  {% endfor %}
-                  {% for label in GRADE_LABELS %}
-                    {% set last_total_val = none %}
-                    {% if grade_last_totals %}
-                      {% if grade_last_totals.get is defined %}
-                        {% set last_total_val = grade_last_totals.get(label) %}
-                      {% elif grade_last_totals[label] is defined %}
-                        {% set last_total_val = grade_last_totals[label] %}
-                      {% endif %}
-                    {% endif %}
-                    {{ td_stat(last_total_val if last_total_val is not none else '—') }}
-                  {% endfor %}
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {{ render_dual_section('PnR Grade', table, practice_note) }}
     </div>
   </div>
 {% endblock %}

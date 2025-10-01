@@ -1,4 +1,5 @@
-{% from "macros/dual_tables.html" import render_grouped_last_practice_header, td_stat %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
+{% from 'macros/table.html' import render_table %}
 
 <h1 class="text-3xl font-bold mb-6">Season Leaderboard</h1>
 
@@ -6,9 +7,7 @@
   <label for="stat-select">Stat:</label>
   <select id="stat-select" name="stat" onchange="this.form.submit()">
     {% for s in stats_config if not s.get('hidden') %}
-      <option value="{{ s.key }}" {% if s.key==selected.key %}selected{% endif %}>
-        {{ s.label }}
-      </option>
+      <option value="{{ s.key }}" {% if s.key == selected.key %}selected{% endif %}>{{ s.label }}</option>
     {% endfor %}
   </select>
   <input type="hidden" name="season_id" value="{{ selected_season }}">
@@ -19,1136 +18,279 @@
   {% endfor %}
 </form>
 
+{% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+
 {% if selected.key == 'defense' %}
-  <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-    {% set bump_last_ns = namespace(rows={}) %}
-    {% for entry in bump_last_rows or [] %}
-      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-      {% if name %}
-        {% set _ = bump_last_ns.rows.update({name: entry}) %}
-      {% endif %}
-    {% endfor %}
-    <table class="table-leaderboard min-w-full">
-      {{ render_grouped_last_practice_header(["Bump +", "Bump Opps", "Bump %"], "Collisions", "Last Practice") }}
-      <tbody>
-        {% for row in bump_rows or [] %}
-          {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-          {% set plus = row.get('plus', 0) %}
-          {% set opps = row.get('opps', 0) %}
-          {% set pct = row.get('pct') %}
-          {% set last = bump_last_ns.rows.get(name) %}
-          {% set last_plus = last.get('plus', 0) if last else 0 %}
-          {% set last_opps = last.get('opps', 0) if last else 0 %}
-          {% set last_pct = last.get('pct') if last else None %}
-          {% if pct is not none %}
-            {% set pct_display = pct|round(1) ~ '%' %}
-          {% elif opps %}
-            {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set pct_display = 'NA' %}
-          {% endif %}
-          {% if last_pct is not none %}
-            {% set last_pct_display = last_pct|round(1) ~ '%' %}
-          {% elif last_opps %}
-            {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set last_pct_display = 'NA' %}
-          {% endif %}
-          <tr>
-            <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-            <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-            {{ td_stat(plus) }}
-            {{ td_stat(opps) }}
-            {{ td_stat(pct_display) }}
-            {{ td_stat(last_plus) }}
-            {{ td_stat(last_opps) }}
-            {{ td_stat(last_pct_display) }}
-          </tr>
-        {% endfor %}
-        {% if bump_totals or bump_last_totals %}
-          {% set season_plus = (bump_totals or {}).get('plus', 0) %}
-          {% set season_opps = (bump_totals or {}).get('opps', 0) %}
-          {% set season_pct = (bump_totals or {}).get('pct') %}
-          {% set lp_plus = (bump_last_totals or {}).get('plus', 0) %}
-          {% set lp_opps = (bump_last_totals or {}).get('opps', 0) %}
-          {% set lp_pct = (bump_last_totals or {}).get('pct') %}
-          {% if season_pct is not none %}
-            {% set season_pct_display = season_pct|round(1) ~ '%' %}
-          {% elif season_opps %}
-            {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set season_pct_display = 'NA' %}
-          {% endif %}
-          {% if lp_pct is not none %}
-            {% set lp_pct_display = lp_pct|round(1) ~ '%' %}
-          {% elif lp_opps %}
-            {% set lp_pct_display = (lp_plus / lp_opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set lp_pct_display = 'NA' %}
-          {% endif %}
-          <tr class="font-bold bg-gray-100 team-totals">
-            <td class="td-num px-4 py-2 text-center"></td>
-            <td class="td-player px-4 py-2 text-left">Team Totals</td>
-            {{ td_stat(season_plus) }}
-            {{ td_stat(season_opps) }}
-            {{ td_stat(season_pct_display) }}
-            {{ td_stat(lp_plus) }}
-            {{ td_stat(lp_opps) }}
-            {{ td_stat(lp_pct_display) }}
-          </tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
+  {% set columns = ["Bump +", "Bump Opps", "Bump %"] %}
+  {% set column_map = {
+    "Bump +": ("plus", "bump_positive"),
+    "Bump Opps": ("opps", "total_opps"),
+    "Bump %": ("pct",),
+  } %}
+  {% set pct_columns = ["Bump %"] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=bump_rows,
+    last_rows=bump_last_rows,
+    season_totals=bump_totals,
+    last_totals=bump_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-defense',
+    default_sort=['pct', 'opps', 'plus']
+  ) %}
+  {{ render_dual_section('Defense — Bumps', table, practice_note) }}
+
 {% elif selected.key == 'off_rebounding' %}
-    <div class="space-y-8">
-      <div class="grid grid-cols-1 gap-8">
-        <div class="flex flex-col h-full">
-          <h3 class="text-lg font-semibold mb-2">Offensive Crash</h3>
-          {% set crash_last_ns = namespace(rows={}) %}
-          {% for entry in crash_last_rows or [] %}
-            {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-            {% if name %}
-              {% set _ = crash_last_ns.rows.update({name: entry}) %}
-            {% endif %}
-          {% endfor %}
-        <div class="flex-1 min-h-0">
-          <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white h-full">
-            <table class="table-leaderboard min-w-full">
-              {{ render_grouped_last_practice_header(["Crash +", "Crash Att", "Crash %"], "Totals", "Last Practice") }}
-              <tbody>
-                {% for row in crash_rows or [] %}
-                  {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-                  {% set plus = row.get('plus', 0) %}
-                  {% set opps = row.get('opps', 0) %}
-                  {% set pct = row.get('pct') %}
-                  {% set last = crash_last_ns.rows.get(name) %}
-                  {% set last_plus = last.get('plus', 0) if last else 0 %}
-                  {% set last_opps = last.get('opps', 0) if last else 0 %}
-                  {% set last_pct = last.get('pct') if last else None %}
-                  {% if pct is not none %}
-                    {% set pct_display = pct|round(1) ~ '%' %}
-                  {% elif opps %}
-                    {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set pct_display = 'NA' %}
-                  {% endif %}
-                  {% if last_pct is not none %}
-                    {% set last_pct_display = last_pct|round(1) ~ '%' %}
-                  {% elif last_opps %}
-                    {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set last_pct_display = 'NA' %}
-                  {% endif %}
-                  <tr>
-                    <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                    <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                    {{ td_stat(plus) }}
-                    {{ td_stat(opps) }}
-                    {{ td_stat(pct_display) }}
-                    {{ td_stat(last_plus) }}
-                    {{ td_stat(last_opps) }}
-                    {{ td_stat(last_pct_display) }}
-                  </tr>
-                {% endfor %}
-                {% if crash_totals or crash_last_totals %}
-                  {% set t_plus = (crash_totals or {}).get('plus', 0) %}
-                  {% set t_opps = (crash_totals or {}).get('opps', 0) %}
-                  {% set t_pct = (crash_totals or {}).get('pct') %}
-                  {% set lt_plus = (crash_last_totals or {}).get('plus', 0) %}
-                  {% set lt_opps = (crash_last_totals or {}).get('opps', 0) %}
-                  {% set lt_pct = (crash_last_totals or {}).get('pct') %}
-                  {% if t_pct is not none %}
-                    {% set t_pct_display = t_pct|round(1) ~ '%' %}
-                  {% elif t_opps %}
-                    {% set t_pct_display = (t_plus / t_opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set t_pct_display = 'NA' %}
-                  {% endif %}
-                  {% if lt_pct is not none %}
-                    {% set lt_pct_display = lt_pct|round(1) ~ '%' %}
-                  {% elif lt_opps %}
-                    {% set lt_pct_display = (lt_plus / lt_opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set lt_pct_display = 'NA' %}
-                  {% endif %}
-                  <tr class="bg-gray-100 font-semibold team-totals">
-                    <td class="td-num px-4 py-2 text-center"></td>
-                    <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                    {{ td_stat(t_plus) }}
-                    {{ td_stat(t_opps) }}
-                    {{ td_stat(t_pct_display) }}
-                    {{ td_stat(lt_plus) }}
-                    {{ td_stat(lt_opps) }}
-                    {{ td_stat(lt_pct_display) }}
-                  </tr>
-                {% endif %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        </div>
-        <div class="flex flex-col h-full">
-          <h3 class="text-lg font-semibold mb-2">Back Man</h3>
-          {% set back_last_ns = namespace(rows={}) %}
-          {% for entry in backman_last_rows or [] %}
-            {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-            {% if name %}
-              {% set _ = back_last_ns.rows.update({name: entry}) %}
-            {% endif %}
-          {% endfor %}
-          <div class="flex-1 min-h-0">
-            <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white h-full">
-              <table class="table-leaderboard min-w-full">
-                {{ render_grouped_last_practice_header(["Back Man +", "Back Man Att", "Back Man %"], "Totals", "Last Practice") }}
-                <tbody>
-                  {% for row in backman_rows or [] %}
-                  {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-                  {% set plus = row.get('plus', 0) %}
-                  {% set opps = row.get('opps', 0) %}
-                  {% set pct = row.get('pct') %}
-                  {% set last = back_last_ns.rows.get(name) %}
-                  {% set last_plus = last.get('plus', 0) if last else 0 %}
-                  {% set last_opps = last.get('opps', 0) if last else 0 %}
-                  {% set last_pct = last.get('pct') if last else None %}
-                  {% if pct is not none %}
-                    {% set pct_display = pct|round(1) ~ '%' %}
-                  {% elif opps %}
-                    {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set pct_display = 'NA' %}
-                  {% endif %}
-                  {% if last_pct is not none %}
-                    {% set last_pct_display = last_pct|round(1) ~ '%' %}
-                  {% elif last_opps %}
-                    {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set last_pct_display = 'NA' %}
-                  {% endif %}
-                  <tr>
-                    <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                    <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                    {{ td_stat(plus) }}
-                    {{ td_stat(opps) }}
-                    {{ td_stat(pct_display) }}
-                    {{ td_stat(last_plus) }}
-                    {{ td_stat(last_opps) }}
-                    {{ td_stat(last_pct_display) }}
-                  </tr>
-                {% endfor %}
-                {% if backman_totals or backman_last_totals %}
-                  {% set t_plus = (backman_totals or {}).get('plus', 0) %}
-                  {% set t_opps = (backman_totals or {}).get('opps', 0) %}
-                  {% set t_pct = (backman_totals or {}).get('pct') %}
-                  {% set lt_plus = (backman_last_totals or {}).get('plus', 0) %}
-                  {% set lt_opps = (backman_last_totals or {}).get('opps', 0) %}
-                  {% set lt_pct = (backman_last_totals or {}).get('pct') %}
-                  {% if t_pct is not none %}
-                    {% set t_pct_display = t_pct|round(1) ~ '%' %}
-                  {% elif t_opps %}
-                    {% set t_pct_display = (t_plus / t_opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set t_pct_display = 'NA' %}
-                  {% endif %}
-                  {% if lt_pct is not none %}
-                    {% set lt_pct_display = lt_pct|round(1) ~ '%' %}
-                  {% elif lt_opps %}
-                    {% set lt_pct_display = (lt_plus / lt_opps * 100)|round(1) ~ '%' %}
-                  {% else %}
-                    {% set lt_pct_display = 'NA' %}
-                  {% endif %}
-                  <tr class="bg-gray-100 font-semibold team-totals">
-                    <td class="td-num px-4 py-2 text-center"></td>
-                    <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                    {{ td_stat(t_plus) }}
-                    {{ td_stat(t_opps) }}
-                    {{ td_stat(t_pct_display) }}
-                    {{ td_stat(lt_plus) }}
-                    {{ td_stat(lt_opps) }}
-                    {{ td_stat(lt_pct_display) }}
-                  </tr>
-                {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-  {% elif selected.key == 'def_rebounding' %}
-    {% set box_last_ns = namespace(rows={}) %}
-    {% for entry in box_last_rows or [] %}
-      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-      {% if name %}
-        {% set _ = box_last_ns.rows.update({name: entry}) %}
-      {% endif %}
-    {% endfor %}
-    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-      <table class="table-leaderboard min-w-full">
-      {{ render_grouped_last_practice_header(
-        ["Box Out +", "Box Out Opp", "Box Out %", "Off Reb's Given Up"],
-        "Box Out",
-        "Last Practice"
-      ) }}
-      <tbody>
-        {% for row in box_rows or [] %}
-          {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-          {% set plus = row.get('plus', 0) %}
-          {% set opps = row.get('opps', 0) %}
-          {% set pct = row.get('pct') %}
-          {% set given_up = row.get('off_reb_given_up', 0) %}
-          {% set last = box_last_ns.rows.get(name) %}
-          {% set last_plus = last.get('plus', 0) if last else 0 %}
-          {% set last_opps = last.get('opps', 0) if last else 0 %}
-          {% set last_pct = last.get('pct') if last else None %}
-          {% set last_given = last.get('off_reb_given_up', 0) if last else 0 %}
-          {% if pct is not none %}
-            {% set pct_display = pct|round(1) ~ '%' %}
-          {% elif opps %}
-            {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set pct_display = 'NA' %}
-          {% endif %}
-          {% if last_pct is not none %}
-            {% set last_pct_display = last_pct|round(1) ~ '%' %}
-          {% elif last_opps %}
-            {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set last_pct_display = 'NA' %}
-          {% endif %}
-          <tr>
-            <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-            <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-            {{ td_stat(plus) }}
-            {{ td_stat(opps) }}
-            {{ td_stat(pct_display) }}
-            {{ td_stat(given_up) }}
-            {{ td_stat(last_plus) }}
-            {{ td_stat(last_opps) }}
-            {{ td_stat(last_pct_display) }}
-            {{ td_stat(last_given) }}
-          </tr>
-        {% endfor %}
-        {% if box_totals or box_last_totals %}
-          {% set t_plus = (box_totals or {}).get('plus', 0) %}
-          {% set t_opps = (box_totals or {}).get('opps', 0) %}
-          {% set t_pct = (box_totals or {}).get('pct') %}
-          {% set t_given = (box_totals or {}).get('off_reb_given_up', 0) %}
-          {% set lt_plus = (box_last_totals or {}).get('plus', 0) %}
-          {% set lt_opps = (box_last_totals or {}).get('opps', 0) %}
-          {% set lt_pct = (box_last_totals or {}).get('pct') %}
-          {% set lt_given = (box_last_totals or {}).get('off_reb_given_up', 0) %}
-          {% if t_pct is not none %}
-            {% set t_pct_display = t_pct|round(1) ~ '%' %}
-          {% elif t_opps %}
-            {% set t_pct_display = (t_plus / t_opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set t_pct_display = 'NA' %}
-          {% endif %}
-          {% if lt_pct is not none %}
-            {% set lt_pct_display = lt_pct|round(1) ~ '%' %}
-          {% elif lt_opps %}
-            {% set lt_pct_display = (lt_plus / lt_opps * 100)|round(1) ~ '%' %}
-          {% else %}
-            {% set lt_pct_display = 'NA' %}
-          {% endif %}
-          <tr class="bg-gray-100 font-semibold team-totals">
-            <td class="td-num px-4 py-2 text-center"></td>
-            <td class="td-player px-4 py-2 text-left">Team Totals</td>
-            {{ td_stat(t_plus) }}
-            {{ td_stat(t_opps) }}
-            {{ td_stat(t_pct_display) }}
-            {{ td_stat(t_given) }}
-            {{ td_stat(lt_plus) }}
-            {{ td_stat(lt_opps) }}
-            {{ td_stat(lt_pct_display) }}
-            {{ td_stat(lt_given) }}
-          </tr>
-        {% endif %}
-      </tbody>
-      </table>
-    </div>
-  {% elif selected.key == 'collision_gap_help' %}
-    {% set collision_last_ns = namespace(rows={}) %}
-    {% for entry in collision_last_rows or [] %}
-      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-      {% if name %}
-        {% set _ = collision_last_ns.rows.update({name: entry}) %}
-      {% endif %}
-    {% endfor %}
-    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-      <table class="table-leaderboard min-w-full">
-        {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
-        <tbody>
-          {% for row in collision_rows or [] %}
-            {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-            {% set plus = row.get('plus', 0) %}
-            {% set opps = row.get('opps', 0) %}
-            {% set pct = row.get('pct') %}
-            {% if pct is not none %}
-              {% set pct_display = pct|round(1) ~ '%' %}
-            {% elif opps %}
-              {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set pct_display = 'NA' %}
-            {% endif %}
-            {% set last = collision_last_ns.rows.get(name) %}
-            {% set last_plus = last.get('plus', 0) if last else 0 %}
-            {% set last_opps = last.get('opps', 0) if last else 0 %}
-            {% set last_pct = last.get('pct') if last else None %}
-            {% if last_pct is not none %}
-              {% set last_pct_display = last_pct|round(1) ~ '%' %}
-            {% elif last_opps %}
-              {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set last_pct_display = 'NA' %}
-            {% endif %}
-            <tr>
-              <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-              <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-              {{ td_stat(plus) }}
-              {{ td_stat(opps) }}
-              {{ td_stat(pct_display) }}
-              {{ td_stat(last_plus) }}
-              {{ td_stat(last_opps) }}
-              {{ td_stat(last_pct_display) }}
-            </tr>
-          {% endfor %}
-          {% if collision_totals or collision_last_totals %}
-            {% set season_totals = collision_totals or {} %}
-            {% set last_totals = collision_last_totals or {} %}
-            {% set season_plus = season_totals.get('plus', 0) %}
-            {% set season_opps = season_totals.get('opps', 0) %}
-            {% set season_pct = season_totals.get('pct') %}
-            {% if season_pct is not none %}
-              {% set season_pct_display = season_pct|round(1) ~ '%' %}
-            {% elif season_opps %}
-              {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set season_pct_display = 'NA' %}
-            {% endif %}
-            {% set last_plus_total = last_totals.get('plus', 0) %}
-            {% set last_opps_total = last_totals.get('opps', 0) %}
-            {% set last_pct_total = last_totals.get('pct') %}
-            {% if last_pct_total is not none %}
-              {% set last_pct_display = last_pct_total|round(1) ~ '%' %}
-            {% elif last_opps_total %}
-              {% set last_pct_display = (last_plus_total / last_opps_total * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set last_pct_display = 'NA' %}
-            {% endif %}
-            <tr class="bg-gray-100 font-semibold team-totals">
-              <td class="td-num px-4 py-2 text-center"></td>
-              <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
-              {{ td_stat(season_plus) }}
-              {{ td_stat(season_opps) }}
-              {{ td_stat(season_pct_display) }}
-              {{ td_stat(last_plus_total) }}
-              {{ td_stat(last_opps_total) }}
-              {{ td_stat(last_pct_display) }}
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  {% elif selected.key == 'overall_gap_help' %}
-    {% set overall_gap_last_ns = namespace(rows={}) %}
-    {% for entry in overall_gap_last_rows or [] %}
-      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-      {% if name %}
-        {% set _ = overall_gap_last_ns.rows.update({name: entry}) %}
-      {% endif %}
-    {% endfor %}
-    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-      <table class="table-leaderboard min-w-full">
-        {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
-        <tbody>
-          {% for row in overall_gap_rows or [] %}
-            {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-            {% set plus = row.get('plus', 0) %}
-            {% set opps = row.get('opps', 0) %}
-            {% set pct = row.get('pct') %}
-            {% if pct is not none %}
-              {% set pct_display = pct|round(1) ~ '%' %}
-            {% elif opps %}
-              {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set pct_display = 'NA' %}
-            {% endif %}
-            {% set last = overall_gap_last_ns.rows.get(name) %}
-            {% set last_plus = last.get('plus', 0) if last else 0 %}
-            {% set last_opps = last.get('opps', 0) if last else 0 %}
-            {% set last_pct = last.get('pct') if last else None %}
-            {% if last_pct is not none %}
-              {% set last_pct_display = last_pct|round(1) ~ '%' %}
-            {% elif last_opps %}
-              {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set last_pct_display = 'NA' %}
-            {% endif %}
-            <tr>
-              <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-              <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-              {{ td_stat(plus) }}
-              {{ td_stat(opps) }}
-              {{ td_stat(pct_display) }}
-              {{ td_stat(last_plus) }}
-              {{ td_stat(last_opps) }}
-              {{ td_stat(last_pct_display) }}
-            </tr>
-          {% endfor %}
-          {% if overall_gap_totals or overall_gap_last_totals %}
-            {% set season_totals = overall_gap_totals or {} %}
-            {% set last_totals = overall_gap_last_totals or {} %}
-            {% set season_plus = season_totals.get('plus', 0) %}
-            {% set season_opps = season_totals.get('opps', 0) %}
-            {% set season_pct = season_totals.get('pct') %}
-            {% if season_pct is not none %}
-              {% set season_pct_display = season_pct|round(1) ~ '%' %}
-            {% elif season_opps %}
-              {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set season_pct_display = 'NA' %}
-            {% endif %}
-            {% set last_plus_total = last_totals.get('plus', 0) %}
-            {% set last_opps_total = last_totals.get('opps', 0) %}
-            {% set last_pct_total = last_totals.get('pct') %}
-            {% if last_pct_total is not none %}
-              {% set last_pct_display = last_pct_total|round(1) ~ '%' %}
-            {% elif last_opps_total %}
-              {% set last_pct_display = (last_plus_total / last_opps_total * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set last_pct_display = 'NA' %}
-            {% endif %}
-            <tr class="bg-gray-100 font-semibold team-totals">
-              <td class="td-num px-4 py-2 text-center"></td>
-              <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
-              {{ td_stat(season_plus) }}
-              {{ td_stat(season_opps) }}
-              {{ td_stat(season_pct_display) }}
-              {{ td_stat(last_plus_total) }}
-              {{ td_stat(last_opps_total) }}
-              {{ td_stat(last_pct_display) }}
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  {% elif selected.key == 'overall_low_man' %}
-    {% set overall_low_last_ns = namespace(rows={}) %}
-    {% for entry in overall_low_last_rows or [] %}
-      {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-      {% if name %}
-        {% set _ = overall_low_last_ns.rows.update({name: entry}) %}
-      {% endif %}
-    {% endfor %}
-    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-      <table class="table-leaderboard min-w-full">
-        {{ render_grouped_last_practice_header(["Low +", "Low Opp", "Low %"], "Totals", "Last Practice") }}
-        <tbody>
-          {% for row in overall_low_rows or [] %}
-            {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-            {% set plus = row.get('plus', 0) %}
-            {% set opps = row.get('opps', 0) %}
-            {% set pct = row.get('pct') %}
-            {% if pct is not none %}
-              {% set pct_display = pct|round(1) ~ '%' %}
-            {% elif opps %}
-              {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set pct_display = 'NA' %}
-            {% endif %}
-            {% set last = overall_low_last_ns.rows.get(name) %}
-            {% set last_plus = last.get('plus', 0) if last else 0 %}
-            {% set last_opps = last.get('opps', 0) if last else 0 %}
-            {% set last_pct = last.get('pct') if last else None %}
-            {% if last_pct is not none %}
-              {% set last_pct_display = last_pct|round(1) ~ '%' %}
-            {% elif last_opps %}
-              {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set last_pct_display = 'NA' %}
-            {% endif %}
-            <tr>
-              <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-              <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-              {{ td_stat(plus) }}
-              {{ td_stat(opps) }}
-              {{ td_stat(pct_display) }}
-              {{ td_stat(last_plus) }}
-              {{ td_stat(last_opps) }}
-              {{ td_stat(last_pct_display) }}
-            </tr>
-          {% endfor %}
-          {% if overall_low_totals or overall_low_last_totals %}
-            {% set season_totals = overall_low_totals or {} %}
-            {% set last_totals = overall_low_last_totals or {} %}
-            {% set season_plus = season_totals.get('plus', 0) %}
-            {% set season_opps = season_totals.get('opps', 0) %}
-            {% set season_pct = season_totals.get('pct') %}
-            {% if season_pct is not none %}
-              {% set season_pct_display = season_pct|round(1) ~ '%' %}
-            {% elif season_opps %}
-              {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set season_pct_display = 'NA' %}
-            {% endif %}
-            {% set last_plus_total = last_totals.get('plus', 0) %}
-            {% set last_opps_total = last_totals.get('opps', 0) %}
-            {% set last_pct_total = last_totals.get('pct') %}
-            {% if last_pct_total is not none %}
-              {% set last_pct_display = last_pct_total|round(1) ~ '%' %}
-            {% elif last_opps_total %}
-              {% set last_pct_display = (last_plus_total / last_opps_total * 100)|round(1) ~ '%' %}
-            {% else %}
-              {% set last_pct_display = 'NA' %}
-            {% endif %}
-            <tr class="bg-gray-100 font-semibold team-totals">
-              <td class="td-num px-4 py-2 text-center"></td>
-              <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
-              {{ td_stat(season_plus) }}
-              {{ td_stat(season_opps) }}
-              {{ td_stat(season_pct_display) }}
-              {{ td_stat(last_plus_total) }}
-              {{ td_stat(last_opps_total) }}
-              {{ td_stat(last_pct_display) }}
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  {% elif selected.key == 'pnr_gap_help' %}
-    {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-    <div class="space-y-8">
-      <div class="flex flex-col h-full">
-        <div class="flex items-baseline justify-between mb-3">
-          <h3 class="text-lg font-semibold">PnR Gap Help</h3>
-          {% if practice_note %}
-            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-          {% endif %}
-        </div>
-        {% set gap_last_ns = namespace(rows={}) %}
-        {% for entry in gap_last_rows or [] %}
-          {% set name = entry.get('player_name') or entry.get('player') %}
-          {% if name %}
-            {% set _ = gap_last_ns.rows.update({name: entry}) %}
-          {% endif %}
-        {% endfor %}
-        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-          <table class="table-leaderboard min-w-full">
-            {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
-            <tbody>
-              {% for row in gap_rows or [] %}
-                {% set name = row.get('player_name') or row.get('player') %}
-                {% set last = gap_last_ns.rows.get(name) %}
-                <tr>
-                  <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                  <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                  {{ td_stat(row.get('Gap +', '—')) }}
-                  {{ td_stat(row.get('Gap Opp', '—')) }}
-                  {{ td_stat(row.get('Gap %', '—')) }}
-                  {{ td_stat(last.get('Gap +', '—') if last else '—') }}
-                  {{ td_stat(last.get('Gap Opp', '—') if last else '—') }}
-                  {{ td_stat(last.get('Gap %', '—') if last else '—') }}
-                </tr>
-              {% endfor %}
-              {% if gap_totals or gap_last_totals %}
-                {% set season_totals = gap_totals or {} %}
-                {% set last_totals = gap_last_totals or {} %}
-                <tr class="bg-gray-100 font-semibold team-totals">
-                  <td class="td-num px-4 py-2 text-center"></td>
-                  <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
-                  {{ td_stat(season_totals.get('Gap +', '—')) }}
-                  {{ td_stat(season_totals.get('Gap Opp', '—')) }}
-                  {{ td_stat(season_totals.get('Gap %', '—')) }}
-                  {{ td_stat(last_totals.get('Gap +', '—')) }}
-                  {{ td_stat(last_totals.get('Gap Opp', '—')) }}
-                  {{ td_stat(last_totals.get('Gap %', '—')) }}
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="flex flex-col h-full">
-        <div class="flex items-baseline justify-between mb-3">
-          <h3 class="text-lg font-semibold">PnR Low Man</h3>
-          {% if practice_note %}
-            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-          {% endif %}
-        </div>
-        {% set low_last_ns = namespace(rows={}) %}
-        {% for entry in low_last_rows or [] %}
-          {% set name = entry.get('player_name') or entry.get('player') %}
-          {% if name %}
-            {% set _ = low_last_ns.rows.update({name: entry}) %}
-          {% endif %}
-        {% endfor %}
-        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-          <table class="table-leaderboard min-w-full">
-            {{ render_grouped_last_practice_header(["Gap +", "Gap Opp", "Gap %"], "Totals", "Last Practice") }}
-            <tbody>
-              {% for row in low_rows or [] %}
-                {% set name = row.get('player_name') or row.get('player') %}
-                {% set last = low_last_ns.rows.get(name) %}
-                <tr>
-                  <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                  <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                  {{ td_stat(row.get('Gap +', '—')) }}
-                  {{ td_stat(row.get('Gap Opp', '—')) }}
-                  {{ td_stat(row.get('Gap %', '—')) }}
-                  {{ td_stat(last.get('Gap +', '—') if last else '—') }}
-                  {{ td_stat(last.get('Gap Opp', '—') if last else '—') }}
-                  {{ td_stat(last.get('Gap %', '—') if last else '—') }}
-                </tr>
-              {% endfor %}
-              {% if low_totals or low_last_totals %}
-                {% set season_totals = low_totals or {} %}
-                {% set last_totals = low_last_totals or {} %}
-                <tr class="bg-gray-100 font-semibold team-totals">
-                  <td class="td-num px-4 py-2 text-center"></td>
-                  <td class="td-player px-4 py-2 text-left">{{ season_totals.get('player', 'Team Totals') }}</td>
-                  {{ td_stat(season_totals.get('Gap +', '—')) }}
-                  {{ td_stat(season_totals.get('Gap Opp', '—')) }}
-                  {{ td_stat(season_totals.get('Gap %', '—')) }}
-                  {{ td_stat(last_totals.get('Gap +', '—')) }}
-                  {{ td_stat(last_totals.get('Gap Opp', '—')) }}
-                  {{ td_stat(last_totals.get('Gap %', '—')) }}
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  {% elif selected.key == 'pnr_grade' %}
-    {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-    <div class="space-y-8">
-      <div class="grid grid-cols-1 gap-8">
-        <div class="flex flex-col h-full">
-          <div class="flex items-baseline justify-between mb-3">
-            <h3 class="text-lg font-semibold">Close Window</h3>
-            {% if practice_note %}
-              <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-            {% endif %}
-          </div>
-          {% set close_last_ns = namespace(rows={}) %}
-          {% for entry in close_last_rows or [] %}
-            {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-            {% if name %}
-              {% set _ = close_last_ns.rows.update({name: entry}) %}
-            {% endif %}
-          {% endfor %}
-          <div class="flex-1 min-h-0">
-            <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white h-full">
-              <table class="table-leaderboard min-w-full">
-                {{ render_grouped_last_practice_header(["Close Window +", "Close Window Att", "Close Window %"], "Totals", "Last Practice") }}
-                <tbody>
-                  {% for row in close_rows or [] %}
-                    {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-                    {% set plus = row.get('plus', 0) %}
-                    {% set opps = row.get('opps', 0) %}
-                    {% set pct = row.get('pct') %}
-                    {% if pct is not none %}
-                      {% set pct_display = pct|round(1) ~ '%' %}
-                    {% elif opps %}
-                      {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set pct_display = 'NA' %}
-                    {% endif %}
-                    {% set last = close_last_ns.rows.get(name) %}
-                    {% set last_plus = last.get('plus', 0) if last else 0 %}
-                    {% set last_opps = last.get('opps', 0) if last else 0 %}
-                    {% set last_pct = last.get('pct') if last else None %}
-                    {% if last_pct is not none %}
-                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
-                    {% elif last_opps %}
-                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set last_pct_display = 'NA' %}
-                    {% endif %}
-                    <tr>
-                      <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                      <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                      {{ td_stat(plus) }}
-                      {{ td_stat(opps) }}
-                      {{ td_stat(pct_display) }}
-                      {{ td_stat(last_plus) }}
-                      {{ td_stat(last_opps) }}
-                      {{ td_stat(last_pct_display) }}
-                    </tr>
-                  {% endfor %}
-                  {% if close_totals or close_last_totals %}
-                    {% set season_totals = close_totals or {} %}
-                    {% set last_totals = close_last_totals or {} %}
-                    {% set season_plus = season_totals.get('plus', 0) %}
-                    {% set season_opps = season_totals.get('opps', 0) %}
-                    {% set season_pct = season_totals.get('pct') %}
-                    {% if season_pct is not none %}
-                      {% set season_pct_display = season_pct|round(1) ~ '%' %}
-                    {% elif season_opps %}
-                      {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set season_pct_display = 'NA' %}
-                    {% endif %}
-                    {% set last_plus = last_totals.get('plus', 0) %}
-                    {% set last_opps = last_totals.get('opps', 0) %}
-                    {% set last_pct = last_totals.get('pct') %}
-                    {% if last_pct is not none %}
-                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
-                    {% elif last_opps %}
-                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set last_pct_display = 'NA' %}
-                    {% endif %}
-                    <tr class="bg-gray-100 font-semibold team-totals">
-                      <td class="td-num px-4 py-2 text-center"></td>
-                      <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                      {{ td_stat(season_plus) }}
-                      {{ td_stat(season_opps) }}
-                      {{ td_stat(season_pct_display) }}
-                      {{ td_stat(last_plus) }}
-                      {{ td_stat(last_opps) }}
-                      {{ td_stat(last_pct_display) }}
-                    </tr>
-                  {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div class="flex flex-col h-full">
-          <div class="flex items-baseline justify-between mb-3">
-            <h3 class="text-lg font-semibold">Shut Door</h3>
-            {% if practice_note %}
-              <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-            {% endif %}
-          </div>
-          {% set shut_last_ns = namespace(rows={}) %}
-          {% for entry in shut_last_rows or [] %}
-            {% set name = entry.get('player_name') or entry.get('player') or entry.get('name') %}
-            {% if name %}
-              {% set _ = shut_last_ns.rows.update({name: entry}) %}
-            {% endif %}
-          {% endfor %}
-          <div class="flex-1 min-h-0">
-            <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white h-full">
-              <table class="table-leaderboard min-w-full">
-                {{ render_grouped_last_practice_header(["Shut Door +", "Shut Door Att", "Shut Door %"], "Totals", "Last Practice") }}
-                <tbody>
-                  {% for row in shut_rows or [] %}
-                    {% set name = row.get('player_name') or row.get('player') or row.get('name') %}
-                    {% set plus = row.get('plus', 0) %}
-                    {% set opps = row.get('opps', 0) %}
-                    {% set pct = row.get('pct') %}
-                    {% if pct is not none %}
-                      {% set pct_display = pct|round(1) ~ '%' %}
-                    {% elif opps %}
-                      {% set pct_display = (plus / opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set pct_display = 'NA' %}
-                    {% endif %}
-                    {% set last = shut_last_ns.rows.get(name) %}
-                    {% set last_plus = last.get('plus', 0) if last else 0 %}
-                    {% set last_opps = last.get('opps', 0) if last else 0 %}
-                    {% set last_pct = last.get('pct') if last else None %}
-                    {% if last_pct is not none %}
-                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
-                    {% elif last_opps %}
-                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set last_pct_display = 'NA' %}
-                    {% endif %}
-                    <tr>
-                      <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-                      <td class="td-player px-4 py-2 text-left">{{ name }}</td>
-                      {{ td_stat(plus) }}
-                      {{ td_stat(opps) }}
-                      {{ td_stat(pct_display) }}
-                      {{ td_stat(last_plus) }}
-                      {{ td_stat(last_opps) }}
-                      {{ td_stat(last_pct_display) }}
-                    </tr>
-                  {% endfor %}
-                  {% if shut_totals or shut_last_totals %}
-                    {% set season_totals = shut_totals or {} %}
-                    {% set last_totals = shut_last_totals or {} %}
-                    {% set season_plus = season_totals.get('plus', 0) %}
-                    {% set season_opps = season_totals.get('opps', 0) %}
-                    {% set season_pct = season_totals.get('pct') %}
-                    {% if season_pct is not none %}
-                      {% set season_pct_display = season_pct|round(1) ~ '%' %}
-                    {% elif season_opps %}
-                      {% set season_pct_display = (season_plus / season_opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set season_pct_display = 'NA' %}
-                    {% endif %}
-                    {% set last_plus = last_totals.get('plus', 0) %}
-                    {% set last_opps = last_totals.get('opps', 0) %}
-                    {% set last_pct = last_totals.get('pct') %}
-                    {% if last_pct is not none %}
-                      {% set last_pct_display = last_pct|round(1) ~ '%' %}
-                    {% elif last_opps %}
-                      {% set last_pct_display = (last_plus / last_opps * 100)|round(1) ~ '%' %}
-                    {% else %}
-                      {% set last_pct_display = 'NA' %}
-                    {% endif %}
-                    <tr class="bg-gray-100 font-semibold team-totals">
-                      <td class="td-num px-4 py-2 text-center"></td>
-                      <td class="td-player px-4 py-2 text-left">Team Totals</td>
-                      {{ td_stat(season_plus) }}
-                      {{ td_stat(season_opps) }}
-                      {{ td_stat(season_pct_display) }}
-                      {{ td_stat(last_plus) }}
-                      {{ td_stat(last_opps) }}
-                      {{ td_stat(last_pct_display) }}
-                    </tr>
-                  {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
+  <div class="space-y-8">
+    {% set crash_columns = ["Crash +", "Crash Att", "Crash %"] %}
+    {% set crash_map = {
+      "Crash +": ("plus", "crash_plus"),
+      "Crash Att": ("opps", "crash_opp", "crash_opps"),
+      "Crash %": ("pct", "crash_pct"),
+    } %}
+    {% set crash_table = build_dual_table(
+      base_columns=crash_columns,
+      season_rows=crash_rows,
+      last_rows=crash_last_rows,
+      season_totals=crash_totals,
+      last_totals=crash_last_totals,
+      column_map=crash_map,
+      pct_columns=['Crash %'],
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-offense-crash',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {{ render_dual_section('Offensive Crash', crash_table, practice_note) }}
+
+    {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
+    {% set back_map = {
+      "Back Man +": ("plus", "back_plus"),
+      "Back Man Att": ("opps", "back_opp", "back_opps"),
+      "Back Man %": ("pct", "back_pct"),
+    } %}
+    {% set back_table = build_dual_table(
+      base_columns=back_columns,
+      season_rows=backman_rows,
+      last_rows=backman_last_rows,
+      season_totals=backman_totals,
+      last_totals=backman_last_totals,
+      column_map=back_map,
+      pct_columns=['Back Man %'],
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-offense-back',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {{ render_dual_section('Offensive Back Man', back_table, practice_note) }}
+  </div>
+
+{% elif selected.key == 'def_rebounding' %}
+  {% set columns = ["Box Out +", "Box Out Att", "Box Out %", "Off Reb's Given Up"] %}
+  {% set column_map = {
+    "Box Out +": ("plus", "box_plus"),
+    "Box Out Att": ("opps", "box_opp", "box_opps"),
+    "Box Out %": ("pct", "box_pct"),
+    "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
+  } %}
+  {% set pct_columns = ["Box Out %"] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=box_rows,
+    last_rows=box_last_rows,
+    season_totals=box_totals,
+    last_totals=box_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-def-reb',
+    default_sort=['pct', 'opps', 'plus']
+  ) %}
+  {{ render_dual_section('Defensive Rebounding', table, practice_note) }}
+
+{% elif selected.key == 'collision_gap_help' %}
+  {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+  {% set column_map = {
+    "Gap +": ("plus", "gap_plus"),
+    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+    "Gap %": ("pct", "gap_pct"),
+  } %}
+  {% set pct_columns = ["Gap %"] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=collision_rows,
+    last_rows=collision_last_rows,
+    season_totals=collision_totals,
+    last_totals=collision_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-collision-gap',
+    default_sort=['pct', 'opps', 'plus']
+  ) %}
+  {{ render_dual_section('Collisions — Gap Help', table, practice_note) }}
+
+{% elif selected.key == 'overall_gap_help' %}
+  {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+  {% set column_map = {
+    "Gap +": ("plus", "gap_plus"),
+    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+    "Gap %": ("pct", "gap_pct"),
+  } %}
+  {% set pct_columns = ["Gap %"] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=overall_gap_rows,
+    last_rows=overall_gap_last_rows,
+    season_totals=overall_gap_totals,
+    last_totals=overall_gap_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-overall-gap',
+    default_sort=['pct', 'opps', 'plus']
+  ) %}
+  {{ render_dual_section('Overall Gap Help', table, practice_note) }}
+
+{% elif selected.key == 'overall_low_man' %}
+  {% set columns = ["Low +", "Low Opp", "Low %"] %}
+  {% set column_map = {
+    "Low +": ("plus", "low_plus"),
+    "Low Opp": ("opps", "low_opp", "low_opps"),
+    "Low %": ("pct", "low_pct"),
+  } %}
+  {% set pct_columns = ["Low %"] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=overall_low_rows,
+    last_rows=overall_low_last_rows,
+    season_totals=overall_low_totals,
+    last_totals=overall_low_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-overall-low',
+    default_sort=['pct', 'opps', 'plus']
+  ) %}
+  {{ render_dual_section('Overall Low Man', table, practice_note) }}
+
+{% elif selected.key == 'pnr_gap_help' %}
+  <div class="space-y-8">
+    {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+    {% set column_map = {
+      "Gap +": ("plus", "gap_plus"),
+      "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+      "Gap %": ("pct", "gap_pct"),
+    } %}
+    {% set pct_columns = ["Gap %"] %}
+    {% set gap_table = build_dual_table(
+      base_columns=columns,
+      season_rows=gap_rows,
+      last_rows=gap_last_rows,
+      season_totals=gap_totals,
+      last_totals=gap_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-pnr-gap',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+
+    {% set low_table = build_dual_table(
+      base_columns=columns,
+      season_rows=low_rows,
+      last_rows=low_last_rows,
+      season_totals=low_totals,
+      last_totals=low_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-pnr-low',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+  </div>
+
+{% elif selected.key == 'pnr_grade' %}
+  <div class="space-y-8">
+    {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+    {% set column_map = {
+      "Gap +": ("plus", "gap_plus"),
+      "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+      "Gap %": ("pct", "gap_pct"),
+    } %}
+    {% set pct_columns = ["Gap %"] %}
+    {% set gap_table = build_dual_table(
+      base_columns=columns,
+      season_rows=close_rows,
+      last_rows=close_last_rows,
+      season_totals=close_totals,
+      last_totals=close_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-pnr-gap',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+
+    {% set low_table = build_dual_table(
+      base_columns=columns,
+      season_rows=shut_rows,
+      last_rows=shut_last_rows,
+      season_totals=shut_totals,
+      last_totals=shut_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-pnr-low',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+  </div>
+
+{% else %}
+  {% set table = build_leaderboard_table(
+    config=selected,
+    rows=rows,
+    team_totals=team_totals,
+    table_id='leaderboard-' ~ selected.key if selected else None
+  ) %}
+  {% if table.has_data %}
+    {{ render_table(
+      id=table.id or 'leaderboard-table',
+      columns=table.columns,
+      rows=table.rows,
+      totals=table.totals,
+      dense=True,
+      sticky_header=True,
+      caption=selected.label if selected else 'Leaderboard',
+      default_sort=table.default_sort
+    ) }}
   {% else %}
-    <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-      <table class="table-leaderboard min-w-full">
-        <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-          <tr>
-            <th class="th-num px-4 py-2 text-center sortable" data-col="0">#</th>
-            <th class="th-player px-4 py-2 text-left sortable" data-col="1">Player</th>
-          {% if selected.key == 'assist_summary' %}
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="2">Ast</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="3">Pot Ast</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="4">2nd Ast</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="5">TO</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="6">AST/TO</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="7">Adj AST/TO</th>
-          {% elif selected.key == 'offense_summary' %}
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="2">Poss</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="3">PPP On</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="4">PPP Off</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="5">Ind TO Rate (Poss.)</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="6">TO % (Bamalytics)</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="7">% of TO's (NBA.com)</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="8">Team TO Rate</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="9">Ind Off Reb%</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="10">Off Reb Rate</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="11">Ind Fouls Drawn%</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="12">Fouls Rate</th>
-          {% elif selected.key.endswith('_fg_pct') %}
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="2">FG (M–A)</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="3">FG%</th>
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="4">Freq</th>
-            {% if selected.key == 'fg3_fg_pct' %}
-              <th class="th-stat px-4 py-2 text-center sortable" data-col="5">Shrink 3FG (M–A)</th>
-              <th class="th-stat px-4 py-2 text-center sortable" data-col="6">Shrink 3FG %</th>
-              <th class="th-stat px-4 py-2 text-center sortable" data-col="7">Non-Shrink 3FG (M–A)</th>
-              <th class="th-stat px-4 py-2 text-center sortable" data-col="8">Non-Shrink 3FG %</th>
-            {% endif %}
-          {% else %}
-            <th class="th-stat px-4 py-2 text-center sortable" data-col="2">{{ selected.label }}</th>
-          {% endif %}
-        </tr>
-        </thead>
-        <tbody{% if selected.key == 'fg3_fg_pct' %} class="divide-y divide-gray-200"{% endif %}>
-        {% for row in rows %}
-          <tr{% if selected.key == 'fg3_fg_pct' and loop.index is even %} class="bg-gray-100"{% endif %}>
-            <td class="td-num px-4 py-2 text-center">{{ loop.index }}</td>
-            {% if selected.key == 'assist_summary' %}
-              {% set player, ast, pot, sec, tos, ratio, adj = row %}
-              <td class="td-player px-4 py-2 text-left">{{ player }}</td>
-              {{ td_stat(ast) }}
-              {{ td_stat(pot) }}
-              {{ td_stat(sec) }}
-              {{ td_stat(tos) }}
-              {{ td_stat(ratio) }}
-              {{ td_stat(adj) }}
-            {% elif selected.key == 'offense_summary' %}
-              {% set player, poss, ppp_on, ppp_off, ind_to, bama_to, team_to_pct, to_rate, ind_oreb, oreb_rate, ind_foul, foul_rate = row %}
-              <td class="td-player px-4 py-2 text-left">{{ player }}</td>
-              {{ td_stat(poss) }}
-              {{ td_stat(ppp_on) }}
-              {{ td_stat(ppp_off) }}
-              {{ td_stat(ind_to) }}
-              {{ td_stat(bama_to) }}
-              {{ td_stat(team_to_pct) }}
-              {{ td_stat(to_rate) }}
-              {{ td_stat(ind_oreb) }}
-              {{ td_stat(oreb_rate) }}
-              {{ td_stat(ind_foul) }}
-              {{ td_stat(foul_rate) }}
-            {% elif selected.key.endswith('_fg_pct') %}
-              {% if selected.key == 'fg3_fg_pct' %}
-                {% set player, makes, attempts, pct, freq, shrink_makes, shrink_att, shrink_pct, nonshrink_makes, nonshrink_att, nonshrink_pct = row %}
-                <td class="td-player px-4 py-2 text-left">{{ player }}</td>
-                <td class="px-4 py-2 text-center">{{ makes }}-{{ attempts }}</td>
-                <td class="px-4 py-2 text-center"{% if attempts %} style="{{ pct|grade_3fg_pct(attempts) }}"{% endif %}>{{ pct|round(1) }}%</td>
-                <td class="px-4 py-2 text-center">{{ freq|round(1) }}%</td>
-                <td class="px-4 py-2 text-center">{{ shrink_makes }}-{{ shrink_att }}</td>
-                <td class="px-4 py-2 text-center"{% if shrink_att %} style="{{ shrink_pct|grade_3fg_pct(shrink_att) }}"{% endif %}>{{ shrink_pct|round(1) }}%</td>
-                <td class="px-4 py-2 text-center">{{ nonshrink_makes }}-{{ nonshrink_att }}</td>
-                <td class="px-4 py-2 text-center"{% if nonshrink_att %} style="{{ nonshrink_pct|grade_3fg_pct(nonshrink_att) }}"{% endif %}>{{ nonshrink_pct|round(1) }}%</td>
-              {% else %}
-                {% set player, makes, attempts, pct, freq = row %}
-                <td class="td-player px-4 py-2 text-left">{{ player }}</td>
-                {{ td_stat(makes ~ '-' ~ attempts) }}
-                <td class="px-4 py-2">{{ pct|round(1) }}%</td>
-                <td class="px-4 py-2">{{ freq|round(1) }}%</td>
-              {% endif %}
-            {% else %}
-              {% set player, val = row %}
-              <td class="td-player px-4 py-2 text-left">{{ player }}</td>
-              <td class="px-4 py-2">
-                {% if selected.format=='pct' %}
-                  {{ val|round(1) }}%
-                {% else %}
-                  {{ val }}
-                {% endif %}
-              </td>
-            {% endif %}
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <p class="text-sm text-gray-600">Select a leaderboard to view details.</p>
   {% endif %}
-</div>
-<script>
-  (function () {
-    const script = document.currentScript;
-    const container = script && script.previousElementSibling;
-    if (!container) {
-      return;
-    }
-
-    const tables = container.querySelectorAll('table');
-
-    tables.forEach(table => {
-      const tbody = table.querySelector('tbody');
-      if (!tbody) {
-        return;
-      }
-
-      const headers = table.querySelectorAll('th.sortable');
-
-      headers.forEach(header => {
-        header.dataset.order = header.dataset.order || 'none';
-        header.classList.add('cursor-pointer', 'select-none');
-
-        let indicator = header.querySelector('.sort-indicator');
-        if (!indicator) {
-          indicator = document.createElement('span');
-          indicator.className = 'ml-1 text-xs text-gray-400 sort-indicator';
-          indicator.textContent = '▲▼';
-          header.appendChild(indicator);
-        } else {
-          indicator.textContent = '▲▼';
-          indicator.classList.remove('text-gray-600');
-          indicator.classList.add('text-gray-400');
-        }
-
-        header.addEventListener('click', () => {
-          const columnIndex = header.dataset.col ? parseInt(header.dataset.col, 10) : header.cellIndex;
-          if (Number.isNaN(columnIndex)) {
-            return;
-          }
-
-          const newOrder = header.dataset.order === 'asc' ? 'desc' : 'asc';
-          const descending = newOrder === 'desc';
-          const totalRow = tbody.querySelector('.team-totals');
-
-          if (totalRow) {
-            totalRow.remove();
-          }
-
-          const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => !row.classList.contains('team-totals'));
-
-          rows.sort((rowA, rowB) => compareRows(rowA, rowB, columnIndex, descending));
-
-          const shouldUpdateRank = columnIndex !== 0;
-
-          rows.forEach((row, index) => {
-            if (shouldUpdateRank && row.children[0]) {
-              row.children[0].textContent = index + 1;
-            }
-            tbody.appendChild(row);
-          });
-
-          if (totalRow) {
-            tbody.appendChild(totalRow);
-          }
-
-          updateHeaderStates(headers, header, newOrder);
-        });
-      });
-    });
-
-    function compareRows(rowA, rowB, columnIndex, descending) {
-      const cellA = rowA.children[columnIndex];
-      const cellB = rowB.children[columnIndex];
-
-      const valueA = extractValue(cellA ? cellA.textContent : '');
-      const valueB = extractValue(cellB ? cellB.textContent : '');
-
-      let comparison;
-      if (valueA.type === 'number' && valueB.type === 'number') {
-        comparison = valueA.value - valueB.value;
-      } else if (valueA.type === 'number') {
-        comparison = -1;
-      } else if (valueB.type === 'number') {
-        comparison = 1;
-      } else {
-        comparison = valueA.value.localeCompare(valueB.value, undefined, { sensitivity: 'base' });
-      }
-
-      if (comparison === 0) {
-        return 0;
-      }
-
-      return descending ? -comparison : comparison;
-    }
-
-    function extractValue(text) {
-      const trimmed = text.trim();
-      if (!trimmed || trimmed.toUpperCase() === 'NA') {
-        return { type: 'number', value: Number.NEGATIVE_INFINITY };
-      }
-
-      const numericText = trimmed.replace(/[^0-9.+-]+/g, '');
-      const numericValue = numericText ? parseFloat(numericText) : NaN;
-
-      if (!Number.isNaN(numericValue)) {
-        return { type: 'number', value: numericValue };
-      }
-
-      return { type: 'string', value: trimmed.toLowerCase() };
-    }
-
-    function updateHeaderStates(headers, activeHeader, order) {
-      headers.forEach(header => {
-        const indicator = header.querySelector('.sort-indicator');
-        if (!indicator) {
-          return;
-        }
-
-        if (header === activeHeader) {
-          header.dataset.order = order;
-          header.setAttribute('aria-sort', order === 'asc' ? 'ascending' : 'descending');
-          indicator.textContent = order === 'asc' ? '▲' : '▼';
-          indicator.classList.remove('text-gray-400');
-          indicator.classList.add('text-gray-600');
-        } else {
-          header.dataset.order = 'none';
-          header.removeAttribute('aria-sort');
-          indicator.textContent = '▲▼';
-          indicator.classList.remove('text-gray-600');
-          indicator.classList.add('text-gray-400');
-        }
-      });
-    }
-  })();
-</script>
+{% endif %}

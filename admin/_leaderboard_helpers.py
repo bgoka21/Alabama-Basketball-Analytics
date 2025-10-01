@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 import functools
+import re
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Mapping
 
 from sqlalchemy import func
@@ -343,6 +344,30 @@ def _to_int(value: Any) -> int:
         return int(text)
     except (TypeError, ValueError):
         return 0
+
+
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        text = str(value).strip()
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+    if not text:
+        return None
+
+    sanitized = text.replace(",", "")
+    sanitized = re.sub(r"[^0-9.+-]", "", sanitized)
+    if not sanitized or sanitized in {".", "+", "-", "+.", "-."}:
+        return None
+
+    try:
+        return float(sanitized)
+    except (TypeError, ValueError):
+        return None
 
 
 def _to_pct(value: Any, plus: Optional[int] = None, opps: Optional[int] = None) -> Optional[float]:
@@ -938,4 +963,775 @@ def combine_dual_totals(
         "label": totals_label,
         "totals": season_totals,
         "last": last_totals,
+    }
+
+
+_SLUG_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify_label(label: Any) -> str:
+    text = str(label or "").strip().lower()
+    if not text:
+        return "col"
+    replacements = {
+        "%": " pct ",
+        "+": " plus ",
+        "#": " number ",
+        "/": " ",
+    }
+    for target, replacement in replacements.items():
+        text = text.replace(target, replacement)
+    slug = _SLUG_SANITIZE_RE.sub("_", text).strip("_")
+    return slug or "col"
+
+
+def _extract_numeric_for_column(
+    source: Any,
+    column: str,
+    mapping: Mapping[str, Any],
+    pct_set: set[str],
+) -> Optional[float]:
+    if source is None:
+        return None
+
+    spec = mapping.get(column)
+    keys, formatter, default_value = _parse_column_spec(column, spec)
+    value = _resolve_column_value(source, keys)
+    if value is None and default_value is not None:
+        value = default_value
+
+    if (column in pct_set) or (formatter == "pct"):
+        return _to_pct(value)
+
+    return _to_float(value)
+
+
+def build_dual_table(
+    *,
+    base_columns: Sequence[str],
+    season_rows: Optional[Sequence[Mapping[str, Any]]],
+    last_rows: Optional[Sequence[Mapping[str, Any]]],
+    season_totals: Optional[Mapping[str, Any]],
+    last_totals: Optional[Mapping[str, Any]],
+    column_map: Optional[Mapping[str, Any]] = None,
+    pct_columns: Optional[Sequence[str]] = None,
+    left_label: str = "Season Totals",
+    right_label: str = "Last Practice",
+    totals_label: str = "Team Totals",
+    table_id: Optional[str] = None,
+    default_sort: Optional[Sequence[Any]] = None,
+    default_placeholder: str = "—",
+) -> Dict[str, Any]:
+    """Return render_table-ready payload for dual leaderboard tables."""
+
+    mapping: Mapping[str, Any] = column_map or {}
+    pct_set = {col for col in (pct_columns or [])}
+
+    formatted_season = format_dual_rows(
+        season_rows,
+        base_columns,
+        column_map=mapping,
+        pct_columns=pct_columns,
+        default_placeholder=default_placeholder,
+    )
+    formatted_last = format_dual_rows(
+        last_rows,
+        base_columns,
+        column_map=mapping,
+        pct_columns=pct_columns,
+        default_placeholder=default_placeholder,
+    )
+    formatted_season_totals = format_dual_totals(
+        season_totals,
+        base_columns,
+        column_map=mapping,
+        pct_columns=pct_columns,
+        default_placeholder=default_placeholder,
+        label=totals_label,
+    )
+    formatted_last_totals = format_dual_totals(
+        last_totals,
+        base_columns,
+        column_map=mapping,
+        pct_columns=pct_columns,
+        default_placeholder=default_placeholder,
+        label=totals_label,
+    )
+
+    display_rows = combine_dual_rows(formatted_season, formatted_last)
+    display_totals = combine_dual_totals(
+        formatted_season_totals,
+        formatted_last_totals,
+        label=totals_label,
+    )
+
+    def _numeric_rows(
+        source_rows: Optional[Sequence[Mapping[str, Any]]],
+        formatted_rows: Sequence[Mapping[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        numeric: list[Dict[str, Any]] = []
+        for index, formatted in enumerate(formatted_rows):
+            raw = None
+            if source_rows is not None and index < len(source_rows):
+                raw = source_rows[index]
+            entry: Dict[str, Any] = {
+                "jersey": formatted.get("jersey"),
+                "player": formatted.get("player"),
+            }
+            for column in base_columns:
+                entry[column] = _extract_numeric_for_column(raw, column, mapping, pct_set)
+            numeric.append(entry)
+        return numeric
+
+    numeric_season_rows = _numeric_rows(season_rows, formatted_season)
+    numeric_last_rows = _numeric_rows(last_rows, formatted_last)
+
+    numeric_season_totals = None
+    if season_totals:
+        numeric_season_totals = {"player": totals_label}
+        for column in base_columns:
+            numeric_season_totals[column] = _extract_numeric_for_column(
+                season_totals, column, mapping, pct_set
+            )
+
+    numeric_last_totals = None
+    if last_totals:
+        numeric_last_totals = {"player": totals_label}
+        for column in base_columns:
+            numeric_last_totals[column] = _extract_numeric_for_column(
+                last_totals, column, mapping, pct_set
+            )
+
+    numeric_rows = combine_dual_rows(numeric_season_rows, numeric_last_rows)
+    numeric_totals = combine_dual_totals(
+        numeric_season_totals,
+        numeric_last_totals,
+        label=totals_label,
+    )
+
+    column_specs: list[Dict[str, Any]] = []
+    canonical_map: Dict[str, Dict[str, Any]] = {}
+
+    for column in base_columns:
+        slug = _slugify_label(column)
+        spec_keys, formatter, _ = _parse_column_spec(column, mapping.get(column))
+        canonical_keys = [
+            str(key).lower()
+            for key in spec_keys
+            if isinstance(key, str)
+        ]
+        column_info = {
+            "label": column,
+            "slug": slug,
+            "keys": canonical_keys,
+            "formatter": formatter,
+        }
+        column_specs.append(column_info)
+        for key in canonical_keys:
+            canonical_map.setdefault(key, column_info)
+
+        lowered_label = str(column).lower()
+        if "%" in str(column) or "pct" in lowered_label:
+            canonical_map.setdefault("pct", column_info)
+        if "opp" in lowered_label or "att" in lowered_label:
+            canonical_map.setdefault("opps", column_info)
+        if "+" in str(column) or "plus" in lowered_label:
+            canonical_map.setdefault("plus", column_info)
+
+    columns: list[Dict[str, Any]] = [
+        {
+            "key": "rank",
+            "label": "#",
+            "align": "right",
+            "sortable": True,
+            "width": "w-14",
+            "value_key": "rank_value",
+        },
+        {
+            "key": "player",
+            "label": "Player",
+            "align": "left",
+            "sortable": True,
+        },
+    ]
+
+    for spec in column_specs:
+        columns.append(
+            {
+                "key": f"totals_{spec['slug']}",
+                "label": f"{left_label} — {spec['label']}",
+                "align": "right",
+                "sortable": True,
+                "value_key": f"totals_{spec['slug']}_value",
+            }
+        )
+
+    for spec in column_specs:
+        columns.append(
+            {
+                "key": f"last_{spec['slug']}",
+                "label": f"{right_label} — {spec['label']}",
+                "align": "right",
+                "sortable": True,
+                "value_key": f"last_{spec['slug']}_value",
+            }
+        )
+
+    rows: list[Dict[str, Any]] = []
+    for index, display in enumerate(display_rows):
+        numeric = numeric_rows[index] if index < len(numeric_rows) else {}
+        totals_display = display.get("totals") or {}
+        last_display = display.get("last") or {}
+        totals_numeric = (numeric.get("totals") or {}) if numeric else {}
+        last_numeric = (numeric.get("last") or {}) if numeric else {}
+
+        jersey = display.get("jersey")
+        if jersey in (None, ""):
+            jersey_display = index + 1
+        else:
+            jersey_display = jersey
+
+        rank_value = _to_float(jersey_display)
+        if rank_value is None:
+            rank_value = float(index + 1)
+
+        row_entry: Dict[str, Any] = {
+            "rank": jersey_display,
+            "rank_value": rank_value,
+            "player": display.get("player") or "",
+        }
+
+        for spec in column_specs:
+            label = spec["label"]
+            slug = spec["slug"]
+            total_value = totals_display.get(label, default_placeholder)
+            last_value = last_display.get(label, default_placeholder)
+            row_entry[f"totals_{slug}"] = total_value
+            value_numeric = totals_numeric.get(label) if totals_numeric else None
+            if value_numeric is not None:
+                row_entry[f"totals_{slug}_value"] = value_numeric
+            else:
+                row_entry[f"totals_{slug}_value"] = ""
+            row_entry[f"last_{slug}"] = last_value
+            value_numeric = last_numeric.get(label) if last_numeric else None
+            if value_numeric is not None:
+                row_entry[f"last_{slug}_value"] = value_numeric
+            else:
+                row_entry[f"last_{slug}_value"] = ""
+
+        rows.append(row_entry)
+
+    totals_row: Optional[Dict[str, Any]] = None
+    if display_totals:
+        totals_display_data = display_totals.get("totals") or {}
+        last_totals_display = display_totals.get("last") or {}
+        totals_label_value = display_totals.get("label") or totals_label
+        totals_numeric_data = (numeric_totals.get("totals") or {}) if numeric_totals else {}
+        last_numeric_data = (numeric_totals.get("last") or {}) if numeric_totals else {}
+
+        totals_row = {
+            "rank": "",
+            "player": totals_label_value,
+        }
+
+        for spec in column_specs:
+            label = spec["label"]
+            slug = spec["slug"]
+            totals_row[f"totals_{slug}"] = totals_display_data.get(label, default_placeholder)
+            totals_row[f"last_{slug}"] = last_totals_display.get(label, default_placeholder)
+            totals_numeric_value = totals_numeric_data.get(label)
+            last_numeric_value = last_numeric_data.get(label)
+            if totals_numeric_value is not None:
+                totals_row[f"totals_{slug}_value"] = totals_numeric_value
+            if last_numeric_value is not None:
+                totals_row[f"last_{slug}_value"] = last_numeric_value
+
+    def _resolve_sort_key(key: str) -> Optional[str]:
+        lowered = key.lower()
+        if lowered in {"player", "name"}:
+            return "player"
+        if lowered in {"rank", "jersey", "#"}:
+            return "rank"
+        if lowered.startswith("totals_") or lowered.startswith("last_"):
+            return lowered
+        for spec in column_specs:
+            if lowered == spec["slug"] or lowered == str(spec["label"]).lower():
+                return f"totals_{spec['slug']}"
+        mapped = canonical_map.get(lowered)
+        if mapped:
+            return f"totals_{mapped['slug']}"
+        return None
+
+    default_sort_sequence: list[Any] = []
+    if default_sort:
+        default_sort_sequence.extend(default_sort)
+    else:
+        default_sort_sequence.extend([
+            ("pct", "desc"),
+            ("opps", "desc"),
+            ("plus", "desc"),
+        ])
+
+    resolved_sort: list[Tuple[str, str]] = []
+    for item in default_sort_sequence:
+        if isinstance(item, (list, tuple)):
+            key = item[0]
+            direction = item[1] if len(item) > 1 else "desc"
+        else:
+            key = item
+            direction = "desc"
+        key_str = str(key).strip()
+        if not key_str:
+            continue
+        direction_str = str(direction).strip().lower()
+        if direction_str not in {"asc", "desc"}:
+            direction_str = "desc"
+        resolved_key = _resolve_sort_key(key_str)
+        if not resolved_key:
+            continue
+        resolved_sort.append((resolved_key, direction_str))
+
+    # Ensure Player ascending is always a final tie-breaker
+    if not any(key == "player" for key, _ in resolved_sort):
+        resolved_sort.append(("player", "asc"))
+
+    # Remove duplicates while preserving order
+    seen_sort_keys: set[str] = set()
+    sort_parts: list[str] = []
+    for key, direction in resolved_sort:
+        if key in seen_sort_keys:
+            continue
+        seen_sort_keys.add(key)
+        sort_parts.append(f"{key}:{direction}")
+
+    default_sort_value = ";".join(sort_parts)
+
+    return {
+        "id": table_id,
+        "columns": columns,
+        "rows": rows,
+        "totals": totals_row,
+        "default_sort": default_sort_value,
+        "has_data": bool(rows) or bool(totals_row),
+    }
+
+
+def build_leaderboard_table(
+    *,
+    config: Optional[Mapping[str, Any]],
+    rows: Optional[Sequence[Any]],
+    team_totals: Optional[Any] = None,
+    table_id: Optional[str] = None,
+    default_sort: Optional[Sequence[Any]] = None,
+    default_placeholder: str = "—",
+) -> Dict[str, Any]:
+    """Return ``render_table`` payload for standard (non-dual) leaderboards."""
+
+    cfg = dict(config or {})
+    stat_key = str(cfg.get("key") or "").strip()
+    label = cfg.get("label") or stat_key.title() or "Stat"
+
+    def _spec(
+        column_label: str,
+        *,
+        keys: Optional[Sequence[str]] = None,
+        index: Optional[int] = None,
+        fmt: str = "float",
+        precision: Optional[int] = None,
+        strip_trailing: bool = True,
+        align: str = "right",
+        slug: Optional[str] = None,
+        default: bool = False,
+        default_order: int = 0,
+        default_direction: str = "desc",
+        compose: Optional[str] = None,
+        make_keys: Optional[Sequence[str]] = None,
+        make_index: Optional[int] = None,
+        attempt_keys: Optional[Sequence[str]] = None,
+        attempt_index: Optional[int] = None,
+        sort_source: str = "value",
+    ) -> Dict[str, Any]:
+        return {
+            "label": column_label,
+            "keys": tuple(keys or ()),
+            "index": index,
+            "format": fmt,
+            "precision": precision,
+            "strip_trailing": strip_trailing,
+            "align": align,
+            "slug": slug or _slugify_label(column_label),
+            "default_sort": default,
+            "default_order": default_order,
+            "default_direction": default_direction,
+            "compose": compose,
+            "make_keys": tuple(make_keys or ()),
+            "make_index": make_index,
+            "attempt_keys": tuple(attempt_keys or ()),
+            "attempt_index": attempt_index,
+            "sort_source": sort_source,
+        }
+
+    column_specs: list[Dict[str, Any]] = []
+
+    if stat_key == "assist_summary":
+        column_specs.extend(
+            [
+                _spec("Ast", keys=("assists", "ast"), index=1, fmt="int", default=True),
+                _spec("Pot Ast", keys=("pot_assists", "pot_ast"), index=2, fmt="int"),
+                _spec("2nd Ast", keys=("second_assists", "sec_ast"), index=3, fmt="int"),
+                _spec("TO", keys=("turnovers", "tos"), index=4, fmt="int"),
+                _spec(
+                    "AST/TO",
+                    keys=("assist_turnover_ratio", "ast_to"),
+                    index=5,
+                    fmt="float",
+                    precision=2,
+                ),
+                _spec(
+                    "Adj AST/TO",
+                    keys=("adj_assist_turnover_ratio", "adj_ast_to"),
+                    index=6,
+                    fmt="float",
+                    precision=2,
+                ),
+            ]
+        )
+    elif stat_key == "offense_summary":
+        column_specs.extend(
+            [
+                _spec(
+                    "Off Poss",
+                    keys=("offensive_possessions", "poss"),
+                    index=1,
+                    fmt="int",
+                    default=True,
+                    default_order=2,
+                ),
+                _spec(
+                    "PPP On",
+                    keys=("ppp_on",),
+                    index=2,
+                    fmt="float",
+                    default=True,
+                ),
+                _spec(
+                    "PPP Off",
+                    keys=("ppp_off",),
+                    index=3,
+                    fmt="float",
+                ),
+                _spec(
+                    "Ind TO Rate (Poss.)",
+                    keys=("individual_turnover_rate", "ind_to_rate"),
+                    index=4,
+                    fmt="float",
+                    precision=1,
+                ),
+                _spec(
+                    "TO % (Bamalytics)",
+                    keys=("bamalytics_turnover_rate", "bama_to_rate"),
+                    index=5,
+                    fmt="float",
+                    precision=1,
+                    strip_trailing=False,
+                ),
+                _spec(
+                    "% of TO's (NBA.com)",
+                    keys=("individual_team_turnover_pct", "team_to_pct"),
+                    index=6,
+                    fmt="float",
+                    precision=1,
+                    strip_trailing=False,
+                ),
+                _spec(
+                    "Team TO Rate",
+                    keys=("turnover_rate", "team_to_rate"),
+                    index=7,
+                    fmt="float",
+                    precision=1,
+                ),
+                _spec(
+                    "Ind Off Reb%",
+                    keys=("individual_off_reb_rate", "ind_oreb_pct"),
+                    index=8,
+                    fmt="float",
+                    precision=1,
+                ),
+                _spec(
+                    "Off Reb Rate",
+                    keys=("off_reb_rate",),
+                    index=9,
+                    fmt="float",
+                    precision=1,
+                ),
+                _spec(
+                    "Ind Fouls Drawn%",
+                    keys=("individual_foul_rate", "ind_foul_rate"),
+                    index=10,
+                    fmt="float",
+                    precision=1,
+                ),
+                _spec(
+                    "Fouls Rate",
+                    keys=("fouls_drawn_rate", "foul_rate"),
+                    index=11,
+                    fmt="float",
+                    precision=1,
+                ),
+            ]
+        )
+    elif stat_key.endswith("_fg_pct"):
+        base = stat_key.replace("_fg_pct", "")
+        make_keys = (f"{base}_makes", "makes", "fgm")
+        attempt_keys = (f"{base}_attempts", "attempts", "fga")
+
+        column_specs.append(
+            _spec(
+                "FG (M–A)",
+                compose="makes_attempts",
+                make_keys=make_keys,
+                make_index=1,
+                attempt_keys=attempt_keys,
+                attempt_index=2,
+                align="center",
+                sort_source="makes",
+                default=True,
+                default_order=2,
+            )
+        )
+        column_specs.append(
+            _spec(
+                "FG%",
+                keys=(stat_key, "pct"),
+                index=3,
+                fmt="pct",
+                default=True,
+            )
+        )
+        column_specs.append(
+            _spec(
+                "Freq",
+                keys=(f"{base}_freq_pct", "freq"),
+                index=4,
+                fmt="pct",
+            )
+        )
+
+        if stat_key == "fg3_fg_pct":
+            column_specs.append(
+                _spec(
+                    "Shrink 3FG (M–A)",
+                    compose="makes_attempts",
+                    make_keys=("fg3_shrink_makes", "shrink_makes"),
+                    make_index=5,
+                    attempt_keys=("fg3_shrink_att", "shrink_attempts"),
+                    attempt_index=6,
+                    align="center",
+                    sort_source="makes",
+                )
+            )
+            column_specs.append(
+                _spec(
+                    "Shrink 3FG %",
+                    keys=("fg3_shrink_pct", "shrink_pct"),
+                    index=7,
+                    fmt="pct",
+                )
+            )
+            column_specs.append(
+                _spec(
+                    "Non-Shrink 3FG (M–A)",
+                    compose="makes_attempts",
+                    make_keys=("fg3_nonshrink_makes", "nonshrink_makes"),
+                    make_index=8,
+                    attempt_keys=("fg3_nonshrink_att", "nonshrink_attempts"),
+                    attempt_index=9,
+                    align="center",
+                    sort_source="makes",
+                )
+            )
+            column_specs.append(
+                _spec(
+                    "Non-Shrink 3FG %",
+                    keys=("fg3_nonshrink_pct", "nonshrink_pct"),
+                    index=10,
+                    fmt="pct",
+                )
+            )
+    else:
+        fmt = cfg.get("format") or "float"
+        column_specs.append(
+            _spec(
+                label,
+                keys=(stat_key,),
+                index=1,
+                fmt="pct" if fmt == "pct" else ("int" if fmt == "int" else "float"),
+                precision=1 if fmt == "pct" else None,
+                default=True,
+                strip_trailing=fmt != "pct",
+            )
+        )
+
+    columns: list[Dict[str, Any]] = [
+        {
+            "key": "rank",
+            "label": "#",
+            "align": "right",
+            "sortable": True,
+            "width": "w-14",
+            "value_key": "rank_value",
+        },
+        {
+            "key": "player",
+            "label": "Player",
+            "align": "left",
+            "sortable": True,
+        },
+    ]
+
+    for spec in column_specs:
+        key = spec["slug"]
+        spec["key"] = key
+        spec["value_key"] = f"{key}_value"
+        columns.append(
+            {
+                "key": key,
+                "label": spec["label"],
+                "align": spec["align"],
+                "sortable": True,
+                "value_key": spec["value_key"],
+            }
+        )
+
+    def _format_composed(
+        source: Any,
+        spec: Dict[str, Any],
+    ) -> tuple[str, Optional[float]]:
+        make = _resolve_value(source, spec.get("make_keys", ()), index=spec.get("make_index"))
+        attempt = _resolve_value(
+            source,
+            spec.get("attempt_keys", ()),
+            index=spec.get("attempt_index"),
+        )
+        make_int = _to_int(make)
+        attempt_int = _to_int(attempt)
+        display = f"{make_int}-{attempt_int}"
+        if spec.get("sort_source") == "attempts":
+            numeric = _to_float(attempt)
+        else:
+            numeric = _to_float(make)
+        return display, numeric
+
+    def _format_value(
+        source: Any,
+        spec: Dict[str, Any],
+    ) -> tuple[str, Optional[float]]:
+        if spec.get("compose") == "makes_attempts":
+            return _format_composed(source, spec)
+
+        value = _resolve_value(source, spec.get("keys", ()), index=spec.get("index"))
+
+        fmt = spec.get("format")
+        if fmt == "int":
+            numeric = _to_float(value)
+            if numeric is None:
+                return default_placeholder, None
+            return str(int(round(numeric))), numeric
+        if fmt == "float":
+            numeric = _to_float(value)
+            if numeric is None:
+                return default_placeholder, None
+            precision = spec.get("precision")
+            if precision is not None:
+                formatted = f"{numeric:.{precision}f}"
+                if spec.get("strip_trailing", True) and precision > 0:
+                    formatted = formatted.rstrip("0").rstrip(".")
+                    if not formatted:
+                        formatted = "0"
+            else:
+                formatted = str(numeric)
+            return formatted, numeric
+        if fmt == "pct":
+            pct_value = _to_pct(value)
+            if pct_value is None:
+                return default_placeholder, None
+            display = _format_pct_value(pct_value)
+            return display, pct_value
+
+        text = _clean_display_value(value)
+        if text is None:
+            return default_placeholder, None
+        return str(text), None
+
+    row_entries: list[Dict[str, Any]] = []
+    for index, row in enumerate(rows or [], start=1):
+        player = _resolve_value(row, _PLAYER_KEYS, index=0) or ""
+        rank_value = float(index)
+        entry: Dict[str, Any] = {
+            "rank": index,
+            "rank_value": rank_value,
+            "player": player,
+        }
+
+        for spec in column_specs:
+            display, numeric = _format_value(row, spec)
+            entry[spec["key"]] = display if display is not None else default_placeholder
+            if numeric is not None:
+                entry[spec["value_key"]] = numeric
+
+        row_entries.append(entry)
+
+    totals_entry: Optional[Dict[str, Any]] = None
+    if team_totals is not None:
+        totals_entry = {"rank": "", "player": "Team Totals"}
+        for spec in column_specs:
+            display, numeric = _format_value(team_totals, spec)
+            totals_entry[spec["key"]] = display
+            if numeric is not None:
+                totals_entry[spec["value_key"]] = numeric
+
+    sort_sequence: list[Tuple[str, str]] = []
+    if default_sort:
+        for item in default_sort:
+            if isinstance(item, (list, tuple)):
+                key = str(item[0]).strip()
+                direction = str(item[1] if len(item) > 1 else "desc").lower()
+            else:
+                key = str(item).strip()
+                direction = "desc"
+            if not key:
+                continue
+            if direction not in {"asc", "desc"}:
+                direction = "desc"
+            sort_sequence.append((key, direction))
+    else:
+        ordered = sorted(
+            (spec for spec in column_specs if spec.get("default_sort")),
+            key=lambda s: s.get("default_order", 0),
+        )
+        for spec in ordered:
+            sort_sequence.append((spec["key"], spec.get("default_direction", "desc")))
+        if not sort_sequence and column_specs:
+            sort_sequence.append((column_specs[0]["key"], "desc"))
+
+    if not any(key == "player" for key, _ in sort_sequence):
+        sort_sequence.append(("player", "asc"))
+
+    seen_sort: set[str] = set()
+    sort_parts: list[str] = []
+    for key, direction in sort_sequence:
+        if key in seen_sort:
+            continue
+        seen_sort.add(key)
+        sort_parts.append(f"{key}:{direction}")
+
+    resolved_table_id = table_id or (f"leaderboard-{stat_key}" if stat_key else None)
+
+    return {
+        "id": resolved_table_id,
+        "columns": columns,
+        "rows": row_entries,
+        "totals": totals_entry,
+        "default_sort": ";".join(sort_parts),
+        "has_data": bool(row_entries) or bool(totals_entry),
     }

@@ -2,6 +2,7 @@ import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from typing import Any
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -81,6 +82,8 @@ from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from admin._leaderboard_helpers import (
     build_dual_context,
+    build_dual_table,
+    build_leaderboard_table,
     prepare_dual_context,
     _normalize_compute_result,
     combine_dual_rows,
@@ -1173,81 +1176,71 @@ def _split_leaderboard_rows_for_template(
     """Return practice-style split data for selected dual leaderboard keys."""
 
     if stat_key == "pnr_gap_help":
-        columns = ["Gap +", "Gap Opp", "Gap %"]
-        pct_columns = ["Gap %"]
-        column_map = {
-            "Gap +": ("plus",),
-            "Gap Opp": ("opps",),
-            "Gap %": ("pct",),
-        }
+        def _annotate(entries, subtype):
+            annotated = []
+            for entry in entries or []:
+                if isinstance(entry, Mapping):
+                    data = dict(entry)
+                    data.setdefault("subtype", subtype)
+                    annotated.append(data)
+                else:
+                    annotated.append(entry)
+            return annotated
 
-        season_rows = rows if isinstance(rows, Mapping) else {}
-        season_totals = team_totals if isinstance(team_totals, Mapping) else {}
-        last_rows_map = last_rows if isinstance(last_rows, Mapping) else {}
-        last_totals_map = (
-            last_team_totals if isinstance(last_team_totals, Mapping) else {}
+        season_entries: list[Any] = []
+        last_entries: list[Any] = []
+        season_totals_payload: Any = team_totals
+        last_totals_payload: Any = last_team_totals
+
+        if isinstance(rows, Mapping):
+            season_entries.extend(_annotate(rows.get("gap"), "gap_help"))
+            season_entries.extend(_annotate(rows.get("low"), "low_help"))
+        else:
+            season_entries = rows or []
+
+        if isinstance(last_rows, Mapping):
+            last_entries.extend(_annotate(last_rows.get("gap"), "gap_help"))
+            last_entries.extend(_annotate(last_rows.get("low"), "low_help"))
+        else:
+            last_entries = last_rows or []
+
+        if isinstance(team_totals, Mapping):
+            season_totals_payload = {
+                "gap": team_totals.get("gap") or team_totals.get("gap_help"),
+                "low": team_totals.get("low") or team_totals.get("low_help"),
+            }
+        if isinstance(last_team_totals, Mapping):
+            last_totals_payload = {
+                "gap": last_team_totals.get("gap") or last_team_totals.get("gap_help"),
+                "low": last_team_totals.get("low") or last_team_totals.get("low_help"),
+            }
+
+        normalized = prepare_dual_context(
+            {
+                "season_rows": season_entries,
+                "season_team_totals": season_totals_payload,
+                "last_rows": last_entries,
+                "last_team_totals": last_totals_payload,
+                "last_practice_date": last_practice_date,
+            },
+            stat_key,
         )
 
-        gap_rows = format_dual_rows(
-            season_rows.get("gap"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-        gap_last_rows = format_dual_rows(
-            last_rows_map.get("gap"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-        gap_totals = format_dual_totals(
-            season_totals.get("gap"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-        gap_last_totals = format_dual_totals(
-            last_totals_map.get("gap"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-
-        low_rows = format_dual_rows(
-            season_rows.get("low"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-        low_last_rows = format_dual_rows(
-            last_rows_map.get("low"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-        low_totals = format_dual_totals(
-            season_totals.get("low"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
-        low_last_totals = format_dual_totals(
-            last_totals_map.get("low"),
-            columns,
-            column_map=column_map,
-            pct_columns=pct_columns,
-        )
+        season_by = normalized.get("season_rows_by_subtype") or {}
+        last_by = normalized.get("last_rows_by_subtype") or {}
+        totals_by = normalized.get("season_team_totals") or {}
+        last_totals_by = normalized.get("last_team_totals") or {}
 
         return {
-            "gap_rows": gap_rows,
-            "gap_totals": gap_totals,
-            "gap_last_rows": gap_last_rows,
-            "gap_last_totals": gap_last_totals,
-            "low_rows": low_rows,
-            "low_totals": low_totals,
-            "low_last_rows": low_last_rows,
-            "low_last_totals": low_last_totals,
-            "last_practice_date": last_practice_date,
+            "gap_rows": season_by.get("gap_help") or [],
+            "gap_totals": totals_by.get("gap_help") or {},
+            "gap_last_rows": last_by.get("gap_help") or [],
+            "gap_last_totals": last_totals_by.get("gap_help") or {},
+            "low_rows": season_by.get("low_help") or [],
+            "low_totals": totals_by.get("low_help") or {},
+            "low_last_rows": last_by.get("low_help") or [],
+            "low_last_totals": last_totals_by.get("low_help") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
         }
 
     practice_keys = {
@@ -1757,6 +1750,8 @@ admin_bp.add_app_template_filter(format_dual_rows, name="format_dual_rows")
 admin_bp.add_app_template_filter(format_dual_totals, name="format_dual_totals")
 admin_bp.add_app_template_filter(combine_dual_rows, name="combine_dual_rows")
 admin_bp.add_app_template_filter(combine_dual_totals, name="combine_dual_totals")
+admin_bp.add_app_template_global(build_dual_table, name="build_dual_table")
+admin_bp.add_app_template_global(build_leaderboard_table, name="build_leaderboard_table")
 
 
 def _resolve_season_from_request():
@@ -6058,63 +6053,15 @@ def leaderboard_pnr_gap_help():
     else:
         scope_has_data = _slice_has_data(display_season_slice)
 
-    columns = ["Gap +", "Gap Opp", "Gap %"]
-    pct_columns = ["Gap %"]
-    column_map = {
-        "Gap +": ("plus",),
-        "Gap Opp": ("opps",),
-        "Gap %": ("pct",),
-    }
+    pnr_rows = display_season_slice.get('pnr_rows') or []
+    pnr_totals = display_season_slice.get('pnr_totals') or {}
+    low_rows = display_season_slice.get('low_rows') or []
+    low_totals = display_season_slice.get('low_totals') or {}
 
-    pnr_rows = format_dual_rows(
-        display_season_slice.get('pnr_rows'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-    pnr_totals = format_dual_totals(
-        display_season_slice.get('pnr_totals'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-    low_rows = format_dual_rows(
-        display_season_slice.get('low_rows'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-    low_totals = format_dual_totals(
-        display_season_slice.get('low_totals'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-
-    pnr_last_rows = format_dual_rows(
-        display_last_slice.get('pnr_rows'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-    pnr_last_totals = format_dual_totals(
-        display_last_slice.get('pnr_totals'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-    low_last_rows = format_dual_rows(
-        display_last_slice.get('low_rows'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
-    low_last_totals = format_dual_totals(
-        display_last_slice.get('low_totals'),
-        columns,
-        column_map=column_map,
-        pct_columns=pct_columns,
-    )
+    pnr_last_rows = display_last_slice.get('pnr_rows') or []
+    pnr_last_totals = display_last_slice.get('pnr_totals') or {}
+    low_last_rows = display_last_slice.get('low_rows') or []
+    low_last_totals = display_last_slice.get('low_totals') or {}
 
     return render_template(
         'leaderboard/pnr_gap_help.html',

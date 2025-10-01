@@ -52,121 +52,132 @@
       </div>
 
       {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-      {% set columns = ["Crash +", "Crash Att", "Crash %", "Back Man +", "Back Man Att", "Back Man %", "Box Out +", "Box Out Att", "Box Out %"] %}
+      {% set columns = [
+        "Crash +", "Crash Att", "Crash %",
+        "Back Man +", "Back Man Att", "Back Man %",
+        "Box Out +", "Box Out Att", "Box Out %"
+      ] %}
       {% set season_by = season_rows_by_subtype or {} %}
       {% set last_by = last_rows_by_subtype or {} %}
 
-      {% set crash_columns = ["Crash +", "Crash Att", "Crash %"] %}
-      {% set crash_map = {
-        "Crash +": ("plus", "crash_plus"),
-        "Crash Att": ("opps", "crash_opp", "crash_opps"),
-        "Crash %": ("pct", "crash_pct"),
-      } %}
-      {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
-      {% set back_map = {
-        "Back Man +": ("plus", "back_plus"),
-        "Back Man Att": ("opps", "back_opp", "back_opps"),
-        "Back Man %": ("pct", "back_pct"),
-      } %}
-      {% set box_columns = ["Box Out +", "Box Out Att", "Box Out %"] %}
-      {% set box_map = {
-        "Box Out +": ("plus", "box_plus", "box_out_plus"),
-        "Box Out Att": ("opps", "box_opp", "box_opps", "box_out_opps"),
-        "Box Out %": ("pct", "box_pct", "box_out_pct"),
-      } %}
-      {% set pct_columns = {
-        'crash': ["Crash %"],
-        'back_man': ["Back Man %"],
-        'box_out': ["Box Out %"]
-      } %}
-
-      {% set season_crash = (season_by.get('crash') or [])|format_dual_rows(crash_columns, crash_map, pct_columns['crash']) %}
-      {% set season_back = (season_by.get('back_man') or [])|format_dual_rows(back_columns, back_map, pct_columns['back_man']) %}
-      {% set season_box = (season_by.get('box_out') or [])|format_dual_rows(box_columns, box_map, pct_columns['box_out']) %}
-
-      {% set last_crash = (last_by.get('crash') or [])|format_dual_rows(crash_columns, crash_map, pct_columns['crash']) %}
-      {% set last_back = (last_by.get('back_man') or [])|format_dual_rows(back_columns, back_map, pct_columns['back_man']) %}
-      {% set last_box = (last_by.get('box_out') or [])|format_dual_rows(box_columns, box_map, pct_columns['box_out']) %}
-
       {% set season_ns = namespace(rows={}) %}
-      {% for row in season_crash %}
-        {% set player = row.player or row.get('player') %}
+      {% for row in season_by.get('crash') or [] %}
+        {% set player = row.get('player') or row.get('player_name') or row.get('name') %}
         {% if player %}
-          {% set entry = season_ns.rows.setdefault(player, {'jersey': row.jersey or row.get('jersey'), 'player': player}) %}
-          {% for col in crash_columns %}
-            {% if row[col] is defined and row[col] is not none %}
-              {% set _ = entry.update({col: row[col]}) %}
-            {% endif %}
-          {% endfor %}
+          {% set jersey = row.get('jersey') or row.get('jersey_number') or loop.index %}
+          {% set entry = season_ns.rows.setdefault(player, {'player': player, 'jersey': jersey}) %}
+          {% set _ = entry.update({'Crash +': row.get('plus'), 'Crash Att': row.get('opps'), 'Crash %': row.get('pct')}) %}
         {% endif %}
       {% endfor %}
-      {% for row in season_back %}
-        {% set player = row.player or row.get('player') %}
+      {% for row in season_by.get('back_man') or [] %}
+        {% set player = row.get('player') or row.get('player_name') or row.get('name') %}
         {% if player %}
-          {% set entry = season_ns.rows.setdefault(player, {'jersey': row.jersey or row.get('jersey'), 'player': player}) %}
-          {% for col in back_columns %}
-            {% if row[col] is defined and row[col] is not none %}
-              {% set _ = entry.update({col: row[col]}) %}
-            {% endif %}
-          {% endfor %}
+          {% set jersey = row.get('jersey') or row.get('jersey_number') or loop.index %}
+          {% set entry = season_ns.rows.setdefault(player, {'player': player, 'jersey': jersey}) %}
+          {% set _ = entry.update({'Back Man +': row.get('plus'), 'Back Man Att': row.get('opps'), 'Back Man %': row.get('pct')}) %}
         {% endif %}
       {% endfor %}
-      {% for row in season_box %}
-        {% set player = row.player or row.get('player') %}
+      {% for row in season_by.get('box_out') or [] %}
+        {% set player = row.get('player') or row.get('player_name') or row.get('name') %}
         {% if player %}
-          {% set entry = season_ns.rows.setdefault(player, {'jersey': row.jersey or row.get('jersey'), 'player': player}) %}
-          {% for col in box_columns %}
-            {% if row[col] is defined and row[col] is not none %}
-              {% set _ = entry.update({col: row[col]}) %}
-            {% endif %}
-          {% endfor %}
+          {% set jersey = row.get('jersey') or row.get('jersey_number') or loop.index %}
+          {% set entry = season_ns.rows.setdefault(player, {'player': player, 'jersey': jersey}) %}
+          {% set _ = entry.update({'Box Out +': row.get('plus'), 'Box Out Att': row.get('opps'), 'Box Out %': row.get('pct')}) %}
         {% endif %}
       {% endfor %}
 
       {% set last_ns = namespace(rows={}) %}
-      {% for row in last_crash %}
-        {% set player = row.player or row.get('player') %}
+      {% for row in last_by.get('crash') or [] %}
+        {% set player = row.get('player') or row.get('player_name') or row.get('name') %}
         {% if player %}
-          {% set entry = last_ns.rows.setdefault(player, {'jersey': row.jersey or row.get('jersey'), 'player': player}) %}
-          {% for col in crash_columns %}
-            {% if row[col] is defined and row[col] is not none %}
-              {% set _ = entry.update({col: row[col]}) %}
-            {% endif %}
-          {% endfor %}
+          {% set jersey = row.get('jersey') or row.get('jersey_number') or loop.index %}
+          {% set entry = last_ns.rows.setdefault(player, {'player': player, 'jersey': jersey}) %}
+          {% set _ = entry.update({'Crash +': row.get('plus'), 'Crash Att': row.get('opps'), 'Crash %': row.get('pct')}) %}
         {% endif %}
       {% endfor %}
-      {% for row in last_back %}
-        {% set player = row.player or row.get('player') %}
+      {% for row in last_by.get('back_man') or [] %}
+        {% set player = row.get('player') or row.get('player_name') or row.get('name') %}
         {% if player %}
-          {% set entry = last_ns.rows.setdefault(player, {'jersey': row.jersey or row.get('jersey'), 'player': player}) %}
-          {% for col in back_columns %}
-            {% if row[col] is defined and row[col] is not none %}
-              {% set _ = entry.update({col: row[col]}) %}
-            {% endif %}
-          {% endfor %}
+          {% set jersey = row.get('jersey') or row.get('jersey_number') or loop.index %}
+          {% set entry = last_ns.rows.setdefault(player, {'player': player, 'jersey': jersey}) %}
+          {% set _ = entry.update({'Back Man +': row.get('plus'), 'Back Man Att': row.get('opps'), 'Back Man %': row.get('pct')}) %}
         {% endif %}
       {% endfor %}
-      {% for row in last_box %}
-        {% set player = row.player or row.get('player') %}
+      {% for row in last_by.get('box_out') or [] %}
+        {% set player = row.get('player') or row.get('player_name') or row.get('name') %}
         {% if player %}
-          {% set entry = last_ns.rows.setdefault(player, {'jersey': row.jersey or row.get('jersey'), 'player': player}) %}
-          {% for col in box_columns %}
-            {% if row[col] is defined and row[col] is not none %}
-              {% set _ = entry.update({col: row[col]}) %}
-            {% endif %}
-          {% endfor %}
+          {% set jersey = row.get('jersey') or row.get('jersey_number') or loop.index %}
+          {% set entry = last_ns.rows.setdefault(player, {'player': player, 'jersey': jersey}) %}
+          {% set _ = entry.update({'Box Out +': row.get('plus'), 'Box Out Att': row.get('opps'), 'Box Out %': row.get('pct')}) %}
         {% endif %}
       {% endfor %}
 
       {% set season_table_rows = season_ns.rows.values() | list | sort(attribute='jersey') %}
       {% set last_table_rows = last_ns.rows.values() | list | sort(attribute='jersey') %}
-      {% set combined_rows = season_table_rows|combine_dual_rows(last_table_rows) %}
+
+      {% set totals_ns = namespace(data={}) %}
+      {% set season_totals_map = season_team_totals or {} %}
+      {% if season_totals_map.get('crash') %}
+        {% set crash_totals = season_totals_map.get('crash') %}
+        {% set _ = totals_ns.data.update({'Crash +': crash_totals.get('plus'), 'Crash Att': crash_totals.get('opps'), 'Crash %': crash_totals.get('pct')}) %}
+      {% endif %}
+      {% if season_totals_map.get('back_man') %}
+        {% set back_totals = season_totals_map.get('back_man') %}
+        {% set _ = totals_ns.data.update({'Back Man +': back_totals.get('plus'), 'Back Man Att': back_totals.get('opps'), 'Back Man %': back_totals.get('pct')}) %}
+      {% endif %}
+      {% if season_totals_map.get('box_out') %}
+        {% set box_totals = season_totals_map.get('box_out') %}
+        {% set _ = totals_ns.data.update({'Box Out +': box_totals.get('plus'), 'Box Out Att': box_totals.get('opps'), 'Box Out %': box_totals.get('pct')}) %}
+      {% endif %}
+      {% set season_totals_combined = totals_ns.data if totals_ns.data else None %}
+
+      {% set last_totals_ns = namespace(data={}) %}
+      {% set last_totals_map = last_team_totals or {} %}
+      {% if last_totals_map.get('crash') %}
+        {% set crash_last_totals = last_totals_map.get('crash') %}
+        {% set _ = last_totals_ns.data.update({'Crash +': crash_last_totals.get('plus'), 'Crash Att': crash_last_totals.get('opps'), 'Crash %': crash_last_totals.get('pct')}) %}
+      {% endif %}
+      {% if last_totals_map.get('back_man') %}
+        {% set back_last_totals = last_totals_map.get('back_man') %}
+        {% set _ = last_totals_ns.data.update({'Back Man +': back_last_totals.get('plus'), 'Back Man Att': back_last_totals.get('opps'), 'Back Man %': back_last_totals.get('pct')}) %}
+      {% endif %}
+      {% if last_totals_map.get('box_out') %}
+        {% set box_last_totals = last_totals_map.get('box_out') %}
+        {% set _ = last_totals_ns.data.update({'Box Out +': box_last_totals.get('plus'), 'Box Out Att': box_last_totals.get('opps'), 'Box Out %': box_last_totals.get('pct')}) %}
+      {% endif %}
+      {% set last_totals_combined = last_totals_ns.data if last_totals_ns.data else None %}
+
+      {% set column_map = {
+        "Crash +": ("Crash +", "crash_plus"),
+        "Crash Att": ("Crash Att", "crash_att"),
+        "Crash %": ("Crash %", "crash_pct"),
+        "Back Man +": ("Back Man +", "back_man_plus"),
+        "Back Man Att": ("Back Man Att", "back_man_att"),
+        "Back Man %": ("Back Man %", "back_man_pct"),
+        "Box Out +": ("Box Out +", "box_out_plus"),
+        "Box Out Att": ("Box Out Att", "box_out_att"),
+        "Box Out %": ("Box Out %", "box_out_pct"),
+      } %}
+      {% set pct_columns = ["Crash %", "Back Man %", "Box Out %"] %}
+
+      {% set table = build_dual_table(
+        base_columns=columns,
+        season_rows=season_table_rows,
+        last_rows=last_table_rows,
+        season_totals=season_totals_combined,
+        last_totals=last_totals_combined,
+        column_map=column_map,
+        pct_columns=pct_columns,
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='offensive-rebounding',
+        default_sort=['Crash %', 'Crash Att', 'Crash +', 'player']
+      ) %}
 
       {{ render_dual_section(
         "Offensive Rebounding",
-        combined_rows,
-        None,
-        columns,
+        table,
         practice_note
       ) }}
     </div>
