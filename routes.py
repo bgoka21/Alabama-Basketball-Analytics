@@ -424,3 +424,16 @@ def draft_net():
     return jsonify({'alabama_net': int(al_net), 'rival_net': int(rival_net)})
 
 
+def _dev_tables_enabled() -> bool:
+    """Return True when dev-only routes should be registered."""
+    return app.debug or os.environ.get('FLASK_ENV') == 'development'
+
+
+if _dev_tables_enabled():
+
+    @app.route('/dev/tables-smoke')
+    def dev_tables_smoke():
+        """Render the unified tables smoke test sandbox."""
+        return render_template('dev/tables_smoketest.html')
+
+

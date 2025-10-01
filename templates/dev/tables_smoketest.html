@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% from 'macros/table.html' import render_table %}
+
+{% block page_class %}dev-tables-smoke{% endblock %}
+
+{% block content %}
+<div class="space-y-12">
+  <header class="space-y-2">
+    <h1 class="text-2xl font-bold">Unified Tables Smoke Test</h1>
+    <p class="text-gray-600 dark:text-gray-300">
+      Manual QA sandbox to verify sorting, alignment, accessibility, sticky headers, and large-table performance.
+    </p>
+  </header>
+
+  {# Table A — Numbers & Text #}
+  {% set table_a_columns = [
+    {'key': 'name', 'label': 'Name', 'sortable': True, 'align': 'left'},
+    {'key': 'count', 'label': 'Count', 'sortable': True, 'align': 'right'},
+    {'key': 'score', 'label': 'Score', 'sortable': True, 'align': 'right'},
+    {'key': 'notes', 'label': 'Notes', 'sortable': True, 'align': 'left'}
+  ] %}
+  {% set table_a_rows = [
+    {'name': 'Alpha', 'count': 12, 'score': 18.5, 'notes': 'Leading scorer'},
+    {'name': 'Bravo', 'count': 12, 'score': 18.5, 'notes': ''},
+    {'name': 'Charlie', 'count': 5, 'score': 9.25, 'notes': 'Includes OT; mix of text & numbers 12-3'},
+    {'name': 'Delta', 'count': None, 'score': 0, 'notes': 'DNP'},
+    {'name': 'Echo', 'count': 7, 'score': '', 'notes': '—'}
+  ] %}
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Table A — Numbers &amp; Text</h2>
+    {{ render_table(
+      id='smoke-table-a',
+      columns=table_a_columns,
+      rows=table_a_rows,
+      totals=None,
+      dense=True,
+      sticky_header=False,
+      caption='Numbers and text sample data'
+    ) }}
+  </section>
+
+  {# Table B — Percent & Currency #}
+  {% set table_b_columns = [
+    {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left'},
+    {'key': 'hit_rate', 'label': 'Hit Rate', 'sortable': True, 'align': 'right'},
+    {'key': 'value', 'label': 'Value', 'sortable': True, 'align': 'right'},
+    {'key': 'plus_minus', 'label': 'Plus/Minus', 'sortable': True, 'align': 'right'}
+  ] %}
+  {% set table_b_rows = [
+    {
+      'player': 'Avery',
+      'hit_rate': {'display': '45.5%', 'data_value': '0.455'},
+      'value': {'display': '$1,234.56', 'data_value': '1234.56'},
+      'plus_minus': {'display': '+3.2', 'data_value': '3.2'}
+    },
+    {
+      'player': 'Blake',
+      'hit_rate': {'display': '50.0%', 'data_value': '0.5'},
+      'value': {'display': '$987.00', 'data_value': '987'},
+      'plus_minus': {'display': '-1.5', 'data_value': '-1.5'}
+    },
+    {
+      'player': 'Casey',
+      'hit_rate': {'display': '—', 'data_value': ''},
+      'value': {'display': '$2,500.00', 'data_value': '2500'},
+      'plus_minus': {'display': '0.0', 'data_value': '0'}
+    }
+  ] %}
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Table B — Percent &amp; Currency</h2>
+    {{ render_table(
+      id='smoke-table-b',
+      columns=table_b_columns,
+      rows=table_b_rows,
+      totals=None,
+      dense=True,
+      sticky_header=False,
+      caption='Percent and currency sample data'
+    ) }}
+  </section>
+
+  {# Table C — Dates #}
+  {% set table_c_columns = [
+    {'key': 'label', 'label': 'Label', 'sortable': True, 'align': 'left'},
+    {'key': 'when', 'label': 'When', 'sortable': True, 'align': 'left'},
+    {'key': 'iso', 'label': 'ISO', 'sortable': True, 'align': 'left'},
+    {'key': 'text_date', 'label': 'Text Date', 'sortable': True, 'align': 'left'}
+  ] %}
+  {% set table_c_rows = [
+    {
+      'label': 'Launch',
+      'when': {'display': 'Jan 2, 2025', 'data_value': '2025-01-02T00:00:00'},
+      'iso': '2025-01-02',
+      'text_date': '3/4/25'
+    },
+    {
+      'label': 'Scrimmage',
+      'when': {'display': 'Feb 12, 2024', 'data_value': '2024-02-12T00:00:00'},
+      'iso': '2024-02-12',
+      'text_date': '2/12/24'
+    },
+    {
+      'label': 'Wrap-up',
+      'when': {'display': 'Mar 1, 2024', 'data_value': '2024-03-01T00:00:00'},
+      'iso': '2024-03-01',
+      'text_date': '3/1/24'
+    }
+  ] %}
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Table C — Dates</h2>
+    {{ render_table(
+      id='smoke-table-c',
+      columns=table_c_columns,
+      rows=table_c_rows,
+      totals=None,
+      dense=True,
+      sticky_header=False,
+      caption='Date formats sample data'
+    ) }}
+  </section>
+
+  {# Table D — A/M Pairs #}
+  {% set table_d_columns = [
+    {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left'},
+    {'key': 'atr', 'label': 'ATR A/M (%)', 'sortable': True, 'align': 'right'},
+    {'key': 'fg2', 'label': '2FG A/M (%)', 'sortable': True, 'align': 'right'},
+    {'key': 'fg3', 'label': '3FG A/M (%)', 'sortable': True, 'align': 'right'},
+    {'key': 'ft', 'label': 'FT A/M', 'sortable': True, 'align': 'right'}
+  ] %}
+  {% set table_d_rows = [
+    {
+      'player': 'Harper',
+      'atr': {'display': '5/11 (45.5%)', 'data_value': '0.455'},
+      'fg2': {'display': '9/18 (50.0%)', 'data_value': '0.5'},
+      'fg3': {'display': '3/9 (33.3%)', 'data_value': '0.333'},
+      'ft': {'display': '6/7 (85.7%)', 'data_value': '0.857'}
+    },
+    {
+      'player': 'Iverson',
+      'atr': {'display': '4/9 (44.4%)', 'data_value': '0.444'},
+      'fg2': {'display': '7/15 (46.7%)', 'data_value': '0.467'},
+      'fg3': {'display': '5/10 (50.0%)', 'data_value': '0.5'},
+      'ft': {'display': '8/8 (100%)', 'data_value': '1.0'}
+    },
+    {
+      'player': 'Jordan',
+      'atr': {'display': '2/8 (25.0%)', 'data_value': '0.25'},
+      'fg2': {'display': '4/12 (33.3%)', 'data_value': '0.333'},
+      'fg3': {'display': '6/12 (50.0%)', 'data_value': '0.5'},
+      'ft': {'display': '5/9 (55.6%)', 'data_value': '0.556'}
+    }
+  ] %}
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Table D — A/M Pairs</h2>
+    {{ render_table(
+      id='smoke-table-d',
+      columns=table_d_columns,
+      rows=table_d_rows,
+      totals=None,
+      dense=True,
+      sticky_header=False,
+      caption='Attempts/makes sample data'
+    ) }}
+  </section>
+
+  {# Table E — Sticky Header Demo #}
+  {% set table_e_columns = [
+    {'key': 'rank', 'label': '#', 'sortable': True, 'align': 'right'},
+    {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left'},
+    {'key': 'games', 'label': 'Games', 'sortable': True, 'align': 'right'},
+    {'key': 'efficiency', 'label': 'Efficiency', 'sortable': True, 'align': 'right'},
+    {'key': 'note', 'label': 'Note', 'sortable': True, 'align': 'left'}
+  ] %}
+  {% set table_e_rows = [] %}
+  {% for i in range(1, 61) %}
+    {% set _ = table_e_rows.append({
+      'rank': i,
+      'player': 'Player ' ~ i,
+      'games': 12 + i,
+      'efficiency': {'display': '%.1f'|format(120 - (i / 2)), 'data_value': '%.3f'|format(120 - (i / 2))},
+      'note': 'Tier ' ~ ((i % 5) + 1)
+    }) %}
+  {% endfor %}
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Table E — Sticky Header Demo</h2>
+    {{ render_table(
+      id='smoke-table-e',
+      columns=table_e_columns,
+      rows=table_e_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Sticky header sample data'
+    ) }}
+  </section>
+
+  {# Table F — Performance (1000 rows) #}
+  {% set table_f_columns = [
+    {'key': 'label', 'label': 'Label', 'sortable': True, 'align': 'left'},
+    {'key': 'index', 'label': 'Index', 'sortable': True, 'align': 'right'},
+    {'key': 'ratio', 'label': 'Ratio', 'sortable': True, 'align': 'right'},
+    {'key': 'date', 'label': 'Date', 'sortable': True, 'align': 'left'}
+  ] %}
+  {% set table_f_rows = [] %}
+  {% for i in range(1, 1001) %}
+    {% set _ = table_f_rows.append({
+      'label': 'Row ' ~ i,
+      'index': i,
+      'ratio': {'display': '%.3f'|format(i / 37), 'data_value': '%.6f'|format(i / 37)},
+      'date': {'display': '2025-03-' ~ '%02d'|format((i % 28) + 1), 'data_value': '2025-03-' ~ '%02d'|format((i % 28) + 1)}
+    }) %}
+  {% endfor %}
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Table F — Performance (1000 rows)</h2>
+    {{ render_table(
+      id='smoke-table-f',
+      columns=table_f_columns,
+      rows=table_f_rows,
+      totals=None,
+      dense=True,
+      sticky_header=False,
+      caption='Performance and sorting stress test'
+    ) }}
+  </section>
+</div>
+{% endblock %}

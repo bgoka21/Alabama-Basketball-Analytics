@@ -4,13 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Stats</title>
+    <style>
+        table {
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 0.5rem;
+        }
+        .stats-updated {
+            position: fixed;
+            bottom: 0.5rem;
+            left: 0.5rem;
+            font-size: 0.75rem;
+            color: white;
+        }
+    </style>
 </head>
 <body>
     <h1>🏀 Team Stats</h1>
 
     <h2>📊 Game-by-Game Team Stats</h2>
     <div class="overflow-x-auto">
-    <table class="min-w-full table-auto text-sm" border="1">
+    <table class="min-w-full table-auto text-sm">
         <tr>
             <th>Game ID</th>
             <th>Points</th>
@@ -32,7 +48,7 @@
 
     <h2>📊 Opponent Stats</h2>
     <div class="overflow-x-auto">
-    <table class="min-w-full table-auto text-sm" border="1">
+    <table class="min-w-full table-auto text-sm">
         <tr>
             <th>Game ID</th>
             <th>Points</th>
@@ -51,7 +67,7 @@
         {% endfor %}
     </table>
     </div>
-    <div style="position:fixed;bottom:8px;left:8px;font-size:0.75rem;color:white;">
+    <div class="stats-updated">
         Stats Updated: {{ last_stats_update }}
     </div>
 </body>
