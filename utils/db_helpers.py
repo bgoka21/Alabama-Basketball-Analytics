@@ -1,6 +1,6 @@
 from sqlalchemy import func
 from flask import current_app
-from models.database import db
+from models.database import db, SavedStatProfile
 
 
 def array_agg_or_group_concat(column):
@@ -20,3 +20,12 @@ def array_agg_or_group_concat(column):
     else:
         # Postgres, etc.
         return func.array_agg(column)
+
+
+def list_team_presets(db_session, current_user_id=None):
+    # team-visible OR my private
+    q = db_session.query(SavedStatProfile).filter(
+        (SavedStatProfile.visibility == "team") |
+        ((SavedStatProfile.visibility == "private") & (SavedStatProfile.owner_id == current_user_id))
+    ).order_by(SavedStatProfile.name.asc())
+    return q.all()

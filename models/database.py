@@ -394,5 +394,25 @@ class PlayerDevelopmentPlan(db.Model):
     note_2 = db.Column(db.Text)
     note_3 = db.Column(db.Text)
 
+
+class SavedStatProfile(db.Model):
+    __tablename__ = "saved_stat_profile"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), index=True, nullable=False)
+
+    # JSON of field keys in the order chosen (e.g., ["pts", "fg", "fg3", "ft", "bcp_total"])
+    fields_json = db.Column(db.Text, nullable=False, default="[]")
+
+    # MVP fixed defaults for now
+    mode_default = db.Column(db.String(32), nullable=False, default="totals")     # "totals" | "per_practice"
+    source_default = db.Column(db.String(32), nullable=False, default="practice") # "practice" | "game" | "both"
+
+    owner_id = db.Column(db.Integer, nullable=True)  # creator's user id (if available)
+    visibility = db.Column(db.String(16), nullable=False, default="team")  # "team" or "private"
+
+    created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile
