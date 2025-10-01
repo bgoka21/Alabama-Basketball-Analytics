@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alabama Basketball</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
   <style>
       @media (max-width: 768px) {
         h1 {font-size:1.25rem;line-height:1.75rem;}
@@ -36,6 +37,8 @@
             onerror="console.error('Failed to load pdf-export.js')"></script>
 </head>
 <body class="min-h-screen flex">
+
+  <div id="admin-table-sort-live" data-table-sort-live aria-live="polite" class="sr-only"></div>
 
   <!-- Mobile menu button -->
   {% if not print_mode %}
@@ -72,10 +75,9 @@
     });
   </script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="{{ url_for('static', filename='js/table-sort.js') }}" defer></script>
 
-  {% block scripts %}
-    <script src="{{ url_for('static', filename='js/leaderboard_sort.js') }}"></script>
-  {% endblock %}
+  {% block scripts %}{% endblock %}
 
 </body>
 </html>

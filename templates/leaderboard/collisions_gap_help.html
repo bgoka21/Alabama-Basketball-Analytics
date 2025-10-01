@@ -59,18 +59,24 @@
         "Gap %": ("pct", "gap_pct"),
       } %}
       {% set pct_columns = ["Gap %"] %}
-      {% set season_gap_rows = (season_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
-      {% set last_gap_rows = (last_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
-      {% set season_gap_totals = season_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
-      {% set last_gap_totals = last_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
-      {% set combined_rows = season_gap_rows|combine_dual_rows(last_gap_rows) %}
-      {% set combined_totals = season_gap_totals|combine_dual_totals(last_gap_totals) %}
+      {% set table = build_dual_table(
+        base_columns=columns,
+        season_rows=season_rows,
+        last_rows=last_rows,
+        season_totals=season_team_totals,
+        last_totals=last_team_totals,
+        column_map=column_map,
+        pct_columns=pct_columns,
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='collisions-gap-help',
+        default_sort=['pct', 'opps', 'plus']
+      ) %}
 
       {{ render_dual_section(
         "Collisions — Gap Help",
-        combined_rows,
-        combined_totals,
-        columns,
+        table,
         practice_note
       ) }}
     </div>

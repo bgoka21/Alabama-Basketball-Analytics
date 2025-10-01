@@ -52,25 +52,31 @@
       </div>
 
       {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-      {% set columns = ["Bump +", "Bump Opp", "Bump %"] %}
+      {% set columns = ["Bump +", "Bump Opps", "Bump %"] %}
       {% set column_map = {
         "Bump +": ("plus", "bump_positive"),
-        "Bump Opp": ("opps", "total_opps"),
+        "Bump Opps": ("opps", "total_opps"),
         "Bump %": ("pct",),
       } %}
       {% set pct_columns = ["Bump %"] %}
-      {% set season_bump_rows = (season_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
-      {% set last_bump_rows = (last_rows or [])|format_dual_rows(columns, column_map, pct_columns) %}
-      {% set season_bump_totals = season_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
-      {% set last_bump_totals = last_team_totals|format_dual_totals(columns, column_map, pct_columns) %}
-      {% set combined_rows = season_bump_rows|combine_dual_rows(last_bump_rows) %}
-      {% set combined_totals = season_bump_totals|combine_dual_totals(last_bump_totals) %}
+      {% set table = build_dual_table(
+        base_columns=columns,
+        season_rows=season_rows,
+        last_rows=last_rows,
+        season_totals=season_team_totals,
+        last_totals=last_team_totals,
+        column_map=column_map,
+        pct_columns=pct_columns,
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='defense-bumps',
+        default_sort=['pct', 'opps', 'plus']
+      ) %}
 
       {{ render_dual_section(
         "Defense — Bumps",
-        combined_rows,
-        combined_totals,
-        columns,
+        table,
         practice_note
       ) }}
     </div>

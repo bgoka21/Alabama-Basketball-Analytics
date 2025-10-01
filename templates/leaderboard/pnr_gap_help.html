@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from "macros/dual_tables.html" import render_grouped_last_practice_header, td_stat %}
+{% from 'macros/dual_tables.html' import render_dual_section %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -49,91 +49,50 @@
       </div>
 
       {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
-      {% set GAP_HELP_LABELS = ["Gap +", "Gap Opp", "Gap %"] %}
-      {% set LOW_MAN_LABELS = ["Gap +", "Gap Opp", "Gap %"] %}
+      {% set base_columns = ["Gap +", "Gap Opp", "Gap %"] %}
+      {% set column_map = {
+        "Gap +": ("plus", "gap_plus", "low_plus"),
+        "Gap Opp": ("opps", "gap_opp", "gap_opps", "low_opp", "low_opps"),
+        "Gap %": ("pct", "gap_pct", "low_pct"),
+      } %}
+      {% set pct_columns = ["Gap %"] %}
 
-      {% set gap_rows = pnr_rows or [] %}
-      {% set gap_last_rows = pnr_last_rows or [] %}
+      {% set gap_table = build_dual_table(
+        base_columns=base_columns,
+        season_rows=pnr_rows,
+        last_rows=pnr_last_rows,
+        season_totals=pnr_totals,
+        last_totals=pnr_last_totals,
+        column_map=column_map,
+        pct_columns=pct_columns,
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='pnr-gap-help',
+        default_sort=['pct', 'opps', 'plus']
+      ) %}
+
       <section class="mb-8">
-        <div class="flex items-baseline justify-between mb-3">
-          <h2 class="text-xl font-semibold">PnR Gap Help</h2>
-          {% if practice_note %}
-            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-          {% endif %}
-        </div>
-        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-          <table class="table-leaderboard min-w-full">
-            {{ render_grouped_last_practice_header(GAP_HELP_LABELS, "Totals", "Last Practice") }}
-            <tbody class="divide-y divide-gray-100">
-              {% for row in gap_rows %}
-                {% set last = gap_last_rows[loop.index0] if gap_last_rows|length > loop.index0 else none %}
-                {% set jersey = row.get('jersey') %}
-                {% if jersey is none and row.jersey is defined %}
-                  {% set jersey = row.jersey %}
-                {% endif %}
-                {% if jersey is none %}
-                  {% set jersey = loop.index %}
-                {% endif %}
-                {% set player_name = row.get('player') %}
-                {% if player_name is none and row.player is defined %}
-                  {% set player_name = row.player %}
-                {% endif %}
-                <tr>
-                  <td class="td-num px-4 py-2 text-center">{{ jersey }}</td>
-                  <td class="td-player px-4 py-2 text-left">{{ player_name }}</td>
-                  {{ td_stat(row.get('Gap +')) }}
-                  {{ td_stat(row.get('Gap Opp')) }}
-                  {{ td_stat(row.get('Gap %')) }}
-                  {{ td_stat(last.get('Gap +') if last else '—') }}
-                  {{ td_stat(last.get('Gap Opp') if last else '—') }}
-                  {{ td_stat(last.get('Gap %') if last else '—') }}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
       </section>
 
-      {% set low_rows_list = low_rows or [] %}
-      {% set low_last_rows_list = low_last_rows or [] %}
+      {% set low_table = build_dual_table(
+        base_columns=base_columns,
+        season_rows=low_rows,
+        last_rows=low_last_rows,
+        season_totals=low_totals,
+        last_totals=low_last_totals,
+        column_map=column_map,
+        pct_columns=pct_columns,
+        left_label=scope_label_text,
+        right_label='Last Practice',
+        totals_label='Team Totals',
+        table_id='pnr-low-man',
+        default_sort=['pct', 'opps', 'plus']
+      ) %}
+
       <section aria-label="PnR Gap Help — Low Man">
-        <div class="flex items-baseline justify-between mb-3">
-          <h2 class="text-xl font-semibold">PnR Low Man</h2>
-          {% if practice_note %}
-            <span class="text-xs text-gray-500">Last Practice: {{ practice_note }}</span>
-          {% endif %}
-        </div>
-        <div class="table-wrap rounded-lg shadow border border-gray-200 bg-white">
-          <table class="table-leaderboard min-w-full">
-            {{ render_grouped_last_practice_header(LOW_MAN_LABELS, "Totals", "Last Practice") }}
-            <tbody class="divide-y divide-gray-100">
-              {% for row in low_rows_list %}
-                {% set last = low_last_rows_list[loop.index0] if low_last_rows_list|length > loop.index0 else none %}
-                {% set jersey = row.get('jersey') %}
-                {% if jersey is none and row.jersey is defined %}
-                  {% set jersey = row.jersey %}
-                {% endif %}
-                {% if jersey is none %}
-                  {% set jersey = loop.index %}
-                {% endif %}
-                {% set player_name = row.get('player') %}
-                {% if player_name is none and row.player is defined %}
-                  {% set player_name = row.player %}
-                {% endif %}
-                <tr>
-                  <td class="td-num px-4 py-2 text-center">{{ jersey }}</td>
-                  <td class="td-player px-4 py-2 text-left">{{ player_name }}</td>
-                  {{ td_stat(row.get('Gap +')) }}
-                  {{ td_stat(row.get('Gap Opp')) }}
-                  {{ td_stat(row.get('Gap %')) }}
-                  {{ td_stat(last.get('Gap +') if last else '—') }}
-                  {{ td_stat(last.get('Gap Opp') if last else '—') }}
-                  {{ td_stat(last.get('Gap %') if last else '—') }}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
       </section>
     </div>
   </div>

@@ -104,6 +104,8 @@
           }
         });
       });
+
+      applyDefaultSort(table, sortableHeaders);
     });
   }
 
@@ -526,6 +528,81 @@
     const clone = header.cloneNode(true);
     clone.querySelectorAll('.sort-caret, .sr-only').forEach((node) => node.remove());
     return clone.textContent.trim().replace(/\s+/g, ' ') || header.textContent.trim();
+  }
+
+  function applyDefaultSort(table, headers) {
+    if (!headers.length) {
+      return;
+    }
+
+    const spec = parseDefaultSort(table.dataset.defaultSort || '');
+    if (!spec.length) {
+      return;
+    }
+
+    const resolved = spec
+      .map((item) => {
+        const key = item.key;
+        const header = headers.find((candidate) => {
+          return (candidate.dataset.key || candidate.getAttribute('data-key')) === key;
+        });
+        if (!header) {
+          return null;
+        }
+        const columnIndex = Number(header.dataset.columnIndex);
+        if (Number.isNaN(columnIndex)) {
+          return null;
+        }
+        return { header, columnIndex, direction: item.direction };
+      })
+      .filter(Boolean);
+
+    if (!resolved.length) {
+      return;
+    }
+
+    let primary = null;
+
+    for (let index = resolved.length - 1; index >= 0; index -= 1) {
+      const entry = resolved[index];
+      if (!entry) {
+        continue;
+      }
+      const { header, columnIndex, direction } = entry;
+      const type = header.dataset.sortType || inferColumnType(table, columnIndex);
+      header.dataset.sortType = type;
+      sortTableByColumn(table, columnIndex, type, direction);
+      if (!primary) {
+        primary = { header, direction };
+      }
+    }
+
+    if (primary) {
+      updateHeaderIndicators(headers, primary.header, primary.direction);
+      table.dataset.sortColumnIndex = String(primary.header.dataset.columnIndex || '');
+      table.dataset.sortDirection = primary.direction;
+    }
+  }
+
+  function parseDefaultSort(value) {
+    if (!value) {
+      return [];
+    }
+
+    return value
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((chunk) => {
+        const pieces = chunk.split(':');
+        const key = pieces[0] ? pieces[0].trim() : '';
+        let direction = pieces[1] ? pieces[1].trim().toLowerCase() : 'desc';
+        if (direction !== 'asc' && direction !== 'desc') {
+          direction = 'desc';
+        }
+        return key ? { key, direction } : null;
+      })
+      .filter(Boolean);
   }
 })();
 

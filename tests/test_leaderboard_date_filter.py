@@ -1,10 +1,10 @@
-import re
 from datetime import date
 
 import pytest
 from flask import Flask
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
+from bs4 import BeautifulSoup
 
 from pathlib import Path
 from models.database import db, Season, Practice, PlayerStats, Roster
@@ -58,8 +58,26 @@ def client(app):
 
 
 def _points_from_html(html):
-    m = re.search(r'#1 Test</td>\s*<td class="px-4 py-2">\s*(\d+)', html)
-    return int(m.group(1)) if m else 0
+    soup = BeautifulSoup(html, 'html.parser')
+    table = soup.find('table')
+    if not table:
+        return 0
+
+    for row in table.select('tbody tr'):
+        player_cell = row.find('td', {'data-key': 'player'})
+        if not player_cell:
+            continue
+        if player_cell.get_text(strip=True) != '#1 Test':
+            continue
+        value_cell = row.find('td', {'data-key': 'points'})
+        if not value_cell:
+            continue
+        text = value_cell.get_text(strip=True)
+        try:
+            return int(float(text))
+        except ValueError:
+            return 0
+    return 0
 
 
 def test_leaderboard_date_filter(client):

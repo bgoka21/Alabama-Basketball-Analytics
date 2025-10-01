@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/leaderboard_fix.css') }}">
   <style>
       @media (max-width: 768px) {
         h1 {font-size:1.25rem;line-height:1.75rem;}
@@ -36,7 +35,7 @@
 </head>
 <body class="min-h-screen flex">
 
-  <div id="aria-status" aria-live="polite" class="sr-only"></div>
+  <div id="aria-status" aria-live="polite" data-table-sort-live class="sr-only"></div>
 
   <!-- Mobile menu button -->
   <button id="mobile-menu-button" class="md:hidden p-2 no-print">&#9776;</button>
@@ -94,9 +93,7 @@
 
   <script src="{{ url_for('static', filename='js/table-sort.js') }}" defer></script>
 
-  {% block scripts %}
-    <script src="{{ url_for('static', filename='js/leaderboard_sort.js') }}"></script>
-  {% endblock %}
+  {% block scripts %}{% endblock %}
 
 </body>
 </html>
