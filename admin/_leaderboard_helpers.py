@@ -1159,10 +1159,11 @@ def build_dual_table(
         columns.append(
             {
                 "key": f"totals_{spec['slug']}",
-                "label": f"{left_label} — {spec['label']}",
+                "label": spec["label"],
                 "align": "right",
                 "sortable": True,
                 "value_key": f"totals_{spec['slug']}_value",
+                "group": left_label,
             }
         )
 
@@ -1170,10 +1171,11 @@ def build_dual_table(
         columns.append(
             {
                 "key": f"last_{spec['slug']}",
-                "label": f"{right_label} — {spec['label']}",
+                "label": spec["label"],
                 "align": "right",
                 "sortable": True,
                 "value_key": f"last_{spec['slug']}_value",
+                "group": right_label,
             }
         )
 
