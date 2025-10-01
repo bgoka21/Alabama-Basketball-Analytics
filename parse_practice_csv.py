@@ -54,6 +54,28 @@ defense_mapping = {
     "Isolation": "blowby_isolation",
 }
 
+SHOT_TOKEN_MAP = {
+    "ATR+": ("atr", "made"),
+    "ATR-": ("atr", "miss"),
+    "2FG+": ("2fg", "made"),
+    "2FG-": ("2fg", "miss"),
+    "3FG+": ("3fg", "made"),
+    "3FG-": ("3fg", "miss"),
+}
+
+CONTEST_LEVEL_MAP = {
+    "Contest": ("contest_early", "contest"),
+    "Late": ("contest_late", "late"),
+    "No Contest": ("contest_no", "no_contest"),
+    "None": ("contest_no", "no_contest"),
+}
+
+SHOT_PREFIX_LOOKUP = {
+    "atr": "atr",
+    "2fg": "fg2",
+    "3fg": "fg3",
+}
+
 
 
 
@@ -123,6 +145,22 @@ def bump(d: dict, key: str, amount: int = 1):
     d[key] = d.get(key, 0) + amount
 
 
+def _determine_row_shot_context(row, player_columns):
+    """Return the first ATR/2FG/3FG attempt found in the row, if any."""
+    for col in player_columns:
+        cell = row.get(col, "")
+        tokens = split_tokens(cell)
+        for token in tokens:
+            if token in SHOT_TOKEN_MAP:
+                shot_class, shot_result = SHOT_TOKEN_MAP[token]
+                return {
+                    "shot_class": shot_class,
+                    "shot_result": shot_result,
+                    "shot_token": token,
+                }
+    return None
+
+
 def ensure_player_defaults(slot: dict):
     """
     Ensure all new counter fields exist with default 0.
@@ -153,6 +191,25 @@ def ensure_player_defaults(slot: dict):
         "close_window_missed": 0,    # CW -
         "shut_door_positive": 0,     # SD +
         "shut_door_missed": 0,       # SD -
+        # Contest by shot type
+        "atr_contest_attempts": 0,
+        "atr_contest_makes": 0,
+        "atr_late_attempts": 0,
+        "atr_late_makes": 0,
+        "atr_no_contest_attempts": 0,
+        "atr_no_contest_makes": 0,
+        "fg2_contest_attempts": 0,
+        "fg2_contest_makes": 0,
+        "fg2_late_attempts": 0,
+        "fg2_late_makes": 0,
+        "fg2_no_contest_attempts": 0,
+        "fg2_no_contest_makes": 0,
+        "fg3_contest_attempts": 0,
+        "fg3_contest_makes": 0,
+        "fg3_late_attempts": 0,
+        "fg3_late_makes": 0,
+        "fg3_no_contest_attempts": 0,
+        "fg3_no_contest_makes": 0,
     }
     for k, v in defaults.items():
         if k not in slot:
@@ -231,6 +288,11 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
 
         labels = [t.strip().upper() for t in drill_str.split(",") if t.strip()]
+
+        if row_type in ("Crimson", "White", "Alabama", "Blue"):
+            row_shot_context = _determine_row_shot_context(row, player_columns)
+        else:
+            row_shot_context = None
 
         # ─── Bump parsing (scan all player columns regardless of row type) ──
         for col in player_columns:
@@ -702,16 +764,39 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 if roster_id is None:
                     continue
 
+                slot = player_stats_dict[roster_id]
+                details = player_detail_list[roster_id]
+
                 for token in tokens:
                     if token in ("Bump +", "Bump -", "Low Man +", "Low Man -"):
                         continue
                     if token in defense_mapping:
                         key = defense_mapping[token]
-                        player_stats_dict[roster_id][key] += 1
-                        player_detail_list[roster_id].append({
+                        slot[key] += 1
+                        detail_entry = {
                             "event": key,
                             "drill_labels": labels,
-                        })
+                        }
+
+                        if token in CONTEST_LEVEL_MAP and row_shot_context:
+                            _, level_name = CONTEST_LEVEL_MAP[token]
+                            shot_class = row_shot_context["shot_class"]
+                            shot_result = row_shot_context["shot_result"]
+                            prefix = SHOT_PREFIX_LOOKUP.get(shot_class)
+                            if prefix:
+                                ensure_player_defaults(slot)
+                                attempt_field = f"{prefix}_{level_name}_attempts"
+                                make_field = f"{prefix}_{level_name}_makes"
+                                bump(slot, attempt_field, 1)
+                                if shot_result == "made":
+                                    bump(slot, make_field, 1)
+                            detail_entry.update({
+                                "contest_level": level_name,
+                                "shot_class": shot_class,
+                                "shot_result": shot_result,
+                            })
+
+                        details.append(detail_entry)
                         if row_type in ("Crimson", "White"):
                             if col in off_players:
                                 off_events.append(token)
@@ -981,6 +1066,24 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 contest_late      = stats.get("contest_late", 0),
                 contest_no        = stats.get("contest_no", 0),
                 contest_early     = stats.get("contest_early", 0),
+                atr_contest_attempts    = stats.get("atr_contest_attempts", 0),
+                atr_contest_makes       = stats.get("atr_contest_makes", 0),
+                atr_late_attempts       = stats.get("atr_late_attempts", 0),
+                atr_late_makes          = stats.get("atr_late_makes", 0),
+                atr_no_contest_attempts = stats.get("atr_no_contest_attempts", 0),
+                atr_no_contest_makes    = stats.get("atr_no_contest_makes", 0),
+                fg2_contest_attempts    = stats.get("fg2_contest_attempts", 0),
+                fg2_contest_makes       = stats.get("fg2_contest_makes", 0),
+                fg2_late_attempts       = stats.get("fg2_late_attempts", 0),
+                fg2_late_makes          = stats.get("fg2_late_makes", 0),
+                fg2_no_contest_attempts = stats.get("fg2_no_contest_attempts", 0),
+                fg2_no_contest_makes    = stats.get("fg2_no_contest_makes", 0),
+                fg3_contest_attempts    = stats.get("fg3_contest_attempts", 0),
+                fg3_contest_makes       = stats.get("fg3_contest_makes", 0),
+                fg3_late_attempts       = stats.get("fg3_late_attempts", 0),
+                fg3_late_makes          = stats.get("fg3_late_makes", 0),
+                fg3_no_contest_attempts = stats.get("fg3_no_contest_attempts", 0),
+                fg3_no_contest_makes    = stats.get("fg3_no_contest_makes", 0),
                 pass_contest_positive = stats.get("pass_contest_positive", 0),
                 pass_contest_missed   = stats.get("pass_contest_missed", 0),
                 bump_positive     = stats.get("bump_positive", 0),
