@@ -46,6 +46,7 @@
   };
   const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
   const LIVE_REGION_SELECTORS = ['[data-table-sort-announcer]', '[data-table-sort-live]'];
+  const headerGridCache = new WeakMap();
 
   function ready(callback) {
     if (document.readyState === 'loading') {
@@ -257,15 +258,71 @@
   }
 
   function getColumnIndex(header) {
-    let index = 0;
-    const siblings = header.parentElement ? Array.from(header.parentElement.children) : [];
-    for (const cell of siblings) {
-      if (cell === header) {
-        break;
-      }
-      index += cell.colSpan || 1;
+    const table = header.closest('table');
+    if (!table) {
+      return header.cellIndex || 0;
     }
-    return index;
+
+    const grid = getHeaderGrid(table);
+    for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
+      const row = grid[rowIndex];
+      if (!row) {
+        continue;
+      }
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+        if (row[columnIndex] === header) {
+          return columnIndex;
+        }
+      }
+    }
+
+    return header.cellIndex || 0;
+  }
+
+  function getHeaderGrid(table) {
+    if (headerGridCache.has(table)) {
+      return headerGridCache.get(table);
+    }
+
+    const grid = buildHeaderGrid(table);
+    headerGridCache.set(table, grid);
+    return grid;
+  }
+
+  function buildHeaderGrid(table) {
+    const head = table.tHead;
+    if (!head) {
+      return [];
+    }
+
+    const grid = [];
+    const rows = Array.from(head.rows);
+
+    rows.forEach((row, rowIndex) => {
+      grid[rowIndex] = grid[rowIndex] || [];
+      let columnPointer = 0;
+
+      Array.from(row.cells).forEach((cell) => {
+        while (grid[rowIndex][columnPointer]) {
+          columnPointer += 1;
+        }
+
+        const rowSpan = cell.rowSpan || 1;
+        const colSpan = cell.colSpan || 1;
+
+        for (let r = 0; r < rowSpan; r += 1) {
+          const targetRow = rowIndex + r;
+          grid[targetRow] = grid[targetRow] || [];
+          for (let c = 0; c < colSpan; c += 1) {
+            grid[targetRow][columnPointer + c] = cell;
+          }
+        }
+
+        columnPointer += colSpan;
+      });
+    });
+
+    return grid;
   }
 
   function getCellAt(row, columnIndex) {
