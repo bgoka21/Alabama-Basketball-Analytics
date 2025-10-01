@@ -2463,7 +2463,47 @@ def _prepare_custom_stats_columns(dataset_columns):
     return ordered
 
 
-@admin_bp.route('/admin/custom-stats/table-partial', methods=['POST'])
+@admin_bp.route('/custom-stats', methods=['GET'])
+@admin_required
+def custom_stats_index():
+    """Render the custom stats builder with roster bootstrap data."""
+
+    current_season = Season.query.order_by(Season.start_date.desc()).first()
+    roster_query = Roster.query
+
+    if current_season:
+        roster_query = roster_query.filter_by(season_id=current_season.id)
+
+    roster_entries = roster_query.all()
+
+    roster_payload = []
+
+    for entry in roster_entries:
+        jersey_number = _extract_jersey_number(entry.player_name)
+        roster_payload.append(
+            {
+                'id': entry.id,
+                'label': entry.player_name,
+                'name': entry.player_name,
+                'jersey': jersey_number,
+            }
+        )
+
+    roster_payload.sort(
+        key=lambda player: (
+            player['jersey'] is None,
+            player['jersey'] or 0,
+            player['label'],
+        )
+    )
+
+    return render_template(
+        'admin/custom_stats.html',
+        roster_payload=roster_payload,
+    )
+
+
+@admin_bp.route('/custom-stats/table-partial', methods=['POST'])
 @admin_required
 def custom_stats_table_partial():
     data = request.get_json(silent=True) or {}
@@ -2473,7 +2513,7 @@ def custom_stats_table_partial():
     return render_template('admin/_custom_stats_table.html', columns=columns, rows=rows)
 
 
-@admin_bp.route('/admin/custom-stats/export/csv', methods=['POST'])
+@admin_bp.route('/custom-stats/export/csv', methods=['POST'])
 @admin_required
 def export_custom_stats_csv():
     data = request.get_json(silent=True) or {}
