@@ -1957,6 +1957,486 @@ def get_practice_field_catalog():
     return jsonify(PRACTICE_FIELD_GROUPS)
 
 
+def _parse_iso_date(value):
+    """Return ``date`` parsed from ISO-8601 string or ``None`` when invalid."""
+
+    if not value:
+        return None
+
+    try:
+        if isinstance(value, (datetime, date)):
+            return value if isinstance(value, date) else value.date()
+        return datetime.fromisoformat(str(value)).date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _flatten_practice_field_catalog():
+    """Return mapping of practice stat key to catalog entry (with group info)."""
+
+    from app.stats.field_catalog_practice import PRACTICE_FIELD_GROUPS
+
+    catalog = {}
+    for group_label, fields in PRACTICE_FIELD_GROUPS.items():
+        for field in fields:
+            entry = dict(field)
+            entry.setdefault('format', 'count')
+            entry['group'] = group_label
+            catalog[field['key']] = entry
+    return catalog
+
+
+_JERSEY_RE = re.compile(r"^\s*#?(\d+)")
+
+
+def _extract_jersey_number(player_name):
+    """Return integer jersey number parsed from ``player_name`` if present."""
+
+    if not player_name:
+        return None
+
+    match = _JERSEY_RE.match(player_name)
+    if not match:
+        return None
+
+    try:
+        return int(match.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_div(numer, denom):
+    if not denom:
+        return None
+    try:
+        return numer / denom
+    except ZeroDivisionError:
+        return None
+
+
+def _format_count(value, mode, practice_count):
+    if value is None:
+        return {'display': '—', 'data_value': None}
+
+    if mode == 'per_practice':
+        if not practice_count:
+            return {'display': '—', 'data_value': None}
+        value = value / practice_count
+        if math.isclose(value, round(value)):
+            display = str(int(round(value)))
+        else:
+            display = f"{value:.1f}"
+        return {'display': display, 'data_value': round(value, 4)}
+
+    if math.isclose(value, round(value)):
+        display = str(int(round(value)))
+    else:
+        display = f"{value:.1f}"
+    return {'display': display, 'data_value': round(value, 4)}
+
+
+def _format_percent(value):
+    if value is None:
+        return {'display': '—', 'data_value': None}
+
+    return {'display': f"{value:.1f}%", 'data_value': round(value, 4)}
+
+
+def _format_ratio(value, decimals=2):
+    if value is None:
+        return {'display': '—', 'data_value': None}
+
+    display = f"{value:.{decimals}f}"
+    return {'display': display, 'data_value': round(value, 4)}
+
+
+def _format_shooting_split(makes, attempts, mode, practice_count):
+    if attempts <= 0:
+        return {'display': '—', 'data_value': None}
+
+    disp_makes = makes
+    disp_attempts = attempts
+    if mode == 'per_practice':
+        if not practice_count:
+            return {'display': '—', 'data_value': None}
+        disp_makes = makes / practice_count
+        disp_attempts = attempts / practice_count
+        makes_display = f"{disp_makes:.1f}"
+        attempts_display = f"{disp_attempts:.1f}"
+    else:
+        makes_display = str(int(round(disp_makes)))
+        attempts_display = str(int(round(disp_attempts)))
+
+    pct = _safe_div(makes, attempts)
+    pct_display = f"{pct * 100:.1f}%" if pct is not None else "—"
+    return {
+        'display': f"{makes_display}-{attempts_display}  {pct_display}",
+        'data_value': round(pct * 100, 4) if pct is not None else None,
+    }
+
+
+def _collect_player_practice_stats(roster_entry, date_from=None, date_to=None):
+    """Return aggregated PlayerStats/BlueCollar totals for a roster entry."""
+
+    ps_query = (
+        PlayerStats.query
+        .filter(
+            PlayerStats.player_name == roster_entry.player_name,
+            PlayerStats.season_id == roster_entry.season_id,
+            PlayerStats.practice_id != None,
+        )
+    )
+
+    if date_from or date_to:
+        ps_query = ps_query.join(Practice, PlayerStats.practice_id == Practice.id)
+        if date_from:
+            ps_query = ps_query.filter(Practice.date >= date_from)
+        if date_to:
+            ps_query = ps_query.filter(Practice.date <= date_to)
+
+    ps_records = ps_query.all()
+
+    practice_ids = {rec.practice_id for rec in ps_records if rec.practice_id}
+
+    numeric_fields = {
+        'points': 0,
+        'assists': 0,
+        'turnovers': 0,
+        'foul_by': 0,
+        'atr_makes': 0,
+        'atr_attempts': 0,
+        'fg2_makes': 0,
+        'fg2_attempts': 0,
+        'fg3_makes': 0,
+        'fg3_attempts': 0,
+        'ftm': 0,
+        'fta': 0,
+        'crash_positive': 0,
+        'crash_missed': 0,
+        'back_man_positive': 0,
+        'back_man_missed': 0,
+        'box_out_positive': 0,
+        'box_out_missed': 0,
+        'off_reb_given_up': 0,
+    }
+
+    extra_averages = {
+        'good_shot_sum': 0.0,
+        'good_shot_count': 0,
+        'oreb_pct_sum': 0.0,
+        'oreb_pct_count': 0,
+    }
+
+    for rec in ps_records:
+        for field in numeric_fields:
+            numeric_fields[field] += getattr(rec, field, 0) or 0
+
+        good_pct = getattr(rec, 'good_shot_pct', None)
+        if good_pct is not None:
+            extra_averages['good_shot_sum'] += good_pct
+            extra_averages['good_shot_count'] += 1
+
+        oreb_pct = getattr(rec, 'oreb_pct', None)
+        if oreb_pct is not None:
+            extra_averages['oreb_pct_sum'] += oreb_pct
+            extra_averages['oreb_pct_count'] += 1
+
+    bc_query = (
+        BlueCollarStats.query
+        .filter(
+            BlueCollarStats.player_id == roster_entry.id,
+            BlueCollarStats.season_id == roster_entry.season_id,
+            BlueCollarStats.practice_id != None,
+        )
+    )
+
+    if date_from or date_to:
+        bc_query = bc_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
+        if date_from:
+            bc_query = bc_query.filter(Practice.date >= date_from)
+        if date_to:
+            bc_query = bc_query.filter(Practice.date <= date_to)
+
+    blue_records = bc_query.all()
+
+    practice_ids.update(rec.practice_id for rec in blue_records if rec.practice_id)
+
+    blue_totals = {
+        'total_blue_collar': 0,
+        'deflection': 0,
+        'charge_taken': 0,
+        'floor_dive': 0,
+        'reb_tip': 0,
+        'misc': 0,
+        'steal': 0,
+        'block': 0,
+        'off_reb': 0,
+        'def_reb': 0,
+    }
+
+    for rec in blue_records:
+        for field in blue_totals:
+            blue_totals[field] += getattr(rec, field, 0) or 0
+
+    return {
+        'player_name': roster_entry.player_name,
+        'jersey': _extract_jersey_number(roster_entry.player_name),
+        'practice_count': len(practice_ids),
+        'totals': numeric_fields,
+        'blue': blue_totals,
+        'extra': extra_averages,
+    }
+
+
+def _format_practice_stat_row(aggregates, field_keys, mode):
+    totals = aggregates['totals']
+    blue = aggregates['blue']
+    extras = aggregates['extra']
+    practice_count = aggregates['practice_count']
+
+    total_fg_makes = (
+        totals['atr_makes'] + totals['fg2_makes'] + totals['fg3_makes']
+    )
+    total_fg_attempts = (
+        totals['atr_attempts'] + totals['fg2_attempts'] + totals['fg3_attempts']
+    )
+
+    rows = {}
+
+    for key in field_keys:
+        if key == 'fg':
+            rows[key] = _format_shooting_split(
+                total_fg_makes, total_fg_attempts, mode, practice_count
+            )
+        elif key == 'fg3':
+            rows[key] = _format_shooting_split(
+                totals['fg3_makes'], totals['fg3_attempts'], mode, practice_count
+            )
+        elif key == 'ft':
+            rows[key] = _format_shooting_split(
+                totals['ftm'], totals['fta'], mode, practice_count
+            )
+        elif key == 'efg':
+            pct = _safe_div(
+                totals['atr_makes'] + totals['fg2_makes'] + 1.5 * totals['fg3_makes'],
+                total_fg_attempts,
+            )
+            rows[key] = _format_percent(pct * 100 if pct is not None else None)
+        elif key == 'reb':
+            value = blue['off_reb'] + blue['def_reb']
+            rows[key] = _format_count(value, mode, practice_count)
+        elif key == 'oreb':
+            rows[key] = _format_count(blue['off_reb'], mode, practice_count)
+        elif key == 'dreb':
+            rows[key] = _format_count(blue['def_reb'], mode, practice_count)
+        elif key == 'rd_crash_plus':
+            rows[key] = _format_count(totals['crash_positive'], mode, practice_count)
+        elif key == 'rd_crash_att':
+            attempts = totals['crash_positive'] + totals['crash_missed']
+            rows[key] = _format_count(attempts, mode, practice_count)
+        elif key == 'rd_crash_pct':
+            attempts = totals['crash_positive'] + totals['crash_missed']
+            pct = _safe_div(totals['crash_positive'], attempts)
+            rows[key] = _format_percent(pct * 100 if pct is not None else None)
+        elif key == 'rd_back_plus':
+            rows[key] = _format_count(totals['back_man_positive'], mode, practice_count)
+        elif key == 'rd_back_att':
+            attempts = totals['back_man_positive'] + totals['back_man_missed']
+            rows[key] = _format_count(attempts, mode, practice_count)
+        elif key == 'rd_back_pct':
+            attempts = totals['back_man_positive'] + totals['back_man_missed']
+            pct = _safe_div(totals['back_man_positive'], attempts)
+            rows[key] = _format_percent(pct * 100 if pct is not None else None)
+        elif key == 'rd_box_plus':
+            rows[key] = _format_count(totals['box_out_positive'], mode, practice_count)
+        elif key == 'rd_box_att':
+            attempts = totals['box_out_positive'] + totals['box_out_missed']
+            rows[key] = _format_count(attempts, mode, practice_count)
+        elif key == 'rd_box_pct':
+            attempts = totals['box_out_positive'] + totals['box_out_missed']
+            pct = _safe_div(totals['box_out_positive'], attempts)
+            rows[key] = _format_percent(pct * 100 if pct is not None else None)
+        elif key == 'rd_given_up':
+            rows[key] = _format_count(totals['off_reb_given_up'], mode, practice_count)
+        elif key == 'pts':
+            rows[key] = _format_count(totals['points'], mode, practice_count)
+        elif key == 'ast':
+            rows[key] = _format_count(totals['assists'], mode, practice_count)
+        elif key == 'to':
+            rows[key] = _format_count(totals['turnovers'], mode, practice_count)
+        elif key == 'stl':
+            rows[key] = _format_count(blue['steal'], mode, practice_count)
+        elif key == 'blk':
+            rows[key] = _format_count(blue['block'], mode, practice_count)
+        elif key == 'pf':
+            rows[key] = _format_count(totals['foul_by'], mode, practice_count)
+        elif key == 'ppp':
+            possessions = total_fg_attempts + totals['turnovers']
+            ratio = _safe_div(totals['points'], possessions)
+            rows[key] = _format_ratio(ratio, decimals=2)
+        elif key == 'atr':
+            ratio = _safe_div(totals['assists'], totals['turnovers'])
+            rows[key] = _format_ratio(ratio, decimals=2)
+        elif key == 'ft_rate':
+            ratio = _safe_div(totals['fta'], total_fg_attempts)
+            rows[key] = _format_ratio(ratio, decimals=2)
+        elif key == 'gs_pct':
+            if extras['good_shot_count']:
+                avg = extras['good_shot_sum'] / extras['good_shot_count']
+                rows[key] = _format_percent(avg)
+            else:
+                rows[key] = _format_percent(None)
+        elif key == 'oreb_pct':
+            if extras['oreb_pct_count']:
+                avg = extras['oreb_pct_sum'] / extras['oreb_pct_count']
+                rows[key] = _format_percent(avg)
+            else:
+                attempts = totals['crash_positive'] + totals['crash_missed']
+                pct = _safe_div(blue['off_reb'], attempts)
+                rows[key] = _format_percent(pct * 100 if pct is not None else None)
+        elif key == 'pps':
+            ratio = _safe_div(totals['points'], total_fg_attempts)
+            rows[key] = _format_ratio(ratio, decimals=2)
+        elif key == 'bcp_total':
+            rows[key] = _format_count(blue['total_blue_collar'], mode, practice_count)
+        elif key == 'deflections':
+            rows[key] = _format_count(blue['deflection'], mode, practice_count)
+        elif key == 'charges':
+            rows[key] = _format_count(blue['charge_taken'], mode, practice_count)
+        elif key == 'floor_dives':
+            rows[key] = _format_count(blue['floor_dive'], mode, practice_count)
+        elif key == 'loose_balls_won':
+            rows[key] = _format_count(blue['misc'], mode, practice_count)
+        elif key == 'tips':
+            rows[key] = _format_count(blue['reb_tip'], mode, practice_count)
+        elif key == 'steals_bc':
+            rows[key] = _format_count(blue['steal'], mode, practice_count)
+        elif key == 'blocks_bc':
+            rows[key] = _format_count(blue['block'], mode, practice_count)
+        else:
+            rows[key] = {'display': '—', 'data_value': None}
+
+    return rows
+
+
+def _build_practice_table_dataset(request_data):
+    player_ids = request_data.get('player_ids') or []
+    if not isinstance(player_ids, list):
+        player_ids = []
+
+    field_keys = request_data.get('fields') or []
+    if not isinstance(field_keys, list):
+        field_keys = []
+
+    mode = request_data.get('mode') or 'totals'
+    mode = mode if mode in {'totals', 'per_practice'} else 'totals'
+
+    date_from = _parse_iso_date(request_data.get('date_from'))
+    date_to = _parse_iso_date(request_data.get('date_to'))
+
+    catalog = _flatten_practice_field_catalog()
+    selected_fields = [key for key in field_keys if key in catalog]
+
+    roster_rows = []
+    if player_ids:
+        roster_rows = (
+            Roster.query.filter(Roster.id.in_(player_ids)).all()
+        )
+
+    roster_rows = sorted(
+        roster_rows,
+        key=lambda r: (
+            _extract_jersey_number(r.player_name) is None,
+            _extract_jersey_number(r.player_name) or 0,
+            r.player_name,
+        ),
+    )
+
+    rows = []
+
+    for roster_entry in roster_rows:
+        aggregates = _collect_player_practice_stats(
+            roster_entry,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+        row_display = {
+            'player': roster_entry.player_name,
+            'jersey': {
+                'display': str(aggregates['jersey']) if aggregates['jersey'] is not None else '—',
+                'data_value': aggregates['jersey'],
+            },
+            '_practice_count': aggregates['practice_count'],
+        }
+
+        if selected_fields:
+            field_values = _format_practice_stat_row(
+                aggregates,
+                selected_fields,
+                mode,
+            )
+            row_display.update(field_values)
+
+        rows.append(row_display)
+
+    columns = [
+        {'key': 'jersey', 'label': '#', 'format': 'text', 'sortable': True},
+        {'key': 'player', 'label': 'Player', 'format': 'text', 'sortable': True},
+    ]
+
+    for key in selected_fields:
+        entry = catalog[key]
+        column = {
+            'key': key,
+            'label': entry['label'],
+            'format': entry.get('format', 'count'),
+            'group': entry.get('group'),
+            'sortable': True,
+        }
+        columns.append(column)
+
+    return {'columns': columns, 'rows': rows}
+
+
+@admin_bp.route('/api/practice/table', methods=['POST'])
+@admin_required
+def practice_table_api():
+    data = request.get_json(silent=True) or {}
+    dataset = _build_practice_table_dataset(data)
+    return jsonify(dataset)
+
+
+@admin_bp.route('/admin/custom-stats/export/csv', methods=['POST'])
+@admin_required
+def export_custom_stats_csv():
+    data = request.get_json(silent=True) or {}
+    dataset = _build_practice_table_dataset(data)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    headers = [col['label'] for col in dataset['columns']]
+    writer.writerow(headers)
+
+    for row in dataset['rows']:
+        csv_row = []
+        for col in dataset['columns']:
+            key = col['key']
+            cell = row.get(key)
+            if isinstance(cell, Mapping):
+                display = cell.get('display', '')
+            else:
+                display = cell or ''
+            csv_row.append(display)
+        writer.writerow(csv_row)
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = 'attachment; filename=practice_custom_stats.csv'
+    return response
+
+
 @admin_bp.route('/api/presets', methods=['GET'])
 @admin_required
 def list_presets_api():
