@@ -7,6 +7,7 @@
   'use strict';
 
   const MAX_SAMPLE_ROWS = 10;
+  const MISSING_NUMERIC_SENTINEL = Number.NEGATIVE_INFINITY;
   const SORTABLE_HEADER_SELECTOR = 'th[data-sortable="true"]';
   const SR_MESSAGES = {
     asc: 'sorted ascending',
@@ -364,9 +365,23 @@
     return null;
   }
 
+  function isMissingNumericValue(value) {
+    if (value == null) {
+      return false;
+    }
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === 'na' || normalized === '-';
+  }
+
   function parseValueByType(value, type) {
     if (value === '') {
       return null;
+    }
+
+    if (type === 'number' || type === 'percent' || type === 'currency') {
+      if (isMissingNumericValue(value)) {
+        return MISSING_NUMERIC_SENTINEL;
+      }
     }
 
     switch (type) {
@@ -491,6 +506,10 @@
   function parseNumber(value) {
     if (value == null) {
       return null;
+    }
+
+    if (isMissingNumericValue(value)) {
+      return MISSING_NUMERIC_SENTINEL;
     }
 
     let sanitized = String(value).replace(/[\u00A0\s]/g, '').trim();
