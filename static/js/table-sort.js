@@ -247,6 +247,33 @@
       fragment.appendChild(item.row);
     });
     tbody.appendChild(fragment);
+
+    const updateRankings = () => {
+      let rankCounter = 0;
+      Array.from(tbody.rows).forEach((row) => {
+        if (row.hasAttribute('data-total')) {
+          return;
+        }
+
+        const rankCell = Array.from(row.cells).find((cell) => cell.getAttribute('data-key') === 'rank');
+        if (!rankCell) {
+          return;
+        }
+
+        const currentValue = (rankCell.getAttribute('data-value') || '').trim();
+        const currentText = (rankCell.textContent || '').trim();
+        if (currentValue === '' && currentText === '') {
+          return;
+        }
+
+        rankCounter += 1;
+        const newRank = String(rankCounter);
+        rankCell.textContent = newRank;
+        rankCell.setAttribute('data-value', newRank);
+      });
+    };
+
+    updateRankings();
   }
 
   function getCellValue(cell) {
