@@ -1,4 +1,5 @@
 {% extends 'admin/base.html' %}
+{% from 'macros/table.html' import render_table %}
 
 {% block page_controls %}
 <form method="get" class="mb-4 flex items-center gap-2">
@@ -15,37 +16,42 @@
 {% block content %}
   <h1 class="text-2xl font-bold mb-4">Players List</h1>
 
-  <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white dark:bg-gray-800">
-      <thead class="bg-gray-100 dark:bg-gray-700">
-        <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium uppercase">Player Name</th>
-          <th class="px-6 py-3 text-center text-xs font-medium uppercase">Action</th>
-        </tr>
-      </thead>
-      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200">
-        {% for player in players %}
-          <tr>
-            <td class="px-6 py-4">{{ player }}</td>
-            <td class="px-6 py-4 text-center">
-              <a
-                href="{{ url_for('admin.player_detail',
-                                 player_name=player,
-                                 season_id=selected_season) }}"
-                class="text-blue-600 hover:underline"
-              >
-                View Player
-              </a>
-            </td>
-          </tr>
-        {% else %}
-          <tr>
-            <td colspan="2" class="px-6 py-4 text-center">No players found for this season.</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% set columns = [
+    {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left'},
+    {'key': 'actions', 'label': 'Actions', 'sortable': False, 'align': 'center', 'width': 'w-28'}
+  ] %}
+
+  {% set table_rows = namespace(items=[]) %}
+  {% for player in players %}
+    {% set actions %}
+      <a
+        href="{{ url_for('admin.player_detail', player_name=player, season_id=selected_season) }}"
+        class="text-blue-600 hover:underline"
+      >
+        View Player
+      </a>
+    {% endset %}
+    {% set table_rows.items = table_rows.items + [{
+      'player': player,
+      'actions': actions | safe
+    }] %}
+  {% endfor %}
+
+  {{ render_table(
+    id='admin-players',
+    columns=columns,
+    rows=table_rows.items,
+    totals=None,
+    dense=True,
+    sticky_header=True,
+    caption='Players List'
+  ) }}
+
+  {% if players|length == 0 %}
+    <div class="table-empty text-center text-sm text-gray-600 dark:text-gray-300 mt-3">
+      No players found for this season.
+    </div>
+  {% endif %}
 
   {% if selected_season %}
     <div class="mt-4 text-right">
