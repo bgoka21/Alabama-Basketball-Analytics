@@ -22,46 +22,162 @@
         <caption class="sr-only">{{ caption }}</caption>
         {%- endif %}
         {%- set thead_classes = 'bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700' -%}
+        {%- set sticky_header_class = ' sticky top-0 z-10 bg-gray-50 dark:bg-gray-800/60' if sticky_header else '' -%}
         <thead class="{{ thead_classes }}{% if sticky_header %} sticky top-0 z-10{% endif %}">
-          <tr>
-            {%- for col in columns %}
-              {%- set align = col.align | default('left') -%}
-              {%- set align_class = {
-                'left': 'text-left',
-                'right': 'text-right',
-                'center': 'text-center'
-              }[align] -%}
-              {%- set justify_class = {
-                'left': 'justify-start',
-                'right': 'justify-end',
-                'center': 'justify-center'
-              }[align] -%}
-              {%- set width_class = col.width if col.width is defined and col.width else '' -%}
-              {%- set sticky_class = ' sticky top-0 z-10 bg-gray-50 dark:bg-gray-800/60' if sticky_header else '' -%}
-              {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_class -%}
-              {%- if col.sortable -%}
-                {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
-              {%- endif -%}
-              <th scope="col"
-                  class="{{ th_base_classes }} {{ width_class }}"
-                  data-sortable="{{ 'true' if col.sortable else 'false' }}"
-                  data-key="{{ col.key }}"
-                  aria-sort="none">
-                {%- if col.sortable -%}
-                  <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
-                          aria-label="Sort by {{ col.label }}">
-                    <span>{{ col.label | safe }}</span>
-                    <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
-                  </button>
+          {%- set grouped_columns = columns | selectattr('group', 'defined') | selectattr('group') | list -%}
+          {%- set has_groups = grouped_columns | length > 0 -%}
+          {%- if has_groups -%}
+            {%- set header_state = namespace(items=[], current_label=None, current_span=0) -%}
+            {%- for col in columns -%}
+              {%- set group = col.group if col.group is defined else none -%}
+              {%- if group -%}
+                {%- if header_state.current_label == group -%}
+                  {%- set header_state.current_span = header_state.current_span + 1 -%}
                 {%- else -%}
-                  <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
-                    <span>{{ col.label | safe }}</span>
-                    <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
-                  </div>
+                  {%- if header_state.current_span > 0 -%}
+                    {%- set header_state.items = header_state.items + [{'type': 'group', 'label': header_state.current_label, 'span': header_state.current_span}] -%}
+                  {%- endif -%}
+                  {%- set header_state.current_label = group -%}
+                  {%- set header_state.current_span = 1 -%}
                 {%- endif -%}
-              </th>
-            {%- endfor %}
-          </tr>
+              {%- else -%}
+                {%- if header_state.current_span > 0 -%}
+                  {%- set header_state.items = header_state.items + [{'type': 'group', 'label': header_state.current_label, 'span': header_state.current_span}] -%}
+                  {%- set header_state.current_label = None -%}
+                  {%- set header_state.current_span = 0 -%}
+                {%- endif -%}
+                {%- set header_state.items = header_state.items + [{'type': 'standalone', 'column': col}] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if header_state.current_span > 0 -%}
+              {%- set header_state.items = header_state.items + [{'type': 'group', 'label': header_state.current_label, 'span': header_state.current_span}] -%}
+            {%- endif -%}
+            {%- set header_groups = header_state.items -%}
+            <tr>
+              {%- for item in header_groups -%}
+                {%- if item.type == 'group' -%}
+                  {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
+                  <th scope="col" colspan="{{ item.span }}" class="{{ group_th_classes }}">
+                    {{ item.label }}
+                  </th>
+                {%- else -%}
+                  {%- set col = item.column -%}
+                  {%- set align = col.align | default('left') -%}
+                  {%- set align_class = {
+                    'left': 'text-left',
+                    'right': 'text-right',
+                    'center': 'text-center'
+                  }[align] -%}
+                  {%- set justify_class = {
+                    'left': 'justify-start',
+                    'right': 'justify-end',
+                    'center': 'justify-center'
+                  }[align] -%}
+                  {%- set width_class = col.width if col.width is defined and col.width else '' -%}
+                  {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                  {%- if col.sortable -%}
+                    {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
+                  {%- endif -%}
+                  <th scope="col"
+                      class="{{ th_base_classes }} {{ width_class }}"
+                      data-sortable="{{ 'true' if col.sortable else 'false' }}"
+                      data-key="{{ col.key }}"
+                      aria-sort="none"
+                      rowspan="2">
+                    {%- if col.sortable -%}
+                      <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                              aria-label="Sort by {{ col.label }}">
+                        <span>{{ col.label | safe }}</span>
+                        <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                      </button>
+                    {%- else -%}
+                      <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                        <span>{{ col.label | safe }}</span>
+                        <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
+                      </div>
+                    {%- endif -%}
+                  </th>
+                {%- endif -%}
+              {%- endfor %}
+            </tr>
+            <tr>
+              {%- for col in columns if col.group is defined and col.group -%}
+                {%- set align = col.align | default('left') -%}
+                {%- set align_class = {
+                  'left': 'text-left',
+                  'right': 'text-right',
+                  'center': 'text-center'
+                }[align] -%}
+                {%- set justify_class = {
+                  'left': 'justify-start',
+                  'right': 'justify-end',
+                  'center': 'justify-center'
+                }[align] -%}
+                {%- set width_class = col.width if col.width is defined and col.width else '' -%}
+                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                {%- if col.sortable -%}
+                  {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
+                {%- endif -%}
+                <th scope="col"
+                    class="{{ th_base_classes }} {{ width_class }}"
+                    data-sortable="{{ 'true' if col.sortable else 'false' }}"
+                    data-key="{{ col.key }}"
+                    aria-sort="none">
+                  {%- if col.sortable -%}
+                    <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                            aria-label="Sort by {{ col.label }}">
+                      <span>{{ col.label | safe }}</span>
+                      <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                    </button>
+                  {%- else -%}
+                    <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                      <span>{{ col.label | safe }}</span>
+                      <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
+                    </div>
+                  {%- endif -%}
+                </th>
+              {%- endfor %}
+            </tr>
+          {%- else -%}
+            <tr>
+              {%- for col in columns %}
+                {%- set align = col.align | default('left') -%}
+                {%- set align_class = {
+                  'left': 'text-left',
+                  'right': 'text-right',
+                  'center': 'text-center'
+                }[align] -%}
+                {%- set justify_class = {
+                  'left': 'justify-start',
+                  'right': 'justify-end',
+                  'center': 'justify-center'
+                }[align] -%}
+                {%- set width_class = col.width if col.width is defined and col.width else '' -%}
+                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                {%- if col.sortable -%}
+                  {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
+                {%- endif -%}
+                <th scope="col"
+                    class="{{ th_base_classes }} {{ width_class }}"
+                    data-sortable="{{ 'true' if col.sortable else 'false' }}"
+                    data-key="{{ col.key }}"
+                    aria-sort="none">
+                  {%- if col.sortable -%}
+                    <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                            aria-label="Sort by {{ col.label }}">
+                      <span>{{ col.label | safe }}</span>
+                      <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                    </button>
+                  {%- else -%}
+                    <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                      <span>{{ col.label | safe }}</span>
+                      <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
+                    </div>
+                  {%- endif -%}
+                </th>
+              {%- endfor %}
+            </tr>
+          {%- endif -%}
         </thead>
         <tbody>
           {%- for row in rows %}
