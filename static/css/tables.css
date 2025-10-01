@@ -58,6 +58,13 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
   font-variant-numeric: tabular-nums;
 }
 
+/* Fallback emphasis for percentage columns */
+.unified-table td[data-key*='pct'],
+.unified-table tfoot td[data-key*='pct'],
+.unified-table tfoot th[data-key*='pct'] {
+  font-weight: 600;
+}
+
 /* Sticky header support (used when macro passes sticky_header=True) */
 .unified-table.thead-sticky thead th {
   position: sticky;

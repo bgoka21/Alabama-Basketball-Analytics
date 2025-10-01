@@ -190,6 +190,7 @@
                 'center': 'text-center'
               }[align] -%}
               {%- set numeric_class = ' text-right tabular-nums' if align == 'right' else '' -%}
+              {%- set cell_class = col.cell_class if col.cell_class is defined and col.cell_class else '' -%}
               {%- set cell_value = row.get(col.key) if row is mapping else row | attr(col.key) -%}
               {%- set data_value = '' -%}
               {%- if cell_value is mapping and cell_value.display is defined -%}
@@ -213,7 +214,8 @@
               {%- if data_value is undefined or data_value is none -%}
                 {%- set data_value = '' -%}
               {%- endif -%}
-              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}" data-key="{{ col.key }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>{{ display_value | trim }}</td>
+              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}{% if cell_class %} {{ cell_class }}{% endif %}"
+                  data-key="{{ col.key }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>{{ display_value | trim }}</td>
             {%- endfor %}
           </tr>
           {%- endfor %}
@@ -229,13 +231,14 @@
                 'center': 'text-center'
               }[align] -%}
               {%- set numeric_class = ' text-right tabular-nums' if align == 'right' else '' -%}
+              {%- set cell_class = col.cell_class if col.cell_class is defined and col.cell_class else '' -%}
               {%- set total_value = totals.get(col.key) -%}
               {%- if loop.first -%}
-                <th scope="row" class="{{ padding_class }} {{ align_class }}{{ numeric_class }}">
+                <th scope="row" class="{{ padding_class }} {{ align_class }}{{ numeric_class }}{% if cell_class %} {{ cell_class }}{% endif %}">
                   {{ total_value if total_value is not none and total_value != '' else 'Totals' }}
                 </th>
               {%- else -%}
-                <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}">
+                <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}{% if cell_class %} {{ cell_class }}{% endif %}">
                   {{ total_value if total_value is not none else '' }}
                 </td>
               {%- endif -%}
