@@ -11,7 +11,8 @@
   {%- set container_classes = 'rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden' -%}
   {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
   <div class="{{ container_classes }}">
-    <div class="overflow-x-auto">
+    <div class="table-card-accent" aria-hidden="true"></div>
+    <div class="overflow-x-auto table-card-body">
       {%- set table_classes = 'min-w-full text-sm table-auto unified-table' -%}
       {%- if sticky_header -%}
         {%- set table_classes = table_classes ~ ' thead-sticky' -%}
