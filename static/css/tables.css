@@ -15,6 +15,20 @@
   --tbl-text:      #E5E7EB;            /* gray-200 */
 }
 
+.table-card-accent {
+  height: 0.375rem; /* ~6px strip */
+  background: #9E1B32;
+  flex-shrink: 0;
+}
+
+.dark .table-card-accent {
+  background: #9E1B32;
+}
+
+.table-card-accent + .table-card-body {
+  margin-top: 0;
+}
+
 /* === Base polish (non-invasive; works with Tailwind classes) ========= */
 /* Only target unified tables; never touch Shot Type tables */
 table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
@@ -121,6 +135,9 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
     border-color: #000 !important;
   }
   .unified-table { box-shadow: none !important; }
+  .table-card-accent {
+    display: none;
+  }
 }
 /* ===== Leaderboard legacy aliases -> match unified-table look =================
    This lets old markup (.table-wrap + .table-leaderboard) visually match the
