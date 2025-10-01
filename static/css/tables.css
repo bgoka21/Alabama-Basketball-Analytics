@@ -1,0 +1,124 @@
+/* === Unified Tables: Light/Dark tokens =============================== */
+:root {
+  /* Brand accent for focus rings */
+  --brand: #9E1B32; /* Crimson */
+  /* Neutral tokens for tables */
+  --tbl-header-bg: #F9FAFB;   /* gray-50 */
+  --tbl-border:    #E5E7EB;   /* gray-200 */
+  --tbl-hover:     #F3F4F6;   /* gray-100 */
+  --tbl-text:      #374151;   /* gray-700 */
+}
+.dark :root, .dark {
+  --tbl-header-bg: rgba(31,41,55,0.6); /* gray-800/60 */
+  --tbl-border:    #374151;            /* gray-700 */
+  --tbl-hover:     rgba(55,65,81,0.6); /* gray-700/60 */
+  --tbl-text:      #E5E7EB;            /* gray-200 */
+}
+
+/* === Base polish (non-invasive; works with Tailwind classes) ========= */
+/* Only target unified tables; never touch Shot Type tables */
+table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
+
+.unified-table thead th {
+  background: var(--tbl-header-bg);
+  color: var(--tbl-text);
+  border-bottom: 1px solid var(--tbl-border);
+  user-select: none;
+}
+
+.unified-table tbody tr:nth-child(even) { /* stripe */
+  background: #F9FAFB;
+}
+.dark .unified-table tbody tr:nth-child(even) {
+  background: #1F2937; /* gray-800 */
+}
+.unified-table tbody tr:hover {
+  background: var(--tbl-hover);
+}
+
+/* Numeric helpers (extra safety even if Tailwind classes are present) */
+.unified-table td[data-align="right"],
+.unified-table th[data-align="right"],
+.unified-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sticky header support (used when macro passes sticky_header=True) */
+.unified-table.thead-sticky thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* === Sorting carets & header states ================================== */
+/* Sortable headers: pointer & focus-visible ring */
+.unified-table th[data-sortable="true"],
+.unified-table th[data-sortable="true"] > button {
+  cursor: pointer;
+}
+
+/* Focus outlines (keyboard a11y) */
+.unified-table th[data-sortable="true"]:focus-visible,
+.unified-table th[data-sortable="true"] > button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: .25rem;
+}
+
+/* Caret element provided by the macro: .sort-caret */
+.unified-table th .sort-caret {
+  opacity: 0;
+  transition: opacity .15s ease, transform .15s ease;
+  display: inline-block;
+  margin-left: .25rem;
+  line-height: 1;
+}
+
+/* Default symbol; JS toggles header classes below */
+.unified-table th .sort-caret::before {
+  content: '↕';
+  font-size: .8em;
+}
+
+/* Make caret visible on hover/focus for sortable columns */
+.unified-table th[data-sortable="true"]:hover .sort-caret,
+.unified-table th[data-sortable="true"]:focus-within .sort-caret {
+  opacity: 1;
+}
+
+/* Active sort states (toggled by JS in Prompt 2) */
+.unified-table th.is-sorted-asc .sort-caret { opacity: 1; transform: rotate(180deg); }
+.unified-table th.is-sorted-asc .sort-caret::before { content: '▲'; }
+
+.unified-table th.is-sorted-desc .sort-caret { opacity: 1; transform: rotate(0deg); }
+.unified-table th.is-sorted-desc .sort-caret::before { content: '▼'; }
+
+/* Reset non-active headers to unsorted */
+.unified-table th[aria-sort="none"] .sort-caret::before { content: '↕'; }
+
+/* === Totals row emphasis ============================================= */
+.unified-table tfoot tr,
+.unified-table tr[data-row="totals"] {
+  background: var(--tbl-header-bg);
+  border-top: 1px solid var(--tbl-border);
+  font-weight: 600;
+}
+
+/* === Empty/loading states (optional utility classes) ================== */
+.table-empty {
+  padding: 1rem;
+  text-align: center;
+  color: #6B7280; /* gray-500 */
+}
+.dark .table-empty { color: #9CA3AF; /* gray-400 */ }
+
+/* === Print-friendly tweaks =========================================== */
+@media print {
+  .unified-table thead th {
+    background: #ffffff !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+  .unified-table { box-shadow: none !important; }
+}
