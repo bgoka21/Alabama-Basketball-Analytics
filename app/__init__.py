@@ -50,7 +50,12 @@ except ImportError:
 
 
 def create_app():
-    app = Flask(__name__)
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    app = Flask(
+        __name__,
+        static_folder=os.path.join(repo_root, 'static'),
+        template_folder=os.path.join(repo_root, 'templates'),
+    )
 
     # Allow JSON serialization of SimpleNamespace objects
     from types import SimpleNamespace
@@ -68,7 +73,7 @@ def create_app():
     app.config['SYNERGY_CLIENT_SECRET'] = os.environ.get('SYNERGY_CLIENT_SECRET', '0vBg4oX7mqNx')
 
     # Database path setup
-    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    basedir = repo_root
     instance_path = os.path.join(basedir, 'instance')
     db_path = os.path.join(instance_path, 'database.db')
     if not os.path.exists(instance_path):
