@@ -1,0 +1,128 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+  <div class="flex flex-col gap-4">
+    <h1 class="text-2xl font-bold text-gray-900">Custom Stats Table (Practice)</h1>
+    <p class="text-sm text-gray-600">Build a practice stats view on the fly. Pick players, dates, and fields, then let the table refresh automatically as you tweak the configuration.</p>
+  </div>
+
+  <div class="grid gap-6 xl:grid-cols-3">
+    <div class="xl:col-span-2 space-y-6">
+      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div class="border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-[#9E1B32]">Roster &amp; Range</h2>
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <label for="custom-auto-refresh" class="font-medium">Auto-refresh</label>
+            <input id="custom-auto-refresh" type="checkbox" class="h-4 w-4 text-[#9E1B32] border-gray-300 rounded" checked />
+          </div>
+        </div>
+        <div class="px-5 py-4 space-y-5">
+          <div>
+            <label for="custom-player-select" class="block text-sm font-semibold text-gray-700">Players</label>
+            <div id="custom-player-select" class="mt-2"></div>
+            <p class="mt-2 text-xs text-gray-500">Search roster names to add multiple players. The table combines everyone you pick.</p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="custom-date-from" class="block text-sm font-semibold text-gray-700">From</label>
+              <input id="custom-date-from" type="date" class="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
+            </div>
+            <div>
+              <label for="custom-date-to" class="block text-sm font-semibold text-gray-700">To</label>
+              <input id="custom-date-to" type="date" class="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
+            </div>
+          </div>
+          <div>
+            <span class="block text-sm font-semibold text-gray-700">Totals vs. Per Practice</span>
+            <div id="custom-mode-toggle" class="mt-2 inline-flex rounded-md border border-gray-300 bg-gray-50 text-sm overflow-hidden">
+              <button type="button" data-mode="totals" class="mode-pill active px-4 py-2 font-medium text-white bg-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Totals</button>
+              <button type="button" data-mode="per_practice" class="mode-pill px-4 py-2 font-medium text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Per Practice</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div class="border-b border-gray-200 px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="text-lg font-semibold text-[#9E1B32]">Presets</h2>
+          <div class="flex items-center gap-2 text-sm">
+            <input id="preset-name" type="text" placeholder="Preset name" class="hidden sm:block rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
+            <button type="button" id="save-preset" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-white px-4 py-2 font-semibold text-[#9E1B32] shadow-sm hover:bg-[#9E1B32] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Save Preset</button>
+          </div>
+        </div>
+        <div class="px-5 py-4 space-y-6 text-sm text-gray-700">
+          <p class="text-xs text-gray-500">Presets are shared with the team. Only the creator can edit or delete their own. Loading a preset adds its fields to your current list instead of clearing it.</p>
+          <div class="grid gap-5 md:grid-cols-2">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">Team Presets</h3>
+              <div id="team-preset-list" class="mt-3 space-y-2">
+                <p class="text-xs text-gray-500">No presets yet. Saved team presets will appear here.</p>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">My Presets</h3>
+              <div id="private-preset-list" class="mt-3 space-y-2">
+                <p class="text-xs text-gray-500">Create a preset to reuse your favorite stat combinations.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="xl:col-span-1">
+      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div class="border-b border-gray-200 px-5 py-4">
+          <h2 class="text-lg font-semibold text-[#9E1B32]">Stat Picker</h2>
+          <p class="mt-1 text-xs text-gray-500">Search for fields or expand a group to add them to the table.</p>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+          <div>
+            <label for="stat-search" class="block text-sm font-semibold text-gray-700">Search</label>
+            <input id="stat-search" type="search" placeholder="Find a stat" class="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
+          </div>
+          <div id="stat-groups" class="space-y-3">
+            <p class="text-xs text-gray-500">Loading stat catalog…</p>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="sticky top-0 z-30 space-y-0">
+    <div class="rounded-xl border border-gray-200 bg-white/95 backdrop-blur px-5 py-3 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="text-sm font-medium text-gray-700">Use the buttons to export your current view.</div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" id="export-csv" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-[#9E1B32] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#7b1427] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Export CSV</button>
+        <button type="button" id="export-png" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-white px-4 py-2 text-sm font-semibold text-[#9E1B32] shadow-sm hover:bg-[#9E1B32] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Export PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="custom-table-container" class="space-y-4">
+    <div class="rounded-xl border border-dashed border-gray-300 px-6 py-12 text-center text-sm text-gray-500">
+      Choose players and fields to generate a table.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="/static/js/custom_stats.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof initCustomStatsPage === 'function') {
+        initCustomStatsPage({
+          fieldsUrl: '/api/practice/fields',
+          dataUrl: '/admin/custom-stats/table-partial',
+          presetsUrl: '/api/presets',
+          exportCsvUrl: '/admin/custom-stats/export/csv'
+        });
+      } else {
+        console.warn('initCustomStatsPage is not defined. Make sure custom_stats.js is loaded.');
+      }
+    });
+  </script>
+{% endblock %}
