@@ -1,4 +1,5 @@
 {% extends 'admin/base.html' %}
+{% from 'macros/table.html' import render_table %}
 
 {% block page_controls %}
 <form method="get" class="mb-4 flex items-center gap-2">
@@ -13,49 +14,68 @@
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">Usage Report</h1>
 
+{% set user_columns = [
+  {'key': 'user', 'label': 'User', 'sortable': True, 'align': 'left'},
+  {'key': 'views', 'label': 'Views', 'sortable': True, 'align': 'right', 'value_key': 'views_raw'}
+] %}
+
+{% set user_rows = namespace(items=[]) %}
+{% for uid, username, count in user_stats %}
+  {% if uid %}
+    {% set user_cell %}
+      <a href="{{ url_for('admin.user_usage_report', user_id=uid) }}" class="text-blue-600 hover:underline">{{ username }}</a>
+    {% endset %}
+  {% else %}
+    {% set user_cell %}Anonymous{% endset %}
+  {% endif %}
+  {% set user_rows.items = user_rows.items + [{
+    'user': user_cell | safe,
+    'views': count,
+    'views_raw': count
+  }] %}
+{% endfor %}
+
 <h2 class="text-xl font-semibold mt-4 mb-2">Views by User</h2>
-<div class="overflow-x-auto mb-6">
-  <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-4 py-2 text-left">Username</th>
-        <th class="px-4 py-2">Views</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for uid, username, count in user_stats %}
-      <tr>
-        <td class="px-4 py-2">
-          {% if uid %}
-          <a href="{{ url_for('admin.user_usage_report', user_id=uid) }}" class="text-blue-600 hover:underline">{{ username }}</a>
-          {% else %}
-          Anonymous
-          {% endif %}
-        </td>
-        <td class="px-4 py-2 text-center">{{ count }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+{{ render_table(
+  id='usage-by-user',
+  columns=user_columns,
+  rows=user_rows.items,
+  totals=None,
+  dense=True,
+  sticky_header=True,
+  caption='Usage views by user'
+) }}
+
+{% if user_rows.items | length == 0 %}
+  <div class="table-empty text-center text-sm text-gray-600 dark:text-gray-300 mt-3">No usage recorded for users.</div>
+{% endif %}
+
+{% set page_columns = [
+  {'key': 'endpoint', 'label': 'Endpoint', 'sortable': True, 'align': 'left'},
+  {'key': 'views', 'label': 'Views', 'sortable': True, 'align': 'right', 'value_key': 'views_raw'}
+] %}
+
+{% set page_rows = namespace(items=[]) %}
+{% for ep, count in page_stats %}
+  {% set page_rows.items = page_rows.items + [{
+    'endpoint': ep,
+    'views': count,
+    'views_raw': count
+  }] %}
+{% endfor %}
 
 <h2 class="text-xl font-semibold mt-4 mb-2">Views by Page</h2>
-<div class="overflow-x-auto">
-  <table class="min-w-full divide-y divide-gray-200 shadow rounded-lg bg-white">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-4 py-2 text-left">Endpoint</th>
-        <th class="px-4 py-2">Views</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for ep, count in page_stats %}
-      <tr>
-        <td class="px-4 py-2">{{ ep }}</td>
-        <td class="px-4 py-2 text-center">{{ count }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+{{ render_table(
+  id='usage-by-page',
+  columns=page_columns,
+  rows=page_rows.items,
+  totals=None,
+  dense=True,
+  sticky_header=True,
+  caption='Usage views by page'
+) }}
+
+{% if page_rows.items | length == 0 %}
+  <div class="table-empty text-center text-sm text-gray-600 dark:text-gray-300 mt-3">No page views recorded.</div>
+{% endif %}
 {% endblock %}

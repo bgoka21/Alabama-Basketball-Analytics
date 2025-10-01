@@ -1,4 +1,5 @@
 {% extends 'admin/base.html' %}
+{% from 'macros/table.html' import render_table %}
 
 {% block content %}
   <div class="flex justify-between items-center mb-6">
@@ -14,41 +15,52 @@
     + Add New User
   </a>
 
-  <div class="overflow-x-auto">
-    <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow">
-      <thead>
-        <tr class="bg-gray-100 dark:bg-gray-700 text-left">
-          <th class="px-4 py-2">Username</th>
-          <th class="px-4 py-2">Role</th>
-          <th class="px-4 py-2">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in users %}
-        <tr class="border-b dark:border-gray-700">
-          <td class="px-4 py-2">{{ user.username }}</td>
-          <td class="px-4 py-2">
-            {% if user.is_admin %}
-              Admin
-            {% elif user.is_player %}
-              Player ({{ user.player_name }})
-            {% else %}
-              User
-            {% endif %}
-          </td>
-          <td class="px-4 py-2 space-x-2">
-            <a href="{{ url_for('admin.edit_user', user_id=user.id) }}"
-               class="text-blue-600 hover:underline">Edit</a>
-            <form action="{{ url_for('admin.delete_user', user_id=user.id) }}"
-                  method="POST"
-                  class="inline-block"
-                  onsubmit="return confirm('Delete {{ user.username }}?');">
-              <button type="submit" class="text-red-600 hover:underline">Delete</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% set columns = [
+    {'key': 'username', 'label': 'User', 'sortable': True, 'align': 'left'},
+    {'key': 'role', 'label': 'Role', 'sortable': True, 'align': 'left'},
+    {'key': 'actions', 'label': 'Actions', 'sortable': False, 'align': 'center', 'width': 'w-32'}
+  ] %}
+
+  {% set table_rows = namespace(items=[]) %}
+  {% for user in users %}
+    {% if user.is_admin %}
+      {% set role = 'Admin' %}
+    {% elif user.is_player %}
+      {% set role = 'Player (' ~ user.player_name ~ ')' %}
+    {% else %}
+      {% set role = 'User' %}
+    {% endif %}
+
+    {% set actions %}
+      <div class="flex items-center justify-center gap-2">
+        <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" class="text-blue-600 hover:underline">Edit</a>
+        <form action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+              method="POST"
+              class="inline-block"
+              onsubmit="return confirm('Delete {{ user.username }}?');">
+          <button type="submit" class="text-red-600 hover:underline">Delete</button>
+        </form>
+      </div>
+    {% endset %}
+
+    {% set table_rows.items = table_rows.items + [{
+      'username': user.username,
+      'role': role,
+      'actions': actions | safe
+    }] %}
+  {% endfor %}
+
+  {{ render_table(
+    id='admin-users',
+    columns=columns,
+    rows=table_rows.items,
+    totals=None,
+    dense=True,
+    sticky_header=True,
+    caption='User Management'
+  ) }}
+
+  {% if users|length == 0 %}
+    <div class="table-empty text-center text-sm text-gray-600 dark:text-gray-300 mt-3">No users found.</div>
+  {% endif %}
 {% endblock %}

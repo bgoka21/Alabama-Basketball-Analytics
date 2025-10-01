@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from 'macros/table.html' import render_table %}
 
 {% block page_controls %}
 <form method="get" class="mb-4 flex items-center gap-2">
@@ -84,61 +85,49 @@
 
 
 <!-- Display List of Uploaded Files -->
-<div class="overflow-x-auto">
-  <table class="min-w-full border text-sm">
-    <thead class="bg-[#9E1B32] text-white">
-      <tr>
-        <th class="px-4 py-2 text-left">Filename</th>
-        <th class="px-4 py-2 text-left">Category</th>
-        <th class="px-4 py-2 text-left">Status</th>
-        <th class="px-4 py-2 text-left">Last Parsed</th>
-        <th class="px-4 py-2 text-left">Actions</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-200">
-      {% for f in uploaded_files %}
-      <tr class="bg-white">
-        <td class="px-4 py-2">{{ f.filename }}</td>
-        <td class="px-4 py-2">{{ f.category }}</td>
-        <td class="px-4 py-2">{{ f.parse_status }}</td>
-        <td class="px-4 py-2">
-          {% if f.last_parsed %}
-            {{ f.last_parsed }}
-          {% else %}
-            Not Parsed
-          {% endif %}
-        </td>
-        <td class="px-4 py-2 space-x-2">
-          <form
-          action="{{ url_for('admin.parse_file', file_id=f.id) }}"
-          method="post"
-          class="inline"
-        >
-          {% if f.category in ['Summer Workouts','Pickup','Fall Workouts','Official Practice'] %}
-            <button
-              type="submit"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-            >
-              {% if f.parse_status == 'Parsed Successfully' %}
-                View Practice
-              {% else %}
-                Parse Practice
-              {% endif %}
-            </button>
-          {% else %}
-            <button
-              type="submit"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-            >
-              {% if f.parse_status == 'Parsed Successfully' %}
-                View Game
-              {% else %}
-                Parse Game
-              {% endif %}
+{% set columns = [
+  {'key': 'filename', 'label': 'Filename', 'sortable': True, 'align': 'left'},
+  {'key': 'category', 'label': 'Category', 'sortable': True, 'align': 'left'},
+  {'key': 'status', 'label': 'Status', 'sortable': True, 'align': 'left'},
+  {'key': 'last_parsed', 'label': 'Last Parsed', 'sortable': True, 'align': 'left', 'value_key': 'last_parsed_raw'},
+  {'key': 'actions', 'label': 'Actions', 'sortable': False, 'align': 'left', 'width': 'w-72'}
+] %}
+
+{% set table_rows = namespace(items=[]) %}
+{% for f in uploaded_files %}
+  {% set last_parsed_display = f.last_parsed if f.last_parsed else 'Not Parsed' %}
+  {% set actions %}
+    <div class="flex flex-wrap items-center gap-2">
+      <form
+        action="{{ url_for('admin.parse_file', file_id=f.id) }}"
+        method="post"
+        class="inline"
+      >
+        {% if f.category in ['Summer Workouts','Pickup','Fall Workouts','Official Practice'] %}
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+          >
+            {% if f.parse_status == 'Parsed Successfully' %}
+              View Practice
+            {% else %}
+              Parse Practice
+            {% endif %}
           </button>
-          {% endif %}
-        </form>
-        {% if f.parse_status == 'Parsed Successfully' %}
+        {% else %}
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+          >
+            {% if f.parse_status == 'Parsed Successfully' %}
+              View Game
+            {% else %}
+              Parse Game
+            {% endif %}
+          </button>
+        {% endif %}
+      </form>
+      {% if f.parse_status == 'Parsed Successfully' %}
         <form
           action="{{ url_for('admin.reparse_file', file_id=f.id) }}"
           method="post"
@@ -151,45 +140,65 @@
             Re-Parse
           </button>
         </form>
-        {% endif %}
-        <a
-          href="{{ url_for('admin.view_logs', file_id=f.id) }}"
-          class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm"
+      {% endif %}
+      <a
+        href="{{ url_for('admin.view_logs', file_id=f.id) }}"
+        class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm"
+      >
+        Logs
+      </a>
+      <form
+        action="{{ url_for('admin.delete_data', file_id=f.id) }}"
+        method="post"
+        class="inline"
+      >
+        <button
+          type="submit"
+          onclick="return confirm('Delete parsed data for this file?')"
+          class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm"
         >
-            Logs
-          </a>
-          <form
-            action="{{ url_for('admin.delete_data', file_id=f.id) }}"
-            method="post"
-            class="inline"
-          >
-            <button
-              type="submit"
-              onclick="return confirm('Delete parsed data for this file?')"
-              class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm"
-            >
-              Delete Data
-            </button>
-          </form>
-          <form
-            action="{{ url_for('admin.delete_file', file_id=f.id) }}"
-            method="post"
-            class="inline"
-          >
-            <button
-              type="submit"
-              onclick="return confirm('Delete this file?')"
-              class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-            >
-              Delete
-            </button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+          Delete Data
+        </button>
+      </form>
+      <form
+        action="{{ url_for('admin.delete_file', file_id=f.id) }}"
+        method="post"
+        class="inline"
+      >
+        <button
+          type="submit"
+          onclick="return confirm('Delete this file?')"
+          class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+        >
+          Delete
+        </button>
+      </form>
+    </div>
+  {% endset %}
+
+  {% set table_rows.items = table_rows.items + [{
+    'filename': f.filename,
+    'category': f.category,
+    'status': f.parse_status,
+    'last_parsed': last_parsed_display,
+    'last_parsed_raw': f.last_parsed if f.last_parsed else '',
+    'actions': actions | safe
+  }] %}
+{% endfor %}
+
+{{ render_table(
+  id='admin-uploaded-files',
+  columns=columns,
+  rows=table_rows.items,
+  totals=None,
+  dense=True,
+  sticky_header=True,
+  caption='Uploaded files'
+) }}
+
+{% if table_rows.items | length == 0 %}
+  <div class="table-empty text-center text-sm text-gray-600 dark:text-gray-300 mt-3">No files uploaded yet.</div>
+{% endif %}
 
 </div>
 <script>

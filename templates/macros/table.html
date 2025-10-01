@@ -11,7 +11,11 @@
   {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
   <div class="{{ container_classes }}">
     <div class="overflow-x-auto">
-      <table id="{{ id }}" role="table" class="min-w-full text-sm table-auto">
+      {%- set table_classes = 'min-w-full text-sm table-auto unified-table' -%}
+      {%- if sticky_header -%}
+        {%- set table_classes = table_classes ~ ' thead-sticky' -%}
+      {%- endif -%}
+      <table id="{{ id }}" role="table" class="{{ table_classes }}">
         {%- if caption %}
         <caption class="sr-only">{{ caption }}</caption>
         {%- endif %}
@@ -33,22 +37,24 @@
               {%- set width_class = col.width if col.width is defined and col.width else '' -%}
               {%- set sticky_class = ' sticky top-0 z-10 bg-gray-50 dark:bg-gray-800/60' if sticky_header else '' -%}
               {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_class -%}
+              {%- if col.sortable -%}
+                {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
+              {%- endif -%}
               <th scope="col"
                   class="{{ th_base_classes }} {{ width_class }}"
                   data-sortable="{{ 'true' if col.sortable else 'false' }}"
                   data-key="{{ col.key }}"
                   aria-sort="none">
                 {%- if col.sortable -%}
-                  <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group">
+                  <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                          aria-label="Sort by {{ col.label }}">
                     <span>{{ col.label }}</span>
-                    <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true">↕</span>
-                    <span class="sr-only sort-state">unsorted</span>
+                    <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                   </button>
                 {%- else -%}
                   <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
                     <span>{{ col.label }}</span>
-                    <span class="sort-caret opacity-0 transition" aria-hidden="true">↕</span>
-                    <span class="sr-only sort-state">unsorted</span>
+                    <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
                   </div>
                 {%- endif -%}
               </th>
@@ -66,8 +72,23 @@
                 'center': 'text-center'
               }[align] -%}
               {%- set numeric_class = ' text-right tabular-nums' if align == 'right' else '' -%}
-              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}" data-key="{{ col.key }}">
-                {{ row.get(col.key, '') }}
+              {%- set display_value = row.get(col.key) if row is mapping else row | attr(col.key) -%}
+              {%- if display_value is undefined or display_value is none -%}
+                {%- set display_value = '' -%}
+              {%- endif -%}
+              {%- set data_value = none -%}
+              {%- if col.value_key is defined and col.value_key -%}
+                {%- if row is mapping -%}
+                  {%- set data_value = row.get(col.value_key) -%}
+                {%- else -%}
+                  {%- set data_value = row | attr(col.value_key) -%}
+                {%- endif -%}
+              {%- endif -%}
+              {%- if data_value is undefined or data_value is none -%}
+                {%- set data_value = '' -%}
+              {%- endif -%}
+              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}" data-key="{{ col.key }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>
+                {{ display_value }}
               </td>
             {%- endfor %}
           </tr>
