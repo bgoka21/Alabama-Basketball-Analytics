@@ -1,33 +1,28 @@
 {% extends 'admin/base.html' %}
+{% from 'macros/table.html' import render_table %}
 {% block content %}
 <h1 class="text-3xl font-bold mb-6">Skill Development</h1>
 {% set action_url = url_for('public.add_nba100_entry') %}
 {% if current_user.is_admin %}
 {% include '_nba100_form.html' %}
 {% endif %}
-<div class="mb-4">
-  <h3 class="text-2xl font-semibold mb-4">NBA 100 History</h3>
-  <div class="overflow-x-auto bg-white rounded-lg shadow-md p-4">
-    <table class="w-full table-fixed border border-gray-200 rounded-md">
-      <thead>
-        <tr class="bg-gray-200">
-          <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Date</th>
-          <th class="px-4 py-2 text-left text-sm font-medium border-r border-gray-300">Makes (out of 100)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for n in nba100_entries %}
-        <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
-          <td class="px-4 py-2 text-sm border-t border-gray-300">{{ n.date.strftime('%b %d, %Y') }}</td>
-          <td class="px-4 py-2 text-sm border-t border-gray-300">{{ n.value }}/100</td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="2" class="px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-300">No NBA 100 entries yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="mb-4 space-y-4">
+  <h3 class="text-2xl font-semibold">NBA 100 History</h3>
+  {% set nba_cols = [
+    {'key': 'date', 'label': 'Date', 'sortable': True, 'align': 'left'},
+    {'key': 'makes', 'label': 'Makes (out of 100)', 'sortable': True, 'align': 'right'},
+  ] %}
+  {{ render_table(
+      id='skill-nba100-history',
+      columns=nba_cols,
+      rows=nba100_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='NBA 100 History'
+  ) }}
+  {% if nba100_rows | length == 0 %}
+    <div class="text-center text-sm text-gray-500">No NBA 100 entries yet.</div>
+  {% endif %}
 </div>
 {% endblock %}

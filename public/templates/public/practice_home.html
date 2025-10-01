@@ -1,4 +1,5 @@
 {% extends 'admin/base.html' %}
+{% from 'macros/table.html' import render_table %}
 {% block content %}
 <h1 class="text-3xl font-bold mb-6">Practice Leaderboards</h1>
 {% if current_user.is_player %}
@@ -33,217 +34,146 @@
   </form>
 </div>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Dunks Get You Paid</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Dunks</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, count in dunks %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ count }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Blue Collar Leaders</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">BCP</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Wins</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, total, wins in bcp_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ '%.1f'|format(total) }}</td>
-          <td class="px-6 py-4 text-sm">{{ wins }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">ATR% Leaders</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">FG</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ATR%</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for p in atr_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=p.player_name) }}" class="text-blue-600 hover:underline">{{ p.player_name }}</a>
-            {% else %}
-              {{ p.player_name }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ p.atrm }}-{{ p.atra }}</td>
-          <td class="px-6 py-4 text-sm">{{ '%.1f'|format(p.atr_pct) if p.atr_pct is not none else '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">3FG% Leaders</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">FG</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">3FG%</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for p in fg3_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=p.player_name) }}" class="text-blue-600 hover:underline">{{ p.player_name }}</a>
-            {% else %}
-              {{ p.player_name }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ p.fg3m }}-{{ p.fg3a }}</td>
-          <td class="px-6 py-4 text-sm">{{ '%.1f'|format(p.fg3_pct) if p.fg3_pct is not none else '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
 
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">PPS Leaders</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">PPS</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, pps in pps_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ '%.2f'|format(pps) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set dunk_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'dunks', 'label': 'Dunks', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Dunks Get You Paid</h2>
+  {{ render_table(
+      id='practice-dunks',
+      columns=dunk_cols,
+      rows=dunk_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Dunks Get You Paid'
+  ) }}
+</div>
 
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Overall Record</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Record</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Win%</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, record, pct in overall_records %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ record }}</td>
-          <td class="px-6 py-4 text-sm">{{ pct }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set bcp_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'bcp', 'label': 'BCP', 'sortable': True, 'align': 'right'},
+  {'key': 'wins', 'label': 'Wins', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Blue Collar Leaders</h2>
+  {{ render_table(
+      id='practice-bcp',
+      columns=bcp_cols,
+      rows=bcp_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Blue Collar Leaders'
+  ) }}
+</div>
 
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Sprint Wins</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Wins</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, wins in sprint_wins %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ wins }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set atr_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'fg', 'label': 'FG', 'sortable': True, 'align': 'right'},
+  {'key': 'pct', 'label': 'ATR%', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">ATR% Leaders</h2>
+  {{ render_table(
+      id='practice-atr',
+      columns=atr_cols,
+      rows=atr_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='ATR% Leaders'
+  ) }}
+</div>
 
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Sprint Losses</h2>
-    <table class="min-w-full">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Losses</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, losses in sprint_losses %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm">{{ losses }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set fg3_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'fg', 'label': 'FG', 'sortable': True, 'align': 'right'},
+  {'key': 'pct', 'label': '3FG%', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">3FG% Leaders</h2>
+  {{ render_table(
+      id='practice-fg3',
+      columns=fg3_cols,
+      rows=fg3_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='3FG% Leaders'
+  ) }}
+</div>
+
+{% set pps_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'pps', 'label': 'PPS', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">PPS Leaders</h2>
+  {{ render_table(
+      id='practice-pps',
+      columns=pps_cols,
+      rows=pps_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='PPS Leaders'
+  ) }}
+</div>
+
+{% set record_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'record', 'label': 'Record', 'sortable': True, 'align': 'left'},
+  {'key': 'win_pct', 'label': 'Win%', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Overall Record</h2>
+  {{ render_table(
+      id='practice-record',
+      columns=record_cols,
+      rows=overall_record_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Overall Record'
+  ) }}
+</div>
+
+{% set sprint_win_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'wins', 'label': 'Wins', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Sprint Wins</h2>
+  {{ render_table(
+      id='practice-sprint-wins',
+      columns=sprint_win_cols,
+      rows=sprint_win_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Sprint Wins'
+  ) }}
+</div>
+
+{% set sprint_loss_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'losses', 'label': 'Losses', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Sprint Losses</h2>
+  {{ render_table(
+      id='practice-sprint-losses',
+      columns=sprint_loss_cols,
+      rows=sprint_loss_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Sprint Losses'
+  ) }}
+</div>
+
 </div>
 {% endblock %}
