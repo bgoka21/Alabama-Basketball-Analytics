@@ -141,6 +141,8 @@ def ensure_player_defaults(slot: dict):
         # Collision Gap (Crimson/White)
         "collision_gap_positive": 0,  # Gap +
         "collision_gap_missed": 0,    # Gap -
+        "pass_contest_positive": 0,   # Contest Pass +
+        "pass_contest_missed": 0,     # Contest Pass -
         # PnR Gap Help / Low
         "pnr_gap_positive": 0,   # Gap +
         "pnr_gap_missed": 0,     # Gap -
@@ -544,6 +546,14 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     elif t == "Gap -":
                         bump(slot, "collision_gap_missed", 1)
                         details.append({"event": "collision_gap_missed", "context": row_type})
+                        handled = True
+                    elif t == "Contest Pass +":
+                        bump(slot, "pass_contest_positive", 1)
+                        details.append({"event": "pass_contest_positive", "context": row_type})
+                        handled = True
+                    elif t == "Contest Pass -":
+                        bump(slot, "pass_contest_missed", 1)
+                        details.append({"event": "pass_contest_missed", "context": row_type})
                         handled = True
             if handled:
                 continue
@@ -971,6 +981,8 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 contest_late      = stats.get("contest_late", 0),
                 contest_no        = stats.get("contest_no", 0),
                 contest_early     = stats.get("contest_early", 0),
+                pass_contest_positive = stats.get("pass_contest_positive", 0),
+                pass_contest_missed   = stats.get("pass_contest_missed", 0),
                 bump_positive     = stats.get("bump_positive", 0),
                 bump_missed       = stats.get("bump_missed", 0),
                 blowby_total      = stats.get("blowby_total", 0),

@@ -483,6 +483,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         'box_out_positive', 'box_out_missed', 'off_reb_given_up',
         # Collision Gap (Crimson/White)
         'collision_gap_positive', 'collision_gap_missed',
+        'pass_contest_positive', 'pass_contest_missed',
         # PnR Gap Help & Low
         'pnr_gap_positive', 'pnr_gap_missed',
         'low_help_positive', 'low_help_missed',
