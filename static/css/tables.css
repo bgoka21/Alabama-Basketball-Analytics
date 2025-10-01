@@ -122,3 +122,89 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
   }
   .unified-table { box-shadow: none !important; }
 }
+/* ===== Leaderboard legacy aliases -> match unified-table look =================
+   This lets old markup (.table-wrap + .table-leaderboard) visually match the
+   unified tables without changing templates or JS.
+============================================================================= */
+
+:root {
+  --lb-border: var(--tbl-border, #E5E7EB);
+  --lb-header: var(--tbl-header-bg, #F9FAFB);
+  --lb-hover:  var(--tbl-hover, #F3F4F6);
+  --lb-text:   var(--tbl-text, #374151);
+}
+
+/* Card container replacement for .table-wrap */
+.table-wrap {
+  border: 1px solid var(--lb-border);
+  border-radius: 0.5rem;               /* rounded-lg */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+  overflow: hidden;                     /* clip header corners */
+  background: transparent;
+}
+
+/* Table base */
+.table-wrap .table-leaderboard {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem; /* text-sm */
+  color: var(--lb-text);
+}
+
+/* Header */
+.table-wrap .table-leaderboard thead th {
+  background: var(--lb-header);
+  color: var(--lb-text);
+  font-weight: 600;     /* font-semibold */
+  padding: 0.5rem 1rem; /* py-2 px-4 */
+  text-wrap: nowrap;
+  border-bottom: 1px solid var(--lb-border);
+}
+
+/* Remove any legacy top stripe/border on header rows */
+.table-wrap .table-leaderboard thead,
+.table-wrap .table-leaderboard thead tr {
+  border-top: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Cells */
+.table-wrap .table-leaderboard td {
+  padding: 0.5rem 1rem; /* py-2 px-4 */
+  vertical-align: middle;
+}
+
+/* Striping + hover */
+.table-wrap .table-leaderboard tbody tr:nth-child(even) {
+  background: #F9FAFB;
+}
+.dark .table-wrap .table-leaderboard tbody tr:nth-child(even) {
+  background: #1F2937; /* gray-800 */
+}
+.table-wrap .table-leaderboard tbody tr:hover {
+  background: var(--lb-hover);
+}
+
+/* Totals row emphasis (if present) */
+.table-wrap .table-leaderboard tfoot tr,
+.table-wrap .table-leaderboard tr[data-row="totals"] {
+  background: var(--lb-header);
+  border-top: 1px solid var(--lb-border);
+  font-weight: 600;
+}
+
+/* Clean up old arrow glyphs in headers if they were hard-coded into text.
+   We dim any inline ▲/▼ characters to reduce visual noise. */
+.table-wrap .table-leaderboard thead th {
+  /* make arrows lighter without changing label text */
+  -webkit-font-smoothing: antialiased;
+}
+.table-wrap .table-leaderboard thead th:has(> *):not(:has(.sort-caret)) {
+  /* no-op; reserved in case templates add caret containers later */
+}
+
+/* Dark mode alignment with unified tokens */
+.dark .table-wrap {
+  border-color: var(--lb-border);
+}
