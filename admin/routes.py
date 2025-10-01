@@ -490,6 +490,16 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         # PnR Grade
         'close_window_positive', 'close_window_missed',
         'shut_door_positive', 'shut_door_missed',
+        # Shot contest breakdowns
+        'atr_contest_attempts', 'atr_contest_makes',
+        'atr_late_attempts', 'atr_late_makes',
+        'atr_no_contest_attempts', 'atr_no_contest_makes',
+        'fg2_contest_attempts', 'fg2_contest_makes',
+        'fg2_late_attempts', 'fg2_late_makes',
+        'fg2_no_contest_attempts', 'fg2_no_contest_makes',
+        'fg3_contest_attempts', 'fg3_contest_makes',
+        'fg3_late_attempts', 'fg3_late_makes',
+        'fg3_no_contest_attempts', 'fg3_no_contest_makes',
     ]
     ps_q = (
         db.session.query(
@@ -882,6 +892,20 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         total_fga = base.get('atr_attempts', 0) + base.get('fg2_attempts', 0) + base.get('fg3_attempts', 0)
         denominator = to + total_fga + pot_ast + ast
         base['bamalytics_turnover_rate'] = round(to / denominator * 100, 1) if denominator else 0.0
+
+        contest_groups = {
+            'atr': ('contest', 'late', 'no_contest'),
+            'fg2': ('contest', 'late', 'no_contest'),
+            'fg3': ('contest', 'late', 'no_contest'),
+        }
+        for prefix, suffixes in contest_groups.items():
+            for suffix in suffixes:
+                att_key = f"{prefix}_{suffix}_attempts"
+                make_key = f"{prefix}_{suffix}_makes"
+                pct_key = f"{prefix}_{suffix}_pct"
+                attempts = base.get(att_key, 0)
+                makes = base.get(make_key, 0)
+                base[pct_key] = (makes / attempts * 100) if attempts else 0
 
         core_rows[player] = base
 
