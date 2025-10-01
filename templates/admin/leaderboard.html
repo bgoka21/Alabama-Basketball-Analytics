@@ -32,24 +32,48 @@
 
 {% block content %}
   {% set practice_links = [
-    ('Defense – Bumps', 'admin.leaderboard_defense_bumps'),
-    ('Offensive Rebounding', 'admin.leaderboard_reb_offense'),
-    ('Defensive Rebounding', 'admin.leaderboard_reb_defense'),
-    ('Collisions – Gap Help', 'admin.leaderboard_collisions_gap_help'),
-    ('Pass Contests', 'admin.leaderboard_pass_contests'),
-    ('PnR Gap Help', 'admin.leaderboard_pnr_gap_help'),
-    ('PnR Grade', 'admin.leaderboard_pnr_grade'),
+    {'label': 'Defense – Bumps', 'endpoint': 'admin.leaderboard_defense_bumps'},
+    {'label': 'Offensive Rebounding', 'endpoint': 'admin.leaderboard_reb_offense'},
+    {'label': 'Defensive Rebounding', 'endpoint': 'admin.leaderboard_reb_defense'},
+    {'label': 'Collisions – Gap Help', 'endpoint': 'admin.leaderboard_collisions_gap_help'},
+    {'label': 'Pass Contests', 'endpoint': 'admin.leaderboard_pass_contests'},
+    {'label': 'PnR Gap Help', 'endpoint': 'admin.leaderboard_pnr_gap_help'},
+    {'label': 'PnR Grade', 'endpoint': 'admin.leaderboard_pnr_grade'},
+    {'label': 'ATR Shot Contests', 'endpoint': 'admin.leaderboard', 'params': {'stat': 'atr_contest_breakdown'}},
+    {'label': '2FG Shot Contests', 'endpoint': 'admin.leaderboard', 'params': {'stat': 'fg2_contest_breakdown'}},
+    {'label': '3FG Shot Contests', 'endpoint': 'admin.leaderboard', 'params': {'stat': 'fg3_contest_breakdown'}},
   ] %}
   <section class="mb-6">
     <h2 class="text-lg font-semibold text-gray-900">Practice Leaderboards</h2>
     <div class="mt-3 flex flex-wrap gap-3 text-sm">
-      {% for label, endpoint in practice_links %}
+      {% for link in practice_links %}
+        {% set endpoint = link.endpoint %}
+        {% set params = link.get('params', {}) %}
+        {% set href_params = params.copy() %}
+        {% if endpoint == 'admin.leaderboard' %}
+          {% if selected_season %}
+            {% set _ = href_params.update({'season_id': selected_season}) %}
+          {% endif %}
+          {% if start_date %}
+            {% set _ = href_params.update({'start_date': start_date}) %}
+          {% endif %}
+          {% if end_date %}
+            {% set _ = href_params.update({'end_date': end_date}) %}
+          {% endif %}
+        {% endif %}
         {% set is_active = request.endpoint == endpoint %}
+        {% if is_active and params %}
+          {% for key, value in params.items() %}
+            {% if request.args.get(key) != value %}
+              {% set is_active = False %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
         <a
           class="px-3 py-1 rounded-full border transition {{ 'bg-[#9E1B32] text-white border-[#9E1B32]' if is_active else 'border-gray-300 text-gray-700 hover:bg-white hover:text-[#9E1B32]' }}"
-          href="{{ url_for(endpoint) }}"
+          href="{{ url_for(endpoint, **href_params) }}"
         >
-          {{ label }}
+          {{ link.label }}
         </a>
       {% endfor %}
     </div>
