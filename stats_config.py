@@ -57,6 +57,38 @@ for sc in ["atr", "fg2", "fg3"]:
         "format": "pct",
     })
 
+# ─── Shot contest breakdown metrics (hidden by default) ─────────────────────
+contest_label_map = {
+    "contest": "Contested",
+    "late": "Late Contest",
+    "no_contest": "No Contest",
+}
+
+for sc in ["atr", "fg2", "fg3"]:
+    base_label = {"atr": "ATR", "fg2": "2FG", "fg3": "3FG"}.get(sc, sc.upper())
+    for suffix, suffix_label in contest_label_map.items():
+        prefix = f"{sc}_{suffix}"
+        LEADERBOARD_STATS.extend([
+            {
+                "key": f"{prefix}_attempts",
+                "label": f"{base_label} {suffix_label} Att",
+                "format": "int",
+                "hidden": True,
+            },
+            {
+                "key": f"{prefix}_makes",
+                "label": f"{base_label} {suffix_label} Makes",
+                "format": "int",
+                "hidden": True,
+            },
+            {
+                "key": f"{prefix}_pct",
+                "label": f"{base_label} {suffix_label} FG%",
+                "format": "pct",
+                "hidden": True,
+            },
+        ])
+
 # ─── Detailed Shot Type FG% Categories (hidden from dropdown for now) ─────────
 shot_classes = ["atr", "fg2", "fg3"]
 labels = ["Assisted", "Non-Assisted"]
