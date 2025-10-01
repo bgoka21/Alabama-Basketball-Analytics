@@ -31,7 +31,7 @@ else:  # pragma: no cover - executed when BeautifulSoup is available
 
 from flask import (
     Blueprint, render_template, request, redirect,
-    url_for, flash, send_file, current_app, session, make_response, abort
+    url_for, flash, send_file, current_app, session, make_response, abort, jsonify
 )
 from flask_login import login_required, current_user, confirm_login, login_user, logout_user
 from utils.auth       import admin_required
@@ -56,6 +56,7 @@ from models.database import (
     PnRStats,
     PlayerDevelopmentPlan,
     Setting,
+    SavedStatProfile,
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -64,7 +65,7 @@ from models.user import User
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import aliased
-from utils.db_helpers import array_agg_or_group_concat
+from utils.db_helpers import array_agg_or_group_concat, list_team_presets
 from utils.skill_config import shot_map, label_map
 from utils.shottype import (
     compute_3fg_breakdown_from_shots,
@@ -1927,6 +1928,146 @@ admin_bp.add_app_template_filter(combine_dual_rows, name="combine_dual_rows")
 admin_bp.add_app_template_filter(combine_dual_totals, name="combine_dual_totals")
 admin_bp.add_app_template_global(build_dual_table, name="build_dual_table")
 admin_bp.add_app_template_global(build_leaderboard_table, name="build_leaderboard_table")
+
+
+def _serialize_saved_stat_profile(profile: SavedStatProfile) -> dict:
+    fields = []
+    if profile.fields_json:
+        try:
+            fields = json.loads(profile.fields_json)
+        except (TypeError, ValueError):
+            fields = []
+
+    return {
+        "id": profile.id,
+        "name": profile.name,
+        "fields": fields,
+        "mode_default": profile.mode_default,
+        "source_default": profile.source_default,
+        "visibility": profile.visibility,
+        "owner_id": profile.owner_id,
+    }
+
+
+@admin_bp.route('/api/practice/fields', methods=['GET'])
+@admin_required
+def get_practice_field_catalog():
+    from app.stats.field_catalog_practice import PRACTICE_FIELD_GROUPS
+
+    return jsonify(PRACTICE_FIELD_GROUPS)
+
+
+@admin_bp.route('/api/presets', methods=['GET'])
+@admin_required
+def list_presets_api():
+    current_user_id = getattr(current_user, 'id', None)
+    presets = list_team_presets(db.session, current_user_id)
+    team_presets = []
+    private_presets = []
+
+    for preset in presets:
+        serialized = _serialize_saved_stat_profile(preset)
+        if preset.visibility == 'team':
+            team_presets.append(serialized)
+        elif preset.visibility == 'private' and preset.owner_id == current_user_id:
+            private_presets.append(serialized)
+
+    return jsonify({
+        'team': team_presets,
+        'private': private_presets,
+    })
+
+
+@admin_bp.route('/api/presets', methods=['POST'])
+@admin_required
+def create_preset_api():
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+
+    fields = data.get('fields') or []
+    if not isinstance(fields, list):
+        return jsonify({'error': 'Fields must be a list'}), 400
+
+    visibility = data.get('visibility') or 'team'
+    if visibility not in {'team', 'private'}:
+        visibility = 'team'
+
+    profile = SavedStatProfile(
+        name=name,
+        fields_json=json.dumps(fields),
+        mode_default=data.get('mode_default') or 'totals',
+        source_default=data.get('source_default') or 'practice',
+        owner_id=getattr(current_user, 'id', None),
+        visibility=visibility,
+    )
+
+    db.session.add(profile)
+    db.session.commit()
+
+    return jsonify(_serialize_saved_stat_profile(profile)), 201
+
+
+@admin_bp.route('/api/presets', methods=['PATCH'])
+@admin_required
+def update_preset_api():
+    data = request.get_json(silent=True) or {}
+    preset_id = data.get('id')
+    if not preset_id:
+        return jsonify({'error': 'Preset id is required'}), 400
+
+    profile = SavedStatProfile.query.get(preset_id)
+    if not profile:
+        return jsonify({'error': 'Preset not found'}), 404
+
+    current_user_id = getattr(current_user, 'id', None)
+    if profile.owner_id != current_user_id:
+        return jsonify({'error': 'Only the owner may modify this preset'}), 403
+
+    if 'name' in data:
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'Name is required'}), 400
+        profile.name = name
+
+    if 'fields' in data:
+        fields = data.get('fields') or []
+        if not isinstance(fields, list):
+            return jsonify({'error': 'Fields must be a list'}), 400
+        profile.fields_json = json.dumps(fields)
+
+    if 'mode_default' in data:
+        profile.mode_default = data.get('mode_default') or profile.mode_default
+
+    if 'source_default' in data:
+        profile.source_default = data.get('source_default') or profile.source_default
+
+    db.session.commit()
+
+    return jsonify(_serialize_saved_stat_profile(profile))
+
+
+@admin_bp.route('/api/presets', methods=['DELETE'])
+@admin_required
+def delete_preset_api():
+    data = request.get_json(silent=True) or {}
+    preset_id = data.get('id')
+    if not preset_id:
+        return jsonify({'error': 'Preset id is required'}), 400
+
+    profile = SavedStatProfile.query.get(preset_id)
+    if not profile:
+        return jsonify({'error': 'Preset not found'}), 404
+
+    current_user_id = getattr(current_user, 'id', None)
+    if profile.owner_id != current_user_id:
+        return jsonify({'error': 'Only the owner may delete this preset'}), 403
+
+    db.session.delete(profile)
+    db.session.commit()
+
+    return jsonify({'status': 'deleted'})
 
 
 def _resolve_season_from_request():
