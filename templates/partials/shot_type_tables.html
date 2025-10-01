@@ -1,3 +1,4 @@
+<!-- IMPORTANT: Shot Type table — do NOT migrate to unified table; opt-out via .table-exempt -->
 {% set empty_group = namespace(
   total=namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0),
   transition=namespace(attempts=0, makes=0, fg_pct=0, pps=0, freq=0),
@@ -102,7 +103,7 @@
     <div class="shot-section">
       <div id="atr" class="detail-content hidden">
       <div class="relative max-h-[600px] overflow-y-auto">
-      <table class="min-w-full divide-y divide-gray-200 mb-6">
+      <table class="min-w-full divide-y divide-gray-200 mb-6 table-exempt">
         <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10 bg-gray-100">
           <tr>
             <th rowspan="2" class="px-4 py-2 text-left bg-white dark:bg-gray-800">Category</th>
@@ -228,7 +229,7 @@
     <div class="shot-section">
     <div id="fg2" class="detail-content hidden">
       <div class="relative max-h-[600px] overflow-y-auto">
-      <table class="min-w-full divide-y divide-gray-200 mb-6">
+      <table class="min-w-full divide-y divide-gray-200 mb-6 table-exempt">
         <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10 bg-gray-100">
           <tr>
             <th rowspan="2" class="px-4 py-2 text-left bg-white dark:bg-gray-800">Category</th>
@@ -324,7 +325,7 @@
     <div class="shot-section">
     <div id="fg3" class="detail-content hidden">
       <div class="relative max-h-[600px] overflow-y-auto">
-      <table class="min-w-full divide-y divide-gray-200 mb-6">
+      <table class="min-w-full divide-y divide-gray-200 mb-6 table-exempt">
         <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10 bg-gray-100">
           <tr>
             <th rowspan="2" class="px-4 py-2 text-left bg-white dark:bg-gray-800">Category</th>
