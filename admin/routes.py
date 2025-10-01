@@ -2407,6 +2407,72 @@ def practice_table_api():
     return jsonify(dataset)
 
 
+def _prepare_custom_stats_columns(dataset_columns):
+    """Normalize practice table columns for the custom stats partial."""
+
+    align_map = {
+        'count': 'right',
+        'ratio': 'right',
+        'percent': 'right',
+        'shooting_split': 'center',
+    }
+
+    player_col = None
+    jersey_col = None
+    stat_columns = []
+
+    for column in dataset_columns or []:
+        key = column.get('key')
+        mapped = {
+            'key': key,
+            'label': column.get('label', ''),
+            'sortable': column.get('sortable', False),
+        }
+
+        if 'value_key' in column:
+            mapped['value_key'] = column['value_key']
+
+        group = column.get('group')
+        if group:
+            mapped['group'] = group
+
+        fmt = column.get('format')
+        align = align_map.get(fmt, 'left')
+
+        if key == 'player':
+            mapped['align'] = 'left'
+            mapped['width'] = 'sticky-player-header min-w-[14rem]'
+            mapped['cell_class'] = 'sticky-player-cell'
+            player_col = mapped
+        elif key == 'jersey':
+            mapped['align'] = 'right'
+            mapped['width'] = 'w-16'
+            jersey_col = mapped
+        else:
+            mapped['align'] = align
+            if fmt == 'shooting_split':
+                mapped['width'] = 'min-w-[10rem]'
+            stat_columns.append(mapped)
+
+    ordered = []
+    if player_col:
+        ordered.append(player_col)
+    if jersey_col:
+        ordered.append(jersey_col)
+    ordered.extend(stat_columns)
+    return ordered
+
+
+@admin_bp.route('/admin/custom-stats/table-partial', methods=['POST'])
+@admin_required
+def custom_stats_table_partial():
+    data = request.get_json(silent=True) or {}
+    dataset = _build_practice_table_dataset(data)
+    columns = _prepare_custom_stats_columns(dataset.get('columns', []))
+    rows = dataset.get('rows', [])
+    return render_template('admin/_custom_stats_table.html', columns=columns, rows=rows)
+
+
 @admin_bp.route('/admin/custom-stats/export/csv', methods=['POST'])
 @admin_required
 def export_custom_stats_csv():

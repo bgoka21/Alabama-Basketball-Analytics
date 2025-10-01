@@ -1,0 +1,41 @@
+{% from 'macros/table.html' import render_table %}
+
+<div class="custom-stats-table space-y-3">
+  {{ render_table(
+    id='custom-stats-table',
+    columns=columns,
+    rows=rows,
+    totals=None,
+    dense=True,
+    sticky_header=True,
+    caption='Custom practice stats',
+    default_sort='jersey:asc'
+  ) }}
+
+  {% if rows | length == 0 %}
+    <div class="table-empty">No practice data found for the selected filters.</div>
+  {% endif %}
+</div>
+
+<style>
+  .custom-stats-table th.sticky-player-header {
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    background: var(--tbl-header-bg, #F9FAFB);
+    box-shadow: 2px 0 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .custom-stats-table td.sticky-player-cell {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    background: #ffffff;
+    box-shadow: 2px 0 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .custom-stats-table td.sticky-player-cell {
+    background: #111827;
+    box-shadow: 2px 0 0 rgba(17, 24, 39, 0.6);
+  }
+</style>
