@@ -165,6 +165,8 @@ class PlayerStats(db.Model):
     contest_late      = db.Column(db.Integer)
     contest_no        = db.Column(db.Integer)
     contest_early     = db.Column(db.Integer)
+    pass_contest_positive = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    pass_contest_missed   = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     bump_positive     = db.Column(db.Integer)
     bump_missed       = db.Column(db.Integer)
     # --- Offensive Rebounding Opportunities ---

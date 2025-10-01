@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date
 
@@ -13,6 +14,7 @@ FIELDS = [
     "crash_positive", "crash_missed", "back_man_positive", "back_man_missed",
     "box_out_positive", "box_out_missed", "off_reb_given_up",
     "collision_gap_positive", "collision_gap_missed",
+    "pass_contest_positive", "pass_contest_missed",
     "pnr_gap_positive", "pnr_gap_missed",
     "low_help_positive", "low_help_missed",
     "close_window_positive", "close_window_missed",
@@ -86,6 +88,8 @@ def test_parser_counts_for_new_stats(app, fixture):
         assert alice.off_reb_given_up == 0
         assert alice.collision_gap_positive == 1
         assert alice.collision_gap_missed == 1
+        assert alice.pass_contest_positive == 1
+        assert alice.pass_contest_missed == 1
         assert alice.pnr_gap_positive == 1
         assert alice.pnr_gap_missed == 0
         assert alice.low_help_positive == 1
@@ -104,6 +108,8 @@ def test_parser_counts_for_new_stats(app, fixture):
         assert bob.off_reb_given_up == 1
         assert bob.collision_gap_positive == 1
         assert bob.collision_gap_missed == 1
+        assert bob.pass_contest_positive == 1
+        assert bob.pass_contest_missed == 1
         assert bob.pnr_gap_positive == 0
         assert bob.pnr_gap_missed == 1
         assert bob.low_help_positive == 0
@@ -122,6 +128,8 @@ def test_parser_counts_for_new_stats(app, fixture):
         assert carol.off_reb_given_up == 1
         assert carol.collision_gap_positive == 1
         assert carol.collision_gap_missed == 0
+        assert carol.pass_contest_positive == 1
+        assert carol.pass_contest_missed == 1
         assert carol.pnr_gap_positive == 0
         assert carol.pnr_gap_missed == 0
         assert carol.low_help_positive == 1
@@ -130,3 +138,17 @@ def test_parser_counts_for_new_stats(app, fixture):
         assert carol.close_window_missed == 0
         assert carol.shut_door_positive == 1
         assert carol.shut_door_missed == 0
+
+        alice_details = json.loads(alice.stat_details)
+        bob_details = json.loads(bob.stat_details)
+        carol_details = json.loads(carol.stat_details)
+
+        def has_entry(details, event, context):
+            return any(d.get("event") == event and d.get("context") == context for d in details)
+
+        assert has_entry(alice_details, "pass_contest_positive", "Crimson")
+        assert has_entry(alice_details, "pass_contest_missed", "White")
+        assert has_entry(bob_details, "pass_contest_positive", "White")
+        assert has_entry(bob_details, "pass_contest_missed", "Crimson")
+        assert has_entry(carol_details, "pass_contest_positive", "Crimson")
+        assert has_entry(carol_details, "pass_contest_missed", "White")
