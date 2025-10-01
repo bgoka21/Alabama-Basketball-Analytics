@@ -7087,6 +7087,38 @@ def leaderboard():
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
+    practice_links = [
+        {"label": "Defense – Bumps", "endpoint": "admin.leaderboard_defense_bumps"},
+        {"label": "Offensive Rebounding", "endpoint": "admin.leaderboard_reb_offense"},
+        {"label": "Defensive Rebounding", "endpoint": "admin.leaderboard_reb_defense"},
+        {
+            "label": "Collisions – Gap Help",
+            "endpoint": "admin.leaderboard_collisions_gap_help",
+        },
+        {"label": "Pass Contests", "endpoint": "admin.leaderboard_pass_contests"},
+        {"label": "PnR Gap Help", "endpoint": "admin.leaderboard_pnr_gap_help"},
+        {"label": "PnR Grade", "endpoint": "admin.leaderboard_pnr_grade"},
+        {
+            "label": "ATR Shot Contests",
+            "endpoint": "admin.leaderboard",
+            "params": {"stat": "atr_contest_breakdown"},
+        },
+        {
+            "label": "2FG Shot Contests",
+            "endpoint": "admin.leaderboard",
+            "params": {"stat": "fg2_contest_breakdown"},
+        },
+        {
+            "label": "3FG Shot Contests",
+            "endpoint": "admin.leaderboard",
+            "params": {"stat": "fg3_contest_breakdown"},
+        },
+    ]
+    view_functions = current_app.view_functions
+    filtered_practice_links = [
+        link for link in practice_links if link["endpoint"] in view_functions
+    ]
+
     return render_template(
         'admin/leaderboard.html',
         all_seasons=all_seasons,
@@ -7102,6 +7134,7 @@ def leaderboard():
         active_page='leaderboard',
         selected_session=selected_session,
         sessions=sessions,
+        practice_links=filtered_practice_links,
         **split_context,
     )
 

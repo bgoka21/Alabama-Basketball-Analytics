@@ -31,18 +31,6 @@
 {% endblock %}
 
 {% block content %}
-  {% set practice_links = [
-    {'label': 'Defense – Bumps', 'endpoint': 'admin.leaderboard_defense_bumps'},
-    {'label': 'Offensive Rebounding', 'endpoint': 'admin.leaderboard_reb_offense'},
-    {'label': 'Defensive Rebounding', 'endpoint': 'admin.leaderboard_reb_defense'},
-    {'label': 'Collisions – Gap Help', 'endpoint': 'admin.leaderboard_collisions_gap_help'},
-    {'label': 'Pass Contests', 'endpoint': 'admin.leaderboard_pass_contests'},
-    {'label': 'PnR Gap Help', 'endpoint': 'admin.leaderboard_pnr_gap_help'},
-    {'label': 'PnR Grade', 'endpoint': 'admin.leaderboard_pnr_grade'},
-    {'label': 'ATR Shot Contests', 'endpoint': 'admin.leaderboard', 'params': {'stat': 'atr_contest_breakdown'}},
-    {'label': '2FG Shot Contests', 'endpoint': 'admin.leaderboard', 'params': {'stat': 'fg2_contest_breakdown'}},
-    {'label': '3FG Shot Contests', 'endpoint': 'admin.leaderboard', 'params': {'stat': 'fg3_contest_breakdown'}},
-  ] %}
   <section class="mb-6">
     <h2 class="text-lg font-semibold text-gray-900">Practice Leaderboards</h2>
     <div class="mt-3 flex flex-wrap gap-3 text-sm">
