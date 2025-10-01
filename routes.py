@@ -22,6 +22,7 @@ import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
 from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
+from app.utils.table_cells import num, pct
 
 
 
@@ -349,6 +350,19 @@ def player_view(player_name):
     off_reb_rate      = count_event('Off Rebound') / ON_poss if ON_poss else 0
     fouls_drawn_rate  = count_event('Fouled') / ON_poss if ON_poss else 0
 
+    player_summary_rows = [
+        {"stat": "Possessions", "value": num(ON_poss)},
+        {"stat": "PPP (On-court)", "value": num(round(PPP_ON, 2))},
+        {"stat": "PPP (Off-court)", "value": num(round(PPP_OFF, 2))},
+        {"stat": "eFG%", "value": pct(EFG_ON)},
+        {"stat": "ATR%", "value": pct(ATR_pct)},
+        {"stat": "2FG%", "value": pct(FG2_pct)},
+        {"stat": "3FG%", "value": pct(FG3_pct)},
+        {"stat": "Turnover Rate", "value": pct(turnover_rate)},
+        {"stat": "Off-Reb Rate", "value": pct(off_reb_rate)},
+        {"stat": "Fouls Drawn Rate", "value": pct(fouls_drawn_rate)},
+    ]
+
     # 7. Shot type breakdown for mobile tables
     stats_records = PlayerStats.query.filter_by(player_name=player.player_name).all()
     raw_totals, shot_summaries = compute_team_shot_details(stats_records, label_set)
@@ -391,6 +405,7 @@ def player_view(player_name):
         shot_type_categories = shot_type_categories,
         shot_type_totals     = raw_totals,
         shot_summaries       = shot_summaries,
+        player_summary_rows  = player_summary_rows,
     )
 
 

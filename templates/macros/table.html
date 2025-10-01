@@ -72,24 +72,30 @@
                 'center': 'text-center'
               }[align] -%}
               {%- set numeric_class = ' text-right tabular-nums' if align == 'right' else '' -%}
-              {%- set display_value = row.get(col.key) if row is mapping else row | attr(col.key) -%}
-              {%- if display_value is undefined or display_value is none -%}
-                {%- set display_value = '' -%}
+              {%- set cell_value = row.get(col.key) if row is mapping else row | attr(col.key) -%}
+              {%- set data_value = '' -%}
+              {%- if cell_value is mapping and cell_value.display is defined -%}
+                {%- set display_value = cell_value.display -%}
+                {%- if cell_value.data_value is defined and cell_value.data_value is not none -%}
+                  {%- set data_value = cell_value.data_value -%}
+                {%- endif -%}
+              {%- else -%}
+                {%- set display_value = cell_value if cell_value is not none and cell_value is not undefined else '' -%}
               {%- endif -%}
-              {%- set data_value = none -%}
               {%- if col.value_key is defined and col.value_key -%}
                 {%- if row is mapping -%}
-                  {%- set data_value = row.get(col.value_key) -%}
+                  {%- set override_value = row.get(col.value_key) -%}
                 {%- else -%}
-                  {%- set data_value = row | attr(col.value_key) -%}
+                  {%- set override_value = row | attr(col.value_key) -%}
+                {%- endif -%}
+                {%- if override_value is not none and override_value is not undefined and override_value != '' -%}
+                  {%- set data_value = override_value -%}
                 {%- endif -%}
               {%- endif -%}
               {%- if data_value is undefined or data_value is none -%}
                 {%- set data_value = '' -%}
               {%- endif -%}
-              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}" data-key="{{ col.key }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>
-                {{ display_value }}
-              </td>
+              <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}" data-key="{{ col.key }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>{{ display_value | trim }}</td>
             {%- endfor %}
           </tr>
           {%- endfor %}

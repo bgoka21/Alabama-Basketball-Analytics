@@ -2,6 +2,7 @@
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
+from markupsafe import Markup
 from sqlalchemy import func, desc, and_, case
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
@@ -35,6 +36,7 @@ from models.database import (
     SkillEntry,
 )
 from services.nba_stats import get_yesterdays_summer_stats, PLAYERS
+from app.utils.table_cells import pct, ratio, num, dt_iso
 
 
 public_bp = Blueprint(
@@ -95,6 +97,20 @@ def get_all_game_ids_for_current_season():
 def get_last_n_game_ids(n):
     """Return the IDs of the last n games by date."""
     return [g.id for g in Game.query.order_by(Game.game_date.desc()).limit(n).all()]
+
+
+def _player_cell(name, can_link=True):
+    """Return a render_table-compatible cell for a player name."""
+
+    if can_link:
+        url = url_for('admin.player_detail', player_name=name)
+        return {
+            'display': Markup(
+                f'<a href="{url}" class="text-blue-600 hover:underline">{name}</a>'
+            ),
+            'data_value': name,
+        }
+    return {'display': name, 'data_value': name}
 
 
 # ───────────────────────────────────────────────
@@ -350,14 +366,72 @@ def game_homepage():
         "avg_ppg": avg_ppg,
     }
 
+    can_link = current_user.is_authenticated and (
+        current_user.is_admin or not current_user.is_player
+    )
+
+    bcp_rows = []
+    for player, total_bcp, possessions, poss_per_bcp in bcp_leaders:
+        if poss_per_bcp is None:
+            poss_display = "—"
+            poss_value = ""
+        else:
+            poss_display = f"{poss_per_bcp:.2f}"
+            poss_value = f"{float(poss_per_bcp):.6f}"
+        bcp_rows.append(
+            {
+                "player": _player_cell(player, can_link),
+                "player_sort": player,
+                "total_bcp": num(round(total_bcp, 1)),
+                "possessions": num(possessions),
+                "poss_per_bcp": {"display": poss_display, "data_value": poss_value},
+            }
+        )
+
+    hard_hat_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "hard_hats": num(count),
+        }
+        for player, count in hard_hats
+    ]
+
+    fg3_rows = []
+    for r in fg3_leaders:
+        makes = int(r.fg3m or 0)
+        attempts = int(r.fg3a or 0)
+        fg3_rows.append(
+            {
+                "player": _player_cell(r.player_name, can_link),
+                "player_sort": r.player_name,
+                "fg": ratio(makes, attempts, show_pct=False),
+                "fg_pct": pct((r.fg3_pct / 100) if r.fg3_pct is not None else None),
+            }
+        )
+
+    atr_rows = []
+    for r in atr_leaders:
+        makes = int(r.atrm or 0)
+        attempts = int(r.atra or 0)
+        atr_rows.append(
+            {
+                "player": _player_cell(r.player_name, can_link),
+                "player_sort": r.player_name,
+                "fg": ratio(makes, attempts, show_pct=False),
+                "fg_pct": pct((r.atr_pct / 100) if r.atr_pct is not None else None),
+            }
+        )
+
     return render_template(
         "home.html",
-        bcp_leaders=bcp_leaders,
-        hard_hats=hard_hats,
-        fg3_leaders=fg3_leaders,
-        atr_leaders=atr_leaders,
+        bcp_rows=bcp_rows,
+        hard_hat_rows=hard_hat_rows,
+        fg3_rows=fg3_rows,
+        atr_rows=atr_rows,
         filter_opt=filter_opt,
         view_opt=view_opt,
+        sort_by=sort_by,
         active_page="home",
         summary=summary,
     )
@@ -524,8 +598,8 @@ def practice_homepage(active_page="practice_home"):
                     elif ev.get('event') == 'sprint_losses':
                         sl += 1
 
-            pct = (wins / (wins + losses) * 100) if (wins + losses) else 0
-            records.append((player, f"{int(wins)}-{int(losses)}", pct))
+            win_pct_val = (wins / (wins + losses) * 100) if (wins + losses) else 0
+            records.append((player, f"{int(wins)}-{int(losses)}", win_pct_val))
             sprint_wins.append((player, sw))
             sprint_losses.append((player, sl))
             pps_rows.append((player, totals.points_per_shot))
@@ -541,7 +615,6 @@ def practice_homepage(active_page="practice_home"):
             reverse=True,
         )
         overall_records = sorted(records, key=lambda x: x[2], reverse=True)
-        overall_records = [(n, rec, f"{pct:.1f}%") for n, rec, pct in overall_records]
         sprint_wins.sort(key=lambda x: x[1], reverse=True)
         sprint_losses.sort(key=lambda x: x[1])
         pps_leaders = sorted(pps_rows, key=lambda x: x[1], reverse=True)
@@ -638,10 +711,9 @@ def practice_homepage(active_page="practice_home"):
         overall_records = []
         for r in records_raw:
             total = (r.wins or 0) + (r.losses or 0)
-            pct = (r.wins / total * 100) if total else 0
-            overall_records.append((r.player_name, f"{int(r.wins)}-{int(r.losses)}", pct))
+            win_pct_val = (r.wins / total * 100) if total else 0
+            overall_records.append((r.player_name, f"{int(r.wins)}-{int(r.losses)}", win_pct_val))
         overall_records.sort(key=lambda x: x[2], reverse=True)
-        overall_records = [(name, rec, f"{pct:.1f}%") for name, rec, pct in overall_records]
 
         # ─── Sprint Wins ────────────────────────────────────────────────────
         sprint_wins_q = (
@@ -700,16 +772,102 @@ def practice_homepage(active_page="practice_home"):
 
         pps_leaders.sort(key=lambda x: x[1], reverse=True)
 
+    can_link = current_user.is_authenticated and (
+        current_user.is_admin or not current_user.is_player
+    )
+
+    def decimal_cell(value, places=1):
+        if value is None:
+            return {"display": "-", "data_value": ""}
+        display = f"{value:.{places}f}"
+        return {"display": display, "data_value": f"{float(value):.6f}"}
+
+    dunk_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "dunks": num(count),
+        }
+        for player, count in dunks
+    ]
+
+    bcp_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "bcp": decimal_cell(total, places=1),
+            "wins": num(wins),
+        }
+        for player, total, wins in bcp_leaders
+    ]
+
+    atr_rows = [
+        {
+            "player": _player_cell(p.player_name, can_link),
+            "player_sort": p.player_name,
+            "fg": ratio(p.atrm or 0, p.atra or 0, show_pct=False),
+            "pct": pct((p.atr_pct / 100) if p.atr_pct is not None else None),
+        }
+        for p in atr_leaders
+    ]
+
+    fg3_rows = [
+        {
+            "player": _player_cell(p.player_name, can_link),
+            "player_sort": p.player_name,
+            "fg": ratio(p.fg3m or 0, p.fg3a or 0, show_pct=False),
+            "pct": pct((p.fg3_pct / 100) if p.fg3_pct is not None else None),
+        }
+        for p in fg3_leaders
+    ]
+
+    pps_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "pps": decimal_cell(pps, places=2),
+        }
+        for player, pps in pps_leaders
+    ]
+
+    overall_record_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "record": {"display": record, "data_value": record},
+            "win_pct": pct((pct_val / 100) if pct_val is not None else None),
+        }
+        for player, record, pct_val in overall_records
+    ]
+
+    sprint_win_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "wins": num(wins),
+        }
+        for player, wins in sprint_wins
+    ]
+
+    sprint_loss_rows = [
+        {
+            "player": _player_cell(player, can_link),
+            "player_sort": player,
+            "losses": num(losses),
+        }
+        for player, losses in sprint_losses
+    ]
+
     return render_template(
         "practice_home.html",
-        dunks=dunks,
-        bcp_leaders=bcp_leaders,
-        atr_leaders=atr_leaders,
-        fg3_leaders=fg3_leaders,
-        pps_leaders=pps_leaders,
-        overall_records=overall_records,
-        sprint_wins=sprint_wins,
-        sprint_losses=sprint_losses,
+        dunk_rows=dunk_rows,
+        bcp_rows=bcp_rows,
+        atr_rows=atr_rows,
+        fg3_rows=fg3_rows,
+        pps_rows=pps_rows,
+        overall_record_rows=overall_record_rows,
+        sprint_win_rows=sprint_win_rows,
+        sprint_loss_rows=sprint_loss_rows,
         active_page=active_page,
         label_options=label_options,
         selected_labels=selected_labels,
@@ -819,7 +977,19 @@ def skill_dev():
         .order_by(SkillEntry.date.desc())
         .all()
     )
-    return render_template('skill_dev.html', nba100_entries=entries)
+
+    nba100_rows = []
+    for entry in entries:
+        iso_date = entry.date.isoformat() if entry.date else None
+        pretty_date = entry.date.strftime('%b %d, %Y') if entry.date else ''
+        nba100_rows.append(
+            {
+                'date': dt_iso(iso_date, pretty_date),
+                'makes': num(entry.value),
+            }
+        )
+
+    return render_template('skill_dev.html', nba100_rows=nba100_rows)
 
 
 @public_bp.route('/nba100', methods=['POST'])

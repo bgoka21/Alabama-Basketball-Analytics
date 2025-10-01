@@ -1,5 +1,6 @@
 {# templates/public/home.html #}
 {% extends 'admin/base.html' %}
+{% from 'macros/table.html' import render_table %}
 {% block content %}
 <a href="{{ url_for('pdf_home') }}" class="btn no-print">Download PDF</a>
 
@@ -58,155 +59,77 @@
 <!-- 2x2 Grid Layout: 4 Equal Leaderboard Boxes -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-<!-- Blue Collar Points Leaders -->
-<div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-  <h2 class="text-xl font-semibold mb-4">Blue Collar Points Leaders</h2>
-  <table class="min-w-full whitespace-no-wrap">
-    <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-      <tr>
-        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-          Player
-        </th>
-        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-          <a href="{{ url_for('public.homepage', sort='bcp', filter=filter_opt) }}"
-             class="{{ 'text-white bg-[#9E1B32]' if request.args.get('sort','bcp')=='bcp' else 'text-gray-700 hover:underline' }} inline-block px-2 py-1 rounded">
-            Total BCP
-          </a>
-        </th>
-        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-          Possessions
-        </th>
-        <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">
-          <a href="{{ url_for('public.homepage', sort='efficiency', filter=filter_opt) }}"
-             class="{{ 'text-white bg-[#9E1B32]' if request.args.get('sort')=='efficiency' else 'text-gray-700 hover:underline' }} inline-block px-2 py-1 rounded">
-            Poss / BCP
-          </a>
-        </th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-200">
-      {% for player, total_bcp, possessions, poss_per_bcp in bcp_leaders %}
-      <tr class="bg-white hover:bg-gray-50">
-        <td class="px-6 py-4 text-sm text-gray-800">
-          {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-            <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-          {% else %}
-            {{ player }}
-          {% endif %}
-        </td>
-        <td class="px-6 py-4 text-sm text-gray-800">{{ '%.1f'|format(total_bcp) }}</td>
-        <td class="px-6 py-4 text-sm text-gray-800">{{ possessions }}</td>
-        <td class="px-6 py-4 text-sm text-gray-800">
-          {% if poss_per_bcp is not none %}
-            {{ '%.2f'|format(poss_per_bcp) }}
-          {% else %}
-            —
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{% set bcp_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'total_bcp', 'label': 'Total BCP', 'sortable': True, 'align': 'right'},
+  {'key': 'possessions', 'label': 'Possessions', 'sortable': True, 'align': 'right'},
+  {'key': 'poss_per_bcp', 'label': 'Poss / BCP', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Blue Collar Points Leaders</h2>
+  {{ render_table(
+      id='home-bcp',
+      columns=bcp_cols,
+      rows=bcp_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Blue Collar Points Leaders'
+  ) }}
 </div>
 
-  
+{% set hard_hat_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'hard_hats', 'label': 'Hard Hats Won', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Hard Hats</h2>
+  {{ render_table(
+      id='home-hard-hats',
+      columns=hard_hat_cols,
+      rows=hard_hat_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='Hard Hat Winners'
+  ) }}
+</div>
 
-  <!-- Hard Hat Winners -->
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">Hard Hats</h2>
-    <table class="min-w-full whitespace-no-wrap">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">Hard Hats Won</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for player, count in hard_hats %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm text-gray-800">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=player) }}" class="text-blue-600 hover:underline">{{ player }}</a>
-            {% else %}
-              {{ player }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm text-gray-800 font-semibold">{{ count }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set fg3_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'fg', 'label': 'FG', 'sortable': True, 'align': 'right'},
+  {'key': 'fg_pct', 'label': 'FG%', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">3FG% Leaders</h2>
+  {{ render_table(
+      id='home-fg3',
+      columns=fg3_cols,
+      rows=fg3_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='3FG% Leaders'
+  ) }}
+</div>
 
-  <!-- 3FG% Leaders -->
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">3FG% Leaders</h2>
-    <table class="min-w-full whitespace-no-wrap">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">FG</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">FG%</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for p in fg3_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm text-gray-800">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=p.player_name) }}" class="text-blue-600 hover:underline">{{ p.player_name }}</a>
-            {% else %}
-              {{ p.player_name }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm text-gray-800">{{ p.fg3m }}-{{ p.fg3a }}</td>
-          <td class="px-6 py-4 text-sm text-gray-800">
-            {% if p.fg3_pct is not none %}
-              {{ '%.1f'|format(p.fg3_pct) }}%
-            {% else %}
-              —
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- ATR% Leaders -->
-  <div class="bg-white shadow rounded-lg p-6 overflow-x-auto">
-    <h2 class="text-xl font-semibold mb-4">ATR% Leaders</h2>
-    <table class="min-w-full whitespace-no-wrap">
-      <thead class="bg-gray-100 border-b-4 border-[#9E1B32]">
-        <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">Player</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">FG</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase">FG%</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for p in atr_leaders %}
-        <tr class="bg-white hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm text-gray-800">
-            {% if current_user.is_authenticated and (current_user.is_admin or not current_user.is_player) %}
-              <a href="{{ url_for('admin.player_detail', player_name=p.player_name) }}" class="text-blue-600 hover:underline">{{ p.player_name }}</a>
-            {% else %}
-              {{ p.player_name }}
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-sm text-gray-800">{{ p.atrm }}-{{ p.atra }}</td>
-          <td class="px-6 py-4 text-sm text-gray-800">
-            {% if p.atr_pct is not none %}
-              {{ '%.1f'|format(p.atr_pct) }}%
-            {% else %}
-              —
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set atr_cols = [
+  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+  {'key': 'fg', 'label': 'FG', 'sortable': True, 'align': 'right'},
+  {'key': 'fg_pct', 'label': 'ATR%', 'sortable': True, 'align': 'right'},
+] %}
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">ATR% Leaders</h2>
+  {{ render_table(
+      id='home-atr',
+      columns=atr_cols,
+      rows=atr_rows,
+      totals=None,
+      dense=True,
+      sticky_header=True,
+      caption='ATR% Leaders'
+  ) }}
+</div>
 
 </div>
 
