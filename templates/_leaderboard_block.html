@@ -140,6 +140,30 @@
   ) %}
   {{ render_dual_section('Collisions — Gap Help', table, practice_note) }}
 
+{% elif selected.key == 'pass_contest' %}
+  {% set columns = ["Contest +", "Contest Att", "Contest %"] %}
+  {% set column_map = {
+    "Contest +": ("plus", "contest_plus", "pass_contest_plus"),
+    "Contest Att": ("opps", "contest_opp", "contest_opps", "pass_contest_opp", "pass_contest_opps"),
+    "Contest %": ("pct", "contest_pct", "pass_contest_pct"),
+  } %}
+  {% set pct_columns = ["Contest %"] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=pass_contest_rows,
+    last_rows=pass_contest_last_rows,
+    season_totals=pass_contest_totals,
+    last_totals=pass_contest_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-pass-contest',
+    default_sort=['pct', 'opps', 'plus']
+  ) %}
+  {{ render_dual_section('Pass Contests', table, practice_note) }}
+
 {% elif selected.key == 'overall_gap_help' %}
   {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
   {% set column_map = {
