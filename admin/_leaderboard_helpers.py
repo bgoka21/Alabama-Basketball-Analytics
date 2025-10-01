@@ -617,6 +617,75 @@ def prepare_dual_context(context: DualContextResult, stat_key: Optional[str]) ->
         ctx["last_team_totals"] = _normalize_simple_totals(ctx.get("last_team_totals"), indexes=total_indexes)
         return ctx
 
+    contest_keys = {
+        "atr_contest_breakdown": "atr",
+        "fg2_contest_breakdown": "fg2",
+        "fg3_contest_breakdown": "fg3",
+    }
+
+    if stat_key in contest_keys:
+        sc = contest_keys[stat_key]
+        specs = (
+            {
+                "subtype": "contest",
+                "plus_keys": (
+                    "contest_makes",
+                    f"{sc}_contest_makes",
+                    f"{sc}_contest_plus",
+                ),
+                "opps_keys": (
+                    "contest_attempts",
+                    f"{sc}_contest_attempts",
+                    f"{sc}_contest_opps",
+                ),
+                "pct_keys": (
+                    "contest_pct",
+                    f"{sc}_contest_pct",
+                ),
+            },
+            {
+                "subtype": "late",
+                "plus_keys": (
+                    "late_makes",
+                    f"{sc}_late_makes",
+                    f"{sc}_late_plus",
+                ),
+                "opps_keys": (
+                    "late_attempts",
+                    f"{sc}_late_attempts",
+                    f"{sc}_late_opps",
+                ),
+                "pct_keys": (
+                    "late_pct",
+                    f"{sc}_late_pct",
+                ),
+            },
+            {
+                "subtype": "no_contest",
+                "plus_keys": (
+                    "no_contest_makes",
+                    f"{sc}_no_contest_makes",
+                    f"{sc}_no_contest_plus",
+                ),
+                "opps_keys": (
+                    "no_contest_attempts",
+                    f"{sc}_no_contest_attempts",
+                    f"{sc}_no_contest_opps",
+                ),
+                "pct_keys": (
+                    "no_contest_pct",
+                    f"{sc}_no_contest_pct",
+                ),
+            },
+        )
+        ctx["season_rows"] = _normalize_split_rows(ctx.get("season_rows"), specs)
+        ctx["last_rows"] = _normalize_split_rows(ctx.get("last_rows"), specs)
+        ctx["season_team_totals"] = _normalize_split_totals(ctx.get("season_team_totals"), specs)
+        ctx["last_team_totals"] = _normalize_split_totals(ctx.get("last_team_totals"), specs)
+        ctx["season_rows_by_subtype"] = _group_by_subtype(ctx.get("season_rows"))
+        ctx["last_rows_by_subtype"] = _group_by_subtype(ctx.get("last_rows"))
+        return ctx
+
     if stat_key == "def_rebounding":
         row_indexes = {"player": 0, "plus": 1, "opps": 2, "pct": 3}
         total_indexes = {"plus": 0, "opps": 1, "pct": 2}

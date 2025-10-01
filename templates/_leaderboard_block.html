@@ -164,6 +164,45 @@
   ) %}
   {{ render_dual_section('Pass Contests', table, practice_note) }}
 
+{% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
+  {% set label_map = {
+    'atr_contest_breakdown': 'ATR',
+    'fg2_contest_breakdown': '2FG',
+    'fg3_contest_breakdown': '3FG',
+  } %}
+  {% set shot_label = label_map.get(selected.key, 'Shot') %}
+  {% set columns = [
+    'Contest Att', 'Contest Makes', 'Contest FG%',
+    'Late Att', 'Late Makes', 'Late FG%',
+    'No Contest Att', 'No Contest Makes', 'No Contest FG%'
+  ] %}
+  {% set column_map = {
+    'Contest Att': ('opps', 'contest_attempts'),
+    'Contest Makes': ('plus', 'contest_makes'),
+    'Contest FG%': ('pct', 'contest_pct'),
+    'Late Att': ('opps', 'late_attempts'),
+    'Late Makes': ('plus', 'late_makes'),
+    'Late FG%': ('pct', 'late_pct'),
+    'No Contest Att': ('opps', 'no_contest_attempts'),
+    'No Contest Makes': ('plus', 'no_contest_makes'),
+    'No Contest FG%': ('pct', 'no_contest_pct'),
+  } %}
+  {% set pct_columns = ['Contest FG%', 'Late FG%', 'No Contest FG%'] %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=shot_contest_rows,
+    last_rows=shot_contest_last_rows,
+    season_totals=shot_contest_totals,
+    last_totals=shot_contest_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-shot-contest-' ~ selected.key.split('_')[0],
+  ) %}
+  {{ render_dual_section(shot_label ~ ' Shot Contests', table, practice_note) }}
+
 {% elif selected.key == 'overall_gap_help' %}
   {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
   {% set column_map = {

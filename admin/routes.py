@@ -429,6 +429,54 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
         team_opps = total_bump_positive + total_bump_missed
         team_pct = (total_bump_positive / team_opps * 100) if team_opps else 0
         team_totals = (total_bump_positive, team_opps, team_pct)
+    elif stat_key in {
+        'atr_contest_breakdown',
+        'fg2_contest_breakdown',
+        'fg3_contest_breakdown',
+    }:
+        sc = stat_key.split('_', 1)[0]
+        suffixes = (
+            ('contest', 'contest'),
+            ('late', 'late'),
+            ('no_contest', 'no_contest'),
+        )
+        team_totals_map = {
+            key: {'plus': 0, 'opps': 0}
+            for key, _ in suffixes
+        }
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            entry = {'player': p}
+            for suffix_key, subtype in suffixes:
+                makes_key = f'{sc}_{suffix_key}_makes'
+                attempts_key = f'{sc}_{suffix_key}_attempts'
+                makes = safe_int(row.get(makes_key))
+                attempts = safe_int(row.get(attempts_key))
+                pct = make_pct(makes, attempts)
+                entry[f'{subtype}_makes'] = makes
+                entry[f'{subtype}_attempts'] = attempts
+                entry[f'{subtype}_pct'] = pct
+                team_totals_map[subtype]['plus'] += makes
+                team_totals_map[subtype]['opps'] += attempts
+            leaderboard.append(entry)
+
+        def _sort_key(item):
+            pct = item.get('contest_pct')
+            attempts = item.get('contest_attempts', 0)
+            return ((pct if pct is not None else -1e9), attempts)
+
+        leaderboard.sort(key=_sort_key, reverse=True)
+
+        team_totals = {
+            subtype: {
+                'plus': totals['plus'],
+                'opps': totals['opps'],
+                'pct': make_pct(totals['plus'], totals['opps']),
+            }
+            for subtype, totals in team_totals_map.items()
+        }
     elif stat_key.endswith('_fg_pct'):
         for player in players:
             details = shot_details.get(player, {})
@@ -1173,6 +1221,9 @@ _PRACTICE_DUAL_MAP = {
     "overall_gap_help": lambda: compute_overall_gap_help,
     "overall_low_man": lambda: compute_overall_low_man,
     "pnr_grade": lambda: compute_pnr_grade,
+    "atr_contest_breakdown": lambda: _build_stat_compute("atr_contest_breakdown"),
+    "fg2_contest_breakdown": lambda: _build_stat_compute("fg2_contest_breakdown"),
+    "fg3_contest_breakdown": lambda: _build_stat_compute("fg3_contest_breakdown"),
 }
 
 
@@ -1312,6 +1363,9 @@ def _split_leaderboard_rows_for_template(
         "pass_contest",
         "overall_gap_help",
         "overall_low_man",
+        "atr_contest_breakdown",
+        "fg2_contest_breakdown",
+        "fg3_contest_breakdown",
     }
     if stat_key not in practice_keys | {"pnr_grade"}:
         return {}
@@ -1376,6 +1430,63 @@ def _split_leaderboard_rows_for_template(
             f"{prefix}_totals": normalized.get("season_team_totals") or {},
             f"{prefix}_last_rows": normalized.get("last_rows") or [],
             f"{prefix}_last_totals": normalized.get("last_team_totals") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
+
+    contest_keys = {
+        "atr_contest_breakdown": "ATR",
+        "fg2_contest_breakdown": "2FG",
+        "fg3_contest_breakdown": "3FG",
+    }
+
+    if stat_key in contest_keys:
+        season_by = normalized.get("season_rows_by_subtype") or {}
+        last_by = normalized.get("last_rows_by_subtype") or {}
+        totals_by = normalized.get("season_team_totals") or {}
+        last_totals_by = normalized.get("last_team_totals") or {}
+
+        def _combine(rows):
+            combined = {}
+            for entry in rows or []:
+                player = entry.get("player")
+                if not player:
+                    continue
+                subtype = entry.get("subtype")
+                if not subtype:
+                    continue
+                record = combined.setdefault(
+                    player,
+                    {
+                        "player": player,
+                        "jersey": entry.get("jersey"),
+                    },
+                )
+                record[f"{subtype}_makes"] = entry.get("plus")
+                record[f"{subtype}_attempts"] = entry.get("opps")
+                record[f"{subtype}_pct"] = entry.get("pct")
+            return list(combined.values())
+
+        def _totals_map(container):
+            contest = container.get("contest") or {}
+            late = container.get("late") or {}
+            no_contest = container.get("no_contest") or {}
+            return {
+                "contest_makes": contest.get("plus"),
+                "contest_attempts": contest.get("opps"),
+                "contest_pct": contest.get("pct"),
+                "late_makes": late.get("plus"),
+                "late_attempts": late.get("opps"),
+                "late_pct": late.get("pct"),
+                "no_contest_makes": no_contest.get("plus"),
+                "no_contest_attempts": no_contest.get("opps"),
+                "no_contest_pct": no_contest.get("pct"),
+            }
+
+        return {
+            "shot_contest_rows": _combine(normalized.get("season_rows")),
+            "shot_contest_last_rows": _combine(normalized.get("last_rows")),
+            "shot_contest_totals": _totals_map(totals_by),
+            "shot_contest_last_totals": _totals_map(last_totals_by),
             "last_practice_date": normalized.get("last_practice_date"),
         }
 

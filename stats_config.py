@@ -90,6 +90,13 @@ for sc in ["atr", "fg2", "fg3"]:
             },
         ])
 
+    LEADERBOARD_STATS.append(
+        {
+            "key": f"{sc}_contest_breakdown",
+            "label": f"{base_label} Shot Contests",
+        }
+    )
+
 # ─── Detailed Shot Type FG% Categories (hidden from dropdown for now) ─────────
 shot_classes = ["atr", "fg2", "fg3"]
 labels = ["Assisted", "Non-Assisted"]
