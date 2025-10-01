@@ -302,6 +302,41 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
             team_low_opp,
             make_pct(team["low_plus"], team_low_opp),
         )
+    elif stat_key == 'pass_contest':
+        team = {
+            "contest_plus": 0,
+            "contest_minus": 0,
+        }
+
+        for player in players:
+            row = core_rows.get(player, {})
+            p = row.get('player', player)
+            contest_plus = safe_int(row.get('pass_contest_positive'))
+            contest_minus = safe_int(row.get('pass_contest_missed'))
+
+            contest_opp = contest_plus + contest_minus
+            contest_pct = make_pct(contest_plus, contest_opp)
+
+            leaderboard.append(
+                (
+                    p,
+                    contest_plus,
+                    contest_opp,
+                    contest_pct,
+                )
+            )
+
+            team["contest_plus"] += contest_plus
+            team["contest_minus"] += contest_minus
+
+        leaderboard.sort(key=lambda r: ((r[2] or -1e9), r[1]), reverse=True)
+
+        team_contest_opp = team["contest_plus"] + team["contest_minus"]
+        team_totals = (
+            team["contest_plus"],
+            team_contest_opp,
+            make_pct(team["contest_plus"], team_contest_opp),
+        )
     elif stat_key == 'pnr_gap_help':
         team = {
             "gap_plus": 0, "gap_minus": 0,
@@ -1134,6 +1169,7 @@ _PRACTICE_DUAL_MAP = {
     "def_rebounding": lambda: compute_defensive_rebounding,
     "defense": lambda: compute_defense_bumps,
     "collision_gap_help": lambda: compute_collisions_gap_help,
+    "pass_contest": lambda: compute_pass_contest,
     "overall_gap_help": lambda: compute_overall_gap_help,
     "overall_low_man": lambda: compute_overall_low_man,
     "pnr_grade": lambda: compute_pnr_grade,
@@ -1273,6 +1309,7 @@ def _split_leaderboard_rows_for_template(
         "def_rebounding",
         "defense",
         "collision_gap_help",
+        "pass_contest",
         "overall_gap_help",
         "overall_low_man",
     }
@@ -1327,6 +1364,7 @@ def _split_leaderboard_rows_for_template(
 
     simple_dual_prefix = {
         "collision_gap_help": "collision",
+        "pass_contest": "pass_contest",
         "overall_gap_help": "overall_gap",
         "overall_low_man": "overall_low",
     }
@@ -1405,6 +1443,7 @@ compute_offensive_rebounding = _build_stat_compute("off_rebounding")
 compute_defensive_rebounding = _build_stat_compute("def_rebounding")
 compute_defense_bumps = _build_stat_compute("defense")
 compute_collisions_gap_help = _build_stat_compute("collision_gap_help")
+compute_pass_contest = _build_stat_compute("pass_contest")
 
 
 _PLAYER_KEY_ALIASES = ("player_name", "player", "name")
@@ -5956,6 +5995,17 @@ def leaderboard_collisions_gap_help():
         page_title='Collisions – Gap Help',
         compute_fn=compute_collisions_gap_help,
         stat_key='collision_gap_help',
+    )
+
+
+@admin_bp.route('/leaderboard/defense/pass-contests')
+@login_required
+def leaderboard_pass_contests():
+    return _render_dual_leaderboard(
+        'leaderboard/pass_contests.html',
+        page_title='Pass Contests',
+        compute_fn=compute_pass_contest,
+        stat_key='pass_contest',
     )
 
 
