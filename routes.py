@@ -18,6 +18,11 @@ from datetime import date
 from types import SimpleNamespace
 from flask_login import login_required
 from utils.auth import admin_required
+from utils.leaderboard_helpers import (
+    get_on_off_summary,
+    get_turnover_rates_onfloor,
+    get_rebound_rates_onfloor,
+)
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
@@ -281,43 +286,24 @@ def player_view(player_name):
     label_set = {lbl.upper() for lbl in selected_labels}
 
     # 1. On-court offensive possessions & points
-    offense_sides = ('Offense', 'Crimson', 'White')
-    on_q = (
-        db.session.query(
-            func.count(PossessionPlayer.id),
-            func.coalesce(func.sum(Possession.points_scored), 0),
-        )
-        .join(Possession, PossessionPlayer.possession_id == Possession.id)
-        .filter(
-            PossessionPlayer.player_id == player.id,
-            Possession.possession_side.in_(offense_sides),
-        )
+    offense_sides = ('Offense',)
+    helper_labels = list(label_set) if label_set else None
+    summary = get_on_off_summary(
+        player_id=player.id,
+        labels=helper_labels,
     )
-    if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        on_q = on_q.filter(or_(*clauses))
-    ON_poss, ON_pts = on_q.one()
-
-    # 2. Team totals (all offense)
-    team_q = (
-        db.session.query(
-            func.count(Possession.id),
-            func.coalesce(func.sum(Possession.points_scored), 0),
-        )
-        .filter(Possession.possession_side.in_(offense_sides))
+    turnover_rates = get_turnover_rates_onfloor(
+        player_id=player.id,
+        labels=helper_labels,
     )
-    if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        team_q = team_q.filter(or_(*clauses))
-    TEAM_poss, TEAM_pts = team_q.one()
+    rebound_rates = get_rebound_rates_onfloor(
+        player_id=player.id,
+        labels=helper_labels,
+    )
 
-    # 3. Off-court
-    OFF_poss = TEAM_poss - ON_poss
-    OFF_pts  = TEAM_pts - ON_pts
-
-    # 4. PPP calculations
-    PPP_ON  = ON_pts  / ON_poss if ON_poss else 0
-    PPP_OFF = OFF_pts / OFF_poss if OFF_poss else 0
+    ON_poss = summary.offensive_possessions_on
+    PPP_ON = summary.ppp_on_offense or 0.0
+    PPP_OFF = summary.ppp_off_offense or 0.0
 
     # helper to count shot/event details on-court
     def count_event(ev_type):
@@ -346,8 +332,10 @@ def player_view(player_name):
     FG3_pct = count_event('3FG+') / (count_event('3FG+') + count_event('3FG-')) if (count_event('3FG+') + count_event('3FG-')) else 0
 
     # 6. Rate metrics
-    turnover_rate     = count_event('Turnover') / ON_poss if ON_poss else 0
-    off_reb_rate      = count_event('Off Rebound') / ON_poss if ON_poss else 0
+    turnover_pct = turnover_rates.get('team_turnover_rate_on') or 0.0
+    turnover_rate     = (turnover_pct / 100) if ON_poss else 0
+    off_reb_pct = rebound_rates.get('off_reb_rate_on') or 0.0
+    off_reb_rate      = (off_reb_pct / 100) if ON_poss else 0
     fouls_drawn_rate  = count_event('Fouled') / ON_poss if ON_poss else 0
 
     player_summary_rows = [
