@@ -1977,6 +1977,59 @@ def _parse_iso_date(value):
         return None
 
 
+def _extract_payload_value(payload, key):
+    if payload is None:
+        return None
+
+    getter = getattr(payload, "getlist", None)
+    if callable(getter):
+        values = getter(key)
+        if not values:
+            return None
+        if len(values) == 1:
+            return values[0]
+        return values
+
+    return payload.get(key)
+
+
+def _ensure_iterable(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if isinstance(value, str):
+        return [segment.strip() for segment in value.split(',') if segment.strip()]
+    return [value]
+
+
+def _parse_int_list(value):
+    parsed = []
+    for item in _ensure_iterable(value):
+        try:
+            if item in (None, ""):
+                continue
+            parsed.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return parsed
+
+
+def _parse_str_list(value):
+    parsed = []
+    for item in _ensure_iterable(value):
+        text = str(item).strip()
+        if text:
+            parsed.append(text)
+    return parsed
+
+
+def _ensure_scalar(value):
+    if isinstance(value, (list, tuple)):
+        return value[0] if value else None
+    return value
+
+
 def _flatten_practice_field_catalog():
     """Return mapping of practice stat key to catalog entry (with group info)."""
 
@@ -2686,31 +2739,240 @@ def custom_stats_table_partial():
 @admin_bp.route('/custom-stats/export/csv', methods=['POST'])
 @admin_required
 def export_custom_stats_csv():
-    data = request.get_json(silent=True) or {}
-    dataset = _build_practice_table_dataset(data)
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = request.form
 
-    output = io.StringIO()
-    writer = csv.writer(output)
+    player_ids = _parse_int_list(_extract_payload_value(payload, 'player_ids'))
+    fields = _parse_str_list(_extract_payload_value(payload, 'fields'))
 
-    headers = [col['label'] for col in dataset['columns']]
+    date_from = _ensure_scalar(_extract_payload_value(payload, 'date_from'))
+    date_to = _ensure_scalar(_extract_payload_value(payload, 'date_to'))
+
+    raw_mode = _ensure_scalar(_extract_payload_value(payload, 'mode'))
+    if isinstance(raw_mode, str):
+        raw_mode = raw_mode.strip()
+    mode = raw_mode if raw_mode in {'totals', 'per_practice'} else 'totals'
+
+    labels = _extract_payload_value(payload, 'labels')
+
+    dataset_payload = {
+        'player_ids': player_ids,
+        'fields': fields,
+        'date_from': date_from,
+        'date_to': date_to,
+        'mode': mode,
+    }
+    if labels not in (None, ''):
+        dataset_payload['labels'] = labels
+
+    dataset = _build_practice_table_dataset(dataset_payload)
+    rows = dataset.get('rows', [])
+
+    catalog = _flatten_practice_field_catalog()
+    headers = ['Player'] + [catalog.get(key, {}).get('label', key) for key in fields]
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
     writer.writerow(headers)
 
-    for row in dataset['rows']:
-        csv_row = []
-        for col in dataset['columns']:
-            key = col['key']
+    for row in rows:
+        player_cell = row.get('player') or row.get('name') or row.get('player_name')
+        player_display = '—' if player_cell in (None, '') else str(player_cell)
+        csv_row = [player_display]
+
+        for key in fields:
             cell = row.get(key)
             if isinstance(cell, Mapping):
-                display = cell.get('display', '')
+                display = cell.get('display')
             else:
-                display = cell or ''
-            csv_row.append(display)
+                display = cell
+
+            if display in (None, ''):
+                csv_row.append('—')
+            else:
+                csv_row.append(str(display))
+
         writer.writerow(csv_row)
 
-    response = make_response(output.getvalue())
-    response.headers['Content-Type'] = 'text/csv'
-    response.headers['Content-Disposition'] = 'attachment; filename=practice_custom_stats.csv'
+    csv_data = buffer.getvalue()
+    buffer.close()
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    response = make_response(csv_data)
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename="custom_stats_{timestamp}.csv"'
     return response
+
+
+@admin_bp.route('/dev/custom-stats-parity', methods=['GET'])
+@admin_required
+def custom_stats_parity():
+    player_id = request.args.get('player_id', type=int)
+    if not player_id:
+        return jsonify({'error': 'player_id required'}), 400
+
+    date_from_param = request.args.get('date_from')
+    date_to_param = request.args.get('date_to')
+
+    fields_raw = request.args.get('fields', '')
+    fields = _parse_str_list(fields_raw)
+    if not fields:
+        fields = [
+            'shooting_efg_pct',
+            'shooting_pps',
+            'shooting_fg3_freq_pct',
+            'play_ast',
+            'play_to',
+            'play_adj_ast_to_ratio',
+            'play_team_turnover_rate_on',
+            'bc_tips',
+            'adv_ppp_on_offense',
+            'adv_offensive_possessions',
+            'adv_def_reb_rate',
+        ]
+
+    dataset = _build_practice_table_dataset({
+        'player_ids': [player_id],
+        'fields': fields,
+        'date_from': date_from_param,
+        'date_to': date_to_param,
+        'mode': 'totals',
+    })
+    rows = dataset.get('rows') or []
+    row = rows[0] if rows else {}
+
+    roster_entry = db.session.get(Roster, player_id)
+    if not roster_entry:
+        return jsonify({'error': 'player not found'}), 404
+
+    date_from = _parse_iso_date(date_from_param)
+    date_to = _parse_iso_date(date_to_param)
+
+    aggregates = _collect_player_practice_stats(
+        roster_entry,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    totals = dict(aggregates.get('totals', {}))
+    blue_totals = dict(aggregates.get('blue', {}))
+
+    agg = dict(totals)
+    agg.setdefault('assists', totals.get('assists', 0))
+    agg.setdefault('turnovers', totals.get('turnovers', 0))
+    agg.setdefault('second_assists', totals.get('second_assists', 0))
+    agg.setdefault('pot_assists', totals.get('pot_assists', 0))
+    agg['potential_assists'] = totals.get('potential_assists', agg.get('pot_assists', 0))
+    agg['blue_tips'] = blue_totals.get('reb_tip', 0)
+
+    total_fga = _total_fga(agg)
+
+    onoff = get_on_off_summary(
+        player_id=player_id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=None,
+    )
+    to_rates = get_turnover_rates_onfloor(
+        player_id=player_id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=None,
+    ) or {}
+    reb_rates = get_rebound_rates_onfloor(
+        player_id=player_id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=None,
+    ) or {}
+
+    def _normalize_display(cell):
+        if isinstance(cell, Mapping):
+            display = cell.get('display')
+        else:
+            display = cell
+        if display in (None, ''):
+            return '—'
+        return str(display)
+
+    def _expected_display(field):
+        if field == 'shooting_efg_pct':
+            return _fmt_pct(_calc_efg(agg))
+        if field == 'shooting_pps':
+            pps_value = _calc_pps(agg)
+            return f"{pps_value:.2f}" if pps_value is not None else '—'
+        if field == 'shooting_fg3_freq_pct':
+            freq = _pct(_safe_div(agg.get('fg3_attempts', 0), total_fga))
+            return _fmt_pct(freq)
+        if field == 'play_ast':
+            return _fmt_count(agg.get('assists'))
+        if field == 'play_to':
+            return _fmt_count(agg.get('turnovers'))
+        if field == 'play_adj_ast_to_ratio':
+            numerator = (
+                (agg.get('assists', 0) or 0)
+                + (agg.get('second_assists', 0) or 0)
+                + (agg.get('potential_assists', 0) or 0)
+            )
+            ratio = _safe_div(numerator, agg.get('turnovers', 0))
+            return f"{ratio:.2f}" if ratio is not None else '—'
+        if field == 'play_team_turnover_rate_on':
+            return _fmt_pct(to_rates.get('team_turnover_rate_on'))
+        if field == 'bc_tips':
+            return _fmt_count(blue_totals.get('reb_tip'))
+        if field == 'adv_ppp_on_offense':
+            value = onoff.ppp_on_offense if onoff else None
+            return f"{value:.2f}" if value is not None else '—'
+        if field == 'adv_offensive_possessions':
+            value = onoff.offensive_possessions_on if onoff else None
+            return _fmt_count(value)
+        if field == 'adv_def_reb_rate':
+            return _fmt_pct(reb_rates.get('def_reb_rate_on'))
+        return None
+
+    def _to_float_safe(value):
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if not text or text == '—':
+            return None
+        if '•' in text:
+            text = text.split('•')[-1].strip()
+        text = text.replace('%', '').replace(',', '')
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    results = []
+    for field in fields:
+        cs_display = _normalize_display(row.get(field))
+        expected_display = _expected_display(field)
+
+        delta = None
+        cs_numeric = _to_float_safe(cs_display)
+        expected_numeric = _to_float_safe(expected_display)
+        if cs_numeric is not None and expected_numeric is not None:
+            delta = cs_numeric - expected_numeric
+
+        results.append({
+            'field': field,
+            'cs': cs_display,
+            'expected': expected_display,
+            'delta': delta,
+        })
+
+    return jsonify({
+        'player_id': player_id,
+        'date_from': date_from_param,
+        'date_to': date_to_param,
+        'results': results,
+    })
 
 
 @admin_bp.route('/api/presets', methods=['GET'])

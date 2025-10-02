@@ -891,6 +891,29 @@
     return state.html2CanvasPromise;
   }
 
+  function parseFilenameFromDisposition(disposition) {
+    if (!disposition || typeof disposition !== 'string') {
+      return null;
+    }
+
+    const utf8Match = /filename\*\s*=\s*(?:UTF-8''|"?)([^;\"]+)/i.exec(disposition);
+    if (utf8Match && utf8Match[1]) {
+      const candidate = utf8Match[1].replace(/"/g, '').trim();
+      try {
+        return decodeURIComponent(candidate);
+      } catch (error) {
+        return candidate;
+      }
+    }
+
+    const asciiMatch = /filename\s*=\s*"?([^";]+)"?/i.exec(disposition);
+    if (asciiMatch && asciiMatch[1]) {
+      return asciiMatch[1].trim();
+    }
+
+    return null;
+  }
+
   function exportCsv(url, payload) {
     if (!url) {
       alert('CSV export is not configured.');
@@ -910,13 +933,15 @@
         if (!response.ok) {
           throw new Error('Failed to export CSV');
         }
-        return response.blob();
+        const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
+        const filename = parseFilenameFromDisposition(disposition) || 'custom_stats.csv';
+        return response.blob().then((blob) => ({ blob, filename }));
       })
-      .then((blob) => {
+      .then(({ blob, filename }) => {
         const urlObject = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = urlObject;
-        link.download = 'practice_custom_stats.csv';
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
