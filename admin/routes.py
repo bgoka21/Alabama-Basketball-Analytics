@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import datetime as datetime_module
 import io
 import csv
+import json
 import re
 import traceback
 import zipfile
@@ -1930,6 +1931,48 @@ admin_bp.add_app_template_global(build_dual_table, name="build_dual_table")
 admin_bp.add_app_template_global(build_leaderboard_table, name="build_leaderboard_table")
 
 
+def _coerce_player_id(value):
+    if value is None or isinstance(value, bool):
+        raise ValueError("Player ids must be integers")
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError("Player ids must be integers")
+        return int(value)
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            raise ValueError("Player ids must be integers")
+        if text.startswith('+'):
+            text = text[1:]
+        try:
+            return int(text, 10)
+        except ValueError as exc:  # pragma: no cover - defensive branch
+            raise ValueError("Player ids must be integers") from exc
+
+    raise ValueError("Player ids must be integers")
+
+
+def _normalize_preset_player_ids(value):
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("Player ids must be a list of integers")
+
+    normalized = []
+    seen = set()
+    for raw in value:
+        candidate = _coerce_player_id(raw)
+        if candidate not in seen:
+            seen.add(candidate)
+            normalized.append(candidate)
+    return normalized
+
+
 def _serialize_saved_stat_profile(profile: SavedStatProfile) -> dict:
     fields = []
     if profile.fields_json:
@@ -1938,10 +1981,23 @@ def _serialize_saved_stat_profile(profile: SavedStatProfile) -> dict:
         except (TypeError, ValueError):
             fields = []
 
+    player_ids = []
+    if profile.players_json:
+        try:
+            raw_players = json.loads(profile.players_json)
+        except (TypeError, ValueError):
+            raw_players = []
+
+        try:
+            player_ids = _normalize_preset_player_ids(raw_players)
+        except ValueError:
+            player_ids = []
+
     return {
         "id": profile.id,
         "name": profile.name,
         "fields": fields,
+        "player_ids": player_ids,
         "mode_default": profile.mode_default,
         "source_default": profile.source_default,
         "visibility": profile.visibility,
@@ -2576,6 +2632,11 @@ def create_preset_api():
     if not isinstance(fields, list):
         return jsonify({'error': 'Fields must be a list'}), 400
 
+    try:
+        player_ids = _normalize_preset_player_ids(data.get('player_ids'))
+    except ValueError:
+        return jsonify({'error': 'Player ids must be a list of integers'}), 400
+
     visibility = data.get('visibility') or 'team'
     if visibility not in {'team', 'private'}:
         visibility = 'team'
@@ -2583,6 +2644,7 @@ def create_preset_api():
     profile = SavedStatProfile(
         name=name,
         fields_json=json.dumps(fields),
+        players_json=json.dumps(player_ids),
         mode_default=data.get('mode_default') or 'totals',
         source_default=data.get('source_default') or 'practice',
         owner_id=getattr(current_user, 'id', None),
@@ -2622,6 +2684,13 @@ def update_preset_api():
         if not isinstance(fields, list):
             return jsonify({'error': 'Fields must be a list'}), 400
         profile.fields_json = json.dumps(fields)
+
+    if 'player_ids' in data:
+        try:
+            player_ids = _normalize_preset_player_ids(data.get('player_ids'))
+        except ValueError:
+            return jsonify({'error': 'Player ids must be a list of integers'}), 400
+        profile.players_json = json.dumps(player_ids)
 
     if 'mode_default' in data:
         profile.mode_default = data.get('mode_default') or profile.mode_default
