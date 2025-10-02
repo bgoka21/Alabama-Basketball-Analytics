@@ -55,7 +55,7 @@
     hydrateDates(elements, state);
     hydrateModeToggle(elements.modeToggle, state, queueRefresh);
     hydrateAutoRefresh(elements.autoRefresh, state);
-    hydratePresets(config, elements, state, queueRefresh);
+    hydratePresets(config, elements, state, queueRefresh, playerUI);
     hydrateExports(config, elements, state);
 
     function queueRefresh(reason) {
@@ -250,8 +250,12 @@
       const ordered = state.roster
         .filter((entry) => ids.includes(entry.id))
         .map((entry) => entry.id);
+      const prev = state.selectedPlayers.slice();
       state.selectedPlayers = ordered;
-      triggerChange();
+      const changed = prev.length !== ordered.length || prev.some((value, index) => value !== ordered[index]);
+      if (changed) {
+        triggerChange();
+      }
     }
 
     function removePlayer(id) {
@@ -269,6 +273,56 @@
       renderChips();
       renderOptions();
       updateStateFromSelection();
+    }
+
+    function normalizePlayerId(value) {
+      if (typeof value === 'number') {
+        return Number.isInteger(value) ? value : null;
+      }
+      if (typeof value === 'string') {
+        let trimmed = value.trim();
+        if (!trimmed) {
+          return null;
+        }
+        if (trimmed.startsWith('+')) {
+          trimmed = trimmed.slice(1);
+        }
+        if (!/^[-]?\d+$/.test(trimmed)) {
+          return null;
+        }
+        const parsed = Number.parseInt(trimmed, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      }
+      return null;
+    }
+
+    function setSelected(ids) {
+      const prev = state.selectedPlayers.slice();
+      const rosterIds = new Set(state.roster.map((entry) => entry.id));
+      const seen = new Set();
+      const normalized = [];
+      if (Array.isArray(ids)) {
+        ids.forEach((value) => {
+          const parsed = normalizePlayerId(value);
+          if (parsed === null) {
+            return;
+          }
+          if (!rosterIds.has(parsed) || seen.has(parsed)) {
+            return;
+          }
+          seen.add(parsed);
+          normalized.push(parsed);
+        });
+      }
+      state.selectedPlayerIds = new Set(normalized);
+      renderChips();
+      renderOptions();
+      updateStateFromSelection();
+      const next = state.selectedPlayers.slice();
+      if (next.length !== prev.length) {
+        return true;
+      }
+      return next.some((value, index) => value !== prev[index]);
     }
 
     function renderChips() {
@@ -349,6 +403,9 @@
 
     renderChips();
     renderOptions();
+
+    playerUI.setSelected = (ids) => setSelected(Array.isArray(ids) ? ids : []);
+    playerUI.clearSelection = () => setSelected([]);
 
     return playerUI;
   }
@@ -551,7 +608,7 @@
     });
   }
 
-  function hydratePresets(config, elements, state, queueRefresh) {
+  function hydratePresets(config, elements, state, queueRefresh, playerUI) {
     if (!config.presetsUrl) {
       return;
     }
@@ -571,6 +628,7 @@
         const payload = {
           name,
           fields: state.selectedFields.slice(),
+          player_ids: state.selectedPlayers.slice(),
           mode_default: state.mode,
           visibility: 'team',
           source_default: 'practice'
@@ -594,6 +652,11 @@
           })
           .then(() => {
             elements.presetName.value = '';
+            if (playerUI && typeof playerUI.clearSelection === 'function') {
+              playerUI.clearSelection();
+            } else if (playerUI && typeof playerUI.setSelected === 'function') {
+              playerUI.setSelected([]);
+            }
             loadPresets(config.presetsUrl, state, elements);
           })
           .catch((error) => {
@@ -608,6 +671,13 @@
         return;
       }
       let changed = false;
+      if (playerUI && typeof playerUI.setSelected === 'function') {
+        const playerIds = Array.isArray(preset.player_ids) ? preset.player_ids : [];
+        const playersChanged = playerUI.setSelected(playerIds);
+        if (playersChanged) {
+          changed = true;
+        }
+      }
       preset.fields.forEach((key) => {
         if (!state.fieldOrder.has(key)) {
           return;
@@ -731,7 +801,11 @@
       const meta = document.createElement('span');
       meta.className = 'text-xs text-gray-500';
       const fieldCount = Array.isArray(preset.fields) ? preset.fields.length : 0;
-      meta.textContent = `${fieldCount} fields`;
+      const playerCount = Array.isArray(preset.player_ids) ? preset.player_ids.length : 0;
+      const pieces = [];
+      pieces.push(`${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}`);
+      pieces.push(`${playerCount} ${playerCount === 1 ? 'player' : 'players'}`);
+      meta.textContent = pieces.join(' • ');
       const load = document.createElement('button');
       load.type = 'button';
       load.className = 'rounded-md border border-[#9E1B32] px-3 py-1 text-xs font-semibold text-[#9E1B32] hover:bg-[#9E1B32] hover:text-white';
