@@ -2419,7 +2419,6 @@ def _build_practice_table_dataset(request_data):
 
         row_display = {
             'player': roster_entry.player_name,
-            '_practice_count': aggregates['practice_count'],
         }
 
         if selected_fields:
