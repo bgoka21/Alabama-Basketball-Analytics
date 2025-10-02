@@ -2011,13 +2011,69 @@ def _extract_jersey_number(player_name):
         return None
 
 
-def _safe_div(numer, denom):
-    if not denom:
-        return None
+def _safe_div(n, d):
     try:
-        return numer / denom
-    except ZeroDivisionError:
+        return None if d in (0, None) else (n / d)
+    except Exception:
         return None
+
+
+def _pct(n):
+    return None if n is None else n * 100.0
+
+
+def _fmt_count(n):
+    if n is None:
+        return "—"
+    try:
+        value = float(n)
+    except (TypeError, ValueError):
+        return "—"
+    if math.isclose(value, round(value)):
+        return f"{int(round(value)):,}"
+    return f"{value:.1f}"
+
+
+def _fmt_pct(p):
+    return f"{p:.1f}%" if p is not None else "—"
+
+
+def _cell_count(n):
+    return {"display": _fmt_count(n), "data_value": float(n or 0)}
+
+
+def _cell_pct(p):
+    return {"display": _fmt_pct(p), "data_value": float(p or 0)}
+
+
+def _cell_ratio(x):
+    if x is None:
+        return {"display": "—", "data_value": 0.0}
+    return {"display": f"{x:.2f}", "data_value": float(x)}
+
+
+def _total_fga(agg):
+    """Total FGA for frequencies (ATR + 2FG + 3FG attempts)."""
+    atr_att = agg.get("atr_attempts", 0) or 0
+    fg2_att = agg.get("fg2_attempts", 0) or 0
+    fg3_att = agg.get("fg3_attempts", 0) or 0
+    return atr_att + fg2_att + fg3_att
+
+
+def _calc_efg(agg):
+    """Leaderboard eFG: (ATR + FG2 + 1.5*3FG) / total_FGA → percent (0–100)."""
+    makes = (agg.get("atr_makes", 0) or 0) + (agg.get("fg2_makes", 0) or 0)
+    three_m = agg.get("fg3_makes", 0) or 0
+    total_fga = _total_fga(agg)
+    efg = _safe_div(makes + 1.5 * three_m, total_fga)
+    return None if efg is None else (efg * 100.0)
+
+
+def _calc_pps(agg):
+    """Leaderboard PPS: eFG * 2 (points-per-shot)."""
+    efg_pct = _calc_efg(agg)
+    efg = None if efg_pct is None else (efg_pct / 100.0)
+    return None if efg is None else (efg * 2.0)
 
 
 def _format_count(value, mode, practice_count):
@@ -2195,133 +2251,238 @@ def _collect_player_practice_stats(roster_entry, date_from=None, date_to=None):
     }
 
 
-def _format_practice_stat_row(aggregates, field_keys, mode):
-    totals = aggregates['totals']
-    blue = aggregates['blue']
+def _format_practice_stat_row(
+    roster_entry,
+    aggregates,
+    field_keys,
+    mode,
+    date_from=None,
+    date_to=None,
+    labels=None,
+):
+    totals = dict(aggregates['totals'])
+    blue = dict(aggregates['blue'])
     extras = aggregates['extra']
     practice_count = aggregates['practice_count']
 
+    agg = dict(totals)
+    agg['potential_assists'] = totals.get('potential_assists', totals.get('pot_assists', 0))
+    agg['second_assists'] = totals.get('second_assists', 0)
+    agg['blue_total'] = blue.get('total_blue_collar', 0)
+    agg['blue_deflection'] = blue.get('deflection', 0)
+    agg['blue_charges'] = blue.get('charge_taken', 0)
+    agg['blue_floor_dives'] = blue.get('floor_dive', 0)
+    agg['blue_steals'] = blue.get('steal', 0)
+    agg['blue_tips'] = blue.get('reb_tip', 0)
+
+    def _per_practice(value):
+        if value is None:
+            return None
+        if mode == 'per_practice':
+            if not practice_count:
+                return None
+            return value / practice_count
+        return value
+
+    helper_labels = labels if labels else None
+    onoff = get_on_off_summary(
+        player_id=roster_entry.id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=helper_labels,
+    )
+    to_rates = get_turnover_rates_onfloor(
+        player_id=roster_entry.id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=helper_labels,
+    ) or {}
+    reb_rates = get_rebound_rates_onfloor(
+        player_id=roster_entry.id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=helper_labels,
+    ) or {}
+
     total_fg_makes = (
-        totals['atr_makes'] + totals['fg2_makes'] + totals['fg3_makes']
+        (totals.get('atr_makes', 0) or 0)
+        + (totals.get('fg2_makes', 0) or 0)
+        + (totals.get('fg3_makes', 0) or 0)
     )
     total_fg_attempts = (
-        totals['atr_attempts'] + totals['fg2_attempts'] + totals['fg3_attempts']
+        (totals.get('atr_attempts', 0) or 0)
+        + (totals.get('fg2_attempts', 0) or 0)
+        + (totals.get('fg3_attempts', 0) or 0)
     )
 
-    rows = {}
+    pps = _calc_pps(agg)
+    efg_pct = _calc_efg(agg)
+    total_fga = _total_fga(agg)
 
+    cells = {}
+
+    cells['shooting_atr_makes'] = _cell_count(_per_practice(agg.get('atr_makes')))
+    cells['shooting_atr_attempts'] = _cell_count(_per_practice(agg.get('atr_attempts')))
+    cells['shooting_atr_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('atr_makes', 0), agg.get('atr_attempts', 0)))
+    )
+    cells['shooting_atr_freq_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('atr_attempts', 0), total_fga))
+    )
+
+    cells['shooting_fg2_makes'] = _cell_count(_per_practice(agg.get('fg2_makes')))
+    cells['shooting_fg2_attempts'] = _cell_count(_per_practice(agg.get('fg2_attempts')))
+    cells['shooting_fg2_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('fg2_makes', 0), agg.get('fg2_attempts', 0)))
+    )
+    cells['shooting_fg2_freq_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('fg2_attempts', 0), total_fga))
+    )
+
+    cells['shooting_fg3_attempts'] = _cell_count(_per_practice(agg.get('fg3_attempts')))
+    cells['shooting_fg3_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('fg3_makes', 0), agg.get('fg3_attempts', 0)))
+    )
+    cells['shooting_fg3_freq_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('fg3_attempts', 0), total_fga))
+    )
+
+    cells['shooting_ft_makes'] = _cell_count(_per_practice(agg.get('ftm')))
+    cells['shooting_ft_attempts'] = _cell_count(_per_practice(agg.get('fta')))
+    cells['shooting_ft_pct'] = _cell_pct(
+        _pct(_safe_div(agg.get('ftm', 0), agg.get('fta', 0)))
+    )
+
+    cells['shooting_pps'] = _cell_ratio(pps)
+    cells['shooting_efg_pct'] = _cell_pct(efg_pct)
+
+    cells['play_ast'] = _cell_count(_per_practice(agg.get('assists')))
+    cells['play_to'] = _cell_count(_per_practice(agg.get('turnovers')))
+    cells['play_potential_ast'] = _cell_count(_per_practice(agg.get('potential_assists')))
+    cells['play_second_ast'] = _cell_count(_per_practice(agg.get('second_assists')))
+
+    ast = agg.get('assists', 0) or 0
+    turnovers = agg.get('turnovers', 0) or 0
+    pot_ast = agg.get('potential_assists', 0) or 0
+    snd_ast = agg.get('second_assists', 0) or 0
+
+    cells['play_ast_to_ratio'] = _cell_ratio(_safe_div(ast, turnovers))
+    cells['play_adj_ast_to_ratio'] = _cell_ratio(
+        _safe_div(ast + pot_ast + snd_ast, turnovers)
+    )
+
+    cells['play_team_turnover_rate_on'] = _cell_pct(
+        to_rates.get('team_turnover_rate_on') if to_rates else None
+    )
+    cells['play_indiv_turnover_rate'] = _cell_pct(
+        to_rates.get('indiv_turnover_rate') if to_rates else None
+    )
+    cells['play_bamalytics_turnover_rate'] = _cell_pct(
+        to_rates.get('bamalytics_turnover_rate') if to_rates else None
+    )
+    cells['play_indiv_team_to_share'] = _cell_pct(
+        to_rates.get('individual_team_turnover_pct') if to_rates else None
+    )
+
+    cells['bc_total'] = _cell_count(_per_practice(agg.get('blue_total')))
+    cells['bc_deflection'] = _cell_count(_per_practice(agg.get('blue_deflection')))
+    cells['bc_charges_taken'] = _cell_count(_per_practice(agg.get('blue_charges')))
+    cells['bc_floor_dives'] = _cell_count(_per_practice(agg.get('blue_floor_dives')))
+    cells['bc_steals'] = _cell_count(_per_practice(agg.get('blue_steals')))
+    cells['bc_tips'] = _cell_count(_per_practice(agg.get('blue_tips')))
+
+    off_possessions_on = _per_practice(onoff.offensive_possessions_on if onoff else None)
+    def_possessions_on = _per_practice(onoff.defensive_possessions_on if onoff else None)
+
+    cells['adv_offensive_possessions'] = _cell_count(off_possessions_on)
+    cells['adv_defensive_possessions'] = _cell_count(def_possessions_on)
+    cells['adv_ppp_on_offense'] = _cell_ratio(onoff.ppp_on_offense if onoff else None)
+    cells['adv_ppp_on_defense'] = _cell_ratio(onoff.ppp_on_defense if onoff else None)
+    cells['adv_ppp_off_offense'] = _cell_ratio(onoff.ppp_off_offense if onoff else None)
+    cells['adv_ppp_off_defense'] = _cell_ratio(onoff.ppp_off_defense if onoff else None)
+
+    cells['adv_off_reb_rate'] = _cell_pct(reb_rates.get('off_reb_rate_on'))
+    cells['adv_def_reb_rate'] = _cell_pct(reb_rates.get('def_reb_rate_on'))
+
+    # Legacy / existing keys
+    cells['fg'] = _format_shooting_split(
+        total_fg_makes, total_fg_attempts, mode, practice_count
+    )
+    cells['fg3'] = _format_shooting_split(
+        totals.get('fg3_makes', 0), totals.get('fg3_attempts', 0), mode, practice_count
+    )
+    cells['ft'] = _format_shooting_split(
+        totals.get('ftm', 0), totals.get('fta', 0), mode, practice_count
+    )
+    cells['efg'] = _format_percent(efg_pct)
+
+    rebound_total = (blue.get('off_reb', 0) or 0) + (blue.get('def_reb', 0) or 0)
+    cells['reb'] = _format_count(rebound_total, mode, practice_count)
+    cells['oreb'] = _format_count(blue.get('off_reb', 0), mode, practice_count)
+    cells['dreb'] = _format_count(blue.get('def_reb', 0), mode, practice_count)
+
+    crash_attempts = (totals.get('crash_positive', 0) or 0) + (totals.get('crash_missed', 0) or 0)
+    cells['rd_crash_plus'] = _format_count(totals.get('crash_positive', 0), mode, practice_count)
+    cells['rd_crash_att'] = _format_count(crash_attempts, mode, practice_count)
+    cells['rd_crash_pct'] = _format_percent(
+        _pct(_safe_div(totals.get('crash_positive', 0), crash_attempts))
+    )
+
+    back_attempts = (totals.get('back_man_positive', 0) or 0) + (totals.get('back_man_missed', 0) or 0)
+    cells['rd_back_plus'] = _format_count(totals.get('back_man_positive', 0), mode, practice_count)
+    cells['rd_back_att'] = _format_count(back_attempts, mode, practice_count)
+    cells['rd_back_pct'] = _format_percent(
+        _pct(_safe_div(totals.get('back_man_positive', 0), back_attempts))
+    )
+
+    box_attempts = (totals.get('box_out_positive', 0) or 0) + (totals.get('box_out_missed', 0) or 0)
+    cells['rd_box_plus'] = _format_count(totals.get('box_out_positive', 0), mode, practice_count)
+    cells['rd_box_att'] = _format_count(box_attempts, mode, practice_count)
+    cells['rd_box_pct'] = _format_percent(
+        _pct(_safe_div(totals.get('box_out_positive', 0), box_attempts))
+    )
+
+    cells['rd_given_up'] = _format_count(totals.get('off_reb_given_up', 0), mode, practice_count)
+    cells['pts'] = _format_count(totals.get('points', 0), mode, practice_count)
+    cells['ast'] = _format_count(totals.get('assists', 0), mode, practice_count)
+    cells['to'] = _format_count(totals.get('turnovers', 0), mode, practice_count)
+    cells['stl'] = _format_count(blue.get('steal', 0), mode, practice_count)
+    cells['blk'] = _format_count(blue.get('block', 0), mode, practice_count)
+    cells['pf'] = _format_count(totals.get('foul_by', 0), mode, practice_count)
+
+    possessions = total_fg_attempts + (totals.get('turnovers', 0) or 0)
+    cells['ppp'] = _format_ratio(_safe_div(totals.get('points', 0), possessions), decimals=2)
+    cells['atr'] = _format_ratio(_safe_div(totals.get('assists', 0), totals.get('turnovers', 0)), decimals=2)
+    cells['ft_rate'] = _format_ratio(_safe_div(totals.get('fta', 0), total_fg_attempts), decimals=2)
+
+    if extras['good_shot_count']:
+        avg = extras['good_shot_sum'] / extras['good_shot_count']
+        cells['gs_pct'] = _format_percent(avg)
+    else:
+        cells['gs_pct'] = _format_percent(None)
+
+    if extras['oreb_pct_count']:
+        avg = extras['oreb_pct_sum'] / extras['oreb_pct_count']
+        cells['oreb_pct'] = _format_percent(avg)
+    else:
+        pct = _safe_div(blue.get('off_reb', 0), crash_attempts)
+        cells['oreb_pct'] = _format_percent(_pct(pct) if pct is not None else None)
+
+    legacy_pps = _safe_div(totals.get('points', 0), total_fg_attempts)
+    cells['pps'] = _format_ratio(legacy_pps, decimals=2)
+
+    cells['bcp_total'] = _format_count(blue.get('total_blue_collar', 0), mode, practice_count)
+    cells['deflections'] = _format_count(blue.get('deflection', 0), mode, practice_count)
+    cells['charges'] = _format_count(blue.get('charge_taken', 0), mode, practice_count)
+    cells['floor_dives'] = _format_count(blue.get('floor_dive', 0), mode, practice_count)
+    cells['loose_balls_won'] = _format_count(blue.get('misc', 0), mode, practice_count)
+    cells['tips'] = _format_count(blue.get('reb_tip', 0), mode, practice_count)
+    cells['steals_bc'] = _format_count(blue.get('steal', 0), mode, practice_count)
+    cells['blocks_bc'] = _format_count(blue.get('block', 0), mode, practice_count)
+
+    rows = {}
     for key in field_keys:
-        if key == 'fg':
-            rows[key] = _format_shooting_split(
-                total_fg_makes, total_fg_attempts, mode, practice_count
-            )
-        elif key == 'fg3':
-            rows[key] = _format_shooting_split(
-                totals['fg3_makes'], totals['fg3_attempts'], mode, practice_count
-            )
-        elif key == 'ft':
-            rows[key] = _format_shooting_split(
-                totals['ftm'], totals['fta'], mode, practice_count
-            )
-        elif key == 'efg':
-            pct = _safe_div(
-                totals['atr_makes'] + totals['fg2_makes'] + 1.5 * totals['fg3_makes'],
-                total_fg_attempts,
-            )
-            rows[key] = _format_percent(pct * 100 if pct is not None else None)
-        elif key == 'reb':
-            value = blue['off_reb'] + blue['def_reb']
-            rows[key] = _format_count(value, mode, practice_count)
-        elif key == 'oreb':
-            rows[key] = _format_count(blue['off_reb'], mode, practice_count)
-        elif key == 'dreb':
-            rows[key] = _format_count(blue['def_reb'], mode, practice_count)
-        elif key == 'rd_crash_plus':
-            rows[key] = _format_count(totals['crash_positive'], mode, practice_count)
-        elif key == 'rd_crash_att':
-            attempts = totals['crash_positive'] + totals['crash_missed']
-            rows[key] = _format_count(attempts, mode, practice_count)
-        elif key == 'rd_crash_pct':
-            attempts = totals['crash_positive'] + totals['crash_missed']
-            pct = _safe_div(totals['crash_positive'], attempts)
-            rows[key] = _format_percent(pct * 100 if pct is not None else None)
-        elif key == 'rd_back_plus':
-            rows[key] = _format_count(totals['back_man_positive'], mode, practice_count)
-        elif key == 'rd_back_att':
-            attempts = totals['back_man_positive'] + totals['back_man_missed']
-            rows[key] = _format_count(attempts, mode, practice_count)
-        elif key == 'rd_back_pct':
-            attempts = totals['back_man_positive'] + totals['back_man_missed']
-            pct = _safe_div(totals['back_man_positive'], attempts)
-            rows[key] = _format_percent(pct * 100 if pct is not None else None)
-        elif key == 'rd_box_plus':
-            rows[key] = _format_count(totals['box_out_positive'], mode, practice_count)
-        elif key == 'rd_box_att':
-            attempts = totals['box_out_positive'] + totals['box_out_missed']
-            rows[key] = _format_count(attempts, mode, practice_count)
-        elif key == 'rd_box_pct':
-            attempts = totals['box_out_positive'] + totals['box_out_missed']
-            pct = _safe_div(totals['box_out_positive'], attempts)
-            rows[key] = _format_percent(pct * 100 if pct is not None else None)
-        elif key == 'rd_given_up':
-            rows[key] = _format_count(totals['off_reb_given_up'], mode, practice_count)
-        elif key == 'pts':
-            rows[key] = _format_count(totals['points'], mode, practice_count)
-        elif key == 'ast':
-            rows[key] = _format_count(totals['assists'], mode, practice_count)
-        elif key == 'to':
-            rows[key] = _format_count(totals['turnovers'], mode, practice_count)
-        elif key == 'stl':
-            rows[key] = _format_count(blue['steal'], mode, practice_count)
-        elif key == 'blk':
-            rows[key] = _format_count(blue['block'], mode, practice_count)
-        elif key == 'pf':
-            rows[key] = _format_count(totals['foul_by'], mode, practice_count)
-        elif key == 'ppp':
-            possessions = total_fg_attempts + totals['turnovers']
-            ratio = _safe_div(totals['points'], possessions)
-            rows[key] = _format_ratio(ratio, decimals=2)
-        elif key == 'atr':
-            ratio = _safe_div(totals['assists'], totals['turnovers'])
-            rows[key] = _format_ratio(ratio, decimals=2)
-        elif key == 'ft_rate':
-            ratio = _safe_div(totals['fta'], total_fg_attempts)
-            rows[key] = _format_ratio(ratio, decimals=2)
-        elif key == 'gs_pct':
-            if extras['good_shot_count']:
-                avg = extras['good_shot_sum'] / extras['good_shot_count']
-                rows[key] = _format_percent(avg)
-            else:
-                rows[key] = _format_percent(None)
-        elif key == 'oreb_pct':
-            if extras['oreb_pct_count']:
-                avg = extras['oreb_pct_sum'] / extras['oreb_pct_count']
-                rows[key] = _format_percent(avg)
-            else:
-                attempts = totals['crash_positive'] + totals['crash_missed']
-                pct = _safe_div(blue['off_reb'], attempts)
-                rows[key] = _format_percent(pct * 100 if pct is not None else None)
-        elif key == 'pps':
-            ratio = _safe_div(totals['points'], total_fg_attempts)
-            rows[key] = _format_ratio(ratio, decimals=2)
-        elif key == 'bcp_total':
-            rows[key] = _format_count(blue['total_blue_collar'], mode, practice_count)
-        elif key == 'deflections':
-            rows[key] = _format_count(blue['deflection'], mode, practice_count)
-        elif key == 'charges':
-            rows[key] = _format_count(blue['charge_taken'], mode, practice_count)
-        elif key == 'floor_dives':
-            rows[key] = _format_count(blue['floor_dive'], mode, practice_count)
-        elif key == 'loose_balls_won':
-            rows[key] = _format_count(blue['misc'], mode, practice_count)
-        elif key == 'tips':
-            rows[key] = _format_count(blue['reb_tip'], mode, practice_count)
-        elif key == 'steals_bc':
-            rows[key] = _format_count(blue['steal'], mode, practice_count)
-        elif key == 'blocks_bc':
-            rows[key] = _format_count(blue['block'], mode, practice_count)
-        else:
-            rows[key] = {'display': '—', 'data_value': None}
+        rows[key] = cells.get(key, {'display': '—', 'data_value': None})
 
     return rows
 
@@ -2340,6 +2501,14 @@ def _build_practice_table_dataset(request_data):
 
     date_from = _parse_iso_date(request_data.get('date_from'))
     date_to = _parse_iso_date(request_data.get('date_to'))
+
+    raw_labels = request_data.get('labels')
+    if isinstance(raw_labels, str):
+        labels = [lbl.strip() for lbl in raw_labels.split(',') if lbl.strip()]
+    elif raw_labels is None:
+        labels = []
+    else:
+        labels = raw_labels
 
     catalog = _flatten_practice_field_catalog()
     selected_fields = [key for key in field_keys if key in catalog]
@@ -2374,9 +2543,13 @@ def _build_practice_table_dataset(request_data):
 
         if selected_fields:
             field_values = _format_practice_stat_row(
-                aggregates,
-                selected_fields,
-                mode,
+                roster_entry=roster_entry,
+                aggregates=aggregates,
+                field_keys=selected_fields,
+                mode=mode,
+                date_from=date_from,
+                date_to=date_to,
+                labels=labels,
             )
             row_display.update(field_values)
 
@@ -2429,6 +2602,10 @@ def _prepare_custom_stats_columns(dataset_columns):
             'sortable': column.get('sortable', False),
         }
 
+        fmt = column.get('format')
+        if fmt:
+            mapped['format'] = fmt
+
         if 'value_key' in column:
             mapped['value_key'] = column['value_key']
 
@@ -2436,7 +2613,6 @@ def _prepare_custom_stats_columns(dataset_columns):
         if group:
             mapped['group'] = group
 
-        fmt = column.get('format')
         align = align_map.get(fmt, 'left')
 
         if key == 'player':
