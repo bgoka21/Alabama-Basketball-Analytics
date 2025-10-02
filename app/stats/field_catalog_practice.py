@@ -61,7 +61,7 @@ PRACTICE_FIELD_GROUPS = {
         {"key": "atr", "label": "AST/TO", "format": "ratio"},
         {"key": "ft_rate", "label": "FT Rate", "format": "ratio"},
         {"key": "gs_pct", "label": "Good Shot %", "format": "percent"},
-        {"key": "oreb_pct", "label": "OREB%", "format": "percent"},
+        {"key": "practice_oreb_pct", "label": "Practice OREB%", "format": "percent"},
         {"key": "pps", "label": "PPS", "format": "ratio"},
         {"key": "adv_ppp_on_offense", "label": "Offensive PPP (On)", "format": "ratio"},
         {"key": "adv_ppp_on_defense", "label": "Defensive PPP (On)", "format": "ratio"},
@@ -71,6 +71,10 @@ PRACTICE_FIELD_GROUPS = {
         {"key": "adv_defensive_possessions", "label": "Defensive Possessions", "format": "count"},
         {"key": "adv_off_reb_rate", "label": "Off Rebound Rate", "format": "percent"},
         {"key": "adv_def_reb_rate", "label": "Def Rebounding Rate", "format": "percent"},
+    ],
+    "On-Floor Rates": [
+        {"key": "on_floor_oreb_pct", "label": "On-Floor OREB%", "format": "percent"},
+        {"key": "on_floor_dreb_pct", "label": "On-Floor DREB%", "format": "percent"},
     ],
     "Blue Collar": [
         {"key": "bcp_total", "label": "BCP Total", "format": "count"},
