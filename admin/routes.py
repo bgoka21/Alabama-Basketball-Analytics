@@ -96,7 +96,13 @@ from admin._leaderboard_helpers import (
     with_last_practice,
 )
 from utils.session_helpers import get_player_stats_for_date_range
-from utils.leaderboard_helpers import get_player_overall_stats, get_on_court_metrics
+from utils.leaderboard_helpers import (
+    get_player_overall_stats,
+    get_on_court_metrics,
+    get_on_off_summary,
+    get_turnover_rates_onfloor,
+    get_rebound_rates_onfloor,
+)
 from utils.scope import resolve_scope
 from services.eybl_ingest import (
     load_csvs,
@@ -674,82 +680,6 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     bc_q = bc_q.group_by(Roster.player_name)
     bc_rows = {r.player: r._asdict() for r in bc_q.all()}
 
-    # ─── On-court offensive metrics ──────────────────────────────────────
-    poss_q = (
-        db.session.query(
-            Roster.player_name.label('player'),
-            func.count(PlayerPossession.id).label('on_poss'),
-            func.coalesce(func.sum(Possession.points_scored), 0).label('on_pts')
-        )
-        .join(PlayerPossession, Roster.id == PlayerPossession.player_id)
-        .join(Possession, PlayerPossession.possession_id == Possession.id)
-        .filter(
-            Roster.season_id == season_id,
-            Possession.season_id == season_id,
-            Possession.possession_side == 'Offense'
-        )
-    )
-    if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        poss_q = poss_q.filter(or_(*clauses))
-    if start_dt or end_dt:
-        poss_q = (
-            poss_q
-            .outerjoin(Game, Possession.game_id == Game.id)
-            .outerjoin(Practice, Possession.practice_id == Practice.id)
-        )
-        if start_dt:
-            poss_q = poss_q.filter(
-                or_(
-                    and_(Possession.game_id != None, Game.game_date >= start_dt),
-                    and_(Possession.practice_id != None, Practice.date >= start_dt),
-                )
-            )
-        if end_dt:
-            poss_q = poss_q.filter(
-                or_(
-                    and_(Possession.game_id != None, Game.game_date <= end_dt),
-                    and_(Possession.practice_id != None, Practice.date <= end_dt),
-                )
-            )
-    poss_q = poss_q.group_by(Roster.player_name)
-    poss_rows = {r.player: {'offensive_possessions': r.on_poss, 'on_pts': r.on_pts} for r in poss_q.all()}
-
-    team_q = (
-        db.session.query(
-            func.count(Possession.id),
-            func.coalesce(func.sum(Possession.points_scored), 0)
-        )
-        .filter(
-            Possession.season_id == season_id,
-            Possession.possession_side == 'Offense'
-        )
-    )
-    if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        team_q = team_q.filter(or_(*clauses))
-    if start_dt or end_dt:
-        team_q = (
-            team_q
-            .outerjoin(Game, Possession.game_id == Game.id)
-            .outerjoin(Practice, Possession.practice_id == Practice.id)
-        )
-        if start_dt:
-            team_q = team_q.filter(
-                or_(
-                    and_(Possession.game_id != None, Game.game_date >= start_dt),
-                    and_(Possession.practice_id != None, Practice.date >= start_dt),
-                )
-            )
-        if end_dt:
-            team_q = team_q.filter(
-                or_(
-                    and_(Possession.game_id != None, Game.game_date <= end_dt),
-                    and_(Possession.practice_id != None, Practice.date <= end_dt),
-                )
-            )
-    TEAM_poss, TEAM_pts = team_q.one()
-
     # gather practice/game ids for the same filters (used for personal stats)
     id_q = (
         db.session.query(Possession.practice_id, Possession.game_id)
@@ -784,21 +714,6 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     id_rows = id_q.distinct().all()
     practice_ids = [pid for pid, gid in id_rows if pid]
     game_ids = [gid for pid, gid in id_rows if gid]
-
-    # personal turnover counts for the same practices/games
-    personal_to_q = (
-        db.session.query(
-            PlayerStats.player_name.label('player'),
-            func.coalesce(func.sum(PlayerStats.turnovers), 0).label('personal_turnovers')
-        )
-        .filter(PlayerStats.season_id == season_id)
-    )
-    if practice_ids:
-        personal_to_q = personal_to_q.filter(PlayerStats.practice_id.in_(practice_ids))
-    if game_ids:
-        personal_to_q = personal_to_q.filter(PlayerStats.game_id.in_(game_ids))
-    personal_to_q = personal_to_q.group_by(PlayerStats.player_name).all()
-    person_turnovers = {name: val for name, val in personal_to_q}
 
     # personal offensive rebounds counts
     personal_offreb_q = (
@@ -893,48 +808,81 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     events_q = events_q.group_by(Roster.player_name)
     event_rows = {r.player: r._asdict() for r in events_q.all()}
 
+    roster_lookup = dict(
+        db.session.query(Roster.player_name, Roster.id)
+        .filter(Roster.season_id == season_id)
+        .all()
+    )
+    helper_labels = list(label_set) if label_set else None
+    candidate_players = (
+        set(event_rows)
+        | set(ps_rows)
+        | set(bc_rows)
+        | set(person_off_rebs)
+        | set(personal_fouls)
+    )
+
     extra_rows = {}
-    for player in set(poss_rows) | set(event_rows):
-        poss = poss_rows.get(player, {})
+    for player in candidate_players:
+        player_id = roster_lookup.get(player)
+        if not player_id:
+            continue
+
+        summary = get_on_off_summary(
+            player_id=player_id,
+            date_from=start_dt,
+            date_to=end_dt,
+            labels=helper_labels,
+        )
+        turnover_rates = get_turnover_rates_onfloor(
+            player_id=player_id,
+            date_from=start_dt,
+            date_to=end_dt,
+            labels=helper_labels,
+        )
+        rebound_rates = get_rebound_rates_onfloor(
+            player_id=player_id,
+            date_from=start_dt,
+            date_to=end_dt,
+            labels=helper_labels,
+        )
+
         events = event_rows.get(player, {})
-        on_poss = poss.get('offensive_possessions', 0)
-        on_pts = poss.get('on_pts', 0)
-        ppp_on = on_pts / on_poss if on_poss else 0
-        off_poss = TEAM_poss - on_poss
-        off_pts = TEAM_pts - on_pts
-        ppp_off = off_pts / off_poss if off_poss else 0
+        on_poss = summary.offensive_possessions_on
+        ppp_on = summary.ppp_on_offense or 0.0
+        ppp_off = summary.ppp_off_offense or 0.0
         fgm2 = events.get('fgm2', 0)
         fgm3 = events.get('fgm3', 0)
         fga = events.get('fga', 0)
         efg = (fgm2 + 1.5 * fgm3) / fga if fga else 0
-        fg2_pct = events.get('fg2_makes', 0) / events.get('fg2_attempts', 0) if events.get('fg2_attempts', 0) else 0
-        fg3_pct = events.get('fg3_makes', 0) / events.get('fg3_attempts', 0) if events.get('fg3_attempts', 0) else 0
-        turnover_rate = events.get('turnovers_on', 0) / on_poss if on_poss else 0
-        individual_turnover_rate = person_turnovers.get(player, 0) / on_poss if on_poss else 0
-        team_turnovers_on = events.get('turnovers_on', 0)
-        individual_team_turnover_pct = (
-            round(person_turnovers.get(player, 0) / team_turnovers_on * 100, 1)
-            if team_turnovers_on
-            else 0.0
+        fg2_attempts = events.get('fg2_attempts', 0)
+        fg2_pct = (
+            events.get('fg2_makes', 0) / fg2_attempts
+            if fg2_attempts
+            else 0
         )
+        fg3_attempts = events.get('fg3_attempts', 0)
+        fg3_pct = (
+            events.get('fg3_makes', 0) / fg3_attempts
+            if fg3_attempts
+            else 0
+        )
+        team_turnover_rate = turnover_rates.get('team_turnover_rate_on') or 0.0
+        individual_turnover_rate = turnover_rates.get('indiv_turnover_rate') or 0.0
+        individual_team_turnover_pct = (
+            turnover_rates.get('individual_team_turnover_pct') or 0.0
+        )
+        bama_to_rate = turnover_rates.get('bamalytics_turnover_rate') or 0.0
         team_miss = events.get('team_misses_on', 0)
         individual_off_reb_rate = (
             person_off_rebs.get(player, 0) / team_miss
             if team_miss
             else 0
         )
-        # only count the TEAM Off Reb events for team OREB% numerator
-        recorded = events.get('team_off_reb_on', 0)
-        team_rebs = recorded if recorded > 0 else (
-            sum(
-                p.off_reb
-                for p in BlueCollarStats.query.filter_by(season_id=season_id)
-            )
-            * (on_poss / TEAM_poss)
-        )
-        off_reb_rate = team_rebs / team_miss if team_miss else 0
+        off_reb_rate = rebound_rates.get('off_reb_rate_on') or 0.0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
+
         extra_rows[player] = {
             'offensive_possessions': on_poss,
             'ppp_on': round(ppp_on, 2),
@@ -942,10 +890,11 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             'efg_on': round(efg * 100, 1),
             'two_fg_pct': round(fg2_pct * 100, 1),
             'three_fg_pct': round(fg3_pct * 100, 1),
-            'turnover_rate': round(turnover_rate * 100, 1),
-            'off_reb_rate': round(off_reb_rate * 100, 1),
-            'individual_turnover_rate': round(individual_turnover_rate * 100, 1),
-            'individual_team_turnover_pct': individual_team_turnover_pct,
+            'turnover_rate': round(team_turnover_rate, 1),
+            'off_reb_rate': round(off_reb_rate, 1),
+            'individual_turnover_rate': round(individual_turnover_rate, 1),
+            'bamalytics_turnover_rate': round(bama_to_rate, 1),
+            'individual_team_turnover_pct': round(individual_team_turnover_pct, 1),
             'individual_off_reb_rate': round(individual_off_reb_rate * 100, 1),
             'fouls_drawn_rate': round(fouls_rate * 100, 1),
             'individual_foul_rate': round(foul_rate_ind * 100, 1),
@@ -976,7 +925,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
 
         total_fga = base.get('atr_attempts', 0) + base.get('fg2_attempts', 0) + base.get('fg3_attempts', 0)
         denominator = to + total_fga + pot_ast + ast
-        base['bamalytics_turnover_rate'] = round(to / denominator * 100, 1) if denominator else 0.0
+        if 'bamalytics_turnover_rate' not in base:
+            base['bamalytics_turnover_rate'] = round(to / denominator * 100, 1) if denominator else 0.0
 
         contest_groups = {
             'atr': ('contest', 'late', 'no_contest'),
@@ -4891,39 +4841,29 @@ def player_detail(player_name):
     )
 
     # ─── On-court offensive metrics (replicated from player_view) ──────────
-    on_q = (
-        db.session.query(
-            func.count(PlayerPossession.id),
-            func.coalesce(func.sum(Possession.points_scored), 0)
-        )
-        .join(Possession, PlayerPossession.possession_id == Possession.id)
-        .filter(
-            PlayerPossession.player_id == player.id,
-            Possession.possession_side == 'Offense'
-        )
+    helper_labels = list(label_set) if label_set else None
+    summary = get_on_off_summary(
+        player_id=player.id,
+        date_from=start_dt,
+        date_to=end_dt,
+        labels=helper_labels,
     )
-    if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        on_q = on_q.filter(or_(*clauses))
-    ON_poss, ON_pts = on_q.one()
-
-    team_q = (
-        db.session.query(
-            func.count(Possession.id),
-            func.coalesce(func.sum(Possession.points_scored), 0)
-        )
-        .filter(Possession.possession_side == 'Offense')
+    turnover_rates = get_turnover_rates_onfloor(
+        player_id=player.id,
+        date_from=start_dt,
+        date_to=end_dt,
+        labels=helper_labels,
     )
-    if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        team_q = team_q.filter(or_(*clauses))
-    TEAM_poss, TEAM_pts = team_q.one()
+    rebound_rates = get_rebound_rates_onfloor(
+        player_id=player.id,
+        date_from=start_dt,
+        date_to=end_dt,
+        labels=helper_labels,
+    )
 
-    OFF_poss = TEAM_poss - ON_poss
-    OFF_pts  = TEAM_pts - ON_pts
-
-    PPP_ON  = ON_pts / ON_poss if ON_poss else 0
-    PPP_OFF = OFF_pts / OFF_poss if OFF_poss else 0
+    ON_poss = summary.offensive_possessions_on
+    PPP_ON = summary.ppp_on_offense or 0.0
+    PPP_OFF = summary.ppp_off_offense or 0.0
 
     def count_event(ev_type):
         q = (
@@ -4949,8 +4889,10 @@ def player_detail(player_name):
     FG2_pct = count_event('2FG+') / (count_event('2FG+') + count_event('2FG-')) if (count_event('2FG+') + count_event('2FG-')) else 0
     FG3_pct = count_event('3FG+') / (count_event('3FG+') + count_event('3FG-')) if (count_event('3FG+') + count_event('3FG-')) else 0
 
-    turnover_rate    = count_event('Turnover') / ON_poss if ON_poss else 0
-    off_reb_rate     = count_event('Off Rebound') / ON_poss if ON_poss else 0
+    turnover_pct = turnover_rates.get('team_turnover_rate_on') or 0.0
+    turnover_rate = (turnover_pct / 100) if ON_poss else 0
+    off_reb_pct = rebound_rates.get('off_reb_rate_on') or 0.0
+    off_reb_rate = (off_reb_pct / 100) if ON_poss else 0
     fouls_drawn_rate = count_event('Fouled') / ON_poss if ON_poss else 0
 
 
