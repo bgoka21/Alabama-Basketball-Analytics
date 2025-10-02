@@ -2456,6 +2456,8 @@ def _format_practice_stat_row(
 
     cells['adv_off_reb_rate'] = _cell_pct(reb_rates.get('off_reb_rate_on'))
     cells['adv_def_reb_rate'] = _cell_pct(reb_rates.get('def_reb_rate_on'))
+    cells['on_floor_oreb_pct'] = _cell_pct(reb_rates.get('off_reb_rate_on'))
+    cells['on_floor_dreb_pct'] = _cell_pct(reb_rates.get('def_reb_rate_on'))
 
     # Legacy / existing keys
     cells['fg'] = _format_shooting_split(
@@ -2516,10 +2518,12 @@ def _format_practice_stat_row(
 
     if extras['oreb_pct_count']:
         avg = extras['oreb_pct_sum'] / extras['oreb_pct_count']
-        cells['oreb_pct'] = _format_percent(avg)
+        cells['practice_oreb_pct'] = _format_percent(avg)
     else:
         pct = _safe_div(blue.get('off_reb', 0), crash_attempts)
-        cells['oreb_pct'] = _format_percent(_pct(pct) if pct is not None else None)
+        cells['practice_oreb_pct'] = _format_percent(
+            _pct(pct) if pct is not None else None
+        )
 
     legacy_pps = _safe_div(totals.get('points', 0), total_fg_attempts)
     cells['pps'] = _format_ratio(legacy_pps, decimals=2)
