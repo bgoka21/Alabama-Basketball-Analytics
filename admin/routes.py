@@ -2124,10 +2124,11 @@ def _format_shooting_split(makes, attempts, mode, practice_count):
         attempts_display = str(int(round(disp_attempts)))
 
     pct = _safe_div(makes, attempts)
-    pct_display = f"{pct * 100:.1f}%" if pct is not None else "—"
+    pct_value = pct * 100 if pct is not None else None
+    pct_display = f"{pct_value:.1f}%" if pct_value is not None else "—"
     return {
-        'display': f"{makes_display}-{attempts_display}  {pct_display}",
-        'data_value': round(pct * 100, 4) if pct is not None else None,
+        'display': f"{makes_display}–{attempts_display} • {pct_display}",
+        'data_value': round(pct_value, 4) if pct_value is not None else None,
     }
 
 
