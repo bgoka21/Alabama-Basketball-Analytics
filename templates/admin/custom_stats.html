@@ -120,7 +120,7 @@
         initCustomStatsPage({
           fieldsUrl: "{{ url_for('admin.get_practice_field_catalog') }}",
           dataUrl: '/admin/custom-stats/table-partial',
-          presetsUrl: '/api/presets',
+          presetsUrl: "{{ url_for('admin.list_presets_api') }}",
           exportCsvUrl: '/admin/custom-stats/export/csv'
         });
       } else {
