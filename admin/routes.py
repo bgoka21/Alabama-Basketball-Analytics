@@ -2419,10 +2419,6 @@ def _build_practice_table_dataset(request_data):
 
         row_display = {
             'player': roster_entry.player_name,
-            'jersey': {
-                'display': str(aggregates['jersey']) if aggregates['jersey'] is not None else '—',
-                'data_value': aggregates['jersey'],
-            },
             '_practice_count': aggregates['practice_count'],
         }
 
@@ -2437,7 +2433,6 @@ def _build_practice_table_dataset(request_data):
         rows.append(row_display)
 
     columns = [
-        {'key': 'jersey', 'label': '#', 'format': 'text', 'sortable': True},
         {'key': 'player', 'label': 'Player', 'format': 'text', 'sortable': True},
     ]
 
@@ -2474,7 +2469,6 @@ def _prepare_custom_stats_columns(dataset_columns):
     }
 
     player_col = None
-    jersey_col = None
     stat_columns = []
 
     for column in dataset_columns or []:
@@ -2500,10 +2494,6 @@ def _prepare_custom_stats_columns(dataset_columns):
             mapped['width'] = 'sticky-player-header min-w-[14rem]'
             mapped['cell_class'] = 'sticky-player-cell'
             player_col = mapped
-        elif key == 'jersey':
-            mapped['align'] = 'right'
-            mapped['width'] = 'w-16'
-            jersey_col = mapped
         else:
             mapped['align'] = align
             if fmt == 'shooting_split':
@@ -2513,8 +2503,6 @@ def _prepare_custom_stats_columns(dataset_columns):
     ordered = []
     if player_col:
         ordered.append(player_col)
-    if jersey_col:
-        ordered.append(jersey_col)
     ordered.extend(stat_columns)
     return ordered
 
