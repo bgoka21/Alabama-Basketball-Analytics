@@ -193,6 +193,7 @@
               {%- set cell_class = col.cell_class if col.cell_class is defined and col.cell_class else '' -%}
               {%- set cell_value = row.get(col.key) if row is mapping else row | attr(col.key) -%}
               {%- set data_value = '' -%}
+              {%- set data_type = col.format if col.format is defined and col.format else 'text' -%}
               {%- if cell_value is mapping and cell_value.display is defined -%}
                 {%- set display_value = cell_value.display -%}
                 {%- if cell_value.data_value is defined and cell_value.data_value is not none -%}
@@ -215,7 +216,7 @@
                 {%- set data_value = '' -%}
               {%- endif -%}
               <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}{% if cell_class %} {{ cell_class }}{% endif %}"
-                  data-key="{{ col.key }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>{{ display_value | trim }}</td>
+                  data-key="{{ col.key }}" data-type="{{ data_type }}"{% if data_value != '' %} data-value="{{ data_value }}"{% endif %}>{{ display_value | trim }}</td>
             {%- endfor %}
           </tr>
           {%- endfor %}
