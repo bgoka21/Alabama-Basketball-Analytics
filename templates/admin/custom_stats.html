@@ -44,29 +44,44 @@
       </section>
 
       <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div class="border-b border-gray-200 px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="border-b border-gray-200 px-5 py-4">
           <h2 class="text-lg font-semibold text-[#9E1B32]">Presets</h2>
-          <div class="flex items-center gap-2 text-sm">
-            <input id="preset-name" type="text" placeholder="Preset name" class="hidden sm:block rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
-            <button type="button" id="save-preset" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-white px-4 py-2 font-semibold text-[#9E1B32] shadow-sm hover:bg-[#9E1B32] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Save Preset</button>
-          </div>
         </div>
-        <div class="px-5 py-4 space-y-6 text-sm text-gray-700">
-          <p class="text-xs text-gray-500">Presets are shared with the team. Only the creator can edit or delete their own. Loading a preset adds its fields to your current list instead of clearing it.</p>
-          <div class="grid gap-5 md:grid-cols-2">
-            <div>
-              <h3 class="text-sm font-semibold text-gray-900">Team Presets</h3>
-              <div id="team-preset-list" class="mt-3 space-y-2">
-                <p class="text-xs text-gray-500">No presets yet. Saved team presets will appear here.</p>
-              </div>
+        <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
+          <section id="presets-panel" class="space-y-4">
+            <div class="flex items-center gap-2 border-b">
+              <button class="preset-tab active border-b-2 border-gray-900 px-3 py-2 text-sm font-semibold text-gray-900" data-tab="players">Players Presets</button>
+              <button class="preset-tab px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800" data-tab="stats">Stats Presets</button>
+              <button class="preset-tab px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800" data-tab="dates">Dates Presets</button>
             </div>
-            <div>
-              <h3 class="text-sm font-semibold text-gray-900">My Presets</h3>
-              <div id="private-preset-list" class="mt-3 space-y-2">
-                <p class="text-xs text-gray-500">Create a preset to reuse your favorite stat combinations.</p>
+
+            <!-- Players preset pane -->
+            <div class="preset-pane" data-pane="players">
+              <div class="flex items-center gap-2">
+                <input id="players-preset-name" class="input px-3 py-1.5 rounded-lg border w-full" placeholder="Preset name (e.g., Starting 5)">
+                <button id="players-preset-save" class="btn-primary px-3 py-1.5 rounded-lg font-medium shadow border bg-gray-900 text-white hover:bg-gray-800">Save Players Preset</button>
               </div>
+              <div id="players-presets-list" class="divide-y"></div>
             </div>
-          </div>
+
+            <!-- Stats preset pane -->
+            <div class="preset-pane hidden" data-pane="stats">
+              <div class="flex items-center gap-2">
+                <input id="stats-preset-name" class="input px-3 py-1.5 rounded-lg border w-full" placeholder="Preset name (e.g., Shooting Splits)">
+                <button id="stats-preset-save" class="btn-primary px-3 py-1.5 rounded-lg font-medium shadow border bg-gray-900 text-white hover:bg-gray-800">Save Stats Preset</button>
+              </div>
+              <div id="stats-presets-list" class="divide-y"></div>
+            </div>
+
+            <!-- Dates preset pane -->
+            <div class="preset-pane hidden" data-pane="dates">
+              <div class="flex items-center gap-2">
+                <input id="dates-preset-name" class="input px-3 py-1.5 rounded-lg border w-full" placeholder="Preset name (e.g., Conference Window)">
+                <button id="dates-preset-save" class="btn-primary px-3 py-1.5 rounded-lg font-medium shadow border bg-gray-900 text-white hover:bg-gray-800">Save Dates Preset</button>
+              </div>
+              <div id="dates-presets-list" class="divide-y"></div>
+            </div>
+          </section>
         </div>
       </section>
     </div>
