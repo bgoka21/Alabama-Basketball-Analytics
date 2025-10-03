@@ -1952,6 +1952,8 @@ def _serialize_saved_stat_profile(profile: SavedStatProfile) -> dict:
         "source_default": profile.source_default,
         "visibility": profile.visibility,
         "owner_id": profile.owner_id,
+        "created_at": profile.created_at.isoformat() if getattr(profile, "created_at", None) else None,
+        "updated_at": profile.updated_at.isoformat() if getattr(profile, "updated_at", None) else None,
     }
 
 
@@ -2993,7 +2995,7 @@ def list_presets_api():
     return jsonify({
         'team': team_presets,
         'private': private_presets,
-    })
+    }), 200
 
 
 @admin_bp.route('/api/presets', methods=['POST'])
@@ -3015,14 +3017,17 @@ def create_preset_api():
 
     visibility = data.get('visibility') or 'team'
     if visibility not in {'team', 'private'}:
-        visibility = 'team'
+        return jsonify({'error': 'Invalid visibility'}), 400
+
+    mode_default = data.get('mode_default') or 'totals'
+    source_default = data.get('source_default') or 'practice'
 
     profile = SavedStatProfile(
         name=name,
         fields_json=json.dumps(fields),
         players_json=json.dumps(player_ids),
-        mode_default=data.get('mode_default') or 'totals',
-        source_default=data.get('source_default') or 'practice',
+        mode_default=mode_default,
+        source_default=source_default,
         owner_id=getattr(current_user, 'id', None),
         visibility=visibility,
     )
@@ -3046,32 +3051,33 @@ def update_preset_api():
         return jsonify({'error': 'Preset not found'}), 404
 
     current_user_id = getattr(current_user, 'id', None)
-    if profile.owner_id != current_user_id:
-        return jsonify({'error': 'Only the owner may modify this preset'}), 403
+    is_admin = getattr(current_user, 'is_admin', False)
+    if profile.owner_id != current_user_id and not is_admin:
+        return jsonify({'error': 'Only the owner or an admin may modify this preset'}), 403
 
-    if 'name' in data:
+    if 'name' in data and data['name'] is not None:
         name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'error': 'Name is required'}), 400
         profile.name = name
 
-    if 'fields' in data:
+    if 'fields' in data and data['fields'] is not None:
         fields = data.get('fields') or []
         if not isinstance(fields, list):
             return jsonify({'error': 'Fields must be a list'}), 400
         profile.fields_json = json.dumps(fields)
 
-    if 'player_ids' in data:
+    if 'player_ids' in data and data['player_ids'] is not None:
         try:
             player_ids = _normalize_preset_player_ids(data.get('player_ids'))
         except ValueError:
             return jsonify({'error': 'Player ids must be a list of integers'}), 400
         profile.players_json = json.dumps(player_ids)
 
-    if 'mode_default' in data:
+    if 'mode_default' in data and data['mode_default'] is not None:
         profile.mode_default = data.get('mode_default') or profile.mode_default
 
-    if 'source_default' in data:
+    if 'source_default' in data and data['source_default'] is not None:
         profile.source_default = data.get('source_default') or profile.source_default
 
     db.session.commit()
@@ -3092,13 +3098,14 @@ def delete_preset_api():
         return jsonify({'error': 'Preset not found'}), 404
 
     current_user_id = getattr(current_user, 'id', None)
-    if profile.owner_id != current_user_id:
-        return jsonify({'error': 'Only the owner may delete this preset'}), 403
+    is_admin = getattr(current_user, 'is_admin', False)
+    if profile.owner_id != current_user_id and not is_admin:
+        return jsonify({'error': 'Only the owner or an admin may delete this preset'}), 403
 
     db.session.delete(profile)
     db.session.commit()
 
-    return jsonify({'status': 'deleted'})
+    return jsonify({'ok': True}), 200
 
 
 def _resolve_season_from_request():
