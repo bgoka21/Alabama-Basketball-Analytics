@@ -1,7 +1,9 @@
 import json
-from datetime import date
 import re
+from datetime import date
+
 import pytest
+
 from flask import Flask
 from flask_login import LoginManager
 from pathlib import Path
@@ -11,6 +13,7 @@ from models.database import db, Season, Practice, PlayerStats, Roster
 from models.user import User
 from public.routes import public_bp
 from admin.routes import admin_bp
+from utils.shottype import persist_player_shot_details
 
 
 @pytest.fixture
@@ -46,12 +49,16 @@ def app():
         shots = [
             {"shot_class": "2fg", "result": "made", "2fg_type": "Dunk", "drill_labels": []}
         ]
-        db.session.add(PlayerStats(practice_id=1, season_id=1, player_name='#1 Test',
-                                  atr_makes=1, atr_attempts=1,
-                                  shot_type_details=json.dumps(shots)))
-        db.session.add(PlayerStats(practice_id=2, season_id=1, player_name='#1 Test',
-                                  atr_makes=3, atr_attempts=4,
-                                  shot_type_details=json.dumps(shots)))
+        ps1 = PlayerStats(practice_id=1, season_id=1, player_name='#1 Test',
+                          atr_makes=1, atr_attempts=1,
+                          shot_type_details=json.dumps(shots))
+        db.session.add(ps1)
+        persist_player_shot_details(ps1, shots, replace=True)
+        ps2 = PlayerStats(practice_id=2, season_id=1, player_name='#1 Test',
+                          atr_makes=3, atr_attempts=4,
+                          shot_type_details=json.dumps(shots))
+        db.session.add(ps2)
+        persist_player_shot_details(ps2, shots, replace=True)
         db.session.commit()
     yield app
     with app.app_context():

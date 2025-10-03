@@ -5,6 +5,7 @@ from flask import Flask
 
 from admin.routes import compute_leaderboard
 from models.database import db, Season, Roster, PlayerStats
+from utils.shottype import persist_player_shot_details
 
 
 @pytest.fixture
@@ -49,20 +50,20 @@ def app():
             },
         ]
 
-        db.session.add(
-            PlayerStats(
-                player_name="Test Player",
-                season_id=1,
-                points=12,
-                fg3_attempts=3,
-                fg3_makes=2,
-                atr_attempts=0,
-                atr_makes=0,
-                fg2_attempts=0,
-                fg2_makes=0,
-                shot_type_details=json.dumps(shots),
-            )
+        player_stat = PlayerStats(
+            player_name="Test Player",
+            season_id=1,
+            points=12,
+            fg3_attempts=3,
+            fg3_makes=2,
+            atr_attempts=0,
+            atr_makes=0,
+            fg2_attempts=0,
+            fg2_makes=0,
+            shot_type_details=json.dumps(shots),
         )
+        db.session.add(player_stat)
+        persist_player_shot_details(player_stat, shots, replace=True)
 
         db.session.commit()
 
@@ -77,13 +78,13 @@ def track_shot_detail_calls(monkeypatch):
     from admin import routes as admin_routes
 
     calls = []
-    original = admin_routes.array_agg_or_group_concat
+    original = admin_routes.compute_leaderboard_shot_details
 
-    def wrapper(column):
-        calls.append(column)
-        return original(column)
+    def wrapper(*args, **kwargs):
+        calls.append((args, kwargs))
+        return original(*args, **kwargs)
 
-    monkeypatch.setattr(admin_routes, "array_agg_or_group_concat", wrapper)
+    monkeypatch.setattr(admin_routes, "compute_leaderboard_shot_details", wrapper)
     return calls
 
 

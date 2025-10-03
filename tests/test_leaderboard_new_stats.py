@@ -14,6 +14,7 @@ from models.database import (
     db, Season, Practice, PlayerStats, Roster,
     Possession, PlayerPossession, ShotDetail
 )
+from utils.shottype import persist_player_shot_details
 from models.user import User
 from admin.routes import admin_bp
 from utils.leaderboard_helpers import (
@@ -60,7 +61,7 @@ def app():
             {"shot_class": "2fg", "result": "made", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
             {"shot_class": "3fg", "result": "made", "possession_type": "total", "drill_labels": ["4V4 DRILLS"]},
         ]
-        db.session.add(PlayerStats(
+        player_stat = PlayerStats(
             practice_id=1,
             season_id=1,
             player_name='#1 Test',
@@ -76,9 +77,11 @@ def app():
             bump_positive=3,
             bump_missed=1,
             shot_type_details=json.dumps(shots),
-        ))
+        )
+        db.session.add(player_stat)
+        persist_player_shot_details(player_stat, shots, replace=True)
 
-        poss1 = Possession(id=1, practice_id=1, season_id=1, game_id=0,
+        poss1 = Possession(id=1, practice_id=1, season_id=1, game_id=None,
                            possession_side='Offense', points_scored=3,
                            drill_labels='4V4 DRILLS')
         db.session.add(poss1)
@@ -86,14 +89,14 @@ def app():
         db.session.add(ShotDetail(possession_id=1, event_type='3FG+'))
         db.session.add(ShotDetail(possession_id=1, event_type='Off Rebound'))
 
-        poss2 = Possession(id=2, practice_id=1, season_id=1, game_id=0,
+        poss2 = Possession(id=2, practice_id=1, season_id=1, game_id=None,
                            possession_side='Offense', points_scored=2,
                            drill_labels='4V4 DRILLS')
         db.session.add(poss2)
         db.session.add(PlayerPossession(possession_id=2, player_id=2))
         db.session.add(ShotDetail(possession_id=2, event_type='2FG+'))
 
-        poss3 = Possession(id=3, practice_id=1, season_id=1, game_id=0,
+        poss3 = Possession(id=3, practice_id=1, season_id=1, game_id=None,
                            possession_side='Offense', points_scored=2)
         db.session.add(poss3)
         db.session.add(PlayerPossession(possession_id=3, player_id=1))

@@ -17,6 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover
     np = _DummyNP()
 import sqlite3
 from utils.lineup import compute_lineup_efficiencies
+from utils.shottype import persist_player_shot_details
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
 
 #print("🔥 parse_csv() function has started executing!")
@@ -811,7 +812,13 @@ def parse_csv(file_path, game_id, season_id):
                     clean_stats["shot_type_details"] = json_details
 
                 # Insert the new, non-duplicated PlayerStats row
-                db.session.add(PlayerStats(**clean_stats))
+                player_stat = PlayerStats(**clean_stats)
+                db.session.add(player_stat)
+                persist_player_shot_details(
+                    player_stat,
+                    stats.get("shot_type_details") or [],
+                    replace=True,
+                )
 
             # Commit once after processing all players
             db.session.commit()
@@ -1144,9 +1151,12 @@ def parse_csv(file_path, game_id, season_id):
             # Insert PlayerPossession entries
             player_ids = []
             for jersey in poss.get("players_on_floor", []):
-                player = PlayerStats.query.filter_by(game_id=game_id, player_name=jersey).first()
-                if player:
-                    player_ids.append(player.id)
+                roster_entry = Roster.query.filter_by(
+                    season_id=season_id,
+                    player_name=jersey,
+                ).first()
+                if roster_entry:
+                    player_ids.append(roster_entry.id)
 
             for pid in player_ids:
                 db.session.add(PlayerPossession(

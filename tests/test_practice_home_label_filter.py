@@ -10,6 +10,7 @@ from models.database import db, Season, Practice, PlayerStats, Roster
 from models.user import User
 from public.routes import public_bp
 from admin.routes import admin_bp
+from utils.shottype import persist_player_shot_details
 
 
 @pytest.fixture
@@ -45,7 +46,9 @@ def app():
             {"shot_class":"2fg","result":"made","2fg_type":"Dunk","drill_labels":["SCRIMMAGE"]},
             {"shot_class":"2fg","result":"made","2fg_type":"Dunk","drill_labels":["4V4 DRILLS"]},
         ]
-        db.session.add(PlayerStats(practice_id=1, season_id=1, player_name='#1 Test', shot_type_details=json.dumps(shots)))
+        player_stat = PlayerStats(practice_id=1, season_id=1, player_name='#1 Test', shot_type_details=json.dumps(shots))
+        db.session.add(player_stat)
+        persist_player_shot_details(player_stat, shots, replace=True)
         db.session.commit()
     yield app
     with app.app_context():

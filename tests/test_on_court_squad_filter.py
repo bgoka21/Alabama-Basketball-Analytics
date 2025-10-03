@@ -35,31 +35,31 @@ def test_on_court_metrics_filters_by_squad(app):
         db.session.commit()
 
         # Crimson offense with r1 on court
-        p1 = Possession(practice_id=1, season_id=1, game_id=0, possession_side='Crimson', points_scored=2)
+        p1 = Possession(practice_id=1, season_id=1, game_id=None, possession_side='Crimson', points_scored=2)
         db.session.add(p1)
         db.session.flush()
         db.session.add(PlayerPossession(possession_id=p1.id, player_id=r1.id))
 
         # Additional Crimson possession with r1 on court to establish squad
-        p1b = Possession(practice_id=1, season_id=1, game_id=0, possession_side='Crimson', points_scored=2)
+        p1b = Possession(practice_id=1, season_id=1, game_id=None, possession_side='Crimson', points_scored=2)
         db.session.add(p1b)
         db.session.flush()
         db.session.add(PlayerPossession(possession_id=p1b.id, player_id=r1.id))
 
         # Crimson offense with r1 off court
-        p2 = Possession(practice_id=1, season_id=1, game_id=0, possession_side='Crimson', points_scored=3)
+        p2 = Possession(practice_id=1, season_id=1, game_id=None, possession_side='Crimson', points_scored=3)
         db.session.add(p2)
         db.session.flush()
         db.session.add(PlayerPossession(possession_id=p2.id, player_id=r2.id))
 
         # White offense with r1 on court (should be ignored for squad stats)
-        p3 = Possession(practice_id=1, season_id=1, game_id=0, possession_side='White', points_scored=1)
+        p3 = Possession(practice_id=1, season_id=1, game_id=None, possession_side='White', points_scored=1)
         db.session.add(p3)
         db.session.flush()
         db.session.add(PlayerPossession(possession_id=p3.id, player_id=r1.id))
 
         # White offense with r1 off court (should be ignored)
-        p4 = Possession(practice_id=1, season_id=1, game_id=0, possession_side='White', points_scored=2)
+        p4 = Possession(practice_id=1, season_id=1, game_id=None, possession_side='White', points_scored=2)
         db.session.add(p4)
         db.session.flush()
         db.session.add(PlayerPossession(possession_id=p4.id, player_id=r2.id))

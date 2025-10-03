@@ -91,7 +91,7 @@ def _create_practice(app):
         db.session.add(bc)
         obc = OpponentBlueCollarStats(practice_id=1, season_id=1)
         db.session.add(obc)
-        poss = Possession(id=2, game_id=1, practice_id=1, season_id=1)
+        poss = Possession(id=2, game_id=None, practice_id=1, season_id=1)
         db.session.add(poss)
         pp = PlayerPossession(possession_id=2, player_id=1)
         db.session.add(pp)

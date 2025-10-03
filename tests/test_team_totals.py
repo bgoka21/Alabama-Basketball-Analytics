@@ -109,9 +109,9 @@ def app():
                                        floor_dive=0, charge_taken=0,
                                        reb_tip=0, total_blue_collar=3))
         db.session.add_all([
-            Possession(practice_id=1, season_id=1, game_id=0, paint_touches='0', points_scored=2),
-            Possession(practice_id=1, season_id=1, game_id=0, paint_touches='1', points_scored=1),
-            Possession(practice_id=1, season_id=1, game_id=0, paint_touches='3', points_scored=3),
+            Possession(practice_id=1, season_id=1, game_id=None, paint_touches='0', points_scored=2),
+            Possession(practice_id=1, season_id=1, game_id=None, paint_touches='1', points_scored=1),
+            Possession(practice_id=1, season_id=1, game_id=None, paint_touches='3', points_scored=3),
         ])
         db.session.commit()
     yield app
