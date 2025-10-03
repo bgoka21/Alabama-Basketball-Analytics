@@ -74,6 +74,12 @@ from utils.shottype import (
     gather_labels_for_shot,
     get_player_shottype_3fg_breakdown,
 )
+from utils.cache_utils import (
+    build_leaderboard_cache_key,
+    get_cache,
+    normalize_label_set,
+    register_leaderboard_cache_entry,
+)
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
 from parse_practice_csv import (
@@ -565,6 +571,21 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     specific date range (inclusive). Dates are matched against the associated
     ``Practice.date`` or ``Game.game_date`` fields.
     """
+    normalized_labels = normalize_label_set(label_set)
+    cache = get_cache()
+    cache_key = metadata = None
+    if cache is not None:
+        cache_key, metadata = build_leaderboard_cache_key(
+            stat_key,
+            season_id,
+            start_dt,
+            end_dt,
+            normalized_labels,
+        )
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
     cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
     if not cfg:
         abort(404)
@@ -1190,7 +1211,12 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
 
     all_players = set(core_rows) | set(shot_details)
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
-    return cfg, leaderboard, team_totals
+    result = (cfg, leaderboard, team_totals)
+    if cache is not None and cache_key is not None and metadata is not None:
+        cache.set(cache_key, result)
+        register_leaderboard_cache_entry(cache, cache_key, metadata)
+
+    return result
 
 
 _PRACTICE_DUAL_MAP = {

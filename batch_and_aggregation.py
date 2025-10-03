@@ -5,7 +5,13 @@ import shutil
 import logging
 from models.database import db, Season, Game, PlayerStats, TeamStats
 from test_parse import parse_csv  # Ensure this path is correct for your project
-from app import app  # Import the Flask app for the application context
+from app import app as flask_app, create_app  # Import the Flask app for the application context
+from utils.cache_utils import invalidate_season_leaderboard_cache
+
+if flask_app is None:
+    flask_app = create_app()
+
+app = flask_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +36,7 @@ def process_multiple_csvs(directory_path, season_id, archive_path):
                  if filename.lower().endswith('.csv')]
     logger.info(f"Found {len(csv_files)} CSV files in {directory_path}")
 
+    updated_stats = False
     for file_path in csv_files:
         try:
             logger.info(f"Processing {file_path}...")
@@ -39,8 +46,12 @@ def process_multiple_csvs(directory_path, season_id, archive_path):
             archive_file = os.path.join(archive_path, os.path.basename(file_path))
             shutil.move(file_path, archive_file)
             logger.info(f"Moved {file_path} to archive folder: {archive_file}")
+            updated_stats = True
         except Exception as e:
             logger.exception(f"Error processing file {file_path}: {e}")
+    if updated_stats:
+        with app.app_context():
+            invalidate_season_leaderboard_cache(season_id)
     logger.info("Batch processing complete.")
 
 def aggregate_player_stats(season_id):

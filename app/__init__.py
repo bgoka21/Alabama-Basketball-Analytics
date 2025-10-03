@@ -7,6 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_apscheduler import APScheduler
+from flask_caching import Cache
 from flask.cli import with_appcontext
 from sqlalchemy import inspect
 import pdfkit
@@ -29,6 +30,7 @@ def _ns_default(self, obj):
 DefaultJSONProvider.default = _ns_default
 
 scheduler = APScheduler()
+cache = Cache()
 
 try:
     PDFKIT_CONFIG = pdfkit.configuration()
@@ -109,6 +111,16 @@ def create_app():
 
     # Allow up to 32 MB uploads (tune as needed)
     app.config.setdefault("MAX_CONTENT_LENGTH", 32 * 1024 * 1024)
+
+    # Configure caching
+    app.config.setdefault("CACHE_TYPE", os.environ.get("CACHE_TYPE", "SimpleCache"))
+    default_timeout = os.environ.get("CACHE_DEFAULT_TIMEOUT")
+    try:
+        default_timeout = int(default_timeout) if default_timeout is not None else 300
+    except (TypeError, ValueError):
+        default_timeout = 300
+    app.config.setdefault("CACHE_DEFAULT_TIMEOUT", default_timeout)
+    cache.init_app(app)
 
     # --- Initialize Extensions ---
     db.init_app(app)
