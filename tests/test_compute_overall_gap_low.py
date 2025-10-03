@@ -23,7 +23,9 @@ def test_compute_overall_gap_help_combines_sources(monkeypatch):
     monkeypatch.setattr(routes, "compute_collisions_gap_help", fake_collisions)
     monkeypatch.setattr(routes, "compute_pnr_gap_help", fake_pnr)
 
-    totals, rows = routes.compute_overall_gap_help(season_id=1)
+    payload = routes.compute_overall_gap_help(season_id=1)
+    totals = payload["team_totals"]
+    rows = payload["rows"]
 
     assert totals["plus"] == 10
     assert totals["opps"] == 16
@@ -48,10 +50,12 @@ def test_compute_overall_gap_help_single_source(monkeypatch):
     monkeypatch.setattr(routes, "compute_collisions_gap_help", fake_collisions)
     monkeypatch.setattr(routes, "compute_pnr_gap_help", fake_pnr)
 
-    totals, rows = routes.compute_overall_gap_help(season_id=1)
+    payload = routes.compute_overall_gap_help(season_id=1)
 
-    assert totals == {"plus": 5, "opps": 10, "pct": 50.0}
-    assert rows == [{"player_name": "Only", "plus": 5, "opps": 10, "pct": 50.0}]
+    assert payload["team_totals"] == {"plus": 5, "opps": 10, "pct": 50.0}
+    assert payload["rows"] == [
+        {"player_name": "Only", "plus": 5, "opps": 10, "pct": 50.0}
+    ]
 
 
 def test_compute_overall_low_man_combines_sources(monkeypatch):
@@ -77,7 +81,9 @@ def test_compute_overall_low_man_combines_sources(monkeypatch):
     monkeypatch.setattr(routes, "compute_collisions_gap_help", fake_collisions)
     monkeypatch.setattr(routes, "compute_pnr_gap_help", fake_pnr)
 
-    totals, rows = routes.compute_overall_low_man(season_id=1)
+    payload = routes.compute_overall_low_man(season_id=1)
+    totals = payload["team_totals"]
+    rows = payload["rows"]
 
     assert captured["role"] == "low_man"
     assert totals["plus"] == 9
@@ -115,7 +121,10 @@ def test_compute_overall_low_man_handles_missing_collisions(monkeypatch):
     monkeypatch.setattr(routes, "compute_collisions_gap_help", fake_collisions)
     monkeypatch.setattr(routes, "compute_pnr_gap_help", fake_pnr)
 
-    totals, rows = routes.compute_overall_low_man(season_id=1)
+    payload = routes.compute_overall_low_man(season_id=1)
+
+    totals = payload["team_totals"]
+    rows = payload["rows"]
 
     assert totals["plus"] == 1
     assert totals["opps"] == 2
@@ -150,10 +159,13 @@ def test_overall_gap_help_stat_key_includes_all_sources(monkeypatch):
     monkeypatch.setattr(routes, "compute_collisions_gap_help", fake_collisions)
     monkeypatch.setattr(routes, "compute_pnr_gap_help", fake_pnr)
 
-    totals, rows = routes.compute_overall_gap_help(
+    payload = routes.compute_overall_gap_help(
         season_id=1,
         stat_key="overall_gap_help",
     )
+
+    totals = payload["team_totals"]
+    rows = payload["rows"]
 
     assert "stat_key" not in captured["collisions_kwargs"]
     assert "stat_key" not in captured["pnr_kwargs"]
@@ -194,10 +206,13 @@ def test_overall_low_man_stat_key_includes_all_sources(monkeypatch):
     monkeypatch.setattr(routes, "compute_collisions_gap_help", fake_collisions)
     monkeypatch.setattr(routes, "compute_pnr_gap_help", fake_pnr)
 
-    totals, rows = routes.compute_overall_low_man(
+    payload = routes.compute_overall_low_man(
         season_id=1,
         stat_key="overall_low_man",
     )
+
+    totals = payload["team_totals"]
+    rows = payload["rows"]
 
     assert "stat_key" not in captured["collisions_kwargs"]
     assert captured["pnr_kwargs"].get("role") == "low_man"
@@ -212,5 +227,11 @@ def test_overall_low_man_stat_key_includes_all_sources(monkeypatch):
 
 
 def test_compute_overall_requires_season_id():
-    assert routes.compute_overall_gap_help(season_id=None) == (None, [])
-    assert routes.compute_overall_low_man(season_id=None) == (None, [])
+    assert routes.compute_overall_gap_help(season_id=None) == {
+        "team_totals": None,
+        "rows": [],
+    }
+    assert routes.compute_overall_low_man(season_id=None) == {
+        "team_totals": None,
+        "rows": [],
+    }
