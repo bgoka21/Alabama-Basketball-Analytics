@@ -1,128 +1,123 @@
 {% extends 'admin/base.html' %}
 
 {% block content %}
-<div class="space-y-8">
-  <div class="flex flex-col gap-4">
-    <h1 class="text-2xl font-bold text-gray-900">Custom Stats Table (Practice)</h1>
-    <p class="text-sm text-gray-600">Build a practice stats view on the fly. Pick players, dates, and fields, then let the table refresh automatically as you tweak the configuration.</p>
-  </div>
+<div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
+  <div class="space-y-8">
+    <div class="flex flex-col gap-4">
+      <h1 class="text-2xl font-bold text-gray-900">Custom Stats Table (Practice)</h1>
+      <p class="text-sm text-gray-600">Build a practice stats view on the fly. Pick players, dates, and fields, then let the table refresh automatically as you tweak the configuration.</p>
+    </div>
 
-  <div class="grid gap-6 xl:grid-cols-3">
-    <div class="xl:col-span-2 space-y-6">
-      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div class="border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-[#9E1B32]">Roster &amp; Range</h2>
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <label for="custom-auto-refresh" class="font-medium">Auto-refresh</label>
-            <input id="custom-auto-refresh" type="checkbox" class="h-4 w-4 text-[#9E1B32] border-gray-300 rounded" checked />
+    <div class="grid gap-6 xl:grid-cols-3">
+      <main class="xl:col-span-2 space-y-4">
+        <div class="sticky top-0 z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b">
+          <div class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm font-medium text-gray-700">Use the buttons to export your current view.</div>
+            <div class="flex flex-wrap items-center gap-3">
+              <button type="button" id="export-csv" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-[#9E1B32] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#7b1427] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Export CSV</button>
+              <button type="button" id="export-png" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-white px-4 py-2 text-sm font-semibold text-[#9E1B32] shadow-sm hover:bg-[#9E1B32] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Export PNG</button>
+            </div>
           </div>
         </div>
-        <div class="px-5 py-4 space-y-5">
+
+        <section id="custom-table-container" class="space-y-4">
+          <div class="rounded-xl border border-dashed border-gray-300 px-6 py-12 text-center text-sm text-gray-500">
+            Choose players and fields to generate a table.
+          </div>
+        </section>
+      </main>
+
+      <aside class="xl:col-span-1 space-y-6">
+        <section id="filters-panel" class="rounded-xl border p-4 space-y-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-base font-semibold">Filters</h2>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-600">
+              <span>Auto-refresh</span>
+              <input id="custom-auto-refresh" type="checkbox" class="h-4 w-4 text-[#9E1B32] border-gray-300 rounded" checked />
+            </label>
+          </div>
+
           <div>
-            <label for="custom-player-select" class="block text-sm font-semibold text-gray-700">Players</label>
+            <label class="block text-sm font-medium">Players</label>
             <div id="custom-player-select" class="mt-2"></div>
             <p class="mt-2 text-xs text-gray-500">Search roster names to add multiple players. The table combines everyone you pick.</p>
           </div>
-          <div class="grid gap-4 sm:grid-cols-2">
+
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label for="custom-date-from" class="block text-sm font-semibold text-gray-700">From</label>
-              <input id="custom-date-from" type="date" class="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
+              <label for="custom-date-from" class="block text-sm font-medium">From</label>
+              <input id="custom-date-from" type="date" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
             </div>
             <div>
-              <label for="custom-date-to" class="block text-sm font-semibold text-gray-700">To</label>
-              <input id="custom-date-to" type="date" class="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
+              <label for="custom-date-to" class="block text-sm font-medium">To</label>
+              <input id="custom-date-to" type="date" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
             </div>
           </div>
+
           <div>
-            <span class="block text-sm font-semibold text-gray-700">Totals vs. Per Practice</span>
-            <div id="custom-mode-toggle" class="mt-2 inline-flex rounded-md border border-gray-300 bg-gray-50 text-sm overflow-hidden">
+            <span class="block text-sm font-medium">Totals vs. Per Practice</span>
+            <div id="custom-mode-toggle" class="mt-2 inline-flex overflow-hidden rounded-md border border-gray-300 bg-gray-50 text-sm">
               <button type="button" data-mode="totals" class="mode-pill active px-4 py-2 font-medium text-white bg-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Totals</button>
               <button type="button" data-mode="per_practice" class="mode-pill px-4 py-2 font-medium text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Per Practice</button>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div class="border-b border-gray-200 px-5 py-4">
-          <h2 class="text-lg font-semibold text-[#9E1B32]">Presets</h2>
-        </div>
-        <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
-          <section id="presets-panel" class="space-y-4">
+        <section class="rounded-xl border p-4 space-y-4" id="presets-panel">
+          <h2 class="text-base font-semibold">Presets</h2>
+          <div class="space-y-4 text-sm text-gray-700">
             <div class="flex items-center gap-2 border-b">
               <button class="preset-tab active border-b-2 border-gray-900 px-3 py-2 text-sm font-semibold text-gray-900" data-tab="players">Players Presets</button>
               <button class="preset-tab px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800" data-tab="stats">Stats Presets</button>
               <button class="preset-tab px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800" data-tab="dates">Dates Presets</button>
             </div>
 
-            <!-- Players preset pane -->
             <div class="preset-pane" data-pane="players">
               <div class="flex items-center gap-2">
-                <input id="players-preset-name" class="input px-3 py-1.5 rounded-lg border w-full" placeholder="Preset name (e.g., Starting 5)">
-                <button id="players-preset-save" class="btn-primary px-3 py-1.5 rounded-lg font-medium shadow border bg-gray-900 text-white hover:bg-gray-800">Save Players Preset</button>
+                <input id="players-preset-name" class="input w-full rounded-lg border px-3 py-1.5" placeholder="Preset name (e.g., Starting 5)">
+                <button id="players-preset-save" class="btn-primary rounded-lg border bg-gray-900 px-3 py-1.5 font-medium text-white shadow hover:bg-gray-800">Save Players Preset</button>
               </div>
               <div id="players-presets-list" class="divide-y"></div>
             </div>
 
-            <!-- Stats preset pane -->
             <div class="preset-pane hidden" data-pane="stats">
               <div class="flex items-center gap-2">
-                <input id="stats-preset-name" class="input px-3 py-1.5 rounded-lg border w-full" placeholder="Preset name (e.g., Shooting Splits)">
-                <button id="stats-preset-save" class="btn-primary px-3 py-1.5 rounded-lg font-medium shadow border bg-gray-900 text-white hover:bg-gray-800">Save Stats Preset</button>
+                <input id="stats-preset-name" class="input w-full rounded-lg border px-3 py-1.5" placeholder="Preset name (e.g., Shooting Splits)">
+                <button id="stats-preset-save" class="btn-primary rounded-lg border bg-gray-900 px-3 py-1.5 font-medium text-white shadow hover:bg-gray-800">Save Stats Preset</button>
               </div>
               <div id="stats-presets-list" class="divide-y"></div>
             </div>
 
-            <!-- Dates preset pane -->
             <div class="preset-pane hidden" data-pane="dates">
               <div class="flex items-center gap-2">
-                <input id="dates-preset-name" class="input px-3 py-1.5 rounded-lg border w-full" placeholder="Preset name (e.g., Conference Window)">
-                <button id="dates-preset-save" class="btn-primary px-3 py-1.5 rounded-lg font-medium shadow border bg-gray-900 text-white hover:bg-gray-800">Save Dates Preset</button>
+                <input id="dates-preset-name" class="input w-full rounded-lg border px-3 py-1.5" placeholder="Preset name (e.g., Conference Window)">
+                <button id="dates-preset-save" class="btn-primary rounded-lg border bg-gray-900 px-3 py-1.5 font-medium text-white shadow hover:bg-gray-800">Save Dates Preset</button>
               </div>
               <div id="dates-presets-list" class="divide-y"></div>
             </div>
-          </section>
-        </div>
-      </section>
-    </div>
+          </div>
+        </section>
 
-    <aside class="xl:col-span-1">
-      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div class="border-b border-gray-200 px-5 py-4">
-          <h2 class="text-lg font-semibold text-[#9E1B32]">Stat Picker</h2>
-          <p class="mt-1 text-xs text-gray-500">Search for fields or expand a group to add them to the table.</p>
-        </div>
-        <div class="px-5 py-4 space-y-4">
+        <section id="stat-picker" class="rounded-xl border p-4 space-y-4">
           <div>
-            <label for="stat-search" class="block text-sm font-semibold text-gray-700">Search</label>
+            <h2 class="text-base font-semibold">Stat Picker</h2>
+            <p class="mt-1 text-xs text-gray-500">Search for fields or expand a group to add them to the table.</p>
+          </div>
+          <div>
+            <label for="stat-search" class="block text-sm font-medium">Search</label>
             <input id="stat-search" type="search" placeholder="Find a stat" class="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
           </div>
           <div id="stat-groups" class="space-y-3">
             <p class="text-xs text-gray-500">Loading stat catalog…</p>
           </div>
-        </div>
-      </section>
-    </aside>
-  </div>
-
-  <div class="sticky top-0 z-30 space-y-0">
-    <div class="rounded-xl border border-gray-200 bg-white/95 backdrop-blur px-5 py-3 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div class="text-sm font-medium text-gray-700">Use the buttons to export your current view.</div>
-      <div class="flex flex-wrap items-center gap-3">
-        <button type="button" id="export-csv" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-[#9E1B32] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#7b1427] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Export CSV</button>
-        <button type="button" id="export-png" class="inline-flex items-center rounded-md border border-[#9E1B32] bg-white px-4 py-2 text-sm font-semibold text-[#9E1B32] shadow-sm hover:bg-[#9E1B32] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Export PNG</button>
-      </div>
+        </section>
+      </aside>
     </div>
-  </div>
 
-  <div id="custom-table-container" class="space-y-4">
-    <div class="rounded-xl border border-dashed border-gray-300 px-6 py-12 text-center text-sm text-gray-500">
-      Choose players and fields to generate a table.
-    </div>
+    <script type="application/json" id="custom-stats-roster-data">
+      {{ roster_payload | tojson }}
+    </script>
   </div>
-  <script type="application/json" id="custom-stats-roster-data">
-    {{ roster_payload | tojson }}
-  </script>
 </div>
 {% endblock %}
 
