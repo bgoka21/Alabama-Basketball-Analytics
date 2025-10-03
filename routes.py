@@ -23,7 +23,6 @@ from utils.leaderboard_helpers import (
     get_turnover_rates_onfloor,
     get_rebound_rates_onfloor,
 )
-from utils.label_filters import apply_possession_label_filter
 import pdfkit
 from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
@@ -319,7 +318,8 @@ def player_view(player_name):
             )
         )
         if label_set:
-            q = apply_possession_label_filter(q, label_set)
+            clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+            q = q.filter(or_(*clauses))
         return q.scalar() or 0
 
     # 5. Shooting splits

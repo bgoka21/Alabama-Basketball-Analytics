@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 import functools
 import re
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Mapping
@@ -56,70 +56,6 @@ def get_last_practice(session: Session, season_id: Optional[int]):
     return query.order_by(*order_clauses).first()
 
 
-def parse_dual_compute_payload(result: Any) -> Tuple[Any, Any, Dict[Any, Any]]:
-    """Return ``(team_totals, rows, practice_slices)`` from a compute response."""
-
-    practice_slices: Dict[Any, Any] = {}
-
-    if isinstance(result, Mapping):
-        candidate = result.get("practice_slices")
-        if isinstance(candidate, Mapping):
-            practice_slices = dict(candidate)
-
-    team_totals, rows = _normalize_compute_result(result)
-    return team_totals, rows, practice_slices
-
-
-def _resolve_practice_slice(
-    practice_slices: Mapping[Any, Any],
-    target_date: date,
-):
-    """Return the slice payload for ``target_date`` if available."""
-
-    if not practice_slices:
-        return None
-
-    if target_date in practice_slices:
-        return practice_slices[target_date]
-
-    iso_key = target_date.isoformat()
-    if iso_key in practice_slices:
-        return practice_slices[iso_key]
-
-    alt_key = target_date.strftime("%Y-%m-%d")
-    if alt_key in practice_slices:
-        return practice_slices[alt_key]
-
-    for key, value in practice_slices.items():
-        if not isinstance(value, Mapping):
-            continue
-
-        candidate_date = None
-        if isinstance(key, str):
-            try:
-                candidate_date = datetime.fromisoformat(key).date()
-            except ValueError:
-                candidate_date = None
-        elif isinstance(key, date):
-            candidate_date = key
-
-        if candidate_date == target_date:
-            return value
-
-        raw_date = value.get("date") or value.get("practice_date")
-        if isinstance(raw_date, date) and raw_date == target_date:
-            return value
-        if isinstance(raw_date, str):
-            try:
-                parsed = datetime.fromisoformat(raw_date).date()
-            except ValueError:
-                continue
-            if parsed == target_date:
-                return value
-
-    return None
-
-
 def with_last_practice(
     session: Session,
     season_id: Optional[int],
@@ -144,9 +80,7 @@ def with_last_practice(
         end_dt=None,
         **compute_kwargs,
     )
-    season_team_totals, season_rows, practice_slices = parse_dual_compute_payload(
-        season_result
-    )
+    season_team_totals, season_rows = _normalize_compute_result(season_result)
     context.update(
         {
             "season_rows": season_rows,
@@ -167,23 +101,14 @@ def with_last_practice(
     if last_practice_date is None:
         return context
 
-    slice_payload = None
-    if isinstance(practice_slices, Mapping):
-        slice_payload = _resolve_practice_slice(practice_slices, last_practice_date)
-
-    if slice_payload is not None:
-        last_team_totals = slice_payload.get("team_totals")
-        last_rows = slice_payload.get("rows")
-    else:
-        last_result = compute_fn(
-            session=session,
-            season_id=season_id,
-            start_dt=last_practice_date,
-            end_dt=last_practice_date,
-            **compute_kwargs,
-        )
-        last_team_totals, last_rows, _ = parse_dual_compute_payload(last_result)
-
+    last_result = compute_fn(
+        session=session,
+        season_id=season_id,
+        start_dt=last_practice_date,
+        end_dt=last_practice_date,
+        **compute_kwargs,
+    )
+    last_team_totals, last_rows = _normalize_compute_result(last_result)
     context.update(
         {
             "last_rows": last_rows,
