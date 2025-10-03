@@ -1037,8 +1037,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         details = player_detail_list.get(roster_id, [])
         
         # 1) Insert PlayerStats
-        db.session.add(
-            PlayerStats(
+        player_stat = PlayerStats(
                 player_name       = db.session.get(Roster, roster_id).player_name,
                 season_id         = season_id,
                 practice_id       = practice_id,
@@ -1120,8 +1119,9 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 shot_type_details = json.dumps(shots) if shots else None,
                 stat_details      = json.dumps(details) if details else None
             )
-        )
-        
+        db.session.add(player_stat)
+        db.session.flush()
+
         # 2) Insert BlueCollarStats
         total_bcp = sum(blues.get(k, 0) * blue_collar_values[k] for k in blues)
         db.session.add(

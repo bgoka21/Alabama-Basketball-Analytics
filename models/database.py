@@ -1,10 +1,74 @@
+import json
+import re
+import sqlite3
+from typing import Iterable, Set
+
 from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.sql import func
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
+
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):  # pragma: no cover - relies on sqlite3
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
+
+
+def _normalize_label_values(values: Iterable[str]) -> Set[str]:
+    normalized: Set[str] = set()
+    for raw in values:
+        if not isinstance(raw, str):
+            continue
+        label = raw.strip().upper()
+        if label:
+            normalized.add(label)
+    return normalized
+
+
+def _coerce_label_iter(value) -> Iterable[str]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return re.split(r",", value)
+    if isinstance(value, dict):
+        return value.values()
+    try:
+        return tuple(value)
+    except TypeError:  # pragma: no cover - defensive fallback
+        return ()
+
+
+def _collect_labels_from_detail_blob(blob) -> Set[str]:
+    labels: Set[str] = set()
+    if not blob:
+        return labels
+    data = blob
+    if isinstance(blob, str):
+        try:
+            data = json.loads(blob)
+        except Exception:  # pragma: no cover - corrupted legacy blobs
+            return labels
+    entries: Iterable = ()
+    if isinstance(data, dict):
+        entries = (data,)
+    elif isinstance(data, list):
+        entries = data
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        labels |= _normalize_label_values(_coerce_label_iter(entry.get("drill_labels")))
+        labels |= _normalize_label_values(_coerce_label_iter(entry.get("possession_type")))
+        labels |= _normalize_label_values(_coerce_label_iter(entry.get("team")))
+    return labels
 
 
 class Season(db.Model):
@@ -227,6 +291,30 @@ class PlayerStats(db.Model):
     sprint_wins     = db.Column(db.Integer, default=0)
     sprint_losses   = db.Column(db.Integer, default=0)
 
+    label_entries   = db.relationship(
+        'PlayerStatLabel',
+        back_populates='player_stat',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+
+class PlayerStatLabel(db.Model):
+    __tablename__ = 'player_stat_labels'
+
+    player_stats_id = db.Column(
+        db.Integer,
+        db.ForeignKey('player_stats.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    label = db.Column(db.String(64), primary_key=True)
+
+    __table_args__ = (
+        db.Index('ix_player_stat_labels_label', 'label'),
+    )
+
+    player_stat = db.relationship('PlayerStats', back_populates='label_entries')
+
 
 
 class BlueCollarStats(db.Model):
@@ -280,6 +368,30 @@ class Possession(db.Model):
     shot_clock_pt       = db.Column(db.String(10))
     points_scored       = db.Column(db.Integer, default=0)
     drill_labels       = db.Column(db.String(255))
+
+    label_entries = db.relationship(
+        'PossessionLabel',
+        back_populates='possession',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+
+class PossessionLabel(db.Model):
+    __tablename__ = 'possession_labels'
+
+    possession_id = db.Column(
+        db.Integer,
+        db.ForeignKey('possession.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    label = db.Column(db.String(64), primary_key=True)
+
+    __table_args__ = (
+        db.Index('ix_possession_labels_label', 'label'),
+    )
+
+    possession = db.relationship('Possession', back_populates='label_entries')
 
 
 class PlayerPossession(db.Model):
@@ -422,3 +534,76 @@ class SavedStatProfile(db.Model):
 
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile
+
+
+def _gather_player_stat_labels(target: "PlayerStats") -> Set[str]:
+    labels = set()
+    labels |= _collect_labels_from_detail_blob(target.shot_type_details)
+    labels |= _collect_labels_from_detail_blob(target.stat_details)
+    return labels
+
+
+def _replace_player_stat_labels(connection, player_stats_id: int, labels: Set[str]) -> None:
+    table = PlayerStatLabel.__table__
+    connection.execute(
+        table.delete().where(table.c.player_stats_id == player_stats_id)
+    )
+    if labels:
+        connection.execute(
+            table.insert(),
+            [
+                {"player_stats_id": player_stats_id, "label": label}
+                for label in sorted(labels)
+            ],
+        )
+
+
+def _gather_possession_labels(target: "Possession") -> Set[str]:
+    return _normalize_label_values(_coerce_label_iter(target.drill_labels))
+
+
+def _replace_possession_labels(connection, possession_id: int, labels: Set[str]) -> None:
+    table = PossessionLabel.__table__
+    connection.execute(
+        table.delete().where(table.c.possession_id == possession_id)
+    )
+    if labels:
+        connection.execute(
+            table.insert(),
+            [
+                {"possession_id": possession_id, "label": label}
+                for label in sorted(labels)
+            ],
+        )
+
+
+@event.listens_for(PlayerStats, "after_insert")
+def _player_stats_after_insert(mapper, connection, target):  # pragma: no cover - SQLAlchemy hook
+    if target.id is None:
+        return
+    labels = _gather_player_stat_labels(target)
+    _replace_player_stat_labels(connection, target.id, labels)
+
+
+@event.listens_for(PlayerStats, "after_update")
+def _player_stats_after_update(mapper, connection, target):  # pragma: no cover - SQLAlchemy hook
+    if target.id is None:
+        return
+    labels = _gather_player_stat_labels(target)
+    _replace_player_stat_labels(connection, target.id, labels)
+
+
+@event.listens_for(Possession, "after_insert")
+def _possession_after_insert(mapper, connection, target):  # pragma: no cover - SQLAlchemy hook
+    if target.id is None:
+        return
+    labels = _gather_possession_labels(target)
+    _replace_possession_labels(connection, target.id, labels)
+
+
+@event.listens_for(Possession, "after_update")
+def _possession_after_update(mapper, connection, target):  # pragma: no cover - SQLAlchemy hook
+    if target.id is None:
+        return
+    labels = _gather_possession_labels(target)
+    _replace_possession_labels(connection, target.id, labels)

@@ -14,6 +14,7 @@ from typing import Iterable, List, Mapping, MutableMapping
 from sqlalchemy import and_, or_
 
 from models.database import Game, Practice, PlayerStats, Roster, db
+from utils.label_filters import apply_player_label_filter
 
 
 def _normalize_iterable(value):
@@ -199,12 +200,7 @@ def get_player_shottype_3fg_breakdown(
     q = _apply_common_filters(q, practice, start_date, end_date)
 
     if label_set:
-        clauses = []
-        for lbl in label_set:
-            pattern = f"%{lbl}%"
-            clauses.append(PlayerStats.shot_type_details.ilike(pattern))
-            clauses.append(PlayerStats.stat_details.ilike(pattern))
-        q = q.filter(or_(*clauses))
+        q = apply_player_label_filter(q, label_set)
 
     rows = q.with_entities(PlayerStats.shot_type_details).all()
     shots = _collect_shots_from_query(rows)
