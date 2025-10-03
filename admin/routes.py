@@ -68,16 +68,12 @@ from models.user import User
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import aliased
+from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from utils.shottype import (
     compute_3fg_breakdown_from_shots,
-    compute_leaderboard_shot_details,
     gather_labels_for_shot,
     get_player_shottype_3fg_breakdown,
-)
-from utils.label_filters import (
-    apply_player_label_filter,
-    apply_possession_label_filter,
 )
 from utils.cache_utils import (
     build_leaderboard_cache_key,
@@ -647,7 +643,12 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
         .filter(PlayerStats.season_id == season_id)
     )
     if label_set:
-        ps_q = apply_player_label_filter(ps_q, label_set)
+        clauses = []
+        for lbl in label_set:
+            pattern = f"%{lbl}%"
+            clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+            clauses.append(PlayerStats.stat_details.ilike(pattern))
+        ps_q = ps_q.filter(or_(*clauses))
     if start_dt or end_dt:
         ps_q = (
             ps_q
@@ -693,7 +694,12 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
                 PlayerStats.game_id == BlueCollarStats.game_id,
             ),
         )
-        bc_q = apply_player_label_filter(bc_q, label_set)
+        bc_clauses = []
+        for lbl in label_set:
+            pattern = f"%{lbl}%"
+            bc_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+            bc_clauses.append(PlayerStats.stat_details.ilike(pattern))
+        bc_q = bc_q.filter(or_(*bc_clauses))
     if start_dt or end_dt:
         bc_q = (
             bc_q
@@ -726,7 +732,8 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
         )
     )
     if label_set:
-        id_q = apply_possession_label_filter(id_q, label_set)
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        id_q = id_q.filter(or_(*clauses))
     if start_dt or end_dt:
         id_q = (
             id_q
@@ -819,7 +826,8 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
         )
     )
     if label_set:
-        events_q = apply_possession_label_filter(events_q, label_set)
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        events_q = events_q.filter(or_(*clauses))
     if start_dt or end_dt:
         events_q = (
             events_q
@@ -1002,13 +1010,165 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
 
     shot_details = {}
     if needs_shot_details:
-        shot_details = compute_leaderboard_shot_details(
-            db.session,
-            season_id,
-            start_date=start_dt,
-            end_date=end_dt,
-            label_set=label_set,
+        shot_rows = (
+            Roster.query
+            .join(
+                PlayerStats,
+                and_(
+                    PlayerStats.player_name == Roster.player_name,
+                    PlayerStats.season_id == Roster.season_id,
+                ),
+            )
+            .filter(PlayerStats.season_id == season_id)
         )
+        if label_set:
+            s_clauses = []
+            for lbl in label_set:
+                pattern = f"%{lbl}%"
+                s_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+                s_clauses.append(PlayerStats.stat_details.ilike(pattern))
+            shot_rows = shot_rows.filter(or_(*s_clauses))
+        if start_dt or end_dt:
+            shot_rows = (
+                shot_rows
+                .outerjoin(Game, PlayerStats.game_id == Game.id)
+                .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+            )
+            if start_dt:
+                shot_rows = shot_rows.filter(
+                    or_(
+                        and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                        and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                    )
+                )
+            if end_dt:
+                shot_rows = shot_rows.filter(
+                    or_(
+                        and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                        and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                    )
+                )
+        shot_rows = (
+            shot_rows
+            .with_entities(
+                Roster.player_name,
+                array_agg_or_group_concat(PlayerStats.shot_type_details),
+            )
+            .group_by(Roster.player_name)
+            .all()
+        )
+
+        new_shot_rows = []
+        for player, blobs in shot_rows:
+            if isinstance(blobs, str):
+                parts = blobs.split('|||')
+            elif isinstance(blobs, (list, tuple)):
+                parts = blobs
+            else:
+                parts = []
+
+            json_list = []
+            for fragment in parts:
+                if not fragment:
+                    continue
+                try:
+                    parsed = json.loads(fragment)
+                except ValueError:
+                    continue
+                if isinstance(parsed, list):
+                    json_list.extend(parsed)
+                else:
+                    json_list.append(parsed)
+
+            new_shot_rows.append((player, json_list))
+
+        for player, shot_list in new_shot_rows:
+            detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
+            filtered_shots = []
+            for shot in shot_list:
+                raw_sc = shot.get('shot_class', '').lower()
+                sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
+                raw_ctx = shot.get('possession_type', '').strip().lower()
+                if 'trans' in raw_ctx:
+                    ctx = 'transition'
+                elif 'half' in raw_ctx:
+                    ctx = 'halfcourt'
+                else:
+                    ctx = 'total'
+                if sc not in ['atr', 'fg2', 'fg3']:
+                    continue
+
+                labels_for_this_shot = gather_labels_for_shot(shot)
+                normalized_labels = {
+                    str(lbl).strip().upper()
+                    for lbl in labels_for_this_shot
+                    if str(lbl).strip()
+                }
+                normalized_labels.update(
+                    lbl.strip().upper()
+                    for lbl in re.split(r",", shot.get("possession_type", ""))
+                    if lbl.strip()
+                )
+                drill_labels = shot.get('drill_labels', [])
+                if isinstance(drill_labels, str):
+                    drill_iter = re.split(r",", drill_labels)
+                else:
+                    drill_iter = drill_labels or []
+                normalized_labels.update(
+                    lbl.strip().upper()
+                    for lbl in drill_iter
+                    if isinstance(lbl, str) and lbl.strip()
+                )
+
+                if label_set and not (normalized_labels & label_set):
+                    continue
+
+                filtered_shots.append(shot)
+
+                label = 'Assisted' if 'Assisted' in labels_for_this_shot else 'Non-Assisted'
+                made = (shot.get('result') == 'made')
+
+                bucket = detail_counts[(sc, label, ctx)]
+                bucket['attempts'] += 1
+                bucket['makes'] += made
+            flat = {}
+            totals_by_sc = defaultdict(lambda: {'attempts': 0, 'makes': 0})
+            for (sc, label, ctx), data in detail_counts.items():
+                a = data['attempts']
+                m = data['makes']
+                pts = 2 if sc in ('atr', 'fg2') else 3
+                flat[f"{sc}_{label}_{ctx}_attempts"] = a
+                flat[f"{sc}_{label}_{ctx}_makes"] = m
+                flat[f"{sc}_{label}_{ctx}_fg_pct"] = (m / a * 100 if a else 0)
+                flat[f"{sc}_{label}_{ctx}_pps"] = (pts * m / a if a else 0)
+                total = sum(d['attempts'] for k, d in detail_counts.items() if k[0] == sc) or 1
+                flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
+                totals_by_sc[sc]['attempts'] += a
+                totals_by_sc[sc]['makes'] += m
+
+            total_attempts = sum(t['attempts'] for t in totals_by_sc.values()) or 0
+            for sc, t in totals_by_sc.items():
+                a = t['attempts']
+                m = t['makes']
+                pts = 2 if sc in ('atr', 'fg2') else 3
+                flat[f"{sc}_attempts"] = a
+                flat[f"{sc}_makes"] = m
+                flat[f"{sc}_fg_pct"] = (m / a * 100 if a else 0)
+                flat[f"{sc}_pps"] = (pts * m / a if a else 0)
+                flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
+
+            breakdown = compute_3fg_breakdown_from_shots(filtered_shots)
+            # Single source of truth for Shrink/Non-Shrink 3FG (mirrors player Shot Type tab).
+            flat.update({
+                "fg3_shrink_att": breakdown["fg3_shrink_att"],
+                "fg3_shrink_makes": breakdown["fg3_shrink_makes"],
+                "fg3_shrink_pct": breakdown["fg3_shrink_pct"],
+                "fg3_nonshrink_att": breakdown["fg3_nonshrink_att"],
+                "fg3_nonshrink_makes": breakdown["fg3_nonshrink_makes"],
+                "fg3_nonshrink_pct": breakdown["fg3_nonshrink_pct"],
+            })
+
+            shot_details[player] = flat
 
     if current_app.debug and stat_key == 'fg3_fg_pct':
         checked = 0
@@ -5520,7 +5680,8 @@ def player_detail(player_name):
             )
         )
         if label_set:
-            q = apply_possession_label_filter(q, label_set)
+            clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+            q = q.filter(or_(*clauses))
         return q.scalar() or 0
 
     FGM2_ON = count_event('ATR+') + count_event('2FG+')

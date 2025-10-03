@@ -43,8 +43,6 @@ def process_multiple_csvs(directory_path, season_id, archive_path):
             logger.info(f"Processing {file_path}...")
             # Process the CSV file. The parse_csv function checks for an existing Game record.
             parse_csv(file_path, game_id=None, season_id=season_id)
-            with app.app_context():
-                db.session.flush()
             # If processing is successful, move the file to the archive folder.
             archive_file = os.path.join(archive_path, os.path.basename(file_path))
             shutil.move(file_path, archive_file)
