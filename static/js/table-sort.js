@@ -7,7 +7,8 @@
   'use strict';
 
   const MAX_SAMPLE_ROWS = 10;
-  const MISSING_NUMERIC_SENTINEL = Number.NEGATIVE_INFINITY;
+  const PLACEHOLDER_VALUES = new Set(['-', '--', '—', '–']);
+  const PLACEHOLDER_NORMALIZED = new Set(['na', 'n/a', 'n.a.', 'nan', 'none', 'null']);
   const SORTABLE_HEADER_SELECTOR = 'th[data-sortable="true"]';
   const SR_MESSAGES = {
     asc: 'sorted ascending',
@@ -218,10 +219,10 @@
         return a.index - b.index;
       }
       if (a.isEmpty) {
-        return direction === 'asc' ? 1 : -1;
+        return 1;
       }
       if (b.isEmpty) {
-        return direction === 'asc' ? -1 : 1;
+        return -1;
       }
 
       let comparison = 0;
@@ -365,23 +366,24 @@
     return null;
   }
 
-  function isMissingNumericValue(value) {
+  function isPlaceholderValue(value) {
     if (value == null) {
-      return false;
+      return true;
     }
-    const normalized = String(value).trim().toLowerCase();
-    return normalized === 'na' || normalized === '-';
+    const trimmed = String(value).trim();
+    if (!trimmed) {
+      return true;
+    }
+    if (PLACEHOLDER_VALUES.has(trimmed)) {
+      return true;
+    }
+    const normalized = trimmed.toLowerCase();
+    return PLACEHOLDER_NORMALIZED.has(normalized);
   }
 
   function parseValueByType(value, type) {
-    if (value === '') {
+    if (value === '' || isPlaceholderValue(value)) {
       return null;
-    }
-
-    if (type === 'number' || type === 'percent' || type === 'currency') {
-      if (isMissingNumericValue(value)) {
-        return MISSING_NUMERIC_SENTINEL;
-      }
     }
 
     switch (type) {
@@ -423,7 +425,7 @@
         continue;
       }
       const rawValue = getCellValue(cell).trim();
-      if (rawValue === '') {
+      if (rawValue === '' || isPlaceholderValue(rawValue)) {
         continue;
       }
       const detected = detectValueType(rawValue);
@@ -460,7 +462,7 @@
 
   function detectValueType(value) {
     const trimmed = value.trim();
-    if (!trimmed) {
+    if (!trimmed || isPlaceholderValue(trimmed)) {
       return 'text';
     }
 
@@ -508,8 +510,8 @@
       return null;
     }
 
-    if (isMissingNumericValue(value)) {
-      return MISSING_NUMERIC_SENTINEL;
+    if (isPlaceholderValue(value)) {
+      return null;
     }
 
     let sanitized = String(value).replace(/[\u00A0\s]/g, '').trim();
