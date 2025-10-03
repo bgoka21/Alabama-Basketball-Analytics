@@ -112,6 +112,11 @@ from services.eybl_ingest import (
 )
 from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 
+try:  # Optional CSRF protection – not every deployment wires this up
+    from app.extensions import csrf  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - extension not present in some setups
+    csrf = None
+
 # --- Helper Functions at the top ---
 
 def normalize_category(name: str) -> str:
@@ -2981,7 +2986,7 @@ def custom_stats_parity():
     })
 
 
-@admin_bp.route('/api/presets', methods=['GET'])
+@admin_bp.get('/api/presets')
 @admin_required
 def list_presets_api():
     current_user_id = getattr(current_user, 'id', None)
@@ -3002,7 +3007,7 @@ def list_presets_api():
     }), 200
 
 
-@admin_bp.route('/api/presets', methods=['POST'])
+@admin_bp.post('/api/presets')
 @admin_required
 def create_preset_api():
     data = request.get_json(silent=True) or {}
@@ -3042,7 +3047,7 @@ def create_preset_api():
     return jsonify(_serialize_saved_stat_profile(profile)), 201
 
 
-@admin_bp.route('/api/presets', methods=['PATCH'])
+@admin_bp.patch('/api/presets')
 @admin_required
 def update_preset_api():
     data = request.get_json(silent=True) or {}
@@ -3089,7 +3094,7 @@ def update_preset_api():
     return jsonify(_serialize_saved_stat_profile(profile))
 
 
-@admin_bp.route('/api/presets', methods=['DELETE'])
+@admin_bp.delete('/api/presets')
 @admin_required
 def delete_preset_api():
     data = request.get_json(silent=True) or {}
@@ -3110,6 +3115,20 @@ def delete_preset_api():
     db.session.commit()
 
     return jsonify({'ok': True}), 200
+
+
+@admin_bp.get('/api/presets/ping')
+@admin_required
+def ping_presets_api():
+    return jsonify({'ok': True})
+
+
+if csrf:
+    csrf.exempt(list_presets_api)
+    csrf.exempt(create_preset_api)
+    csrf.exempt(update_preset_api)
+    csrf.exempt(delete_preset_api)
+    csrf.exempt(ping_presets_api)
 
 
 def _resolve_season_from_request():

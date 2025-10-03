@@ -114,7 +114,7 @@
 {% block scripts %}
   {{ super() }}
   <script>
-    window.__CSRF__ = {% if csrf_token is defined %}{{ csrf_token()|tojson }}{% else %}{{ ''|tojson }}{% endif %};
+    window.__CSRF__ = "{% if csrf_token is defined %}{{ csrf_token()|e }}{% else %}{% endif %}";
   </script>
   <script src="/static/js/custom_stats.js"></script>
   <script>
