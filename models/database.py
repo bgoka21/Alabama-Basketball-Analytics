@@ -402,9 +402,13 @@ class SavedStatProfile(db.Model):
     name = db.Column(db.String(128), index=True, nullable=False)
 
     # JSON of field keys in the order chosen (e.g., ["pts", "fg", "fg3", "ft", "bcp_total"])
-    fields_json = db.Column(db.Text, nullable=False, default="[]")
+    fields_json = db.Column(db.Text, nullable=True, default="[]")
     # JSON array of player ids included in the preset (e.g., [12, 45, 99])
-    players_json = db.Column(db.Text, nullable=False, default="[]")
+    players_json = db.Column(db.Text, nullable=True, default="[]")
+
+    preset_type = db.Column(db.String(16), nullable=False, default="combined")
+    date_from = db.Column(db.Date, nullable=True)
+    date_to = db.Column(db.Date, nullable=True)
 
     # MVP fixed defaults for now
     mode_default = db.Column(db.String(32), nullable=False, default="totals")     # "totals" | "per_practice"
