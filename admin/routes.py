@@ -98,11 +98,15 @@ from admin._leaderboard_helpers import (
 )
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
+    OnOffSummary,
     get_player_overall_stats,
     get_on_court_metrics,
     get_on_off_summary,
     get_turnover_rates_onfloor,
     get_rebound_rates_onfloor,
+    get_bulk_on_off_summaries,
+    get_bulk_turnover_rates_onfloor,
+    get_bulk_rebound_rates_onfloor,
 )
 from utils.scope import resolve_scope
 from services.eybl_ingest import (
@@ -828,29 +832,48 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         | set(personal_fouls)
     )
 
-    extra_rows = {}
-    for player in candidate_players:
-        player_id = roster_lookup.get(player)
-        if not player_id:
-            continue
+    candidate_id_map = {
+        player: roster_lookup[player]
+        for player in candidate_players
+        if player in roster_lookup
+    }
+    bulk_on_off = get_bulk_on_off_summaries(
+        candidate_id_map.values(),
+        date_from=start_dt,
+        date_to=end_dt,
+        labels=helper_labels,
+    )
+    bulk_turnovers = get_bulk_turnover_rates_onfloor(
+        candidate_id_map.values(),
+        date_from=start_dt,
+        date_to=end_dt,
+        labels=helper_labels,
+    )
+    bulk_rebounds = get_bulk_rebound_rates_onfloor(
+        candidate_id_map.values(),
+        date_from=start_dt,
+        date_to=end_dt,
+        labels=helper_labels,
+    )
 
-        summary = get_on_off_summary(
-            player_id=player_id,
-            date_from=start_dt,
-            date_to=end_dt,
-            labels=helper_labels,
+    extra_rows = {}
+    for player, player_id in candidate_id_map.items():
+        summary = bulk_on_off.get(
+            player_id,
+            OnOffSummary(0, 0, 0.0, 0.0, 0, 0, 0.0, 0.0),
         )
-        turnover_rates = get_turnover_rates_onfloor(
-            player_id=player_id,
-            date_from=start_dt,
-            date_to=end_dt,
-            labels=helper_labels,
+        turnover_rates = bulk_turnovers.get(
+            player_id,
+            {
+                "team_turnover_rate_on": 0.0,
+                "indiv_turnover_rate": 0.0,
+                "bamalytics_turnover_rate": 0.0,
+                "individual_team_turnover_pct": 0.0,
+            },
         )
-        rebound_rates = get_rebound_rates_onfloor(
-            player_id=player_id,
-            date_from=start_dt,
-            date_to=end_dt,
-            labels=helper_labels,
+        rebound_rates = bulk_rebounds.get(
+            player_id,
+            {"off_reb_rate_on": 0.0, "def_reb_rate_on": 0.0},
         )
 
         events = event_rows.get(player, {})

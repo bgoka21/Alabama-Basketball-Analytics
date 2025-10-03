@@ -16,6 +16,11 @@ from models.database import (
 )
 from models.user import User
 from admin.routes import admin_bp
+from utils.leaderboard_helpers import (
+    get_bulk_on_off_summaries,
+    get_bulk_turnover_rates_onfloor,
+    get_bulk_rebound_rates_onfloor,
+)
 
 
 @pytest.fixture
@@ -229,3 +234,26 @@ def test_defense_leaderboard_team_totals_row(client, app):
     assert total_cells[2] == '5'  # bump_positive total
     assert total_cells[3] == '8'  # total opportunities
     assert total_cells[4] == '62.5%'
+
+
+def test_bulk_leaderboard_helpers_return_consistent_values(app):
+    with app.app_context():
+        summaries = get_bulk_on_off_summaries([1, 2])
+        assert summaries[1].offensive_possessions_on == 2
+        assert summaries[1].ppp_on_offense == pytest.approx(2.5)
+        assert summaries[2].offensive_possessions_on == 1
+        assert summaries[2].ppp_on_offense == pytest.approx(2.0)
+
+        turnovers = get_bulk_turnover_rates_onfloor([1, 2])
+        assert turnovers[1]['team_turnover_rate_on'] == pytest.approx(50.0)
+        assert turnovers[1]['indiv_turnover_rate'] == pytest.approx(50.0)
+        assert turnovers[1]['bamalytics_turnover_rate'] == pytest.approx(9.1, rel=1e-2)
+        assert turnovers[1]['individual_team_turnover_pct'] == pytest.approx(100.0)
+        assert turnovers[2]['team_turnover_rate_on'] == pytest.approx(0.0)
+        assert turnovers[2]['indiv_turnover_rate'] == pytest.approx(0.0)
+
+        rebounds = get_bulk_rebound_rates_onfloor([1, 2])
+        assert rebounds[1]['off_reb_rate_on'] == pytest.approx(0.0)
+        assert rebounds[1]['def_reb_rate_on'] == pytest.approx(0.0)
+        assert rebounds[2]['off_reb_rate_on'] == pytest.approx(0.0)
+        assert rebounds[2]['def_reb_rate_on'] == pytest.approx(0.0)
