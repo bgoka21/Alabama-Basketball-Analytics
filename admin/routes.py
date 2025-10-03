@@ -36,6 +36,7 @@ from flask import (
 )
 from flask_login import login_required, current_user, confirm_login, login_user, logout_user
 from utils.auth       import admin_required
+from werkzeug.exceptions import BadRequest
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -66,7 +67,7 @@ from models.user import User
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import aliased
-from utils.db_helpers import array_agg_or_group_concat, list_team_presets
+from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from utils.shottype import (
     compute_3fg_breakdown_from_shots,
@@ -1928,35 +1929,138 @@ def _normalize_preset_player_ids(value):
     return normalized
 
 
+_PRESET_TYPE_CHOICES = {"players", "stats", "dates", "combined"}
+_DEFAULT_PRESET_TYPE = "combined"
+_DEFAULT_MODE = "totals"
+_DEFAULT_SOURCE = "practice"
+_DEFAULT_VISIBILITY = "team"
+
+
+def _normalize_preset_fields(value):
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("Fields must be a list of strings")
+
+    normalized = []
+    seen = set()
+    for raw in value:
+        if isinstance(raw, str):
+            candidate = raw.strip()
+        else:
+            candidate = str(raw or "").strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        normalized.append(candidate)
+    return normalized
+
+
+def _normalize_preset_type(value, *, default=_DEFAULT_PRESET_TYPE):
+    if value is None:
+        return default
+    candidate = str(value).strip().lower()
+    if not candidate:
+        return default
+    if candidate not in _PRESET_TYPE_CHOICES:
+        raise ValueError("Invalid preset type")
+    return candidate
+
+
+def _normalize_visibility(value):
+    if value is None:
+        return _DEFAULT_VISIBILITY
+    candidate = str(value).strip().lower()
+    if not candidate:
+        return _DEFAULT_VISIBILITY
+    if candidate not in {"team", "private"}:
+        raise ValueError("Invalid visibility")
+    return candidate
+
+
+def _normalize_optional_string(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _load_preset_payload():
+    mimetype = request.mimetype
+    if mimetype and mimetype not in {'application/json', 'text/json'}:
+        raise ValueError("Content-Type must be application/json")
+
+    try:
+        payload = request.get_json(force=True, silent=False)
+    except BadRequest as exc:
+        raise ValueError("Invalid JSON payload") from exc
+
+    if payload is None:
+        raise ValueError("Invalid JSON payload")
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid JSON payload")
+
+    return payload
+
+
+def _parse_preset_date(payload, key):
+    value = payload.get(key)
+    if value in (None, ""):
+        return None
+
+    parsed = _parse_iso_date(value)
+    if parsed is None:
+        raise ValueError(f"{key} must be a valid ISO date (YYYY-MM-DD)")
+    return parsed
+
+
 def _serialize_saved_stat_profile(profile: SavedStatProfile) -> dict:
     fields = []
     if profile.fields_json:
         try:
-            fields = json.loads(profile.fields_json)
-        except (TypeError, ValueError):
-            fields = []
+            raw_fields = json.loads(profile.fields_json)
+        except (TypeError, ValueError):  # pragma: no cover - defensive guard
+            raw_fields = []
+
+        if isinstance(raw_fields, list):
+            normalized_fields = []
+            seen_fields = set()
+            for raw_value in raw_fields:
+                if isinstance(raw_value, str):
+                    candidate = raw_value.strip()
+                else:
+                    candidate = str(raw_value or "").strip()
+                if not candidate or candidate in seen_fields:
+                    continue
+                seen_fields.add(candidate)
+                normalized_fields.append(candidate)
+            fields = normalized_fields
 
     player_ids = []
     if profile.players_json:
         try:
             raw_players = json.loads(profile.players_json)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # pragma: no cover - defensive guard
             raw_players = []
 
         try:
             player_ids = _normalize_preset_player_ids(raw_players)
-        except ValueError:
+        except ValueError:  # pragma: no cover - defensive guard
             player_ids = []
+
+    preset_type = (profile.preset_type or "combined").strip() or "combined"
 
     return {
         "id": profile.id,
         "name": profile.name,
+        "preset_type": preset_type,
         "fields": fields,
         "player_ids": player_ids,
+        "date_from": profile.date_from.isoformat() if getattr(profile, "date_from", None) else None,
+        "date_to": profile.date_to.isoformat() if getattr(profile, "date_to", None) else None,
         "mode_default": profile.mode_default,
         "source_default": profile.source_default,
         "visibility": profile.visibility,
-        "owner_id": profile.owner_id,
         "created_at": profile.created_at.isoformat() if getattr(profile, "created_at", None) else None,
         "updated_at": profile.updated_at.isoformat() if getattr(profile, "updated_at", None) else None,
     }
@@ -2989,132 +3093,206 @@ def custom_stats_parity():
 @admin_bp.get('/api/presets')
 @admin_required
 def list_presets_api():
-    current_user_id = getattr(current_user, 'id', None)
-    presets = list_team_presets(db.session, current_user_id)
-    team_presets = []
-    private_presets = []
+    preset_type_param = request.args.get('preset_type')
+    try:
+        preset_type_filter = None
+        if preset_type_param:
+            preset_type_filter = _normalize_preset_type(preset_type_param)
+    except ValueError:
+        return jsonify({'error': 'Invalid preset type'}), 400
 
-    for preset in presets:
-        serialized = _serialize_saved_stat_profile(preset)
-        if preset.visibility == 'team':
-            team_presets.append(serialized)
-        elif preset.visibility == 'private' and preset.owner_id == current_user_id:
-            private_presets.append(serialized)
+    query = SavedStatProfile.query
+    if preset_type_filter:
+        query = query.filter(SavedStatProfile.preset_type == preset_type_filter)
 
-    return jsonify({
-        'team': team_presets,
-        'private': private_presets,
-    }), 200
+    search_term = request.args.get('q', type=str)
+    if search_term:
+        like_pattern = f"%{search_term.strip()}%"
+        query = query.filter(SavedStatProfile.name.ilike(like_pattern))
+
+    presets = (
+        query.order_by(SavedStatProfile.updated_at.desc(), SavedStatProfile.id.desc())
+        .all()
+    )
+
+    serialized = [_serialize_saved_stat_profile(profile) for profile in presets]
+    payload = {
+        'presets': serialized,
+        'team': serialized,
+        'private': [],
+    }
+    return jsonify(payload)
+
+
+@admin_bp.get('/api/presets/<int:preset_id>')
+@admin_required
+def get_preset_api(preset_id: int):
+    profile = SavedStatProfile.query.get(preset_id)
+    if not profile:
+        return jsonify({'error': 'Preset not found'}), 404
+
+    return jsonify(_serialize_saved_stat_profile(profile))
 
 
 @admin_bp.post('/api/presets')
 @admin_required
 def create_preset_api():
-    data = request.get_json(silent=True) or {}
+    try:
+        data = _load_preset_payload()
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify({'error': 'Name is required'}), 400
 
-    fields = data.get('fields') or []
-    if not isinstance(fields, list):
-        return jsonify({'error': 'Fields must be a list'}), 400
+    try:
+        preset_type = _normalize_preset_type(data.get('preset_type'))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    try:
+        fields = _normalize_preset_fields(data.get('fields'))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
 
     try:
         player_ids = _normalize_preset_player_ids(data.get('player_ids'))
-    except ValueError:
-        return jsonify({'error': 'Player ids must be a list of integers'}), 400
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
 
-    visibility = data.get('visibility') or 'team'
-    if visibility not in {'team', 'private'}:
-        return jsonify({'error': 'Invalid visibility'}), 400
+    try:
+        date_from = _parse_preset_date(data, 'date_from')
+        date_to = _parse_preset_date(data, 'date_to')
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
 
-    mode_default = data.get('mode_default') or 'totals'
-    source_default = data.get('source_default') or 'practice'
+    if date_from and date_to and date_from > date_to:
+        return jsonify({'error': 'date_from must be before or equal to date_to'}), 400
+
+    try:
+        visibility = _normalize_visibility(data.get('visibility'))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    mode_default = _normalize_optional_string(data.get('mode_default')) or _DEFAULT_MODE
+    source_default = _normalize_optional_string(data.get('source_default')) or _DEFAULT_SOURCE
 
     profile = SavedStatProfile(
         name=name,
+        preset_type=preset_type,
         fields_json=json.dumps(fields),
         players_json=json.dumps(player_ids),
+        date_from=date_from,
+        date_to=date_to,
         mode_default=mode_default,
         source_default=source_default,
         owner_id=getattr(current_user, 'id', None),
         visibility=visibility,
     )
 
-    db.session.add(profile)
-    db.session.commit()
+    try:
+        db.session.add(profile)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('Failed to create saved stat preset', extra={'payload': data})
+        return jsonify({'error': 'Failed to save preset'}), 500
 
+    db.session.refresh(profile)
     return jsonify(_serialize_saved_stat_profile(profile)), 201
 
 
-@admin_bp.patch('/api/presets')
+@admin_bp.patch('/api/presets/<int:preset_id>')
 @admin_required
-def update_preset_api():
-    data = request.get_json(silent=True) or {}
-    preset_id = data.get('id')
-    if not preset_id:
-        return jsonify({'error': 'Preset id is required'}), 400
-
+def update_preset_api(preset_id: int):
     profile = SavedStatProfile.query.get(preset_id)
     if not profile:
         return jsonify({'error': 'Preset not found'}), 404
 
-    current_user_id = getattr(current_user, 'id', None)
-    is_admin = getattr(current_user, 'is_admin', False)
-    if profile.owner_id != current_user_id and not is_admin:
-        return jsonify({'error': 'Only the owner or an admin may modify this preset'}), 403
+    try:
+        data = _load_preset_payload()
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
 
-    if 'name' in data and data['name'] is not None:
+    if 'name' in data:
         name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'error': 'Name is required'}), 400
         profile.name = name
 
-    if 'fields' in data and data['fields'] is not None:
-        fields = data.get('fields') or []
-        if not isinstance(fields, list):
-            return jsonify({'error': 'Fields must be a list'}), 400
+    if 'preset_type' in data:
+        try:
+            profile.preset_type = _normalize_preset_type(data.get('preset_type'))
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+
+    if 'fields' in data:
+        try:
+            fields = _normalize_preset_fields(data.get('fields'))
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
         profile.fields_json = json.dumps(fields)
 
-    if 'player_ids' in data and data['player_ids'] is not None:
+    if 'player_ids' in data:
         try:
             player_ids = _normalize_preset_player_ids(data.get('player_ids'))
-        except ValueError:
-            return jsonify({'error': 'Player ids must be a list of integers'}), 400
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
         profile.players_json = json.dumps(player_ids)
 
-    if 'mode_default' in data and data['mode_default'] is not None:
-        profile.mode_default = data.get('mode_default') or profile.mode_default
+    if 'mode_default' in data:
+        profile.mode_default = _normalize_optional_string(data.get('mode_default')) or _DEFAULT_MODE
 
-    if 'source_default' in data and data['source_default'] is not None:
-        profile.source_default = data.get('source_default') or profile.source_default
+    if 'source_default' in data:
+        profile.source_default = _normalize_optional_string(data.get('source_default')) or _DEFAULT_SOURCE
 
-    db.session.commit()
+    if 'visibility' in data:
+        try:
+            profile.visibility = _normalize_visibility(data.get('visibility'))
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
 
+    if 'date_from' in data or 'date_to' in data:
+        try:
+            new_date_from = profile.date_from if 'date_from' not in data else _parse_preset_date(data, 'date_from')
+            new_date_to = profile.date_to if 'date_to' not in data else _parse_preset_date(data, 'date_to')
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+
+        if new_date_from and new_date_to and new_date_from > new_date_to:
+            return jsonify({'error': 'date_from must be before or equal to date_to'}), 400
+
+        profile.date_from = new_date_from
+        profile.date_to = new_date_to
+
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('Failed to update saved stat preset', extra={'preset_id': preset_id})
+        return jsonify({'error': 'Failed to update preset'}), 500
+
+    db.session.refresh(profile)
     return jsonify(_serialize_saved_stat_profile(profile))
 
 
-@admin_bp.delete('/api/presets')
+@admin_bp.delete('/api/presets/<int:preset_id>')
 @admin_required
-def delete_preset_api():
-    data = request.get_json(silent=True) or {}
-    preset_id = data.get('id')
-    if not preset_id:
-        return jsonify({'error': 'Preset id is required'}), 400
-
+def delete_preset_api(preset_id: int):
     profile = SavedStatProfile.query.get(preset_id)
     if not profile:
         return jsonify({'error': 'Preset not found'}), 404
 
-    current_user_id = getattr(current_user, 'id', None)
-    is_admin = getattr(current_user, 'is_admin', False)
-    if profile.owner_id != current_user_id and not is_admin:
-        return jsonify({'error': 'Only the owner or an admin may delete this preset'}), 403
+    try:
+        db.session.delete(profile)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('Failed to delete saved stat preset', extra={'preset_id': preset_id})
+        return jsonify({'error': 'Failed to delete preset'}), 500
 
-    db.session.delete(profile)
-    db.session.commit()
-
-    return jsonify({'ok': True}), 200
+    return jsonify({'ok': True})
 
 
 @admin_bp.get('/api/presets/ping')
@@ -3125,6 +3303,7 @@ def ping_presets_api():
 
 if csrf:
     csrf.exempt(list_presets_api)
+    csrf.exempt(get_preset_api)
     csrf.exempt(create_preset_api)
     csrf.exempt(update_preset_api)
     csrf.exempt(delete_preset_api)
