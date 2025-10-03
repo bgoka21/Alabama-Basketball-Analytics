@@ -60,6 +60,7 @@ from models.database import (
     Setting,
     SavedStatProfile,
 )
+from models.leaderboard_snapshot import LeaderboardSnapshot
 from models.database import PageView
 from models.uploaded_file import UploadedFile
 from models.recruit import Recruit, RecruitShotTypeStat
@@ -593,32 +594,14 @@ def compute_leaderboard_for_key(stat_key, rows, shot_details=None):
     return {"rows": leaderboard, "team_totals": team_totals}
 
 
-def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
-    """Return (config, rows) for the leaderboard.
-
-    Optional ``start_dt`` and ``end_dt`` parameters limit the stats to a
-    specific date range (inclusive). Dates are matched against the associated
-    ``Practice.date`` or ``Game.game_date`` fields.
-    """
-    normalized_labels = normalize_label_set(label_set)
-    cache = get_cache()
-    cache_key = metadata = None
-    if cache is not None:
-        cache_key, metadata = build_leaderboard_cache_key(
-            stat_key,
-            season_id,
-            start_dt,
-            end_dt,
-            normalized_labels,
-        )
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            return cached_result
-
+def _get_leaderboard_config(stat_key):
     cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
     if not cfg:
         abort(404)
+    return cfg
 
+
+def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
     ps_fields = [
         'points','assists','pot_assists','second_assists','turnovers',
         'fta','ftm','atr_attempts','atr_makes',
@@ -1247,6 +1230,90 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
 
     all_players = set(core_rows) | set(shot_details)
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
+
+    return {
+        "player_totals": core_rows,
+        "shot_details": shot_details,
+        "all_players": list(all_players),
+        "leaderboard": leaderboard,
+        "team_totals": team_totals,
+    }
+
+
+def build_leaderboard_baseline(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
+    cfg = _get_leaderboard_config(stat_key)
+    components = _build_leaderboard_components(
+        cfg,
+        stat_key,
+        season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        label_set=label_set,
+    )
+    components["config"] = cfg
+    return components
+
+
+def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
+    """Return (config, rows) for the leaderboard."""
+
+    normalized_labels = normalize_label_set(label_set)
+    cache = get_cache()
+    cache_key = metadata = None
+    if cache is not None:
+        cache_key, metadata = build_leaderboard_cache_key(
+            stat_key,
+            season_id,
+            start_dt,
+            end_dt,
+            normalized_labels,
+        )
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+    cfg = _get_leaderboard_config(stat_key)
+
+    leaderboard = team_totals = None
+
+    snapshot = None
+    start_date = LeaderboardSnapshot.normalize_date(start_dt)
+    end_date = LeaderboardSnapshot.normalize_date(end_dt)
+    if season_id is not None:
+        snapshot = LeaderboardSnapshot.fetch(
+            season_id,
+            stat_key,
+            start_date=start_date,
+            end_date=end_date,
+            normalized_labels=normalized_labels,
+        )
+
+    if snapshot is not None:
+        payload = snapshot.to_components()
+        leaderboard = payload.get("leaderboard") or []
+        team_totals = payload.get("team_totals")
+        if team_totals is None:
+            player_totals = payload.get("player_totals") or {}
+            shot_details = payload.get("shot_details") or {}
+            player_keys = payload.get("player_keys") or list(set(player_totals) | set(shot_details))
+            leaderboard, team_totals = compute_leaderboard_rows(
+                stat_key,
+                player_keys,
+                player_totals,
+                shot_details,
+            )
+    else:
+        components = _build_leaderboard_components(
+            cfg,
+            stat_key,
+            season_id,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            label_set=label_set,
+        )
+        leaderboard = components["leaderboard"]
+        team_totals = components["team_totals"]
+
     result = (cfg, leaderboard, team_totals)
     if cache is not None and cache_key is not None and metadata is not None:
         cache.set(cache_key, result)
