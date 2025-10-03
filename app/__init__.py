@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, redirect, url_for, render_template, request, flash
 from flask.json.provider import DefaultJSONProvider
 from types import SimpleNamespace
@@ -6,10 +7,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_apscheduler import APScheduler
+from flask.cli import with_appcontext
 from sqlalchemy import inspect
 import pdfkit
 
-from datetime import datetime
+from datetime import datetime, date
 from models.database import db, PageView, SavedStatProfile
 from models.user import User
 from admin.routes import admin_bp
@@ -282,6 +284,56 @@ def create_app():
 
     from app.cli.import_draft_stock import import_draft_stock
     app.cli.add_command(import_draft_stock)
+
+    @app.cli.command("seed-presets")
+    @with_appcontext
+    def seed_presets_command():
+        """Seed example saved stat presets if they do not exist."""
+        seeds = [
+            {
+                "name": "Starting Guards",
+                "preset_type": "players",
+                "player_ids": [3, 7, 11],
+                "fields": [],
+            },
+            {
+                "name": "Shooting Splits",
+                "preset_type": "stats",
+                "fields": ["ATR_make", "FG2_make", "FG3_make", "FT_att", "PPP"],
+                "player_ids": [],
+            },
+            {
+                "name": "Conference Window",
+                "preset_type": "dates",
+                "fields": [],
+                "player_ids": [],
+                "date_from": date(2025, 1, 1),
+                "date_to": date(2025, 3, 31),
+            },
+        ]
+
+        created = 0
+        for seed in seeds:
+            existing = SavedStatProfile.query.filter_by(
+                name=seed["name"], preset_type=seed["preset_type"]
+            ).first()
+            if existing:
+                continue
+
+            profile = SavedStatProfile(
+                name=seed["name"],
+                preset_type=seed["preset_type"],
+                fields_json=json.dumps(seed.get("fields", [])),
+                players_json=json.dumps(seed.get("player_ids", [])),
+                date_from=seed.get("date_from"),
+                date_to=seed.get("date_to"),
+                visibility="team",
+            )
+            db.session.add(profile)
+            created += 1
+
+        db.session.commit()
+        print(f"Seeded {created} presets.")
 
     return app
 

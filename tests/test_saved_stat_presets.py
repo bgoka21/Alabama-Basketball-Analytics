@@ -88,21 +88,21 @@ def test_create_rejects_invalid_inputs(client):
         json={'name': 'Bad', 'preset_type': 'nope', 'fields': [], 'player_ids': []},
     )
     assert invalid_type.status_code == 400
-    assert invalid_type.get_json()['error'] == 'Invalid preset type'
+    assert invalid_type.get_json()['error'] == 'preset_type must be one of players, stats, dates, combined'
 
     missing_name = client.post(
         '/admin/api/presets',
         json={'name': '   ', 'fields': [], 'player_ids': []},
     )
     assert missing_name.status_code == 400
-    assert missing_name.get_json()['error'] == 'Name is required'
+    assert missing_name.get_json()['error'] == 'name is required'
 
     invalid_players = client.post(
         '/admin/api/presets',
         json={'name': 'Bad Players', 'fields': [], 'player_ids': 'nope'},
     )
     assert invalid_players.status_code == 400
-    assert invalid_players.get_json()['error'] == 'Player ids must be a list of integers'
+    assert invalid_players.get_json()['error'] == 'player_ids must be a list of integers'
 
 
 def _create_basic_preset(client, **overrides):
@@ -137,7 +137,7 @@ def test_list_and_filter_presets(client):
 
     invalid_filter = client.get('/admin/api/presets?preset_type=nope')
     assert invalid_filter.status_code == 400
-    assert invalid_filter.get_json()['error'] == 'Invalid preset type'
+    assert invalid_filter.get_json()['error'] == 'preset_type must be one of players, stats, dates, combined'
 
 
 def test_get_update_and_delete_preset(client):
@@ -176,7 +176,7 @@ def test_get_update_and_delete_preset(client):
 
     missing = client.get(f"/admin/api/presets/{created['id']}")
     assert missing.status_code == 404
-    assert missing.get_json()['error'] == 'Preset not found'
+    assert missing.get_json()['error'] == 'preset not found'
 
 
 def test_patch_updates_fields_and_players(client):

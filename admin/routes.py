@@ -1889,35 +1889,35 @@ admin_bp.add_app_template_global(build_leaderboard_table, name="build_leaderboar
 
 def _coerce_player_id(value):
     if value is None or isinstance(value, bool):
-        raise ValueError("Player ids must be integers")
+        raise ValueError("player_ids must be integers")
 
     if isinstance(value, int):
         return value
 
     if isinstance(value, float):
         if not value.is_integer():
-            raise ValueError("Player ids must be integers")
+            raise ValueError("player_ids must be integers")
         return int(value)
 
     if isinstance(value, str):
         text = value.strip()
         if not text:
-            raise ValueError("Player ids must be integers")
+            raise ValueError("player_ids must be integers")
         if text.startswith('+'):
             text = text[1:]
         try:
             return int(text, 10)
         except ValueError as exc:  # pragma: no cover - defensive branch
-            raise ValueError("Player ids must be integers") from exc
+            raise ValueError("player_ids must be integers") from exc
 
-    raise ValueError("Player ids must be integers")
+    raise ValueError("player_ids must be integers")
 
 
 def _normalize_preset_player_ids(value):
     if value is None:
         return []
     if not isinstance(value, list):
-        raise ValueError("Player ids must be a list of integers")
+        raise ValueError("player_ids must be a list of integers")
 
     normalized = []
     seen = set()
@@ -1940,7 +1940,7 @@ def _normalize_preset_fields(value):
     if value is None:
         return []
     if not isinstance(value, list):
-        raise ValueError("Fields must be a list of strings")
+        raise ValueError("fields must be a list of strings")
 
     normalized = []
     seen = set()
@@ -1963,7 +1963,7 @@ def _normalize_preset_type(value, *, default=_DEFAULT_PRESET_TYPE):
     if not candidate:
         return default
     if candidate not in _PRESET_TYPE_CHOICES:
-        raise ValueError("Invalid preset type")
+        raise ValueError("preset_type must be one of players, stats, dates, combined")
     return candidate
 
 
@@ -1974,7 +1974,7 @@ def _normalize_visibility(value):
     if not candidate:
         return _DEFAULT_VISIBILITY
     if candidate not in {"team", "private"}:
-        raise ValueError("Invalid visibility")
+        raise ValueError("visibility must be team or private")
     return candidate
 
 
@@ -1988,17 +1988,17 @@ def _normalize_optional_string(value):
 def _load_preset_payload():
     mimetype = request.mimetype
     if mimetype and mimetype not in {'application/json', 'text/json'}:
-        raise ValueError("Content-Type must be application/json")
+        raise ValueError("content-type must be application/json")
 
     try:
         payload = request.get_json(force=True, silent=False)
     except BadRequest as exc:
-        raise ValueError("Invalid JSON payload") from exc
+        raise ValueError("invalid JSON payload") from exc
 
     if payload is None:
-        raise ValueError("Invalid JSON payload")
+        raise ValueError("invalid JSON payload")
     if not isinstance(payload, dict):
-        raise ValueError("Invalid JSON payload")
+        raise ValueError("invalid JSON payload")
 
     return payload
 
@@ -2010,7 +2010,7 @@ def _parse_preset_date(payload, key):
 
     parsed = _parse_iso_date(value)
     if parsed is None:
-        raise ValueError(f"{key} must be a valid ISO date (YYYY-MM-DD)")
+        raise ValueError(f"{key} must be YYYY-MM-DD")
     return parsed
 
 
@@ -3098,8 +3098,8 @@ def list_presets_api():
         preset_type_filter = None
         if preset_type_param:
             preset_type_filter = _normalize_preset_type(preset_type_param)
-    except ValueError:
-        return jsonify({'error': 'Invalid preset type'}), 400
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
 
     query = SavedStatProfile.query
     if preset_type_filter:
@@ -3129,7 +3129,7 @@ def list_presets_api():
 def get_preset_api(preset_id: int):
     profile = SavedStatProfile.query.get(preset_id)
     if not profile:
-        return jsonify({'error': 'Preset not found'}), 404
+        return jsonify({'error': 'preset not found'}), 404
 
     return jsonify(_serialize_saved_stat_profile(profile))
 
@@ -3144,7 +3144,9 @@ def create_preset_api():
 
     name = (data.get('name') or '').strip()
     if not name:
-        return jsonify({'error': 'Name is required'}), 400
+        return jsonify({'error': 'name is required'}), 400
+    if len(name) > 100:
+        return jsonify({'error': 'name must be 100 characters or fewer'}), 400
 
     try:
         preset_type = _normalize_preset_type(data.get('preset_type'))
@@ -3197,7 +3199,7 @@ def create_preset_api():
     except SQLAlchemyError:
         db.session.rollback()
         current_app.logger.exception('Failed to create saved stat preset', extra={'payload': data})
-        return jsonify({'error': 'Failed to save preset'}), 500
+        return jsonify({'error': 'failed to save preset'}), 500
 
     db.session.refresh(profile)
     return jsonify(_serialize_saved_stat_profile(profile)), 201
@@ -3208,7 +3210,7 @@ def create_preset_api():
 def update_preset_api(preset_id: int):
     profile = SavedStatProfile.query.get(preset_id)
     if not profile:
-        return jsonify({'error': 'Preset not found'}), 404
+        return jsonify({'error': 'preset not found'}), 404
 
     try:
         data = _load_preset_payload()
@@ -3218,7 +3220,9 @@ def update_preset_api(preset_id: int):
     if 'name' in data:
         name = (data.get('name') or '').strip()
         if not name:
-            return jsonify({'error': 'Name is required'}), 400
+            return jsonify({'error': 'name is required'}), 400
+        if len(name) > 100:
+            return jsonify({'error': 'name must be 100 characters or fewer'}), 400
         profile.name = name
 
     if 'preset_type' in data:
@@ -3271,7 +3275,7 @@ def update_preset_api(preset_id: int):
     except SQLAlchemyError:
         db.session.rollback()
         current_app.logger.exception('Failed to update saved stat preset', extra={'preset_id': preset_id})
-        return jsonify({'error': 'Failed to update preset'}), 500
+        return jsonify({'error': 'failed to update preset'}), 500
 
     db.session.refresh(profile)
     return jsonify(_serialize_saved_stat_profile(profile))
@@ -3282,7 +3286,7 @@ def update_preset_api(preset_id: int):
 def delete_preset_api(preset_id: int):
     profile = SavedStatProfile.query.get(preset_id)
     if not profile:
-        return jsonify({'error': 'Preset not found'}), 404
+        return jsonify({'error': 'preset not found'}), 404
 
     try:
         db.session.delete(profile)
@@ -3290,7 +3294,7 @@ def delete_preset_api(preset_id: int):
     except SQLAlchemyError:
         db.session.rollback()
         current_app.logger.exception('Failed to delete saved stat preset', extra={'preset_id': preset_id})
-        return jsonify({'error': 'Failed to delete preset'}), 500
+        return jsonify({'error': 'failed to delete preset'}), 500
 
     return jsonify({'ok': True})
 
