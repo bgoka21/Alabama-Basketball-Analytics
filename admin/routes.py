@@ -100,6 +100,7 @@ from admin._leaderboard_helpers import (
     build_leaderboard_table,
     prepare_dual_context,
     _normalize_compute_result,
+    parse_dual_compute_payload,
     combine_dual_rows,
     combine_dual_totals,
     format_dual_rows,
@@ -1474,6 +1475,75 @@ def _split_leaderboard_rows_for_template(
     return context
 
 
+def _collect_practice_dates(session, season_id):
+    """Return sorted unique practice dates for ``season_id``."""
+
+    if season_id is None:
+        return []
+
+    active_session = session or db.session
+
+    query = (
+        active_session.query(Practice.date, Practice.created_at)
+        .filter(Practice.season_id == season_id)
+    )
+
+    seen = set()
+    dates = []
+
+    for date_value, created_at in query:
+        if date_value is not None:
+            effective_date = date_value
+        elif created_at is not None:
+            effective_date = created_at.date()
+        else:
+            continue
+
+        if effective_date not in seen:
+            seen.add(effective_date)
+            dates.append(effective_date)
+
+    dates.sort()
+    return dates
+
+
+def _build_practice_slices(
+    *,
+    session,
+    season_id,
+    stat_key,
+    label_set,
+    reducer,
+):
+    """Return mapping of practice date to reduced leaderboard payload."""
+
+    if season_id is None:
+        return {}
+
+    active_session = session or db.session
+    practice_dates = _collect_practice_dates(active_session, season_id)
+    if not practice_dates:
+        return {}
+
+    slices = {}
+    for practice_date in practice_dates:
+        _, rows, team_totals = compute_leaderboard(
+            stat_key,
+            season_id,
+            start_dt=practice_date,
+            end_dt=practice_date,
+            label_set=label_set,
+        )
+        slice_totals, slice_rows = reducer(rows, team_totals)
+        if slice_rows or slice_totals is not None:
+            slices[practice_date] = {
+                "team_totals": slice_totals,
+                "rows": slice_rows,
+            }
+
+    return slices
+
+
 def _build_stat_compute(default_key):
     """Return a compute wrapper that adapts :func:`compute_leaderboard`."""
 
@@ -1495,7 +1565,24 @@ def _build_stat_compute(default_key):
             end_dt=end_dt,
             label_set=label_set,
         )
-        return team_totals, rows
+
+        payload = {
+            "team_totals": team_totals,
+            "rows": rows,
+        }
+
+        if start_dt is None and end_dt is None and season_id is not None:
+            practice_slices = _build_practice_slices(
+                session=session,
+                season_id=season_id,
+                stat_key=key,
+                label_set=label_set,
+                reducer=lambda slice_rows, slice_totals: (slice_totals, slice_rows),
+            )
+            if practice_slices:
+                payload["practice_slices"] = practice_slices
+
+        return payload
 
     return _compute
 
@@ -1612,7 +1699,7 @@ def compute_pnr_gap_help(
     """Return PnR Gap Help stats optionally filtered to a specific help role."""
 
     if season_id is None:
-        return None, []
+        return {"team_totals": None, "rows": []}
 
     key = "pnr_gap_help"
     _, rows, team_totals = compute_leaderboard(
@@ -1652,35 +1739,56 @@ def compute_pnr_gap_help(
     def _resolve_player(source):
         return _resolve_value(source, 0, player_keys)
 
-    filtered_rows = []
-    for row in rows or []:
-        player = _resolve_player(row)
-        plus = _resolve_value(row, plus_index, plus_aliases)
-        opps = _resolve_value(row, opp_index, opp_aliases)
-        pct = _resolve_value(row, pct_index, pct_aliases)
+    def _transform(raw_rows, raw_totals):
+        filtered_rows = []
+        for row in raw_rows or []:
+            player = _resolve_player(row)
+            plus = _resolve_value(row, plus_index, plus_aliases)
+            opps = _resolve_value(row, opp_index, opp_aliases)
+            pct = _resolve_value(row, pct_index, pct_aliases)
 
-        filtered_rows.append(
-            {
-                "player_name": player,
-                "plus": plus,
-                "opps": opps,
-                "pct": pct,
+            filtered_rows.append(
+                {
+                    "player_name": player,
+                    "plus": plus,
+                    "opps": opps,
+                    "pct": pct,
+                }
+            )
+
+        totals_plus = _resolve_value(raw_totals, total_plus_index, plus_aliases)
+        totals_opps = _resolve_value(raw_totals, total_opp_index, opp_aliases)
+        totals_pct = _resolve_value(raw_totals, total_pct_index, pct_aliases)
+
+        filtered_totals = None
+        if any(value is not None for value in (totals_plus, totals_opps, totals_pct)):
+            filtered_totals = {
+                "plus": totals_plus,
+                "opps": totals_opps,
+                "pct": totals_pct,
             }
+
+        return filtered_totals, filtered_rows
+
+    filtered_totals, filtered_rows = _transform(rows, team_totals)
+
+    payload = {
+        "team_totals": filtered_totals,
+        "rows": filtered_rows,
+    }
+
+    if start_dt is None and end_dt is None and season_id is not None:
+        practice_slices = _build_practice_slices(
+            session=session,
+            season_id=season_id,
+            stat_key=key,
+            label_set=label_set,
+            reducer=_transform,
         )
+        if practice_slices:
+            payload["practice_slices"] = practice_slices
 
-    totals_plus = _resolve_value(team_totals, total_plus_index, plus_aliases)
-    totals_opps = _resolve_value(team_totals, total_opp_index, opp_aliases)
-    totals_pct = _resolve_value(team_totals, total_pct_index, pct_aliases)
-
-    filtered_totals = None
-    if any(value is not None for value in (totals_plus, totals_opps, totals_pct)):
-        filtered_totals = {
-            "plus": totals_plus,
-            "opps": totals_opps,
-            "pct": totals_pct,
-        }
-
-    return filtered_totals, filtered_rows
+    return payload
 
 
 def compute_overall_gap_help(
@@ -1696,7 +1804,7 @@ def compute_overall_gap_help(
     """Return combined Collision + PnR Gap Help results."""
 
     if season_id is None:
-        return None, []
+        return {"team_totals": None, "rows": []}
 
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
@@ -1710,7 +1818,9 @@ def compute_overall_gap_help(
         label_set=label_set,
         **shared_kwargs,
     )
-    collision_totals, collision_rows = _normalize_compute_result(collision_result)
+    collision_totals, collision_rows, collision_slices = parse_dual_compute_payload(
+        collision_result
+    )
 
     pnr_result = compute_pnr_gap_help(
         session=session,
@@ -1720,58 +1830,98 @@ def compute_overall_gap_help(
         label_set=label_set,
         **shared_kwargs,
     )
-    pnr_totals, pnr_rows = _normalize_compute_result(pnr_result)
-
-    stats = {}
-    for source_rows, plus_index, opp_index in (
-        (collision_rows, 1, 2),
-        (pnr_rows, 1, 2),
+    pnr_totals, pnr_rows, pnr_slices = parse_dual_compute_payload(pnr_result)
+    def _combine_payload(
+        collision_rows_payload,
+        collision_totals_payload,
+        pnr_rows_payload,
+        pnr_totals_payload,
     ):
-        player_totals = _collect_player_totals(
-            source_rows,
+        stats = {}
+        for source_rows, plus_index, opp_index in (
+            (collision_rows_payload, 1, 2),
+            (pnr_rows_payload, 1, 2),
+        ):
+            player_totals = _collect_player_totals(
+                source_rows,
+                plus_aliases=_GAP_PLUS_ALIASES,
+                opp_aliases=_GAP_OPP_ALIASES,
+                plus_index=plus_index,
+                opp_index=opp_index,
+            )
+            for player, entry in player_totals.items():
+                combined = stats.setdefault(
+                    player,
+                    {
+                        "player_name": player,
+                        "plus": 0,
+                        "opps": 0,
+                    },
+                )
+                combined["plus"] += entry["plus"]
+                combined["opps"] += entry["opps"]
+
+        rows_payload = _finalize_rows(stats)
+
+        collision_plus, collision_opps = _extract_totals(
+            collision_totals_payload,
             plus_aliases=_GAP_PLUS_ALIASES,
             opp_aliases=_GAP_OPP_ALIASES,
-            plus_index=plus_index,
-            opp_index=opp_index,
+            plus_index=0,
+            opp_index=1,
         )
-        for player, entry in player_totals.items():
-            combined = stats.setdefault(
-                player,
-                {
-                    "player_name": player,
-                    "plus": 0,
-                    "opps": 0,
-                },
-            )
-            combined["plus"] += entry["plus"]
-            combined["opps"] += entry["opps"]
+        pnr_plus, pnr_opps = _extract_totals(
+            pnr_totals_payload,
+            plus_aliases=_GAP_PLUS_ALIASES,
+            opp_aliases=_GAP_OPP_ALIASES,
+            plus_index=0,
+            opp_index=1,
+        )
 
-    rows = _finalize_rows(stats)
+        total_plus = collision_plus + pnr_plus
+        total_opps = collision_opps + pnr_opps
+        totals_payload = {
+            "plus": total_plus,
+            "opps": total_opps,
+            "pct": _safe_pct(total_plus, total_opps),
+        }
 
-    collision_plus, collision_opps = _extract_totals(
+        return totals_payload, rows_payload
+
+    totals, rows = _combine_payload(
+        collision_rows,
         collision_totals,
-        plus_aliases=_GAP_PLUS_ALIASES,
-        opp_aliases=_GAP_OPP_ALIASES,
-        plus_index=0,
-        opp_index=1,
-    )
-    pnr_plus, pnr_opps = _extract_totals(
+        pnr_rows,
         pnr_totals,
-        plus_aliases=_GAP_PLUS_ALIASES,
-        opp_aliases=_GAP_OPP_ALIASES,
-        plus_index=0,
-        opp_index=1,
     )
 
-    total_plus = collision_plus + pnr_plus
-    total_opps = collision_opps + pnr_opps
-    totals = {
-        "plus": total_plus,
-        "opps": total_opps,
-        "pct": _safe_pct(total_plus, total_opps),
+    payload = {
+        "team_totals": totals,
+        "rows": rows,
     }
 
-    return totals, rows
+    if start_dt is None and end_dt is None and season_id is not None:
+        practice_slices = {}
+        practice_dates = set(collision_slices) | set(pnr_slices)
+        for practice_date in sorted(practice_dates):
+            collision_payload = collision_slices.get(practice_date, {})
+            pnr_payload = pnr_slices.get(practice_date, {})
+            slice_totals, slice_rows = _combine_payload(
+                collision_payload.get("rows"),
+                collision_payload.get("team_totals"),
+                pnr_payload.get("rows"),
+                pnr_payload.get("team_totals"),
+            )
+            if slice_rows or slice_totals is not None:
+                practice_slices[practice_date] = {
+                    "team_totals": slice_totals,
+                    "rows": slice_rows,
+                }
+
+        if practice_slices:
+            payload["practice_slices"] = practice_slices
+
+    return payload
 
 
 def compute_overall_low_man(
@@ -1787,7 +1937,7 @@ def compute_overall_low_man(
     """Return combined Collision + PnR Low Man help results."""
 
     if season_id is None:
-        return None, []
+        return {"team_totals": None, "rows": []}
 
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
@@ -1801,7 +1951,9 @@ def compute_overall_low_man(
         label_set=label_set,
         **shared_kwargs,
     )
-    collision_totals, collision_rows = _normalize_compute_result(collision_result)
+    collision_totals, collision_rows, collision_slices = parse_dual_compute_payload(
+        collision_result
+    )
 
     pnr_result = compute_pnr_gap_help(
         session=session,
@@ -1812,58 +1964,99 @@ def compute_overall_low_man(
         role="low_man",
         **shared_kwargs,
     )
-    pnr_totals, pnr_rows = _normalize_compute_result(pnr_result)
+    pnr_totals, pnr_rows, pnr_slices = parse_dual_compute_payload(pnr_result)
 
-    stats = {}
-    for source_rows, plus_aliases, opp_aliases, plus_index, opp_index in (
-        (collision_rows, _LOW_PLUS_ALIASES, _LOW_OPP_ALIASES, 4, 5),
-        (pnr_rows, _GAP_PLUS_ALIASES, _GAP_OPP_ALIASES, 1, 2),
+    def _combine_payload(
+        collision_rows_payload,
+        collision_totals_payload,
+        pnr_rows_payload,
+        pnr_totals_payload,
     ):
-        player_totals = _collect_player_totals(
-            source_rows,
-            plus_aliases=plus_aliases,
-            opp_aliases=opp_aliases,
-            plus_index=plus_index,
-            opp_index=opp_index,
-        )
-        for player, entry in player_totals.items():
-            combined = stats.setdefault(
-                player,
-                {
-                    "player_name": player,
-                    "plus": 0,
-                    "opps": 0,
-                },
+        stats = {}
+        for source_rows, plus_aliases, opp_aliases, plus_index, opp_index in (
+            (collision_rows_payload, _LOW_PLUS_ALIASES, _LOW_OPP_ALIASES, 4, 5),
+            (pnr_rows_payload, _GAP_PLUS_ALIASES, _GAP_OPP_ALIASES, 1, 2),
+        ):
+            player_totals = _collect_player_totals(
+                source_rows,
+                plus_aliases=plus_aliases,
+                opp_aliases=opp_aliases,
+                plus_index=plus_index,
+                opp_index=opp_index,
             )
-            combined["plus"] += entry["plus"]
-            combined["opps"] += entry["opps"]
+            for player, entry in player_totals.items():
+                combined = stats.setdefault(
+                    player,
+                    {
+                        "player_name": player,
+                        "plus": 0,
+                        "opps": 0,
+                    },
+                )
+                combined["plus"] += entry["plus"]
+                combined["opps"] += entry["opps"]
 
-    rows = _finalize_rows(stats)
+        rows_payload = _finalize_rows(stats)
 
-    collision_plus, collision_opps = _extract_totals(
+        collision_plus, collision_opps = _extract_totals(
+            collision_totals_payload,
+            plus_aliases=_LOW_PLUS_ALIASES,
+            opp_aliases=_LOW_OPP_ALIASES,
+            plus_index=3,
+            opp_index=4,
+        )
+        pnr_plus, pnr_opps = _extract_totals(
+            pnr_totals_payload,
+            plus_aliases=_GAP_PLUS_ALIASES,
+            opp_aliases=_GAP_OPP_ALIASES,
+            plus_index=0,
+            opp_index=1,
+        )
+
+        total_plus = collision_plus + pnr_plus
+        total_opps = collision_opps + pnr_opps
+        totals_payload = {
+            "plus": total_plus,
+            "opps": total_opps,
+            "pct": _safe_pct(total_plus, total_opps),
+        }
+
+        return totals_payload, rows_payload
+
+    totals, rows = _combine_payload(
+        collision_rows,
         collision_totals,
-        plus_aliases=_LOW_PLUS_ALIASES,
-        opp_aliases=_LOW_OPP_ALIASES,
-        plus_index=3,
-        opp_index=4,
-    )
-    pnr_plus, pnr_opps = _extract_totals(
+        pnr_rows,
         pnr_totals,
-        plus_aliases=_GAP_PLUS_ALIASES,
-        opp_aliases=_GAP_OPP_ALIASES,
-        plus_index=0,
-        opp_index=1,
     )
 
-    total_plus = collision_plus + pnr_plus
-    total_opps = collision_opps + pnr_opps
-    totals = {
-        "plus": total_plus,
-        "opps": total_opps,
-        "pct": _safe_pct(total_plus, total_opps),
+    payload = {
+        "team_totals": totals,
+        "rows": rows,
     }
 
-    return totals, rows
+    if start_dt is None and end_dt is None and season_id is not None:
+        practice_slices = {}
+        practice_dates = set(collision_slices) | set(pnr_slices)
+        for practice_date in sorted(practice_dates):
+            collision_payload = collision_slices.get(practice_date, {})
+            pnr_payload = pnr_slices.get(practice_date, {})
+            slice_totals, slice_rows = _combine_payload(
+                collision_payload.get("rows"),
+                collision_payload.get("team_totals"),
+                pnr_payload.get("rows"),
+                pnr_payload.get("team_totals"),
+            )
+            if slice_rows or slice_totals is not None:
+                practice_slices[practice_date] = {
+                    "team_totals": slice_totals,
+                    "rows": slice_rows,
+                }
+
+        if practice_slices:
+            payload["practice_slices"] = practice_slices
+
+    return payload
 
 
 compute_pnr_grade = _build_stat_compute("pnr_grade")

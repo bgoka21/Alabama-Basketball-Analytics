@@ -76,8 +76,13 @@ def _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals):
     ):
         is_last = start_dt == LAST_DT and end_dt == LAST_DT
         if is_last:
-            return last_totals, last_rows
-        return season_totals, season_rows
+            return {"team_totals": last_totals, "rows": last_rows}
+
+        payload = {"team_totals": season_totals, "rows": season_rows}
+        payload["practice_slices"] = {
+            LAST_DT: {"team_totals": last_totals, "rows": last_rows}
+        }
+        return payload
 
     return _fake_compute
 
@@ -108,8 +113,62 @@ def test_with_last_practice_returns_last_slice(app_client):
     ):
         calls.append((start_dt, end_dt))
         if start_dt == LAST_DT and end_dt == LAST_DT:
-            return ({"plus": 2, "opps": 3}, [{"player_name": "P", "plus": 2, "opps": 3}])
-        return ({"plus": 5, "opps": 8}, [{"player_name": "P", "plus": 5, "opps": 8}])
+            return {
+                "team_totals": {"plus": 2, "opps": 3},
+                "rows": [{"player_name": "P", "plus": 2, "opps": 3}],
+            }
+        return {
+            "team_totals": {"plus": 5, "opps": 8},
+            "rows": [{"player_name": "P", "plus": 5, "opps": 8}],
+            "practice_slices": {
+                LAST_DT: {
+                    "team_totals": {"plus": 2, "opps": 3},
+                    "rows": [{"player_name": "P", "plus": 2, "opps": 3}],
+                }
+            },
+        }
+
+    ctx = helpers.with_last_practice(
+        db.session,
+        season_id=1,
+        compute_fn=_fake_compute,
+        stat_key="defense",
+    )
+
+    assert calls == [(None, None)]
+    assert ctx["season_rows"]
+    assert ctx["last_rows"]
+    assert ctx["last_practice_date"] == LAST_DT
+
+
+def test_with_last_practice_falls_back_without_slice(app_client):
+    from admin import _leaderboard_helpers as helpers
+
+    db.session.add(Practice(season_id=1, date=LAST_DT, category="Test"))
+    db.session.commit()
+
+    calls = []
+
+    def _fake_compute(
+        *,
+        stat_key,
+        season_id,
+        start_dt=None,
+        end_dt=None,
+        label_set=None,
+        session=None,
+        **kwargs,
+    ):
+        calls.append((start_dt, end_dt))
+        if start_dt == LAST_DT and end_dt == LAST_DT:
+            return {
+                "team_totals": {"plus": 2, "opps": 3},
+                "rows": [{"player_name": "P", "plus": 2, "opps": 3}],
+            }
+        return {
+            "team_totals": {"plus": 5, "opps": 8},
+            "rows": [{"player_name": "P", "plus": 5, "opps": 8}],
+        }
 
     ctx = helpers.with_last_practice(
         db.session,
@@ -120,9 +179,8 @@ def test_with_last_practice_returns_last_slice(app_client):
 
     assert calls[0] == (None, None)
     assert calls[1] == (LAST_DT, LAST_DT)
-    assert ctx["season_rows"]
     assert ctx["last_rows"]
-    assert ctx["last_practice_date"] == LAST_DT
+    assert ctx["last_team_totals"]
 
 
 def _assert_dual_table_basics(html, section_title, expected_texts):
