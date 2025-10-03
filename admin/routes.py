@@ -60,7 +60,6 @@ from models.database import (
     Setting,
     SavedStatProfile,
 )
-from models.leaderboard_snapshot import LeaderboardSnapshot
 from models.database import PageView
 from models.uploaded_file import UploadedFile
 from models.recruit import Recruit, RecruitShotTypeStat
@@ -74,12 +73,6 @@ from utils.shottype import (
     compute_3fg_breakdown_from_shots,
     gather_labels_for_shot,
     get_player_shottype_3fg_breakdown,
-)
-from utils.cache_utils import (
-    build_leaderboard_cache_key,
-    get_cache,
-    normalize_label_set,
-    register_leaderboard_cache_entry,
 )
 from test_parse import get_possession_breakdown_detailed
 from test_parse import parse_csv           # your existing game parser
@@ -161,35 +154,6 @@ def make_pct(numer, denom):
 
 def safe_int(x):
     return int(x or 0)
-
-_SHOT_DETAIL_PREFIXES = ("atr_", "fg2_", "fg3_")
-_SHOT_DETAIL_SUFFIXES = ("_fg_pct", "_freq_pct", "_pps")
-_SHOT_DETAIL_KEYWORDS = ("contest_breakdown", "shrink")
-
-
-def _stat_requires_shot_details(stat_key, cfg, core_rows):
-    """Return ``True`` when ``stat_key`` depends on parsed shot detail blobs."""
-
-    if cfg and cfg.get("requires_shot_details"):
-        return True
-
-    lowered = stat_key.lower()
-
-    if lowered.startswith(_SHOT_DETAIL_PREFIXES) and (
-        lowered.endswith(_SHOT_DETAIL_SUFFIXES)
-        or any(keyword in lowered for keyword in _SHOT_DETAIL_KEYWORDS)
-    ):
-        return True
-
-    if not core_rows:
-        return False
-
-    for row in core_rows.values():
-        if stat_key in row:
-            return False
-
-    return True
-
 
 def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
     """Return ``(rows, team_totals)`` for a leaderboard key.
@@ -594,14 +558,17 @@ def compute_leaderboard_for_key(stat_key, rows, shot_details=None):
     return {"rows": leaderboard, "team_totals": team_totals}
 
 
-def _get_leaderboard_config(stat_key):
+def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
+    """Return (config, rows) for the leaderboard.
+
+    Optional ``start_dt`` and ``end_dt`` parameters limit the stats to a
+    specific date range (inclusive). Dates are matched against the associated
+    ``Practice.date`` or ``Game.game_date`` fields.
+    """
     cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
     if not cfg:
         abort(404)
-    return cfg
 
-
-def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
     ps_fields = [
         'points','assists','pot_assists','second_assists','turnovers',
         'fta','ftm','atr_attempts','atr_makes',
@@ -1006,169 +973,162 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
 
         core_rows[player] = base
 
-    needs_shot_details = _stat_requires_shot_details(stat_key, cfg, core_rows)
-
-    shot_details = {}
-    if needs_shot_details:
-        shot_rows = (
-            Roster.query
-            .join(
-                PlayerStats,
-                and_(
-                    PlayerStats.player_name == Roster.player_name,
-                    PlayerStats.season_id == Roster.season_id,
-                ),
-            )
-            .filter(PlayerStats.season_id == season_id)
-        )
-        if label_set:
-            s_clauses = []
-            for lbl in label_set:
-                pattern = f"%{lbl}%"
-                s_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
-                s_clauses.append(PlayerStats.stat_details.ilike(pattern))
-            shot_rows = shot_rows.filter(or_(*s_clauses))
-        if start_dt or end_dt:
-            shot_rows = (
-                shot_rows
-                .outerjoin(Game, PlayerStats.game_id == Game.id)
-                .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
-            )
-            if start_dt:
-                shot_rows = shot_rows.filter(
-                    or_(
-                        and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
-                        and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
-                    )
-                )
-            if end_dt:
-                shot_rows = shot_rows.filter(
-                    or_(
-                        and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
-                        and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
-                    )
-                )
+    shot_rows = (
+        Roster.query
+        .join(PlayerStats,
+              and_(PlayerStats.player_name == Roster.player_name,
+                   PlayerStats.season_id == Roster.season_id))
+        .filter(PlayerStats.season_id == season_id)
+    )
+    if label_set:
+        s_clauses = []
+        for lbl in label_set:
+            pattern = f"%{lbl}%"
+            s_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
+            s_clauses.append(PlayerStats.stat_details.ilike(pattern))
+        shot_rows = shot_rows.filter(or_(*s_clauses))
+    if start_dt or end_dt:
         shot_rows = (
             shot_rows
-            .with_entities(
-                Roster.player_name,
-                array_agg_or_group_concat(PlayerStats.shot_type_details),
-            )
-            .group_by(Roster.player_name)
-            .all()
+            .outerjoin(Game, PlayerStats.game_id == Game.id)
+            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
         )
+        if start_dt:
+            shot_rows = shot_rows.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            shot_rows = shot_rows.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    shot_rows = (
+        shot_rows
+        .with_entities(
+            Roster.player_name,
+            array_agg_or_group_concat(PlayerStats.shot_type_details)
+        )
+        .group_by(Roster.player_name)
+        .all()
+    )
 
-        new_shot_rows = []
-        for player, blobs in shot_rows:
-            if isinstance(blobs, str):
-                parts = blobs.split('|||')
-            elif isinstance(blobs, (list, tuple)):
-                parts = blobs
+    new_shot_rows = []
+    for player, blobs in shot_rows:
+        if isinstance(blobs, str):
+            parts = blobs.split('|||')
+        elif isinstance(blobs, (list, tuple)):
+            parts = blobs
+        else:
+            parts = []
+
+        json_list = []
+        for fragment in parts:
+            if not fragment:
+                continue
+            try:
+                parsed = json.loads(fragment)
+            except ValueError:
+                continue
+            if isinstance(parsed, list):
+                json_list.extend(parsed)
             else:
-                parts = []
+                json_list.append(parsed)
 
-            json_list = []
-            for fragment in parts:
-                if not fragment:
-                    continue
-                try:
-                    parsed = json.loads(fragment)
-                except ValueError:
-                    continue
-                if isinstance(parsed, list):
-                    json_list.extend(parsed)
-                else:
-                    json_list.append(parsed)
+        new_shot_rows.append((player, json_list))
 
-            new_shot_rows.append((player, json_list))
+    shot_details = {}
+    for player, shot_list in new_shot_rows:
+        detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
+        filtered_shots = []
+        for shot in shot_list:
+            raw_sc = shot.get('shot_class', '').lower()
+            sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
+            raw_ctx = shot.get('possession_type', '').strip().lower()
+            if 'trans' in raw_ctx:
+                ctx = 'transition'
+            elif 'half' in raw_ctx:
+                ctx = 'halfcourt'
+            else:
+                ctx = 'total'
+            if sc not in ['atr', 'fg2', 'fg3']:
+                continue
 
-        for player, shot_list in new_shot_rows:
-            detail_counts = defaultdict(lambda: {'attempts': 0, 'makes': 0})
-            filtered_shots = []
-            for shot in shot_list:
-                raw_sc = shot.get('shot_class', '').lower()
-                sc = {'2fg': 'fg2', '3fg': 'fg3'}.get(raw_sc, raw_sc)
-                raw_ctx = shot.get('possession_type', '').strip().lower()
-                if 'trans' in raw_ctx:
-                    ctx = 'transition'
-                elif 'half' in raw_ctx:
-                    ctx = 'halfcourt'
-                else:
-                    ctx = 'total'
-                if sc not in ['atr', 'fg2', 'fg3']:
-                    continue
+            labels_for_this_shot = gather_labels_for_shot(shot)
+            normalized_labels = {
+                str(lbl).strip().upper()
+                for lbl in labels_for_this_shot
+                if str(lbl).strip()
+            }
+            normalized_labels.update(
+                lbl.strip().upper()
+                for lbl in re.split(r",", shot.get("possession_type", ""))
+                if lbl.strip()
+            )
+            drill_labels = shot.get('drill_labels', [])
+            if isinstance(drill_labels, str):
+                drill_iter = re.split(r",", drill_labels)
+            else:
+                drill_iter = drill_labels or []
+            normalized_labels.update(
+                lbl.strip().upper()
+                for lbl in drill_iter
+                if isinstance(lbl, str) and lbl.strip()
+            )
 
-                labels_for_this_shot = gather_labels_for_shot(shot)
-                normalized_labels = {
-                    str(lbl).strip().upper()
-                    for lbl in labels_for_this_shot
-                    if str(lbl).strip()
-                }
-                normalized_labels.update(
-                    lbl.strip().upper()
-                    for lbl in re.split(r",", shot.get("possession_type", ""))
-                    if lbl.strip()
-                )
-                drill_labels = shot.get('drill_labels', [])
-                if isinstance(drill_labels, str):
-                    drill_iter = re.split(r",", drill_labels)
-                else:
-                    drill_iter = drill_labels or []
-                normalized_labels.update(
-                    lbl.strip().upper()
-                    for lbl in drill_iter
-                    if isinstance(lbl, str) and lbl.strip()
-                )
+            if label_set and not (normalized_labels & label_set):
+                continue
 
-                if label_set and not (normalized_labels & label_set):
-                    continue
+            filtered_shots.append(shot)
 
-                filtered_shots.append(shot)
+            label = 'Assisted' if 'Assisted' in labels_for_this_shot else 'Non-Assisted'
+            made = (shot.get('result') == 'made')
 
-                label = 'Assisted' if 'Assisted' in labels_for_this_shot else 'Non-Assisted'
-                made = (shot.get('result') == 'made')
+            bucket = detail_counts[(sc, label, ctx)]
+            bucket['attempts'] += 1
+            bucket['makes'] += made
+        flat = {}
+        totals_by_sc = defaultdict(lambda: {'attempts': 0, 'makes': 0})
+        for (sc, label, ctx), data in detail_counts.items():
+            a = data['attempts']
+            m = data['makes']
+            pts = 2 if sc in ('atr','fg2') else 3
+            flat[f"{sc}_{label}_{ctx}_attempts"] = a
+            flat[f"{sc}_{label}_{ctx}_makes"] = m
+            flat[f"{sc}_{label}_{ctx}_fg_pct"] = (m / a * 100 if a else 0)
+            flat[f"{sc}_{label}_{ctx}_pps"] = (pts * m / a if a else 0)
+            total = sum(d['attempts'] for k, d in detail_counts.items() if k[0] == sc) or 1
+            flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
+            totals_by_sc[sc]['attempts'] += a
+            totals_by_sc[sc]['makes'] += m
 
-                bucket = detail_counts[(sc, label, ctx)]
-                bucket['attempts'] += 1
-                bucket['makes'] += made
-            flat = {}
-            totals_by_sc = defaultdict(lambda: {'attempts': 0, 'makes': 0})
-            for (sc, label, ctx), data in detail_counts.items():
-                a = data['attempts']
-                m = data['makes']
-                pts = 2 if sc in ('atr', 'fg2') else 3
-                flat[f"{sc}_{label}_{ctx}_attempts"] = a
-                flat[f"{sc}_{label}_{ctx}_makes"] = m
-                flat[f"{sc}_{label}_{ctx}_fg_pct"] = (m / a * 100 if a else 0)
-                flat[f"{sc}_{label}_{ctx}_pps"] = (pts * m / a if a else 0)
-                total = sum(d['attempts'] for k, d in detail_counts.items() if k[0] == sc) or 1
-                flat[f"{sc}_{label}_{ctx}_freq_pct"] = (a / total * 100)
-                totals_by_sc[sc]['attempts'] += a
-                totals_by_sc[sc]['makes'] += m
+        total_attempts = sum(t['attempts'] for t in totals_by_sc.values()) or 0
+        for sc, t in totals_by_sc.items():
+            a = t['attempts']
+            m = t['makes']
+            pts = 2 if sc in ('atr','fg2') else 3
+            flat[f"{sc}_attempts"] = a
+            flat[f"{sc}_makes"] = m
+            flat[f"{sc}_fg_pct"] = (m / a * 100 if a else 0)
+            flat[f"{sc}_pps"] = (pts * m / a if a else 0)
+            flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
 
-            total_attempts = sum(t['attempts'] for t in totals_by_sc.values()) or 0
-            for sc, t in totals_by_sc.items():
-                a = t['attempts']
-                m = t['makes']
-                pts = 2 if sc in ('atr', 'fg2') else 3
-                flat[f"{sc}_attempts"] = a
-                flat[f"{sc}_makes"] = m
-                flat[f"{sc}_fg_pct"] = (m / a * 100 if a else 0)
-                flat[f"{sc}_pps"] = (pts * m / a if a else 0)
-                flat[f"{sc}_freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
+        breakdown = compute_3fg_breakdown_from_shots(filtered_shots)
+        # Single source of truth for Shrink/Non-Shrink 3FG (mirrors player Shot Type tab).
+        flat.update({
+            "fg3_shrink_att": breakdown["fg3_shrink_att"],
+            "fg3_shrink_makes": breakdown["fg3_shrink_makes"],
+            "fg3_shrink_pct": breakdown["fg3_shrink_pct"],
+            "fg3_nonshrink_att": breakdown["fg3_nonshrink_att"],
+            "fg3_nonshrink_makes": breakdown["fg3_nonshrink_makes"],
+            "fg3_nonshrink_pct": breakdown["fg3_nonshrink_pct"],
+        })
 
-            breakdown = compute_3fg_breakdown_from_shots(filtered_shots)
-            # Single source of truth for Shrink/Non-Shrink 3FG (mirrors player Shot Type tab).
-            flat.update({
-                "fg3_shrink_att": breakdown["fg3_shrink_att"],
-                "fg3_shrink_makes": breakdown["fg3_shrink_makes"],
-                "fg3_shrink_pct": breakdown["fg3_shrink_pct"],
-                "fg3_nonshrink_att": breakdown["fg3_nonshrink_att"],
-                "fg3_nonshrink_makes": breakdown["fg3_nonshrink_makes"],
-                "fg3_nonshrink_pct": breakdown["fg3_nonshrink_pct"],
-            })
-
-            shot_details[player] = flat
+        shot_details[player] = flat
 
     if current_app.debug and stat_key == 'fg3_fg_pct':
         checked = 0
@@ -1230,96 +1190,7 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
 
     all_players = set(core_rows) | set(shot_details)
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
-
-    return {
-        "player_totals": core_rows,
-        "shot_details": shot_details,
-        "all_players": list(all_players),
-        "leaderboard": leaderboard,
-        "team_totals": team_totals,
-    }
-
-
-def build_leaderboard_baseline(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
-    cfg = _get_leaderboard_config(stat_key)
-    components = _build_leaderboard_components(
-        cfg,
-        stat_key,
-        season_id,
-        start_dt=start_dt,
-        end_dt=end_dt,
-        label_set=label_set,
-    )
-    components["config"] = cfg
-    return components
-
-
-def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_set=None):
-    """Return (config, rows) for the leaderboard."""
-
-    normalized_labels = normalize_label_set(label_set)
-    cache = get_cache()
-    cache_key = metadata = None
-    if cache is not None:
-        cache_key, metadata = build_leaderboard_cache_key(
-            stat_key,
-            season_id,
-            start_dt,
-            end_dt,
-            normalized_labels,
-        )
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            return cached_result
-
-    cfg = _get_leaderboard_config(stat_key)
-
-    leaderboard = team_totals = None
-
-    snapshot = None
-    start_date = LeaderboardSnapshot.normalize_date(start_dt)
-    end_date = LeaderboardSnapshot.normalize_date(end_dt)
-    if season_id is not None:
-        snapshot = LeaderboardSnapshot.fetch(
-            season_id,
-            stat_key,
-            start_date=start_date,
-            end_date=end_date,
-            normalized_labels=normalized_labels,
-        )
-
-    if snapshot is not None:
-        payload = snapshot.to_components()
-        leaderboard = payload.get("leaderboard") or []
-        team_totals = payload.get("team_totals")
-        if team_totals is None:
-            player_totals = payload.get("player_totals") or {}
-            shot_details = payload.get("shot_details") or {}
-            player_keys = payload.get("player_keys") or list(set(player_totals) | set(shot_details))
-            leaderboard, team_totals = compute_leaderboard_rows(
-                stat_key,
-                player_keys,
-                player_totals,
-                shot_details,
-            )
-    else:
-        components = _build_leaderboard_components(
-            cfg,
-            stat_key,
-            season_id,
-            start_dt=start_dt,
-            end_dt=end_dt,
-            label_set=label_set,
-        )
-        leaderboard = components["leaderboard"]
-        team_totals = components["team_totals"]
-
-    result = (cfg, leaderboard, team_totals)
-    if cache is not None and cache_key is not None and metadata is not None:
-        cache.set(cache_key, result)
-        register_leaderboard_cache_entry(cache, cache_key, metadata)
-
-    return result
+    return cfg, leaderboard, team_totals
 
 
 _PRACTICE_DUAL_MAP = {
