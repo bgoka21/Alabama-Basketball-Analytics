@@ -113,6 +113,9 @@
 
 {% block scripts %}
   {{ super() }}
+  <script>
+    window.__CSRF__ = {% if csrf_token is defined %}{{ csrf_token()|tojson }}{% else %}{{ ''|tojson }}{% endif %};
+  </script>
   <script src="/static/js/custom_stats.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {

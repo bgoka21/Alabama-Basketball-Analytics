@@ -616,7 +616,7 @@
     loadPresets(config.presetsUrl, state, elements);
 
     if (elements.savePreset) {
-      elements.savePreset.addEventListener('click', () => {
+      elements.savePreset.addEventListener('click', async () => {
         if (!elements.presetName) {
           return;
         }
@@ -633,61 +633,98 @@
           visibility: 'team',
           source_default: 'practice'
         };
-        fetch(config.presetsUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          credentials: 'same-origin',
-          body: JSON.stringify(payload)
-        })
-          .then((response) => {
-            if (!response.ok) {
-              return response.json().catch(() => ({})).then((body) => {
-                throw new Error(body.error || 'Unable to save preset');
-              });
-            }
-            return response.json();
-          })
-          .then(() => {
-            elements.presetName.value = '';
-            if (playerUI && typeof playerUI.clearSelection === 'function') {
-              playerUI.clearSelection();
-            } else if (playerUI && typeof playerUI.setSelected === 'function') {
-              playerUI.setSelected([]);
-            }
-            loadPresets(config.presetsUrl, state, elements);
-          })
-          .catch((error) => {
-            console.error('[custom-stats] Failed to save preset', error);
-            alert(error.message || 'Failed to save preset.');
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        };
+        if (window.__CSRF__) {
+          headers['X-CSRFToken'] = window.__CSRF__;
+        }
+        try {
+          const response = await fetch(config.presetsUrl, {
+            method: 'POST',
+            headers,
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
           });
+          if (response.status === 302 || response.redirected) {
+            throw new Error('Not authenticated');
+          }
+          let body = {};
+          try {
+            body = await response.json();
+          } catch (error) {
+            body = {};
+          }
+          if (!response.ok) {
+            throw new Error(body.error || 'Unable to save preset');
+          }
+          elements.presetName.value = '';
+          if (playerUI && typeof playerUI.clearSelection === 'function') {
+            playerUI.clearSelection();
+          } else if (playerUI && typeof playerUI.setSelected === 'function') {
+            playerUI.setSelected([]);
+          }
+          loadPresets(config.presetsUrl, state, elements);
+        } catch (error) {
+          console.error('[custom-stats] Failed to save preset', error);
+          alert(error.message || 'Failed to save preset.');
+        }
       });
     }
 
     function applyPreset(preset) {
-      if (!preset || !Array.isArray(preset.fields)) {
+      if (!preset) {
         return;
       }
+
       let changed = false;
+
       if (playerUI && typeof playerUI.setSelected === 'function') {
-        const playerIds = Array.isArray(preset.player_ids) ? preset.player_ids : [];
-        const playersChanged = playerUI.setSelected(playerIds);
+        const existingPlayers = state.selectedPlayers.slice();
+        const seenPlayers = new Set(existingPlayers.map((value) => String(value)));
+        const incomingPlayers = Array.isArray(preset.player_ids) ? preset.player_ids : [];
+        incomingPlayers.forEach((playerId) => {
+          const key = String(playerId);
+          if (!key) {
+            return;
+          }
+          if (!seenPlayers.has(key)) {
+            seenPlayers.add(key);
+            existingPlayers.push(playerId);
+          }
+        });
+        const playersChanged = playerUI.setSelected(existingPlayers);
         if (playersChanged) {
           changed = true;
         }
       }
-      preset.fields.forEach((key) => {
-        if (!state.fieldOrder.has(key)) {
-          return;
-        }
-        if (!state.selectedFields.includes(key)) {
-          state.selectedFields.push(key);
+
+      const incomingFields = Array.isArray(preset.fields) ? preset.fields : [];
+      if (incomingFields.length) {
+        const mergedFields = state.selectedFields.slice();
+        const seenFields = new Set(mergedFields);
+        let fieldsChanged = false;
+        incomingFields.forEach((rawKey) => {
+          const key = typeof rawKey === 'string' ? rawKey : String(rawKey || '').trim();
+          if (!key) {
+            return;
+          }
+          if (!state.fieldOrder.has(key)) {
+            return;
+          }
+          if (!seenFields.has(key)) {
+            seenFields.add(key);
+            mergedFields.push(key);
+            fieldsChanged = true;
+          }
+        });
+        if (fieldsChanged) {
+          state.selectedFields = mergedFields;
           changed = true;
         }
-      });
-      state.selectedFields = dedupeAndSortFields(state.selectedFields, state.fieldOrder);
+      }
+
       syncFieldCheckboxes(state);
 
       if (preset.mode_default && (preset.mode_default === 'totals' || preset.mode_default === 'per_practice')) {
