@@ -806,23 +806,43 @@ def _clean_display_value(value: Any) -> Any:
     return value
 
 
-def _format_pct_value(value: Any) -> str:
+def _is_placeholder_value(value: Any, placeholder: str) -> bool:
     cleaned = _clean_display_value(value)
     if cleaned is None:
-        return "NA"
+        return True
+    if isinstance(cleaned, str):
+        if cleaned == placeholder:
+            return True
+        normalized = cleaned.lower()
+        if normalized in {"na", "n/a", "n.a.", "nan"}:
+            return True
+        if cleaned in {"-", "--", "—", "–"}:
+            return True
+    return False
+
+
+def _format_pct_value(value: Any, placeholder: str = "—") -> str:
+    cleaned = _clean_display_value(value)
+    if cleaned is None:
+        return placeholder
 
     if isinstance(cleaned, str):
-        if cleaned.endswith("%"):
-            return cleaned
+        text = cleaned.strip()
+        if not text:
+            return placeholder
+        if text.endswith("%"):
+            text = text[:-1]
         try:
-            return f"{float(cleaned):.1f}%"
+            numeric = float(text)
         except (TypeError, ValueError):
-            return cleaned
+            return placeholder
+    else:
+        try:
+            numeric = float(cleaned)
+        except (TypeError, ValueError):
+            return placeholder
 
-    try:
-        return f"{float(cleaned):.1f}%"
-    except (TypeError, ValueError):
-        return "NA"
+    return f"{numeric:.1f}%"
 
 
 def _resolve_column_value(row: Any, keys: Tuple[str, ...]) -> Any:
@@ -882,7 +902,7 @@ def _format_columns_for_source(
             value = default_value
 
         if (column in pct_set) or (formatter == "pct"):
-            value = _format_pct_value(value)
+            value = _format_pct_value(value, default_placeholder)
         elif value is None:
             value = default_placeholder
 
@@ -1148,6 +1168,10 @@ def build_dual_table(
                 "player": formatted.get("player"),
             }
             for column in base_columns:
+                display_value = formatted.get(column)
+                if _is_placeholder_value(display_value, default_placeholder):
+                    entry[column] = None
+                    continue
                 entry[column] = _extract_numeric_for_column(raw, column, mapping, pct_set)
             numeric.append(entry)
         return numeric
@@ -1158,7 +1182,12 @@ def build_dual_table(
     numeric_season_totals = None
     if season_totals:
         numeric_season_totals = {"player": totals_label}
+        formatted_totals = formatted_season_totals or {}
         for column in base_columns:
+            display_value = formatted_totals.get(column)
+            if _is_placeholder_value(display_value, default_placeholder):
+                numeric_season_totals[column] = None
+                continue
             numeric_season_totals[column] = _extract_numeric_for_column(
                 season_totals, column, mapping, pct_set
             )
@@ -1166,7 +1195,12 @@ def build_dual_table(
     numeric_last_totals = None
     if last_totals:
         numeric_last_totals = {"player": totals_label}
+        formatted_last_display = formatted_last_totals or {}
         for column in base_columns:
+            display_value = formatted_last_display.get(column)
+            if _is_placeholder_value(display_value, default_placeholder):
+                numeric_last_totals[column] = None
+                continue
             numeric_last_totals[column] = _extract_numeric_for_column(
                 last_totals, column, mapping, pct_set
             )
@@ -1736,7 +1770,7 @@ def build_leaderboard_table(
             pct_value = _to_pct(value)
             if pct_value is None:
                 return default_placeholder, None
-            display = _format_pct_value(pct_value)
+            display = _format_pct_value(pct_value, default_placeholder)
             return display, pct_value
 
         text = _clean_display_value(value)
