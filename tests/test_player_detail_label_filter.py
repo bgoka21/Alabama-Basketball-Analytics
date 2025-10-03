@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 from models.database import db, Season, Practice, PlayerStats, Roster
 from models.user import User
 from admin.routes import admin_bp
+from utils.shottype import persist_player_shot_details
 
 
 @pytest.fixture
@@ -42,7 +43,7 @@ def app():
             {"shot_class":"atr","result":"miss","possession_type":"4V4 DRILLS","drill_labels":["4V4 DRILLS"]},
             {"shot_class":"3fg","result":"made","possession_type":"4V4 DRILLS","drill_labels":["4V4 DRILLS"]},
         ]
-        db.session.add(PlayerStats(
+        player_stat = PlayerStats(
             practice_id=1,
             season_id=1,
             player_name='#1 Test',
@@ -60,7 +61,9 @@ def app():
             fta=0,
             ftm=0,
             shot_type_details=json.dumps(shots)
-        ))
+        )
+        db.session.add(player_stat)
+        persist_player_shot_details(player_stat, shots, replace=True)
         db.session.commit()
     yield app
     with app.app_context():

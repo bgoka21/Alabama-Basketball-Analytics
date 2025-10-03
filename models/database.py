@@ -123,6 +123,7 @@ class Practice(db.Model):
         nullable=True,
     )
 
+    season          = db.relationship('Season', backref=db.backref('practices', lazy=True))
     team_stats      = db.relationship('TeamStats',               backref='practice', lazy=True)
     player_stats    = db.relationship('PlayerStats',             backref='practice', lazy=True)
     blue_collar     = db.relationship('BlueCollarStats',         backref='practice', lazy=True)
@@ -298,6 +299,15 @@ class PlayerStats(db.Model):
         passive_deletes=True,
     )
 
+    player_shot_details = db.relationship(
+        'PlayerShotDetail',
+        back_populates='player_stats',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+    season = db.relationship('Season')
+
 
 class PlayerStatLabel(db.Model):
     __tablename__ = 'player_stat_labels'
@@ -315,6 +325,50 @@ class PlayerStatLabel(db.Model):
 
     player_stat = db.relationship('PlayerStats', back_populates='label_entries')
 
+
+
+class PlayerShotDetail(db.Model):
+    __tablename__ = 'player_shot_detail'
+
+    id = db.Column(db.Integer, primary_key=True)
+    player_stats_id = db.Column(
+        db.Integer,
+        db.ForeignKey('player_stats.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    shot_class = db.Column(db.String(8), nullable=False, index=True)
+    result = db.Column(db.String(10), nullable=False)
+    possession_type = db.Column(db.String(64), nullable=True)
+    is_assisted = db.Column(db.Boolean, nullable=False, default=False)
+    shot_location = db.Column(db.String(64), nullable=True)
+    drill_labels = db.Column(db.String(255), nullable=True)
+
+    player_stats = db.relationship('PlayerStats', back_populates='player_shot_details')
+
+    label_entries = db.relationship(
+        'PlayerShotDetailLabel',
+        back_populates='shot_detail',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+
+class PlayerShotDetailLabel(db.Model):
+    __tablename__ = 'player_shot_detail_label'
+
+    shot_detail_id = db.Column(
+        db.Integer,
+        db.ForeignKey('player_shot_detail.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    label = db.Column(db.String(64), primary_key=True)
+
+    __table_args__ = (
+        db.Index('ix_player_shot_detail_label', 'label'),
+    )
+
+    shot_detail = db.relationship('PlayerShotDetail', back_populates='label_entries')
 
 
 class BlueCollarStats(db.Model):
@@ -355,7 +409,7 @@ class OpponentBlueCollarStats(db.Model):
 
 class Possession(db.Model):
     id                  = db.Column(db.Integer, primary_key=True)
-    game_id             = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False, index=True)
+    game_id             = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True, index=True)
     practice_id         = db.Column(db.Integer, db.ForeignKey('practice.id'), nullable=True, index=True)
     season_id           = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False, index=True)
     time_segment        = db.Column(db.String(20))
@@ -372,6 +426,20 @@ class Possession(db.Model):
     label_entries = db.relationship(
         'PossessionLabel',
         back_populates='possession',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+    player_entries = db.relationship(
+        'PlayerPossession',
+        backref='possession',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+    shot_events = db.relationship(
+        'ShotDetail',
+        backref='possession',
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
@@ -396,14 +464,26 @@ class PossessionLabel(db.Model):
 
 class PlayerPossession(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
-    possession_id  = db.Column(db.Integer, db.ForeignKey('possession.id'), nullable=False, index=True)
+    possession_id  = db.Column(
+        db.Integer,
+        db.ForeignKey('possession.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     player_id      = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False, index=True)
+
+    player = db.relationship('Roster')
 
 
 class ShotDetail(db.Model):
     """Detailed event or shot occurring within a possession."""
     id            = db.Column(db.Integer, primary_key=True)
-    possession_id = db.Column(db.Integer, db.ForeignKey('possession.id'), nullable=False, index=True)
+    possession_id = db.Column(
+        db.Integer,
+        db.ForeignKey('possession.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     event_type    = db.Column(db.String(64), nullable=False)
 
 
@@ -494,6 +574,8 @@ class PlayerDevelopmentPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     player_name = db.Column(db.String(100), nullable=False)
     season_id = db.Column(db.Integer, db.ForeignKey('season.id'))
+
+    season = db.relationship('Season')
 
     stat_1_name = db.Column(db.String(64))
     stat_1_goal = db.Column(db.Float)

@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from models.database import db, Season, Practice, PlayerStats, Roster
 from models.user import User
 from admin.routes import admin_bp
+from utils.shottype import persist_player_shot_details
 
 @pytest.fixture
 def app():
@@ -43,8 +44,12 @@ def app():
         db.session.add(admin)
         shots1 = [{'shot_class':'2fg','result':'made','drill_labels':['SCRIMMAGE']}]
         shots2 = [{'shot_class':'2fg','result':'made','drill_labels':['4V4 DRILLS']}]
-        db.session.add(PlayerStats(practice_id=1, season_id=1, player_name='#1 Test', points=5, shot_type_details=json.dumps(shots1)))
-        db.session.add(PlayerStats(practice_id=2, season_id=1, player_name='#1 Test', points=7, shot_type_details=json.dumps(shots2)))
+        ps1 = PlayerStats(practice_id=1, season_id=1, player_name='#1 Test', points=5, shot_type_details=json.dumps(shots1))
+        db.session.add(ps1)
+        persist_player_shot_details(ps1, shots1, replace=True)
+        ps2 = PlayerStats(practice_id=2, season_id=1, player_name='#1 Test', points=7, shot_type_details=json.dumps(shots2))
+        db.session.add(ps2)
+        persist_player_shot_details(ps2, shots2, replace=True)
         db.session.commit()
     yield app
     with app.app_context():

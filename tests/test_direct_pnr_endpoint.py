@@ -38,15 +38,16 @@ def app():
         db.session.add(roster)
         admin = User(username='admin', password_hash=generate_password_hash('pw'), is_admin=True)
         db.session.add(admin)
+        db.session.flush()
         # sample PnR stats
         db.session.add_all([
-            PnRStats(game_id=1, possession_id=1, player_id=1, role='BH', advantage_created='Adv+',
+            PnRStats(game_id=None, possession_id=1, player_id=1, role='BH', advantage_created='Adv+',
                      direct=True, points_scored=2, turnover_occurred=False, assist_occurred=True,
                      start_time=0.0, duration=5.0),
-            PnRStats(game_id=1, possession_id=2, player_id=1, role='BH', advantage_created='Adv-',
+            PnRStats(game_id=None, possession_id=2, player_id=1, role='BH', advantage_created='Adv-',
                      direct=False, points_scored=None, turnover_occurred=False, assist_occurred=False,
                      start_time=10.0, duration=4.0),
-            PnRStats(game_id=1, possession_id=3, player_id=1, role='Screener', advantage_created='Adv+',
+            PnRStats(game_id=None, possession_id=3, player_id=1, role='Screener', advantage_created='Adv+',
                      direct=True, points_scored=3, turnover_occurred=False, assist_occurred=False,
                      start_time=20.0, duration=6.0)
         ])

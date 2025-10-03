@@ -11,6 +11,7 @@ from utils.cache_utils import (
     LEADERBOARD_REGISTRY_KEY,
     invalidate_leaderboard_cache,
 )
+from utils.shottype import persist_player_shot_details
 
 
 class DummyCache:
@@ -72,18 +73,18 @@ def cached_app(monkeypatch):
         db.create_all()
         db.session.add(Season(id=1, season_name="2024", start_date=None))
         db.session.add(Roster(id=1, season_id=1, player_name="Test Player"))
-        db.session.add(
-            PlayerStats(
-                player_name="Test Player",
-                season_id=1,
-                practice_id=None,
-                game_id=None,
-                fg3_attempts=4,
-                fg3_makes=2,
-                shot_type_details=json.dumps(shots),
-                stat_details=json.dumps(shots),
-            )
+        player_stat = PlayerStats(
+            player_name="Test Player",
+            season_id=1,
+            practice_id=None,
+            game_id=None,
+            fg3_attempts=4,
+            fg3_makes=2,
+            shot_type_details=json.dumps(shots),
+            stat_details=json.dumps(shots),
         )
+        db.session.add(player_stat)
+        persist_player_shot_details(player_stat, shots, replace=True)
         db.session.commit()
 
     yield app, dummy_cache
