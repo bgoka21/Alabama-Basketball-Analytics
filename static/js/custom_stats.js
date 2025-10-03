@@ -3,12 +3,70 @@
 
   const REFRESH_DEBOUNCE_MS = 150;
   const PNG_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  const PRESETS_URL = '/admin/api/presets';
+
+  function buildPresetHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    };
+    if (window.__CSRF__) {
+      headers['X-CSRFToken'] = window.__CSRF__;
+    }
+    return headers;
+  }
+
+  async function requestJson(url, options) {
+    const fetchOptions = Object.assign({ credentials: 'same-origin' }, options || {});
+    const response = await fetch(url, fetchOptions);
+    const rawText = await response.text();
+    const snippet = (rawText || '').slice(0, 200);
+    const trimmedSnippet = snippet.replace(/\s+/g, ' ').trim();
+
+    if (response.redirected) {
+      const message = `${response.status || 0}: ${trimmedSnippet || 'Redirected'}`.trim();
+      const error = new Error(message || 'Request redirected');
+      error.status = response.status;
+      error.snippet = trimmedSnippet;
+      error.auth = true;
+      throw error;
+    }
+
+    let payload = {};
+    if (rawText) {
+      try {
+        payload = JSON.parse(rawText);
+      } catch (parseError) {
+        const message = `${response.status || 0}: ${trimmedSnippet || 'Invalid JSON response'}`.trim();
+        const error = new Error(message || 'Invalid JSON response');
+        error.status = response.status;
+        error.snippet = trimmedSnippet;
+        throw error;
+      }
+    }
+
+    if (!response.ok) {
+      const message = `${response.status}: ${trimmedSnippet}`.trim();
+      const error = new Error(message || 'Request failed');
+      error.status = response.status;
+      error.snippet = trimmedSnippet;
+      error.payload = payload;
+      if (response.status === 401 || response.status === 403) {
+        error.auth = true;
+      }
+      throw error;
+    }
+
+    return payload;
+  }
 
   function initCustomStatsPage(config) {
     if (!config) {
       console.error('[custom-stats] Missing configuration');
       return;
     }
+
+    config.presetsUrl = config.presetsUrl || PRESETS_URL;
 
     const elements = {
       playerRoot: document.getElementById('custom-player-select'),
@@ -633,42 +691,33 @@
           visibility: 'team',
           source_default: 'practice'
         };
-        const headers = {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        };
-        if (window.__CSRF__) {
-          headers['X-CSRFToken'] = window.__CSRF__;
-        }
         try {
-          const response = await fetch(config.presetsUrl, {
+          const created = await requestJson(config.presetsUrl, {
             method: 'POST',
-            headers,
-            credentials: 'same-origin',
+            headers: buildPresetHeaders(),
             body: JSON.stringify(payload)
           });
-          if (response.status === 302 || response.redirected) {
-            throw new Error('Not authenticated');
-          }
-          let body = {};
-          try {
-            body = await response.json();
-          } catch (error) {
-            body = {};
-          }
-          if (!response.ok) {
-            throw new Error(body.error || 'Unable to save preset');
-          }
           elements.presetName.value = '';
           if (playerUI && typeof playerUI.clearSelection === 'function') {
             playerUI.clearSelection();
           } else if (playerUI && typeof playerUI.setSelected === 'function') {
             playerUI.setSelected([]);
           }
-          loadPresets(config.presetsUrl, state, elements);
+          const createdPreset = created && typeof created === 'object' ? created : null;
+          if (createdPreset && Object.prototype.hasOwnProperty.call(createdPreset, 'id')) {
+            const targetKey = createdPreset.visibility === 'private' ? 'private' : 'team';
+            const existing = Array.isArray(state.presets[targetKey]) ? state.presets[targetKey] : [];
+            const updated = existing.concat(createdPreset);
+            updated.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
+            state.presets[targetKey] = updated;
+            renderPresetList(elements.teamPresetList, state.presets.team, 'team');
+            renderPresetList(elements.privatePresetList, state.presets.private, 'private');
+          } else {
+            await loadPresets(config.presetsUrl, state, elements);
+          }
         } catch (error) {
           console.error('[custom-stats] Failed to save preset', error);
-          alert(error.message || 'Failed to save preset.');
+          alert((error && error.message) || 'Failed to save preset.');
         }
       });
     }
@@ -782,42 +831,59 @@
     });
   }
 
-  function loadPresets(url, state, elements) {
-    fetch(url, { credentials: 'same-origin' })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error('Failed to load presets');
-        }
-        return response.json();
-      })
-      .then((payload) => {
-        state.presets.team = Array.isArray(payload.team) ? payload.team : [];
-        state.presets.private = Array.isArray(payload.private) ? payload.private : [];
-        renderPresetList(elements.teamPresetList, state.presets.team, 'team');
-        renderPresetList(elements.privatePresetList, state.presets.private, 'private');
-      })
-      .catch((error) => {
-        console.error('[custom-stats] Failed to fetch presets', error);
-        renderPresetList(elements.teamPresetList, [], 'team', true);
-        renderPresetList(elements.privatePresetList, [], 'private', true);
+  async function loadPresets(url, state, elements) {
+    try {
+      const payload = await requestJson(url, {
+        method: 'GET',
+        headers: buildPresetHeaders()
       });
+      state.presets.team = Array.isArray(payload.team) ? payload.team : [];
+      state.presets.private = Array.isArray(payload.private) ? payload.private : [];
+      renderPresetList(elements.teamPresetList, state.presets.team, 'team');
+      renderPresetList(elements.privatePresetList, state.presets.private, 'private');
+    } catch (error) {
+      console.error('[custom-stats] Failed to fetch presets', error);
+      state.presets.team = [];
+      state.presets.private = [];
+      if (error && error.auth) {
+        const message = 'Please sign in to admin to use presets.';
+        renderPresetList(elements.teamPresetList, [], 'team', { authRequired: true, message });
+        renderPresetList(elements.privatePresetList, [], 'private', { authRequired: true, message });
+      } else {
+        const message = (error && error.message) || '';
+        renderPresetList(elements.teamPresetList, [], 'team', { failed: true, message });
+        renderPresetList(elements.privatePresetList, [], 'private', { failed: true, message });
+      }
+    }
   }
 
-  function renderPresetList(container, presets, source, failed = false) {
+  function renderPresetList(container, presets, source, options = {}) {
     if (!container) {
       return;
     }
     container.innerHTML = '';
 
-    if (failed) {
+    const failed = Boolean(options.failed);
+    const authRequired = Boolean(options.authRequired);
+    const message = typeof options.message === 'string' ? options.message : '';
+
+    if (authRequired) {
       const errorNode = document.createElement('p');
       errorNode.className = 'text-xs text-red-600';
-      errorNode.textContent = 'Unable to load presets.';
+      errorNode.textContent = message || 'Please sign in to admin to use presets.';
       container.appendChild(errorNode);
       return;
     }
 
-    if (!presets.length) {
+    if (failed) {
+      const errorNode = document.createElement('p');
+      errorNode.className = 'text-xs text-red-600';
+      errorNode.textContent = message || 'Unable to load presets.';
+      container.appendChild(errorNode);
+      return;
+    }
+
+    if (!Array.isArray(presets) || !presets.length) {
       const emptyNode = document.createElement('p');
       emptyNode.className = 'text-xs text-gray-500';
       if (source === 'private') {

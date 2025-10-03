@@ -6,10 +6,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_apscheduler import APScheduler
+from sqlalchemy import inspect
 import pdfkit
 
 from datetime import datetime
-from models.database import db, PageView
+from models.database import db, PageView, SavedStatProfile
 from models.user import User
 from admin.routes import admin_bp
 from merge_app.app import merge_bp
@@ -40,6 +41,14 @@ PDF_OPTIONS = {
     'encoding': 'UTF-8',
     'enable-local-file-access': None
 }
+
+
+def ensure_saved_stat_profile_table(app):
+    with app.app_context():
+        insp = inspect(db.engine)
+        if 'saved_stat_profile' not in insp.get_table_names():
+            SavedStatProfile.__table__.create(bind=db.engine, checkfirst=True)
+
 
 # Optional: Import auth blueprint if it exists
 try:
@@ -101,6 +110,7 @@ def create_app():
 
     # --- Initialize Extensions ---
     db.init_app(app)
+    ensure_saved_stat_profile_table(app)
     Migrate(app, db)
     login_manager = LoginManager()
     login_manager.init_app(app)
