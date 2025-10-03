@@ -7,6 +7,7 @@ from models.database import db, Season, Game, PlayerStats, TeamStats
 from test_parse import parse_csv  # Ensure this path is correct for your project
 from app import app as flask_app, create_app  # Import the Flask app for the application context
 from utils.cache_utils import invalidate_season_leaderboard_cache
+from services.leaderboard_snapshot import refresh_season_baselines
 
 if flask_app is None:
     flask_app = create_app()
@@ -52,6 +53,11 @@ def process_multiple_csvs(directory_path, season_id, archive_path):
     if updated_stats:
         with app.app_context():
             invalidate_season_leaderboard_cache(season_id)
+            refresh_season_baselines(
+                season_id,
+                commit=True,
+                invalidate_cache=False,
+            )
     logger.info("Batch processing complete.")
 
 def aggregate_player_stats(season_id):
