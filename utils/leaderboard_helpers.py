@@ -13,6 +13,10 @@ from models.database import (
     Possession, PlayerPossession, ShotDetail,
     Game, Practice
 )
+from utils.label_filters import (
+    apply_player_label_filter,
+    apply_possession_label_filter,
+)
 
 
 @dataclass
@@ -71,8 +75,7 @@ def _apply_possession_filters(
     label_set: Set[str],
 ) -> Query:
     if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        query = query.filter(or_(*clauses))
+        query = apply_possession_label_filter(query, label_set)
     if start_dt or end_dt:
         query = (
             query.outerjoin(Game, Possession.game_id == Game.id)
@@ -108,12 +111,7 @@ def _apply_playerstats_filters(
     label_set: Set[str],
 ) -> Query:
     if label_set:
-        clauses = []
-        for lbl in label_set:
-            pattern = f"%{lbl}%"
-            clauses.append(PlayerStats.shot_type_details.ilike(pattern))
-            clauses.append(PlayerStats.stat_details.ilike(pattern))
-        query = query.filter(or_(*clauses))
+        query = apply_player_label_filter(query, label_set)
     if start_dt or end_dt:
         query = (
             query.outerjoin(Game, PlayerStats.game_id == Game.id)
@@ -1074,8 +1072,7 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
                 )
             )
     if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        poss_q = poss_q.filter(or_(*clauses))
+        poss_q = apply_possession_label_filter(poss_q, label_set)
     ON_poss, ON_pts = poss_q.one()
 
     team_q = (
@@ -1109,8 +1106,7 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
                 )
             )
     if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        team_q = team_q.filter(or_(*clauses))
+        team_q = apply_possession_label_filter(team_q, label_set)
     TEAM_poss, TEAM_pts = team_q.one()
 
     def ev_count(ev_type: str) -> int:
@@ -1145,7 +1141,7 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
                     )
                 )
         if label_set:
-            q = q.filter(or_(*[Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]))
+            q = apply_possession_label_filter(q, label_set)
         return q.scalar() or 0
 
     turnovers_on = ev_count("Turnover")
@@ -1201,16 +1197,8 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
                 PlayerStats.game_id == BlueCollarStats.game_id,
             ),
         )
-        clauses = [
-            PlayerStats.shot_type_details.ilike(f"%{lbl}%") | PlayerStats.stat_details.ilike(f"%{lbl}%")
-            for lbl in label_set
-        ]
-        bc_q = bc_q.filter(or_(*clauses))
-        ps_clauses = [
-            PlayerStats.shot_type_details.ilike(f"%{lbl}%") | PlayerStats.stat_details.ilike(f"%{lbl}%")
-            for lbl in label_set
-        ]
-        ps_filter_q = ps_filter_q.filter(or_(*ps_clauses))
+        bc_q = apply_player_label_filter(bc_q, label_set)
+        ps_filter_q = apply_player_label_filter(ps_filter_q, label_set)
     off_reb_on = bc_q.with_entities(func.coalesce(func.sum(BlueCollarStats.off_reb), 0)).scalar() or 0
     records = ps_filter_q.all()
     if label_set:

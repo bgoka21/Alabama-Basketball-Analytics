@@ -75,6 +75,10 @@ from utils.shottype import (
     gather_labels_for_shot,
     get_player_shottype_3fg_breakdown,
 )
+from utils.label_filters import (
+    apply_player_label_filter,
+    apply_possession_label_filter,
+)
 from utils.cache_utils import (
     build_leaderboard_cache_key,
     get_cache,
@@ -643,12 +647,7 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
         .filter(PlayerStats.season_id == season_id)
     )
     if label_set:
-        clauses = []
-        for lbl in label_set:
-            pattern = f"%{lbl}%"
-            clauses.append(PlayerStats.shot_type_details.ilike(pattern))
-            clauses.append(PlayerStats.stat_details.ilike(pattern))
-        ps_q = ps_q.filter(or_(*clauses))
+        ps_q = apply_player_label_filter(ps_q, label_set)
     if start_dt or end_dt:
         ps_q = (
             ps_q
@@ -694,12 +693,7 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
                 PlayerStats.game_id == BlueCollarStats.game_id,
             ),
         )
-        bc_clauses = []
-        for lbl in label_set:
-            pattern = f"%{lbl}%"
-            bc_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
-            bc_clauses.append(PlayerStats.stat_details.ilike(pattern))
-        bc_q = bc_q.filter(or_(*bc_clauses))
+        bc_q = apply_player_label_filter(bc_q, label_set)
     if start_dt or end_dt:
         bc_q = (
             bc_q
@@ -732,8 +726,7 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
         )
     )
     if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        id_q = id_q.filter(or_(*clauses))
+        id_q = apply_possession_label_filter(id_q, label_set)
     if start_dt or end_dt:
         id_q = (
             id_q
@@ -826,8 +819,7 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
         )
     )
     if label_set:
-        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-        events_q = events_q.filter(or_(*clauses))
+        events_q = apply_possession_label_filter(events_q, label_set)
     if start_dt or end_dt:
         events_q = (
             events_q
@@ -1022,12 +1014,7 @@ def _build_leaderboard_components(cfg, stat_key, season_id, start_dt=None, end_d
             .filter(PlayerStats.season_id == season_id)
         )
         if label_set:
-            s_clauses = []
-            for lbl in label_set:
-                pattern = f"%{lbl}%"
-                s_clauses.append(PlayerStats.shot_type_details.ilike(pattern))
-                s_clauses.append(PlayerStats.stat_details.ilike(pattern))
-            shot_rows = shot_rows.filter(or_(*s_clauses))
+            shot_rows = apply_player_label_filter(shot_rows, label_set)
         if start_dt or end_dt:
             shot_rows = (
                 shot_rows
@@ -5680,8 +5667,7 @@ def player_detail(player_name):
             )
         )
         if label_set:
-            clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
-            q = q.filter(or_(*clauses))
+            q = apply_possession_label_filter(q, label_set)
         return q.scalar() or 0
 
     FGM2_ON = count_event('ATR+') + count_event('2FG+')
