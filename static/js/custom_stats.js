@@ -27,17 +27,35 @@
   }
 
   const api = {
-    async listPresets({ preset_type, q = '' }) {
-      const url = `${PRESETS_URL}?preset_type=${encodeURIComponent(preset_type)}&q=${encodeURIComponent(q)}`;
+    async listPresets({ preset_type, q = '' } = {}) {
+      const params = new URLSearchParams();
+      if (preset_type) {
+        params.set('preset_type', preset_type);
+      }
+      if (typeof q === 'string' && q.trim()) {
+        params.set('q', q.trim());
+      }
+      const query = params.toString();
+      const url = query ? `${PRESETS_URL}?${query}` : PRESETS_URL;
       const res = await fetch(url, { credentials: 'same-origin' });
       if (!res.ok) {
         throw new Error(await safeErr(res));
       }
       try {
-        return await res.json();
+        const payload = await res.json();
+        if (payload && Array.isArray(payload.presets)) {
+          return payload.presets;
+        }
+        if (payload && Array.isArray(payload.team)) {
+          return payload.team;
+        }
+        if (Array.isArray(payload)) {
+          return payload;
+        }
       } catch (error) {
-        return [];
+        // ignore parse error and fall back to empty array
       }
+      return [];
     },
 
     async createPreset(payload) {
@@ -127,6 +145,16 @@
     }, TOAST_TIMEOUT_MS);
   }
 
+  function setButtonLoading(button, loading) {
+    if (!button) {
+      return;
+    }
+    const isLoading = Boolean(loading);
+    button.disabled = isLoading;
+    button.classList.toggle('opacity-50', isLoading);
+    button.classList.toggle('pointer-events-none', isLoading);
+  }
+
   function initCustomStatsPage(config) {
     if (!config) {
       console.error('[custom-stats] Missing configuration');
@@ -155,7 +183,10 @@
       statsPresetsList: document.getElementById('stats-presets-list'),
       datesPresetName: document.getElementById('dates-preset-name'),
       datesPresetSave: document.getElementById('dates-preset-save'),
-      datesPresetsList: document.getElementById('dates-presets-list')
+      datesPresetsList: document.getElementById('dates-presets-list'),
+      combinedWrapper: document.getElementById('combined-presets-wrapper'),
+      combinedPresetsList: document.getElementById('combined-presets-list'),
+      combinedAccordion: document.getElementById('combined-presets-accordion')
     };
 
     if (!elements.playerRoot || !elements.tableContainer || !elements.statGroups) {
@@ -173,7 +204,7 @@
       source: 'practice',
       autoRefresh: Boolean(elements.autoRefresh ? elements.autoRefresh.checked : true),
       lastPayload: null,
-      presets: { players: [], stats: [], dates: [] },
+      presets: { players: [], stats: [], dates: [], combined: [] },
       dateFrom: elements.dateFrom && elements.dateFrom.value ? elements.dateFrom.value : null,
       dateTo: elements.dateTo && elements.dateTo.value ? elements.dateTo.value : null,
       fieldCheckboxes: [],
@@ -754,7 +785,15 @@
     const containers = {
       players: elements.playersPresetsList,
       stats: elements.statsPresetsList,
-      dates: elements.datesPresetsList
+      dates: elements.datesPresetsList,
+      combined: elements.combinedPresetsList
+    };
+
+    const containerOptions = {
+      combined: {
+        combinedWrapper: elements.combinedWrapper,
+        accordion: elements.combinedAccordion
+      }
     };
 
     Object.entries(containers).forEach(([type, container]) => {
@@ -779,7 +818,7 @@
         if (action === 'apply') {
           let changed = false;
           if (preset.preset_type === 'combined') {
-            changed = applyCombinedPreset(preset, state, playerUI);
+            changed = applyCombinedPreset(preset, state, playerUI, elements);
           } else if (type === 'players') {
             changed = applyPlayersPreset(preset, state, playerUI);
           } else if (type === 'stats') {
@@ -812,7 +851,7 @@
             const updated = await api.updatePreset(preset.id, { name: trimmed });
             preset.name = (updated && updated.name) || trimmed;
             sortPresetsByName(state.presets[type]);
-            renderPresetList(type, container, state.presets[type]);
+            renderPresetList(type, container, state.presets[type], containerOptions[type]);
             notify('success', 'Preset renamed.');
           } catch (error) {
             console.error('[custom-stats] Failed to rename preset', error);
@@ -829,7 +868,7 @@
           try {
             await api.deletePreset(preset.id);
             state.presets[type] = presets.filter((p) => String(p.id) !== String(preset.id));
-            renderPresetList(type, container, state.presets[type]);
+            renderPresetList(type, container, state.presets[type], containerOptions[type]);
             notify('success', 'Preset deleted.');
           } catch (error) {
             console.error('[custom-stats] Failed to delete preset', error);
@@ -841,20 +880,24 @@
 
     async function loadInitialPresets() {
       try {
-        const [players, stats, dates] = await Promise.all([
+        const [players, stats, dates, combined] = await Promise.all([
           api.listPresets({ preset_type: 'players' }),
           api.listPresets({ preset_type: 'stats' }),
-          api.listPresets({ preset_type: 'dates' })
+          api.listPresets({ preset_type: 'dates' }),
+          api.listPresets({ preset_type: 'combined' })
         ]);
         state.presets.players = Array.isArray(players) ? players : [];
         state.presets.stats = Array.isArray(stats) ? stats : [];
         state.presets.dates = Array.isArray(dates) ? dates : [];
+        state.presets.combined = Array.isArray(combined) ? combined : [];
         sortPresetsByName(state.presets.players);
         sortPresetsByName(state.presets.stats);
         sortPresetsByName(state.presets.dates);
-        renderPresetList('players', containers.players, state.presets.players);
-        renderPresetList('stats', containers.stats, state.presets.stats);
-        renderPresetList('dates', containers.dates, state.presets.dates);
+        sortPresetsByName(state.presets.combined);
+        renderPresetList('players', containers.players, state.presets.players, containerOptions.players);
+        renderPresetList('stats', containers.stats, state.presets.stats, containerOptions.stats);
+        renderPresetList('dates', containers.dates, state.presets.dates, containerOptions.dates);
+        renderPresetList('combined', containers.combined, state.presets.combined, containerOptions.combined);
       } catch (error) {
         console.error('[custom-stats] Failed to load presets', error);
         notify('error', 'Unable to load presets.');
@@ -864,6 +907,10 @@
           }
           renderPresetError(container, 'Unable to load presets.');
           state.presets[type] = [];
+          const options = containerOptions[type];
+          if (options && options.combinedWrapper) {
+            options.combinedWrapper.classList.remove('hidden');
+          }
         });
       }
     }
@@ -892,6 +939,10 @@
           source_default: state.source || 'practice',
           visibility: 'team'
         };
+        if (elements.playersPresetSave.disabled) {
+          return;
+        }
+        setButtonLoading(elements.playersPresetSave, true);
         try {
           const created = await api.createPreset(payload);
           if (elements.playersPresetName) {
@@ -900,7 +951,7 @@
           if (created && created.id) {
             state.presets.players.push(created);
             sortPresetsByName(state.presets.players);
-            renderPresetList('players', containers.players, state.presets.players);
+            renderPresetList('players', containers.players, state.presets.players, containerOptions.players);
           } else {
             await loadInitialPresets();
           }
@@ -908,6 +959,8 @@
         } catch (error) {
           console.error('[custom-stats] Failed to save players preset', error);
           notify('error', error.message || 'Unable to save preset.');
+        } finally {
+          setButtonLoading(elements.playersPresetSave, false);
         }
       });
     }
@@ -934,6 +987,10 @@
           source_default: state.source || 'practice',
           visibility: 'team'
         };
+        if (elements.statsPresetSave.disabled) {
+          return;
+        }
+        setButtonLoading(elements.statsPresetSave, true);
         try {
           const created = await api.createPreset(payload);
           if (elements.statsPresetName) {
@@ -942,7 +999,7 @@
           if (created && created.id) {
             state.presets.stats.push(created);
             sortPresetsByName(state.presets.stats);
-            renderPresetList('stats', containers.stats, state.presets.stats);
+            renderPresetList('stats', containers.stats, state.presets.stats, containerOptions.stats);
           } else {
             await loadInitialPresets();
           }
@@ -950,6 +1007,8 @@
         } catch (error) {
           console.error('[custom-stats] Failed to save stats preset', error);
           notify('error', error.message || 'Unable to save preset.');
+        } finally {
+          setButtonLoading(elements.statsPresetSave, false);
         }
       });
     }
@@ -984,6 +1043,10 @@
           source_default: state.source || 'practice',
           visibility: 'team'
         };
+        if (elements.datesPresetSave.disabled) {
+          return;
+        }
+        setButtonLoading(elements.datesPresetSave, true);
         try {
           const created = await api.createPreset(payload);
           if (elements.datesPresetName) {
@@ -992,7 +1055,7 @@
           if (created && created.id) {
             state.presets.dates.push(created);
             sortPresetsByName(state.presets.dates);
-            renderPresetList('dates', containers.dates, state.presets.dates);
+            renderPresetList('dates', containers.dates, state.presets.dates, containerOptions.dates);
           } else {
             await loadInitialPresets();
           }
@@ -1000,6 +1063,8 @@
         } catch (error) {
           console.error('[custom-stats] Failed to save dates preset', error);
           notify('error', error.message || 'Unable to save preset.');
+        } finally {
+          setButtonLoading(elements.datesPresetSave, false);
         }
       });
     }
@@ -1020,26 +1085,40 @@
     container.appendChild(errorNode);
   }
 
-  function renderPresetList(type, container, presets) {
+  function renderPresetList(type, container, presets, options = {}) {
     if (!container) {
       return;
     }
     container.innerHTML = '';
 
+    const combinedWrapper = options.combinedWrapper || null;
+    const accordion = options.accordion || null;
+
     if (!Array.isArray(presets) || !presets.length) {
-      const empty = document.createElement('p');
-      empty.className = 'py-3 text-xs text-gray-500';
-      if (type === 'players') {
-        empty.textContent = 'No players presets yet.';
-      } else if (type === 'stats') {
-        empty.textContent = 'No stats presets yet.';
-      } else if (type === 'dates') {
-        empty.textContent = 'No dates presets yet.';
+      if (combinedWrapper) {
+        combinedWrapper.classList.add('hidden');
+        if (accordion) {
+          accordion.open = false;
+        }
       } else {
-        empty.textContent = 'No presets found.';
+        const empty = document.createElement('p');
+        empty.className = 'py-3 text-xs text-gray-500';
+        if (type === 'players') {
+          empty.textContent = 'No players presets yet';
+        } else if (type === 'stats') {
+          empty.textContent = 'No stats presets yet';
+        } else if (type === 'dates') {
+          empty.textContent = 'No dates presets yet';
+        } else {
+          empty.textContent = 'No presets found';
+        }
+        container.appendChild(empty);
       }
-      container.appendChild(empty);
       return;
+    }
+
+    if (combinedWrapper) {
+      combinedWrapper.classList.remove('hidden');
     }
 
     presets.forEach((preset) => {
@@ -1189,7 +1268,7 @@
     return changed;
   }
 
-  function applyCombinedPreset(preset, state, playerUI) {
+  function applyCombinedPreset(preset, state, playerUI, elements) {
     if (!preset) {
       return false;
     }
@@ -1247,6 +1326,20 @@
         updateModeButtons(state);
         changed = true;
       }
+    }
+
+    const nextDateFrom = preset && preset.date_from ? preset.date_from : null;
+    const nextDateTo = preset && preset.date_to ? preset.date_to : null;
+    if (state.dateFrom !== nextDateFrom || state.dateTo !== nextDateTo) {
+      state.dateFrom = nextDateFrom;
+      state.dateTo = nextDateTo;
+      if (elements && elements.dateFrom) {
+        elements.dateFrom.value = nextDateFrom || '';
+      }
+      if (elements && elements.dateTo) {
+        elements.dateTo.value = nextDateTo || '';
+      }
+      changed = true;
     }
 
     return changed;
