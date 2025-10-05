@@ -19,7 +19,11 @@ from admin.routes import (
     _split_leaderboard_rows_for_template,
     get_practice_dual_context,
 )
-from services.cache_leaderboard import cache_build_one, cache_get_leaderboard
+from services.cache_leaderboard import (
+    cache_build_one,
+    cache_get_leaderboard,
+    expand_cached_rows_for_template,
+)
 from models.database import (
     db,
     BlueCollarStats,
@@ -945,8 +949,7 @@ def season_leaderboard():
 
     if cache_payload:
         cfg = cache_payload.get("config")
-        rows = cache_payload.get("rows", [])
-        team_totals = cache_payload.get("team_totals")
+        rows, team_totals = expand_cached_rows_for_template(cache_payload)
     else:
         cfg, rows, team_totals = compute_leaderboard(
             stat_key,

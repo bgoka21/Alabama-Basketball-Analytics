@@ -1,36 +1,92 @@
 import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from flask import current_app
 
 from models.database import db, CachedLeaderboard, Season
+from admin._leaderboard_helpers import build_leaderboard_table
+
+JsonDict = Dict[str, Any]
 
 # --- BEGIN PATCH: robust normalizer + compute import helper ---
-def _normalize_payload(result, stat_key, season_id):
-    """
-    Accepts tuple/list/dict/None and returns a dict for caching:
-    { rows: [...], stat_key, season_id, updated_at }
-    """
-    if result is None:
-        data = {"rows": []}
-    elif isinstance(result, dict):
-        data = dict(result)  # shallow copy
-    elif isinstance(result, (list, tuple)):
-        # Common pattern: (rows, meta_dict)
-        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[1], dict):
-            rows, meta = result
-            data = {"rows": list(rows), **meta}
-        else:
-            data = {"rows": list(result)}
-    else:
-        data = {"rows": [result]}
+def _format_for_display(
+    cfg: Optional[Dict[str, Any]],
+    raw_rows: Optional[Sequence[Any]],
+    raw_totals: Optional[Any],
+) -> Dict[str, Any]:
+    """Return cache payload with pre-formatted leaderboard rows."""
 
-    data["stat_key"] = stat_key
-    data["season_id"] = season_id
-    data["updated_at"] = datetime.utcnow().isoformat()
-    return data
+    table = build_leaderboard_table(
+        config=cfg,
+        rows=raw_rows,
+        team_totals=raw_totals,
+    )
+
+    columns = table.get("columns") or []
+    key_label_pairs = [
+        (col.get("key"), col.get("label"))
+        for col in columns
+        if col.get("key")
+    ]
+    column_keys = [pair[0] for pair in key_label_pairs]
+    column_labels = [pair[1] for pair in key_label_pairs]
+
+    display_rows = []
+    for row in table.get("rows") or []:
+        display_rows.append([row.get(key, "") for key in column_keys])
+
+    display_totals = None
+    totals_entry = table.get("totals")
+    if totals_entry:
+        display_totals = [totals_entry.get(key, "") for key in column_keys]
+
+    payload: Dict[str, Any] = {
+        "config": cfg,
+        "columns": column_labels,
+        "column_keys": column_keys,
+        "rows": display_rows,
+        "team_totals": display_totals,
+        "default_sort": table.get("default_sort"),
+        "has_data": table.get("has_data"),
+    }
+
+    return payload
+
+
+def expand_cached_rows_for_template(payload: JsonDict) -> tuple[Sequence[Any], Any]:
+    """Return rows/totals suitable for feeding back into templates."""
+
+    rows = payload.get("rows")
+    totals = payload.get("team_totals")
+    column_keys = payload.get("column_keys")
+
+    if not isinstance(column_keys, list) or not isinstance(rows, list):
+        return rows or [], totals
+
+    expanded_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        if isinstance(row, dict):
+            expanded_rows.append(dict(row))
+            continue
+        if isinstance(row, list):
+            entry: Dict[str, Any] = {}
+            for idx, key in enumerate(column_keys):
+                entry[key] = row[idx] if idx < len(row) else ""
+            expanded_rows.append(entry)
+            continue
+        if column_keys:
+            expanded_rows.append({column_keys[0]: row})
+
+    expanded_totals: Any = totals
+    if isinstance(totals, list):
+        totals_entry: Dict[str, Any] = {}
+        for idx, key in enumerate(column_keys):
+            totals_entry[key] = totals[idx] if idx < len(totals) else ""
+        expanded_totals = totals_entry
+
+    return expanded_rows, expanded_totals
 
 
 def _import_compute_leaderboard():
@@ -50,9 +106,6 @@ def _import_compute_leaderboard():
 
 
 # --- END PATCH ---
-
-JsonDict = Dict[str, Any]
-
 
 def _json_default(value: Any) -> Any:
     if isinstance(value, datetime):
@@ -105,9 +158,34 @@ def cache_build_one(
     compute_fn: Callable[[str, Optional[int]], JsonDict],
 ) -> JsonDict:
     raw = compute_fn(stat_key, season_id)
-    data = _normalize_payload(raw, stat_key, season_id)
-    cache_set_leaderboard(season_id, stat_key, data)
-    return data
+
+    cfg: Optional[Dict[str, Any]] = None
+    raw_rows: Sequence[Any] = []
+    raw_totals: Any = None
+
+    if raw is None:
+        raw_rows = []
+    elif isinstance(raw, dict):
+        cfg = raw.get("config")
+        raw_rows = raw.get("rows") or []
+        raw_totals = raw.get("team_totals")
+    elif isinstance(raw, (list, tuple)):
+        if len(raw) == 3:
+            cfg, raw_rows, raw_totals = raw  # type: ignore[assignment]
+        elif len(raw) == 2:
+            cfg, raw_rows = raw  # type: ignore[assignment]
+        else:
+            raw_rows = list(raw)
+    else:
+        raw_rows = [raw]
+
+    payload = _format_for_display(cfg, raw_rows, raw_totals)
+    payload["stat_key"] = stat_key
+    payload["season_id"] = season_id
+    payload["updated_at"] = datetime.utcnow().isoformat()
+
+    cache_set_leaderboard(season_id, stat_key, payload)
+    return payload
 
 
 def cache_build_all(
