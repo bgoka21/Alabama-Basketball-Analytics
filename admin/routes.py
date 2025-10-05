@@ -102,6 +102,7 @@ from services.cache_leaderboard import (
     cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,
+    rebuild_leaderboards_after_parse,
 )
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
@@ -3934,6 +3935,8 @@ def parse_file(file_id):
             uploaded_file.last_parsed  = datetime.utcnow()
             db.session.commit()
 
+            rebuild_leaderboards_after_parse(season_id)
+
             flash("Practice parsed successfully! You can now edit it.", "success")
             return redirect(
                 url_for('admin.edit_practice',
@@ -3976,6 +3979,8 @@ def parse_file(file_id):
                 results.get('defensive_breakdown', {}) )
             uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
             db.session.commit()
+
+            rebuild_leaderboards_after_parse(season_id)
 
             # 4) redirect into your game editor
             game = Game.query.filter_by(csv_filename=filename).first()
@@ -4067,6 +4072,7 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     uploaded_file.parse_status = "Parsed Successfully"
     uploaded_file.last_parsed = datetime.utcnow()
     db.session.commit()
+    rebuild_leaderboards_after_parse(season_id)
     return practice.id, season_id
 
 
@@ -7773,7 +7779,9 @@ def leaderboard():
             cache_payload = cache_build_one(stat_key, sid, build_leaderboard_cache_payload)
 
     if cache_payload:
-        cfg = cache_payload.get("config")
+        cfg = next((c for c in LEADERBOARD_STATS if c["key"] == stat_key), None)
+        if cfg is None:
+            cfg = {"key": stat_key, "label": stat_key.replace("_", " ").title()}
         rows, team_totals = expand_cached_rows_for_template(cache_payload)
     else:
         cfg, rows, team_totals = compute_leaderboard(
