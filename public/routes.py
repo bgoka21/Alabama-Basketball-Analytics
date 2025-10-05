@@ -8,6 +8,7 @@ from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from datetime import date, timedelta
 from collections import defaultdict
+from typing import Any, Optional
 import json
 from types import SimpleNamespace
 from stats_config import LEADERBOARD_STATS
@@ -23,6 +24,7 @@ from services.cache_leaderboard import (
     cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,
+    format_leaderboard_payload,
 )
 from models.database import (
     db,
@@ -934,6 +936,7 @@ def season_leaderboard():
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cache_payload = None
+    table_payload: Optional[dict[str, Any]] = None
     if sid and not label_set:
         cache_payload = cache_get_leaderboard(sid, stat_key)
         if not cache_payload:
@@ -946,16 +949,28 @@ def season_leaderboard():
                 }
 
             cache_payload = cache_build_one(stat_key, sid, _compute_payload)
+        table_payload = cache_payload
 
-    if cache_payload:
-        cfg = cache_payload.get("config")
-        rows, team_totals = expand_cached_rows_for_template(cache_payload)
-    else:
-        cfg, rows, team_totals = compute_leaderboard(
+    if table_payload is None:
+        cfg, computed_rows, computed_totals = compute_leaderboard(
             stat_key,
             sid,
             label_set=label_set if label_set else None,
         )
+        compute_result = {
+            "config": cfg,
+            "rows": computed_rows,
+            "team_totals": computed_totals,
+        }
+        table_payload = format_leaderboard_payload(stat_key, compute_result)
+    else:
+        cfg = next((c for c in LEADERBOARD_STATS if c["key"] == stat_key), None)
+        if cfg is None:
+            cfg = {"key": stat_key, "label": stat_key.replace("_", " ").title()}
+
+    columns, column_keys, rows, team_totals = expand_cached_rows_for_template(table_payload)
+    default_sort = table_payload.get("default_sort")
+    has_data = table_payload.get("has_data", bool(rows) or bool(team_totals))
     practice_dual_ctx = (
         get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
         if cfg
@@ -984,8 +999,13 @@ def season_leaderboard():
         'leaderboard.html',
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
+        columns=columns,
+        column_keys=column_keys,
         rows=rows,
         team_totals=team_totals,
+        table_payload=table_payload,
+        table_default_sort=default_sort,
+        table_has_data=has_data,
         label_options=label_options,
         selected_labels=selected_labels,
         season_id=sid,

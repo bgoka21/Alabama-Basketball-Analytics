@@ -68,6 +68,12 @@ def create_app():
         template_folder=os.path.join(repo_root, 'templates'),
     )
 
+    try:
+        from flask_compress import Compress
+        Compress(app)
+    except Exception:
+        app.logger.warning("Flask-Compress not available; skipping compression")
+
     # Allow JSON serialization of SimpleNamespace objects
     from types import SimpleNamespace
     _json_default = app.json.default

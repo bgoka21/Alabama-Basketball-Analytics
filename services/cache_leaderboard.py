@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -8,7 +8,7 @@ from flask import current_app
 from constants import LEADERBOARD_STAT_KEYS, LEADERBOARD_STATS
 from models.database import CachedLeaderboard, Season, db
 
-from admin._leaderboard_helpers import build_leaderboard_table
+from admin._leaderboard_helpers import build_leaderboard_table as _build_leaderboard_table
 
 JsonDict = Dict[str, Any]
 
@@ -85,95 +85,134 @@ def _extract_compute_components(
     return _lookup_stat_config(stat_key), rows, totals
 
 
-def format_leaderboard_payload(stat_key: str, compute_result: Any) -> Dict[str, Any]:
-    """Return a cache payload containing display-ready leaderboard rows."""
-
+def build_leaderboard_table(stat_key: str, compute_result: Any, *, variant: Optional[str] = None):
     config, rows, totals = _extract_compute_components(stat_key, compute_result)
-
-    table = build_leaderboard_table(config=config, rows=rows, team_totals=totals)
-
-    column_entries = table.get("columns") or []
+    table = _build_leaderboard_table(config=config, rows=rows, team_totals=totals)
     column_keys: List[str] = []
-    column_labels: List[str] = []
-    for column in column_entries:
-        key = column.get("key")
-        if not key:
-            continue
-        column_keys.append(str(key))
-        column_labels.append(str(column.get("label", "")))
+    for column in table.get("columns") or []:
+        key = column.get("key") if isinstance(column, Mapping) else None
+        if key:
+            column_keys.append(str(key))
+    table = dict(table)
+    table.setdefault("column_keys", column_keys)
+    return table
 
-    formatted_rows: List[List[str]] = []
-    for row in table.get("rows") or []:
-        formatted_rows.append(
-            [
-                "" if row.get(key) is None else str(row.get(key))
-                for key in column_keys
-            ]
-        )
 
-    totals_row: Optional[List[str]] = None
-    totals_entry = table.get("totals")
-    if isinstance(totals_entry, Mapping):
+# --- START: authoritative payload formatter (cache uses this) ---
+
+def format_leaderboard_payload(stat_key, compute_result, *, variant=None):
+    """
+    Produce a payload that the templates/JS can render directly without further formatting.
+    Shape:
+      {
+        "stat_key": str,
+        "variant": str|None,
+        "columns": [str, ...],         # human labels
+        "column_keys": [str, ...],     # stable keys in same order
+        "rows": [ [str, ...], ... ],   # flat string lists aligned with column_keys
+        "last_built_at": ISO8601Z
+      }
+    """
+    # IMPORTANT: use the same display builder the templates use for live rendering.
+    # The project already has this (e.g., build_leaderboard_table). Find it via search.
+    table = build_leaderboard_table(stat_key, compute_result, variant=variant) \
+        if "build_leaderboard_table" in globals() else build_leaderboard_table(stat_key, compute_result)
+
+    columns = table["columns"]
+    column_keys = table["column_keys"]
+    # table["rows"] should be a list of dicts keyed by column_keys.
+    rows_list = []
+    for r in table["rows"]:
+        row = []
+        for k in column_keys:
+            v = r.get(k)
+            row.append("" if v is None else str(v))
+        rows_list.append(row)
+
+    totals_row = None
+    totals = table.get("totals")
+    if isinstance(totals, Mapping):
+        totals_row = ["" if totals.get(k) is None else str(totals.get(k)) for k in column_keys]
+    elif isinstance(totals, Sequence) and not isinstance(totals, (str, bytes)):
         totals_row = [
-            "" if totals_entry.get(key) is None else str(totals_entry.get(key))
-            for key in column_keys
-        ]
-    elif isinstance(totals_entry, Sequence) and not isinstance(totals_entry, (str, bytes)):
-        totals_row = [
-            "" if idx >= len(totals_entry) or totals_entry[idx] is None else str(totals_entry[idx])
+            "" if idx >= len(totals) or totals[idx] is None else str(totals[idx])
             for idx, _ in enumerate(column_keys)
         ]
 
-    payload: Dict[str, Any] = {
+    payload = {
         "stat_key": stat_key,
-        "columns": column_labels,
+        "variant": variant,
+        "columns": columns,
         "column_keys": column_keys,
-        "rows": formatted_rows,
+        "rows": rows_list,
         "last_built_at": datetime.utcnow().isoformat() + "Z",
     }
     if totals_row is not None:
         payload["totals"] = totals_row
+
     default_sort = table.get("default_sort")
     if default_sort:
         payload["default_sort"] = default_sort
-    if table.get("has_data") is not None:
-        payload["has_data"] = table.get("has_data")
+    has_data = table.get("has_data")
+    if has_data is not None:
+        payload["has_data"] = has_data
 
     return payload
 
+# --- END: authoritative payload formatter ---
 
-def expand_cached_rows_for_template(payload: JsonDict) -> tuple[Sequence[Any], Any]:
-    """Return rows/totals suitable for feeding back into templates."""
 
+def _assert_payload_shape(payload: Dict[str, Any]) -> None:
     rows = payload.get("rows") or []
+    columns = payload.get("columns") or []
     column_keys = payload.get("column_keys") or []
+    assert len(columns) == len(column_keys)
+    if rows:
+        first_row = rows[0]
+        assert isinstance(first_row, list), "rows must be list[list[str]]"
+        assert len(first_row) == len(columns) == len(column_keys)
+        assert all(isinstance(v, str) for v in first_row)
+
+
+def expand_cached_rows_for_template(payload: JsonDict) -> tuple[Sequence[Any], Sequence[str], List[Dict[str, str]], Optional[Dict[str, str]]]:
+    """Return cached columns/rows without reformatting numeric values."""
+
+    columns = payload.get("columns") or []
+    column_keys = list(payload.get("column_keys") or [])
+    rows = payload.get("rows") or []
     totals = payload.get("totals")
 
-    expanded_rows: List[Dict[str, Any]] = []
-    if isinstance(rows, list):
-        for row in rows:
-            if isinstance(row, dict):
-                expanded_rows.append(dict(row))
-                continue
-            if isinstance(row, Sequence) and not isinstance(row, (str, bytes)):
-                entry: Dict[str, Any] = {}
-                for idx, key in enumerate(column_keys):
-                    entry[key] = row[idx] if idx < len(row) else ""
-                expanded_rows.append(entry)
-                continue
+    expanded_rows: List[Dict[str, str]] = []
+    for row in rows:
+        if isinstance(row, Mapping):
+            entry = {}
+            for key in column_keys:
+                value = row.get(key)
+                entry[key] = "" if value is None else str(value)
+            expanded_rows.append(entry)
+        elif isinstance(row, Sequence) and not isinstance(row, (str, bytes)):
+            entry = {
+                key: row[idx] if idx < len(row) else ""
+                for idx, key in enumerate(column_keys)
+            }
+            expanded_rows.append(entry)
+        else:
             if column_keys:
-                expanded_rows.append({column_keys[0]: row})
+                expanded_rows.append({column_keys[0]: "" if row is None else str(row)})
 
-    expanded_totals: Any = None
+    expanded_totals: Optional[Dict[str, str]] = None
     if isinstance(totals, Mapping):
-        expanded_totals = dict(totals)
+        expanded_totals = {
+            key: "" if totals.get(key) is None else str(totals.get(key))
+            for key in column_keys
+        }
     elif isinstance(totals, Sequence) and not isinstance(totals, (str, bytes)):
         expanded_totals = {
             key: totals[idx] if idx < len(totals) else ""
             for idx, key in enumerate(column_keys)
         }
 
-    return expanded_rows, expanded_totals
+    return columns, column_keys, expanded_rows, expanded_totals
 
 
 def _import_compute_leaderboard():
@@ -202,7 +241,51 @@ def _json_default(value: Any) -> Any:
     return value
 
 
-def cache_get_leaderboard(season_id: Optional[int], stat_key: str) -> Optional[JsonDict]:
+def schedule_refresh(stat_key: str, season_id: Optional[int], variant: Optional[str] = None) -> None:
+    """Queue a background rebuild job for the specified leaderboard."""
+
+    try:
+        from app import scheduler
+    except Exception:  # pragma: no cover - defensive import guard
+        scheduler = None
+
+    if not getattr(scheduler, "add_job", None):
+        return
+
+    job_id = f"lb-rebuild-{season_id}-{stat_key}-{variant or 'base'}"
+    try:
+        scheduler.add_job(
+            func=cache_build_one,
+            args=[stat_key, season_id],
+            kwargs={"variant": variant, "force": True},
+            id=job_id,
+            replace_existing=True,
+            next_run_time=datetime.utcnow(),
+        )
+    except Exception:  # pragma: no cover - scheduler errors should not break requests
+        if current_app:
+            current_app.logger.exception("Failed to schedule leaderboard refresh")
+
+
+def maybe_schedule_refresh(
+    stat_key: str,
+    season_id: Optional[int],
+    variant: Optional[str],
+    last_built_at_iso: Optional[str],
+    staleness_min: int = 10,
+) -> None:
+    try:
+        if not last_built_at_iso:
+            schedule_refresh(stat_key, season_id, variant)
+            return
+        ts = datetime.fromisoformat(last_built_at_iso.replace("Z", ""))
+        if datetime.utcnow() - ts > timedelta(minutes=staleness_min):
+            schedule_refresh(stat_key, season_id, variant)
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+
+def cache_get_leaderboard(season_id: Optional[int], stat_key: str, *, variant: Optional[str] = None) -> Optional[JsonDict]:
     row = CachedLeaderboard.query.filter_by(season_id=season_id, stat_key=stat_key).first()
     if not row:
         return None
@@ -215,7 +298,13 @@ def cache_get_leaderboard(season_id: Optional[int], stat_key: str) -> Optional[J
         return None
 
 
-def cache_set_leaderboard(season_id: Optional[int], stat_key: str, payload_dict: JsonDict) -> None:
+def cache_set_leaderboard(
+    season_id: Optional[int],
+    stat_key: str,
+    payload_dict: JsonDict,
+    *,
+    variant: Optional[str] = None,
+) -> None:
     payload_str = json.dumps(
         payload_dict,
         separators=(",", ":"),
@@ -242,24 +331,47 @@ def cache_set_leaderboard(season_id: Optional[int], stat_key: str, payload_dict:
 def cache_build_one(
     stat_key: str,
     season_id: Optional[int],
-    compute_fn: Callable[[str, Optional[int]], JsonDict],
+    compute_fn: Optional[Callable[[str, Optional[int]], JsonDict]] = None,
+    *,
+    variant: Optional[str] = None,
+    force: bool = False,
 ) -> JsonDict:
-    compute_result = compute_fn(stat_key, season_id)
-    payload = format_leaderboard_payload(stat_key, compute_result)
-    payload["season_id"] = season_id
+    compute = compute_fn or _import_compute_leaderboard()
+    kwargs: Dict[str, Any] = {}
+    if variant is not None:
+        kwargs["variant"] = variant
+    try:
+        compute_result = compute(stat_key, season_id, **kwargs)
+    except TypeError:
+        compute_result = compute(stat_key, season_id)
 
-    cache_set_leaderboard(season_id, stat_key, payload)
+    payload = format_leaderboard_payload(stat_key, compute_result, variant=variant)
+    payload["season_id"] = season_id
+    _assert_payload_shape(payload)
+
+    cache_set_leaderboard(season_id, stat_key, payload, variant=variant)
     return payload
 
 
 def cache_build_all(
     season_id: Optional[int],
-    compute_fn: Callable[[str, Optional[int]], JsonDict],
-    stat_keys,
+    compute_fn: Optional[Callable[[str, Optional[int]], JsonDict]] = None,
+    stat_keys: Optional[Sequence[str]] = None,
+    *,
+    variant: Optional[str] = None,
+    force: bool = False,
 ) -> Dict[str, JsonDict]:
     results: Dict[str, JsonDict] = {}
-    for sk in stat_keys:
-        results[sk] = cache_build_one(sk, season_id, compute_fn)
+    keys = stat_keys or LEADERBOARD_STAT_KEYS
+    compute = compute_fn or _import_compute_leaderboard()
+    for sk in keys:
+        results[sk] = cache_build_one(
+            sk,
+            season_id,
+            compute,
+            variant=variant,
+            force=force,
+        )
     return results
 
 
@@ -278,8 +390,7 @@ def rebuild_leaderboards_for_season(
         return
 
     compute = compute_fn or _import_compute_leaderboard()
-    for sk in stat_keys:
-        cache_build_one(sk, season_id, compute)
+    cache_build_all(season_id, compute, stat_keys, force=True)
 
 
 def rebuild_leaderboards_after_parse(
