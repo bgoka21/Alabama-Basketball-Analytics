@@ -1173,7 +1173,14 @@ def parse_csv(file_path, game_id, season_id):
 
     #print("✅ Player Stats Successfully Inserted!")
     calculate_derived_metrics(player_stats_dict)
-    
+
+    with app_instance.app_context():
+        from constants import LEADERBOARD_STAT_KEYS
+        from services.cache_leaderboard import cache_build_all
+        from admin.routes import build_leaderboard_cache_payload
+
+        cache_build_all(season_id, build_leaderboard_cache_payload, LEADERBOARD_STAT_KEYS)
+
     # --- Calculate Possession Type Breakdowns using the new detailed function ---
     # --- Calculate Possession Type & Split Breakdowns ---
     offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \

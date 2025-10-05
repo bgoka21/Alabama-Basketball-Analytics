@@ -96,6 +96,12 @@ from admin._leaderboard_helpers import (
     build_pnr_gap_help_context,
     with_last_practice,
 )
+from constants import LEADERBOARD_STAT_KEYS
+from services.cache_leaderboard import (
+    cache_build_all,
+    cache_build_one,
+    cache_get_leaderboard,
+)
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
@@ -1168,6 +1174,15 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     all_players = set(core_rows) | set(shot_details)
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
     return cfg, leaderboard, team_totals
+
+
+def build_leaderboard_cache_payload(stat_key, season_id):
+    cfg, rows, team_totals = compute_leaderboard(stat_key, season_id)
+    return {
+        "config": cfg,
+        "rows": rows,
+        "team_totals": team_totals,
+    }
 
 
 _PRACTICE_DUAL_MAP = {
@@ -7750,7 +7765,24 @@ def leaderboard():
     selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    cfg, rows, team_totals = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
+    cache_payload = None
+    if sid and not (start_dt or end_dt or label_set):
+        cache_payload = cache_get_leaderboard(sid, stat_key)
+        if not cache_payload:
+            cache_payload = cache_build_one(stat_key, sid, build_leaderboard_cache_payload)
+
+    if cache_payload:
+        cfg = cache_payload.get("config")
+        rows = cache_payload.get("rows", [])
+        team_totals = cache_payload.get("team_totals")
+    else:
+        cfg, rows, team_totals = compute_leaderboard(
+            stat_key,
+            sid,
+            start_dt,
+            end_dt,
+            label_set if label_set else None,
+        )
     practice_dual_ctx = (
         get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
         if cfg
@@ -7817,6 +7849,7 @@ def leaderboard():
         selected=cfg,
         rows=rows,
         team_totals=team_totals,
+        season_id=sid,
         start_date=start_date or '',
         end_date=end_date or '',
         label_options=label_options,
@@ -7827,6 +7860,34 @@ def leaderboard():
         practice_links=filtered_practice_links,
         **split_context,
     )
+
+
+@admin_bp.route('/api/leaderboards/<int:season_id>', methods=['GET'])
+@login_required
+def api_leaderboards_all(season_id):
+    out = {}
+    for stat_key in LEADERBOARD_STAT_KEYS:
+        cached = cache_get_leaderboard(season_id, stat_key)
+        if not cached:
+            cached = cache_build_one(stat_key, season_id, build_leaderboard_cache_payload)
+        out[stat_key] = cached
+    return jsonify({"season_id": season_id, "leaderboards": out})
+
+
+@admin_bp.route('/api/leaderboard/<int:season_id>/<stat_key>', methods=['GET'])
+@login_required
+def api_leaderboard_one(season_id, stat_key):
+    cached = cache_get_leaderboard(season_id, stat_key)
+    if not cached:
+        cached = cache_build_one(stat_key, season_id, build_leaderboard_cache_payload)
+    return jsonify(cached)
+
+
+@admin_bp.route('/admin/rebuild_leaderboards/<int:season_id>', methods=['POST'])
+@admin_required
+def admin_rebuild_leaderboards(season_id):
+    cache_build_all(season_id, build_leaderboard_cache_payload, LEADERBOARD_STAT_KEYS)
+    return jsonify({"status": "ok", "season_id": season_id})
 
 
 @admin_bp.route('/usage')

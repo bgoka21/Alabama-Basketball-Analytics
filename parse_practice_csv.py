@@ -1144,6 +1144,12 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         )
     db.session.commit()
 
+    from constants import LEADERBOARD_STAT_KEYS
+    from services.cache_leaderboard import cache_build_all
+    from admin.routes import build_leaderboard_cache_payload
+
+    cache_build_all(season_id, build_leaderboard_cache_payload, LEADERBOARD_STAT_KEYS)
+
     # ─── Compute lineup and on/off metrics ───────────────────────────
     lineup_efficiencies = compute_lineup_efficiencies(
         possession_data,
