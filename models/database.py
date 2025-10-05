@@ -7,6 +7,26 @@ from sqlalchemy.sql import func
 db = SQLAlchemy()
 
 
+class CachedLeaderboard(db.Model):
+    __tablename__ = 'cached_leaderboards'
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, index=True, nullable=True)
+    stat_key = db.Column(db.String(128), index=True, nullable=False)
+    payload_json = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('season_id', 'stat_key', name='uq_cached_leaderboards_season_stat'),
+    )
+
+
+
 class Season(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     season_name = db.Column(db.String(20), unique=True, nullable=False)

@@ -357,3 +357,102 @@
     <p class="text-sm text-gray-600">Select a leaderboard to view details.</p>
   {% endif %}
 {% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const seasonId = {{ season_id|tojson }};
+  if (!seasonId) {
+    return;
+  }
+
+  const statSelect = document.getElementById('stat-select');
+  if (!statSelect) {
+    return;
+  }
+
+  const table = document.getElementById('leaderboard-table');
+  const tableBody = table ? table.querySelector('tbody') : null;
+  const columnCount = table ? table.querySelectorAll('thead th').length : 0;
+
+  if (!table || !tableBody) {
+    return;
+  }
+
+  // Disable the inline submit handler once JS takes over.
+  statSelect.onchange = null;
+
+  const allEndpoint = {{ url_for('admin.api_leaderboards_all', season_id=season_id)|tojson if season_id is not none else none|tojson }};
+  if (!allEndpoint) {
+    return;
+  }
+
+  try {
+    const res = await fetch(allEndpoint);
+    if (!res.ok) {
+      throw new Error('Failed to load cached leaderboards');
+    }
+    const data = await res.json();
+    window.LEADERBOARDS = data.leaderboards || {};
+  } catch (err) {
+    console.error(err);
+    return;
+  }
+
+  function normaliseRow(row) {
+    if (Array.isArray(row)) {
+      return row;
+    }
+    if (row && typeof row === 'object') {
+      if (Array.isArray(row.values)) {
+        return row.values;
+      }
+      return Object.values(row);
+    }
+    return [row];
+  }
+
+  function renderRows(payload) {
+    if (!tableBody || !payload || !Array.isArray(payload.rows)) {
+      return false;
+    }
+
+    tableBody.innerHTML = '';
+    payload.rows.forEach((row) => {
+      const values = normaliseRow(row);
+      const cells = columnCount ? values.slice(0, columnCount) : values;
+      while (columnCount && cells.length < columnCount) {
+        cells.push('');
+      }
+      const tr = document.createElement('tr');
+      cells.forEach((value) => {
+        const td = document.createElement('td');
+        td.textContent = value == null ? '' : value;
+        tr.appendChild(td);
+      });
+      tableBody.appendChild(tr);
+    });
+    return true;
+  }
+
+  function updateFromStat(statKey) {
+    if (!window.LEADERBOARDS) {
+      return false;
+    }
+    const payload = window.LEADERBOARDS[statKey];
+    if (!payload) {
+      return false;
+    }
+    return renderRows(payload);
+  }
+
+  // Render initial selection from cache if possible.
+  updateFromStat(statSelect.value);
+
+  statSelect.addEventListener('change', (event) => {
+    const success = updateFromStat(event.target.value);
+    if (!success) {
+      event.target.form?.submit();
+    }
+  });
+});
+</script>

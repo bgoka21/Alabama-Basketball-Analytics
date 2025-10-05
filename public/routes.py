@@ -19,6 +19,7 @@ from admin.routes import (
     _split_leaderboard_rows_for_template,
     get_practice_dual_context,
 )
+from services.cache_leaderboard import cache_build_one, cache_get_leaderboard
 from models.database import (
     db,
     BlueCollarStats,
@@ -928,7 +929,30 @@ def season_leaderboard():
     selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    cfg, rows, team_totals = compute_leaderboard(stat_key, sid, label_set=label_set if label_set else None)
+    cache_payload = None
+    if sid and not label_set:
+        cache_payload = cache_get_leaderboard(sid, stat_key)
+        if not cache_payload:
+            def _compute_payload(sk, season):
+                cfg_local, rows_local, team_totals_local = compute_leaderboard(sk, season)
+                return {
+                    "config": cfg_local,
+                    "rows": rows_local,
+                    "team_totals": team_totals_local,
+                }
+
+            cache_payload = cache_build_one(stat_key, sid, _compute_payload)
+
+    if cache_payload:
+        cfg = cache_payload.get("config")
+        rows = cache_payload.get("rows", [])
+        team_totals = cache_payload.get("team_totals")
+    else:
+        cfg, rows, team_totals = compute_leaderboard(
+            stat_key,
+            sid,
+            label_set=label_set if label_set else None,
+        )
     practice_dual_ctx = (
         get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
         if cfg
@@ -961,6 +985,7 @@ def season_leaderboard():
         team_totals=team_totals,
         label_options=label_options,
         selected_labels=selected_labels,
+        season_id=sid,
         **split_context,
     )
 
