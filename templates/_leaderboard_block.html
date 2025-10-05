@@ -336,22 +336,20 @@
   </div>
 
 {% else %}
-  {% set table = build_leaderboard_table(
-    config=selected,
-    rows=rows,
-    team_totals=team_totals,
-    table_id='leaderboard-' ~ selected.key if selected else None
-  ) %}
-  {% if table.has_data %}
+  {% set table_columns = columns or [] %}
+  {% set table_rows = rows or [] %}
+  {% set table_totals = team_totals %}
+  {% set default_sort = table_default_sort if table_default_sort is defined else none %}
+  {% if table_has_data %}
     {{ render_table(
-      id=table.id or 'leaderboard-table',
-      columns=table.columns,
-      rows=table.rows,
-      totals=table.totals,
+      id='leaderboard-table',
+      columns=table_columns,
+      rows=table_rows,
+      totals=table_totals,
       dense=True,
       sticky_header=True,
       caption=selected.label if selected else 'Leaderboard',
-      default_sort=table.default_sort
+      default_sort=default_sort
     ) }}
   {% else %}
     <p class="text-sm text-gray-600">Select a leaderboard to view details.</p>
@@ -378,6 +376,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  const initialPayload = {{ table_payload|tojson }};
+  if (initialPayload && statSelect.value) {
+    window.LEADERBOARDS = window.LEADERBOARDS || {};
+    window.LEADERBOARDS[statSelect.value] = initialPayload;
+  }
+
   // Disable the inline submit handler once JS takes over.
   statSelect.onchange = null;
 
@@ -392,7 +396,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       throw new Error('Failed to load cached leaderboards');
     }
     const data = await res.json();
-    window.LEADERBOARDS = data.leaderboards || {};
+    window.LEADERBOARDS = window.LEADERBOARDS || {};
+    Object.assign(window.LEADERBOARDS, data.leaderboards || {});
   } catch (err) {
     console.error(err);
     return;
@@ -440,6 +445,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const payload = window.LEADERBOARDS[statKey];
     if (!payload) {
+      return false;
+    }
+    if (Array.isArray(payload.column_keys) && columnCount && payload.column_keys.length !== columnCount) {
       return false;
     }
     return renderRows(payload);

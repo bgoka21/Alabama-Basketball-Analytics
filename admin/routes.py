@@ -1,8 +1,9 @@
+import hashlib
 import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -102,7 +103,10 @@ from services.cache_leaderboard import (
     cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,
+    format_leaderboard_payload,
+    maybe_schedule_refresh,
     rebuild_leaderboards_after_parse,
+    schedule_refresh,
 )
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
@@ -7773,24 +7777,35 @@ def leaderboard():
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cache_payload = None
+    table_payload: Optional[dict[str, Any]] = None
     if sid and not (start_dt or end_dt or label_set):
         cache_payload = cache_get_leaderboard(sid, stat_key)
         if not cache_payload:
             cache_payload = cache_build_one(stat_key, sid, build_leaderboard_cache_payload)
+        table_payload = cache_payload
 
-    if cache_payload:
-        cfg = next((c for c in LEADERBOARD_STATS if c["key"] == stat_key), None)
-        if cfg is None:
-            cfg = {"key": stat_key, "label": stat_key.replace("_", " ").title()}
-        rows, team_totals = expand_cached_rows_for_template(cache_payload)
-    else:
-        cfg, rows, team_totals = compute_leaderboard(
+    if table_payload is None:
+        cfg, computed_rows, computed_totals = compute_leaderboard(
             stat_key,
             sid,
             start_dt,
             end_dt,
             label_set if label_set else None,
         )
+        compute_result = {
+            "config": cfg,
+            "rows": computed_rows,
+            "team_totals": computed_totals,
+        }
+        table_payload = format_leaderboard_payload(stat_key, compute_result)
+    else:
+        cfg = next((c for c in LEADERBOARD_STATS if c["key"] == stat_key), None)
+        if cfg is None:
+            cfg = {"key": stat_key, "label": stat_key.replace("_", " ").title()}
+
+    columns, column_keys, rows, team_totals = expand_cached_rows_for_template(table_payload)
+    default_sort = table_payload.get("default_sort")
+    has_data = table_payload.get("has_data", bool(rows) or bool(team_totals))
     practice_dual_ctx = (
         get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
         if cfg
@@ -7855,8 +7870,13 @@ def leaderboard():
         selected_season=sid,
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
+        columns=columns,
+        column_keys=column_keys,
         rows=rows,
         team_totals=team_totals,
+        table_payload=table_payload,
+        table_default_sort=default_sort,
+        table_has_data=has_data,
         season_id=sid,
         start_date=start_date or '',
         end_date=end_date or '',
@@ -7873,22 +7893,44 @@ def leaderboard():
 @admin_bp.route('/api/leaderboards/<int:season_id>', methods=['GET'])
 @login_required
 def api_leaderboards_all(season_id):
-    out = {}
+    payloads: dict[str, Any] = {}
+    warming: list[str] = []
     for stat_key in LEADERBOARD_STAT_KEYS:
         cached = cache_get_leaderboard(season_id, stat_key)
-        if not cached:
-            cached = cache_build_one(stat_key, season_id, build_leaderboard_cache_payload)
-        out[stat_key] = cached
-    return jsonify({"season_id": season_id, "leaderboards": out})
+        if cached:
+            payloads[stat_key] = cached
+            maybe_schedule_refresh(stat_key, season_id, cached.get("variant"), cached.get("last_built_at"))
+        else:
+            warming.append(stat_key)
+            schedule_refresh(stat_key, season_id)
+
+    response_body: dict[str, Any] = {"season_id": season_id, "leaderboards": payloads}
+    if warming:
+        response_body["warming"] = warming
+
+    status_code = 200 if not warming else 202
+    resp = make_response(jsonify(response_body), status_code)
+    if payloads:
+        etag_source = json.dumps(payloads, sort_keys=True, default=str)
+        resp.set_etag(hashlib.md5(etag_source.encode()).hexdigest())
+    resp.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
+    return resp
 
 
 @admin_bp.route('/api/leaderboard/<int:season_id>/<stat_key>', methods=['GET'])
 @login_required
 def api_leaderboard_one(season_id, stat_key):
     cached = cache_get_leaderboard(season_id, stat_key)
-    if not cached:
-        cached = cache_build_one(stat_key, season_id, build_leaderboard_cache_payload)
-    return jsonify(cached)
+    if cached:
+        maybe_schedule_refresh(stat_key, season_id, cached.get("variant"), cached.get("last_built_at"))
+        resp = make_response(jsonify(cached), 200)
+        etag_source = json.dumps(cached, sort_keys=True, default=str)
+        resp.set_etag(hashlib.md5(etag_source.encode()).hexdigest())
+    else:
+        schedule_refresh(stat_key, season_id)
+        resp = make_response(jsonify({"status": "warming", "stat_key": stat_key}), 202)
+    resp.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
+    return resp
 
 
 @admin_bp.route('/admin/rebuild_leaderboards/<int:season_id>', methods=['POST'])

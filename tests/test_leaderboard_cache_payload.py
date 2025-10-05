@@ -19,12 +19,16 @@ def test_format_payload_points_rows_are_strings():
 
     payload = format_leaderboard_payload("points", compute_result)
 
-    assert payload["columns"] == ["#", "Player", "Points"]
+    labels = [col["label"] for col in payload["columns"]]
+    assert labels == ["#", "Player", "Points"]
     assert len(payload["rows"]) == 2
     first_row = payload["rows"][0]
     assert len(first_row) == len(payload["columns"])
     assert all(isinstance(value, str) for value in first_row)
-    assert payload["totals"] == ["", "Team Totals", "1540"]
+    totals = payload["totals"]
+    assert isinstance(totals, list)
+    assert len(totals) == len(payload["columns"])
+    assert totals[-1] == "1540"
     assert payload["last_built_at"].endswith("Z")
 
 
@@ -61,8 +65,9 @@ def test_format_payload_offense_summary_multi_columns():
 
     payload = format_leaderboard_payload("offense_summary", compute_result)
 
-    assert "PPP On" in payload["columns"]
-    assert "Team TO Rate" in payload["columns"]
+    labels = [col["label"] for col in payload["columns"]]
+    assert "PPP On" in labels
+    assert "Team TO Rate" in labels
     first_row = payload["rows"][0]
     assert len(first_row) == len(payload["columns"])
     assert all(isinstance(value, str) for value in first_row)
@@ -102,8 +107,9 @@ def test_format_payload_fg3_pct_includes_subcolumns():
 
     payload = format_leaderboard_payload("fg3_fg_pct", compute_result)
 
-    assert "Shrink 3FG %" in payload["columns"]
-    assert "Non-Shrink 3FG %" in payload["columns"]
+    labels = [col["label"] for col in payload["columns"]]
+    assert "Shrink 3FG %" in labels
+    assert "Non-Shrink 3FG %" in labels
     first_row = payload["rows"][0]
     assert len(first_row) == len(payload["columns"])
     assert all(isinstance(value, str) for value in first_row)
