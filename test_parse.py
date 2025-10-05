@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover
     np = _DummyNP()
 import sqlite3
 from utils.lineup import compute_lineup_efficiencies
-from utils.shottype import persist_player_shot_details
+# from utils.shottype import persist_player_shot_details
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
 
 #print("🔥 parse_csv() function has started executing!")
