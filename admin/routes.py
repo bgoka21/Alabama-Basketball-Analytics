@@ -101,6 +101,7 @@ from services.cache_leaderboard import (
     cache_build_all,
     cache_build_one,
     cache_get_leaderboard,
+    expand_cached_rows_for_template,
 )
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
@@ -7773,8 +7774,7 @@ def leaderboard():
 
     if cache_payload:
         cfg = cache_payload.get("config")
-        rows = cache_payload.get("rows", [])
-        team_totals = cache_payload.get("team_totals")
+        rows, team_totals = expand_cached_rows_for_template(cache_payload)
     else:
         cfg, rows, team_totals = compute_leaderboard(
             stat_key,
