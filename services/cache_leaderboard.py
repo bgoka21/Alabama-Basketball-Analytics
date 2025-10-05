@@ -1,56 +1,143 @@
 import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from flask import current_app
 
-from models.database import db, CachedLeaderboard, Season
+from constants import LEADERBOARD_STAT_KEYS, LEADERBOARD_STATS
+from models.database import CachedLeaderboard, Season, db
+
 from admin._leaderboard_helpers import build_leaderboard_table
 
 JsonDict = Dict[str, Any]
 
-# --- BEGIN PATCH: robust normalizer + compute import helper ---
-def _format_for_display(
-    cfg: Optional[Dict[str, Any]],
-    raw_rows: Optional[Sequence[Any]],
-    raw_totals: Optional[Any],
-) -> Dict[str, Any]:
-    """Return cache payload with pre-formatted leaderboard rows."""
+def _lookup_stat_config(stat_key: str) -> Dict[str, Any]:
+    """Return a mutable copy of the stat config for ``stat_key``."""
 
-    table = build_leaderboard_table(
-        config=cfg,
-        rows=raw_rows,
-        team_totals=raw_totals,
-    )
+    for cfg in LEADERBOARD_STATS:
+        if cfg.get("key") == stat_key:
+            return dict(cfg)
+    # Fallback: minimal config so ``build_leaderboard_table`` still works.
+    return {"key": stat_key, "label": stat_key.replace("_", " ").title()}
 
-    columns = table.get("columns") or []
-    key_label_pairs = [
-        (col.get("key"), col.get("label"))
-        for col in columns
-        if col.get("key")
-    ]
-    column_keys = [pair[0] for pair in key_label_pairs]
-    column_labels = [pair[1] for pair in key_label_pairs]
 
-    display_rows = []
+def _extract_compute_components(
+    stat_key: str, compute_result: Any
+) -> Tuple[Dict[str, Any], Sequence[Any], Optional[Any]]:
+    """Normalise ``compute_result`` into ``(config, rows, totals)``."""
+
+    def _is_row_sequence(value: Any) -> bool:
+        return isinstance(value, Sequence) and not isinstance(value, (str, bytes, dict))
+
+    config: Optional[Dict[str, Any]] = None
+    rows: Sequence[Any] = []
+    totals: Optional[Any] = None
+
+    if compute_result is None:
+        return _lookup_stat_config(stat_key), rows, totals
+
+    if isinstance(compute_result, dict):
+        cfg = compute_result.get("config")
+        if isinstance(cfg, dict):
+            config = dict(cfg)
+        rows = compute_result.get("rows") or []
+        totals = compute_result.get("team_totals") or compute_result.get("totals")
+        return (config or _lookup_stat_config(stat_key), rows, totals)
+
+    if isinstance(compute_result, (list, tuple)):
+        values = list(compute_result)
+
+        # Identify config from any dict entry with a ``key`` attribute first.
+        for item in values:
+            if isinstance(item, dict) and item.get("key"):
+                config = dict(item)
+                break
+        if config is None:
+            for item in values:
+                if isinstance(item, dict):
+                    config = dict(item)
+                    break
+
+        for item in values:
+            if _is_row_sequence(item):
+                rows = item
+                break
+
+        # Totals is whichever remaining entry is not the config or rows.
+        for item in values:
+            if item is config or item is rows:
+                continue
+            if _is_row_sequence(item) and item is rows:
+                continue
+            if isinstance(item, dict) and config is not None and item.get("key") == config.get("key"):
+                continue
+            totals = item
+            break
+
+        return (config or _lookup_stat_config(stat_key), rows or [], totals)
+
+    if _is_row_sequence(compute_result):
+        rows = compute_result
+    else:
+        rows = [compute_result]
+
+    return _lookup_stat_config(stat_key), rows, totals
+
+
+def format_leaderboard_payload(stat_key: str, compute_result: Any) -> Dict[str, Any]:
+    """Return a cache payload containing display-ready leaderboard rows."""
+
+    config, rows, totals = _extract_compute_components(stat_key, compute_result)
+
+    table = build_leaderboard_table(config=config, rows=rows, team_totals=totals)
+
+    column_entries = table.get("columns") or []
+    column_keys: List[str] = []
+    column_labels: List[str] = []
+    for column in column_entries:
+        key = column.get("key")
+        if not key:
+            continue
+        column_keys.append(str(key))
+        column_labels.append(str(column.get("label", "")))
+
+    formatted_rows: List[List[str]] = []
     for row in table.get("rows") or []:
-        display_rows.append([row.get(key, "") for key in column_keys])
+        formatted_rows.append(
+            [
+                "" if row.get(key) is None else str(row.get(key))
+                for key in column_keys
+            ]
+        )
 
-    display_totals = None
+    totals_row: Optional[List[str]] = None
     totals_entry = table.get("totals")
-    if totals_entry:
-        display_totals = [totals_entry.get(key, "") for key in column_keys]
+    if isinstance(totals_entry, Mapping):
+        totals_row = [
+            "" if totals_entry.get(key) is None else str(totals_entry.get(key))
+            for key in column_keys
+        ]
+    elif isinstance(totals_entry, Sequence) and not isinstance(totals_entry, (str, bytes)):
+        totals_row = [
+            "" if idx >= len(totals_entry) or totals_entry[idx] is None else str(totals_entry[idx])
+            for idx, _ in enumerate(column_keys)
+        ]
 
     payload: Dict[str, Any] = {
-        "config": cfg,
+        "stat_key": stat_key,
         "columns": column_labels,
         "column_keys": column_keys,
-        "rows": display_rows,
-        "team_totals": display_totals,
-        "default_sort": table.get("default_sort"),
-        "has_data": table.get("has_data"),
+        "rows": formatted_rows,
+        "last_built_at": datetime.utcnow().isoformat() + "Z",
     }
+    if totals_row is not None:
+        payload["totals"] = totals_row
+    default_sort = table.get("default_sort")
+    if default_sort:
+        payload["default_sort"] = default_sort
+    if table.get("has_data") is not None:
+        payload["has_data"] = table.get("has_data")
 
     return payload
 
@@ -58,33 +145,33 @@ def _format_for_display(
 def expand_cached_rows_for_template(payload: JsonDict) -> tuple[Sequence[Any], Any]:
     """Return rows/totals suitable for feeding back into templates."""
 
-    rows = payload.get("rows")
-    totals = payload.get("team_totals")
-    column_keys = payload.get("column_keys")
-
-    if not isinstance(column_keys, list) or not isinstance(rows, list):
-        return rows or [], totals
+    rows = payload.get("rows") or []
+    column_keys = payload.get("column_keys") or []
+    totals = payload.get("totals")
 
     expanded_rows: List[Dict[str, Any]] = []
-    for row in rows:
-        if isinstance(row, dict):
-            expanded_rows.append(dict(row))
-            continue
-        if isinstance(row, list):
-            entry: Dict[str, Any] = {}
-            for idx, key in enumerate(column_keys):
-                entry[key] = row[idx] if idx < len(row) else ""
-            expanded_rows.append(entry)
-            continue
-        if column_keys:
-            expanded_rows.append({column_keys[0]: row})
+    if isinstance(rows, list):
+        for row in rows:
+            if isinstance(row, dict):
+                expanded_rows.append(dict(row))
+                continue
+            if isinstance(row, Sequence) and not isinstance(row, (str, bytes)):
+                entry: Dict[str, Any] = {}
+                for idx, key in enumerate(column_keys):
+                    entry[key] = row[idx] if idx < len(row) else ""
+                expanded_rows.append(entry)
+                continue
+            if column_keys:
+                expanded_rows.append({column_keys[0]: row})
 
-    expanded_totals: Any = totals
-    if isinstance(totals, list):
-        totals_entry: Dict[str, Any] = {}
-        for idx, key in enumerate(column_keys):
-            totals_entry[key] = totals[idx] if idx < len(totals) else ""
-        expanded_totals = totals_entry
+    expanded_totals: Any = None
+    if isinstance(totals, Mapping):
+        expanded_totals = dict(totals)
+    elif isinstance(totals, Sequence) and not isinstance(totals, (str, bytes)):
+        expanded_totals = {
+            key: totals[idx] if idx < len(totals) else ""
+            for idx, key in enumerate(column_keys)
+        }
 
     return expanded_rows, expanded_totals
 
@@ -157,32 +244,9 @@ def cache_build_one(
     season_id: Optional[int],
     compute_fn: Callable[[str, Optional[int]], JsonDict],
 ) -> JsonDict:
-    raw = compute_fn(stat_key, season_id)
-
-    cfg: Optional[Dict[str, Any]] = None
-    raw_rows: Sequence[Any] = []
-    raw_totals: Any = None
-
-    if raw is None:
-        raw_rows = []
-    elif isinstance(raw, dict):
-        cfg = raw.get("config")
-        raw_rows = raw.get("rows") or []
-        raw_totals = raw.get("team_totals")
-    elif isinstance(raw, (list, tuple)):
-        if len(raw) == 3:
-            cfg, raw_rows, raw_totals = raw  # type: ignore[assignment]
-        elif len(raw) == 2:
-            cfg, raw_rows = raw  # type: ignore[assignment]
-        else:
-            raw_rows = list(raw)
-    else:
-        raw_rows = [raw]
-
-    payload = _format_for_display(cfg, raw_rows, raw_totals)
-    payload["stat_key"] = stat_key
+    compute_result = compute_fn(stat_key, season_id)
+    payload = format_leaderboard_payload(stat_key, compute_result)
     payload["season_id"] = season_id
-    payload["updated_at"] = datetime.utcnow().isoformat()
 
     cache_set_leaderboard(season_id, stat_key, payload)
     return payload
@@ -202,41 +266,52 @@ def cache_build_all(
 # --- BEGIN PATCH: rebuild helpers ---
 
 
-def rebuild_leaderboards_for_season(season_id, stat_keys, compute_fn=None):
-    """
-    Rebuild cache for all stat_keys for a given season_id.
-    """
+def rebuild_leaderboards_for_season(
+    season_id: Optional[int],
+    stat_keys: Sequence[str] = LEADERBOARD_STAT_KEYS,
+    *,
+    compute_fn: Optional[Callable[[str, Optional[int]], JsonDict]] = None,
+) -> None:
+    """Rebuild cached leaderboards for ``season_id``."""
+
+    if season_id is None:
+        return
+
     compute = compute_fn or _import_compute_leaderboard()
     for sk in stat_keys:
         cache_build_one(sk, season_id, compute)
 
 
-def rebuild_leaderboards_after_parse():
-    """
-    Safe to call at the end of parsing. Never raises.
-    Picks current season if available, else the first season.
-    """
-    from constants import LEADERBOARD_STAT_KEYS
+def rebuild_leaderboards_after_parse(
+    season_id: Optional[int],
+    *,
+    stat_keys: Sequence[str] = LEADERBOARD_STAT_KEYS,
+) -> None:
+    """Rebuild caches after a successful parse without raising to the caller."""
+
+    logger = getattr(current_app, "logger", None)
 
     try:
-        # prefer current season if field exists
-        s = None
-        try:
-            s = Season.query.filter_by(is_current=True).first()
-        except Exception:
-            s = None
-        if not s:
-            s = Season.query.first()
-        if not s:
-            print("[cache] No seasons found; skipping cache rebuild.")
-            return
-        season_id = s.id
-        print(f"[cache] Rebuilding cached leaderboards for season {season_id}...")
-        rebuild_leaderboards_for_season(season_id, LEADERBOARD_STAT_KEYS)
-        print("[cache] Rebuild complete.")
-    except Exception as e:
-        # absolutely never break parsing
-        print(f"[cache] Rebuild failed (non-fatal): {e}")
+        resolved_id = season_id
+        if resolved_id is None:
+            try:
+                season = Season.query.filter_by(is_current=True).first()
+            except Exception:  # pragma: no cover - defensive
+                season = None
+            if not season:
+                season = Season.query.order_by(Season.start_date.desc()).first()
+            if not season:
+                if logger:
+                    logger.warning("Skipped leaderboard cache rebuild: no seasons available.")
+                return
+            resolved_id = season.id
+
+        rebuild_leaderboards_for_season(resolved_id, stat_keys)
+        if logger:
+            logger.info("Rebuilt leaderboard cache for season %s", resolved_id)
+    except Exception as exc:  # pragma: no cover - defensive
+        if logger:
+            logger.exception("Cache rebuild failed after parse: %s", exc)
 
 
 # --- END PATCH ---
