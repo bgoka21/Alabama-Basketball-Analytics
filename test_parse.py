@@ -1169,6 +1169,15 @@ def parse_csv(file_path, game_id, season_id):
 
         db.session.commit()
 
+        # --- BEGIN PATCH: auto rebuild cache after parse ---
+        try:
+            from services.cache_leaderboard import rebuild_leaderboards_after_parse
+
+            rebuild_leaderboards_after_parse()
+        except Exception as _e:
+            print(f"[cache] post-parse rebuild skipped (non-fatal): {_e}")
+        # --- END PATCH ---
+
     conn.close()
 
     #print("✅ Player Stats Successfully Inserted!")

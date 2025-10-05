@@ -1144,6 +1144,15 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         )
     db.session.commit()
 
+    # --- BEGIN PATCH: auto rebuild cache after practice parse ---
+    try:
+        from services.cache_leaderboard import rebuild_leaderboards_after_parse
+
+        rebuild_leaderboards_after_parse()
+    except Exception as _e:
+        print(f"[cache] post-practice rebuild skipped (non-fatal): {_e}")
+    # --- END PATCH ---
+
     from constants import LEADERBOARD_STAT_KEYS
     from services.cache_leaderboard import cache_build_all
     from admin.routes import build_leaderboard_cache_payload
