@@ -4152,11 +4152,13 @@ def delete_file(file_id):
 
 
 @admin_bp.route('/delete-data/<int:file_id>', methods=['POST'])
+@login_required
 @admin_required
 def delete_data(file_id):
     """Delete parsed data associated with an uploaded file."""
     uploaded_file = UploadedFile.query.get_or_404(file_id)
     filename = uploaded_file.filename
+    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
 
     # Determine if this was a practice, recruit, or a game
     category = normalize_category(uploaded_file.category)
@@ -4170,45 +4172,62 @@ def delete_data(file_id):
     ]
     is_recruit = category == 'Recruit'
 
-    if is_practice:
-        practice = Practice.query.filter_by(
-            season_id=uploaded_file.season_id,
-            date=uploaded_file.file_date,
-        ).first()
-        if practice:
-            if practice.category != category:
-                practice.category = category
-            TeamStats.query.filter_by(practice_id=practice.id).delete()
-            PlayerStats.query.filter_by(practice_id=practice.id).delete()
-            BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
-            OpponentBlueCollarStats.query.filter_by(practice_id=practice.id).delete()
-            poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
-            if poss_ids:
-                PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
-            Possession.query.filter_by(practice_id=practice.id).delete()
-            db.session.delete(practice)
-    elif is_recruit:
-        RecruitShotTypeStat.query.filter_by(recruit_id=uploaded_file.recruit_id).delete()
-    else:
-        game = Game.query.filter_by(csv_filename=filename).first()
-        if game:
-            TeamStats.query.filter_by(game_id=game.id).delete()
-            PlayerStats.query.filter_by(game_id=game.id).delete()
-            BlueCollarStats.query.filter_by(game_id=game.id).delete()
-            OpponentBlueCollarStats.query.filter_by(game_id=game.id).delete()
-            poss_ids = [p.id for p in Possession.query.filter_by(game_id=game.id).all()]
-            if poss_ids:
-                PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
-            Possession.query.filter_by(game_id=game.id).delete()
-            db.session.delete(game)
+    try:
+        if is_practice:
+            practice = Practice.query.filter_by(
+                season_id=uploaded_file.season_id,
+                date=uploaded_file.file_date,
+            ).first()
+            if practice:
+                if practice.category != category:
+                    practice.category = category
+                TeamStats.query.filter_by(practice_id=practice.id).delete()
+                PlayerStats.query.filter_by(practice_id=practice.id).delete()
+                BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
+                OpponentBlueCollarStats.query.filter_by(practice_id=practice.id).delete()
+                poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
+                if poss_ids:
+                    PlayerPossession.query.filter(
+                        PlayerPossession.possession_id.in_(poss_ids)
+                    ).delete(synchronize_session=False)
+                Possession.query.filter_by(practice_id=practice.id).delete()
+                db.session.delete(practice)
+        elif is_recruit:
+            RecruitShotTypeStat.query.filter_by(recruit_id=uploaded_file.recruit_id).delete()
+        else:
+            game = Game.query.filter_by(csv_filename=filename).first()
+            if game:
+                TeamStats.query.filter_by(game_id=game.id).delete()
+                PlayerStats.query.filter_by(game_id=game.id).delete()
+                BlueCollarStats.query.filter_by(game_id=game.id).delete()
+                OpponentBlueCollarStats.query.filter_by(game_id=game.id).delete()
+                poss_ids = [p.id for p in Possession.query.filter_by(game_id=game.id).all()]
+                if poss_ids:
+                    PlayerPossession.query.filter(
+                        PlayerPossession.possession_id.in_(poss_ids)
+                    ).delete(synchronize_session=False)
+                Possession.query.filter_by(game_id=game.id).delete()
+                db.session.delete(game)
 
-    # Remove the upload record
-    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-    db.session.delete(uploaded_file)
-    db.session.commit()
+        # Remove the upload record from the database
+        db.session.delete(uploaded_file)
+        db.session.commit()
+    except Exception:
+        current_app.logger.exception("Failed to delete data for uploaded file %s", file_id)
+        db.session.rollback()
+        flash("Failed to delete data.", "error")
+        return redirect(url_for('admin.files_view_unique'))
 
     if os.path.exists(upload_path):
-        os.remove(upload_path)
+        try:
+            os.remove(upload_path)
+        except OSError:
+            current_app.logger.exception("Failed to remove uploaded file %s", upload_path)
+            flash(
+                f"Data for '{filename}' deleted, but removing the uploaded file failed.",
+                "warning",
+            )
+            return redirect(url_for('admin.files_view_unique'))
 
     flash(f"Data for '{filename}' has been deleted.", "success")
     return redirect(url_for('admin.files_view_unique'))
