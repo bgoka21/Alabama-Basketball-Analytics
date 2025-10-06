@@ -368,6 +368,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  const inlineSubmitHandler = statSelect.onchange;
+
   const table = document.getElementById('leaderboard-table');
   const tableBody = table ? table.querySelector('tbody') : null;
   const columnCount = table ? table.querySelectorAll('thead th').length : 0;
@@ -382,9 +384,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.LEADERBOARDS[statSelect.value] = initialPayload;
   }
 
-  // Disable the inline submit handler once JS takes over.
-  statSelect.onchange = null;
-
   const allEndpoint = {{ url_for('admin.api_leaderboards_all', season_id=season_id)|tojson if season_id is not none else none|tojson }};
   if (!allEndpoint) {
     return;
@@ -398,8 +397,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const data = await res.json();
     window.LEADERBOARDS = window.LEADERBOARDS || {};
     Object.assign(window.LEADERBOARDS, data.leaderboards || {});
+    // Disable the inline submit handler once JS takes over successfully.
+    statSelect.onchange = null;
   } catch (err) {
     console.error(err);
+    if (inlineSubmitHandler) {
+      statSelect.onchange = inlineSubmitHandler;
+    } else {
+      statSelect.addEventListener('change', (event) => {
+        event.target.form?.submit();
+      });
+    }
     return;
   }
 
