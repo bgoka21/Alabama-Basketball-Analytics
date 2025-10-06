@@ -16,6 +16,8 @@ from decimal import Decimal
 from time import perf_counter
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
+from constants import LEADERBOARD_STAT_KEYS
+
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 2
@@ -24,33 +26,6 @@ CACHE_TTL = 60 * 15  # 15 minutes
 PLAYER_NUMBER_KEYS = ("player_number", "jersey", "jersey_number", "number", "num")
 PLAYER_NAME_KEYS = ("player_name", "player", "name")
 VALUE_KEYS = ("value", "stat_value", "metric_value")
-
-# Keys that should be formatted as percentages even though they may not end in
-# ``_pct``.
-PERCENT_KEYS = {
-    "efg_on",
-    "efg_off",
-    "turnover_rate",
-    "off_reb_rate",
-    "individual_turnover_rate",
-    "bamalytics_turnover_rate",
-    "individual_team_turnover_pct",
-    "fouls_drawn_rate",
-}
-
-# Keys that are rates/averages (no percent sign) and should be rounded to one
-# decimal place.
-RATE_KEYS = {
-    "ppp_on",
-    "ppp_off",
-    "assist_turnover_ratio",
-    "adj_assist_turnover_ratio",
-    "assist_rate",
-    "def_rating",
-    "off_rating",
-    "offensive_rating",
-    "defensive_rating",
-}
 
 
 class _InMemoryCache:
@@ -80,6 +55,34 @@ def _load_cache_backend() -> Any:  # pragma: no cover - depends on application
 
 
 cache = _load_cache_backend()
+
+
+def list_all_leaderboard_stats() -> list[str]:
+    """Return the canonical ordered list of leaderboard stat keys."""
+
+    return list(LEADERBOARD_STAT_KEYS)
+
+
+_PERCENT_LIKE_KEYS = {
+    "oreb_pct",
+    "dreb_pct",
+    "tov_pct",
+    "ft_pct",
+    "fg2_fg_pct",
+    "fg3_fg_pct",
+    "efg_on",
+    "efg_off",
+    "turnover_rate",
+    "off_reb_rate",
+    "individual_turnover_rate",
+    "bamalytics_turnover_rate",
+    "individual_team_turnover_pct",
+    "fouls_drawn_rate",
+}
+
+
+def _is_percent_stat(stat_key: str) -> bool:
+    return stat_key.endswith("_pct") or stat_key in _PERCENT_LIKE_KEYS
 
 
 def _coerce_numeric(value: Any) -> float:
@@ -130,83 +133,37 @@ def _row_player_name(row: Any) -> Any:
 
 
 def format_stat_value(stat_key: str, raw: Any) -> str:
-    """Return a template-ready string for ``raw``.
-
-    * Integers display without decimals ("838").
-    * Percentages have one decimal place and a trailing ``%``.
-    * Rates/averages have one decimal place without ``%``.
-    """
+    """Return a display-ready string for ``raw``."""
 
     if raw is None:
-        return ""
+        return "0"
+
     if isinstance(raw, str):
-        return raw
-    if isinstance(raw, bool):  # pragma: no cover - defensive
-        raw = int(raw)
-    if isinstance(raw, int):
-        return str(raw)
-    if isinstance(raw, Decimal):
-        value = float(raw)
-    elif isinstance(raw, float):
-        value = raw
+        try:
+            raw_val = float(raw)
+        except (TypeError, ValueError):
+            return raw
+    elif isinstance(raw, Decimal):
+        raw_val = float(raw)
     else:
         try:
-            value = float(raw)
+            raw_val = float(raw)
         except (TypeError, ValueError):
             return str(raw)
 
-    if stat_key.endswith("_pct") or stat_key in PERCENT_KEYS:
-        text = f"{round(value, 1):.1f}%"
+    if _is_percent_stat(stat_key):
+        text = f"{round(raw_val, 1):.1f}%"
+        if text.endswith(".0%"):
+            text = text.replace(".0%", "%")
         return text
 
-    if stat_key in RATE_KEYS:
-        return f"{round(value, 1):.1f}"
+    if abs(raw_val - int(raw_val)) < 1e-9:
+        return str(int(raw_val))
 
-    if float(value).is_integer():
-        return str(int(round(value)))
-
-    text = f"{round(value, 1):.1f}"
+    text = f"{round(raw_val, 1):.1f}"
     if text.endswith(".0"):
         text = text[:-2]
     return text
-
-
-def format_rows(stat_key: str, raw_rows: Iterable[Any]) -> list[dict[str, Any]]:
-    """Convert ``raw_rows`` into template-ready leaderboard rows."""
-
-    prepared: list[dict[str, Any]] = []
-    for row in raw_rows or []:
-        player_name = _row_player_name(row)
-        player_number = _row_player_number(row)
-        raw_value = _row_value(row, stat_key=stat_key)
-        numeric_value = _coerce_numeric(raw_value)
-
-        if player_name is None and player_number is None:
-            continue
-
-        number_text = str(player_number).strip() if player_number is not None else ""
-        if number_text.startswith("#"):
-            number_text = number_text[1:]
-        display_name = str(player_name).strip() if player_name is not None else ""
-        if number_text:
-            display_player = f"#{number_text} {display_name}".strip()
-        else:
-            display_player = display_name
-
-        prepared.append(
-            {
-                "player": display_player,
-                "value": format_stat_value(stat_key, raw_value),
-                "value_sort": numeric_value,
-            }
-        )
-
-    prepared.sort(key=lambda row: row["value_sort"], reverse=True)
-
-    for idx, row in enumerate(prepared, start=1):
-        row["rank"] = str(idx)
-
-    return prepared
 
 
 def query_stat_rows(stat_key: str, season_id: int) -> Iterable[Any]:  # pragma: no cover - application-specific
@@ -218,24 +175,59 @@ def query_stat_rows(stat_key: str, season_id: int) -> Iterable[Any]:  # pragma: 
     raise NotImplementedError("query_stat_rows must be provided by the application")
 
 
+def _payload_key_v2(season_id: int, stat_key: str) -> str:
+    return f"leaderboard:{SCHEMA_VERSION}:{season_id}:{stat_key}"
+
+
 def build_leaderboard_cache(stat_key: str, season_id: int) -> dict[str, Any]:
     """Build and store the cached payload for ``stat_key``."""
 
     start = perf_counter()
-    raw_rows = query_stat_rows(stat_key, season_id) or []
-    rows = format_rows(stat_key, raw_rows)
-    built_at = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    raw_rows = list(query_stat_rows(stat_key, season_id) or [])
+
+    prepared: list[dict[str, Any]] = []
+    for row in raw_rows:
+        player_name = _row_player_name(row)
+        player_number = _row_player_number(row)
+        raw_value = _row_value(row, stat_key=stat_key)
+        numeric_value = _coerce_numeric(raw_value)
+
+        if player_name is None and player_number is None:
+            continue
+
+        number_text = str(player_number).strip() if player_number is not None else ""
+        if number_text.startswith("#"):
+            number_text = number_text[1:]
+
+        display_name = str(player_name).strip() if player_name is not None else ""
+        if number_text:
+            player_display = f"#{number_text} {display_name}".strip()
+        else:
+            player_display = display_name
+
+        prepared.append(
+            {
+                "player": player_display,
+                "value": format_stat_value(stat_key, raw_value),
+                "value_sort": numeric_value,
+            }
+        )
+
+    prepared.sort(key=lambda row: row["value_sort"], reverse=True)
+
+    for idx, row in enumerate(prepared, start=1):
+        row["rank"] = str(idx)
 
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "stat_key": stat_key,
         "season_id": season_id,
-        "rows": rows,
-        "built_at": built_at,
+        "rows": prepared,
+        "built_at": datetime.utcnow().isoformat() + "Z",
     }
 
-    cache_key = f"leaderboard:{SCHEMA_VERSION}:{season_id}:{stat_key}"
-    cache.set(cache_key, payload, timeout=CACHE_TTL)
+    key_v2 = _payload_key_v2(season_id, stat_key)
+    cache.set(key_v2, payload, timeout=CACHE_TTL)
     cache.delete(f"leaderboard:{season_id}:{stat_key}")
 
     duration = perf_counter() - start
@@ -243,7 +235,7 @@ def build_leaderboard_cache(stat_key: str, season_id: int) -> dict[str, Any]:
         "Built leaderboard cache stat=%s season=%s rows=%s in %.3fs",
         stat_key,
         season_id,
-        len(rows),
+        len(prepared),
         duration,
     )
 
@@ -253,36 +245,36 @@ def build_leaderboard_cache(stat_key: str, season_id: int) -> dict[str, Any]:
 def get_leaderboard_payload(stat_key: str, season_id: int) -> dict[str, Any]:
     """Return the cached payload, rebuilding if necessary."""
 
-    cache_keys = [
-        f"leaderboard:{SCHEMA_VERSION}:{season_id}:{stat_key}",
-        f"leaderboard:{season_id}:{stat_key}",
-    ]
-
-    payload: dict[str, Any] | None = None
-    for key in cache_keys:
-        cached = cache.get(key)
-        if not cached:
-            continue
-        if cached.get("schema_version") != SCHEMA_VERSION:
-            cache.delete(key)
-            continue
-        payload = cached
-        break
-
-    if payload is None:
-        logger.info(
-            "Leaderboard cache miss (stat=%s season=%s schema_version=%s)",
-            stat_key,
-            season_id,
-            SCHEMA_VERSION,
-        )
-        payload = build_leaderboard_cache(stat_key, season_id)
-    else:
+    key_v2 = _payload_key_v2(season_id, stat_key)
+    payload = cache.get(key_v2)
+    if payload and payload.get("schema_version") == SCHEMA_VERSION:
         logger.info(
             "Leaderboard cache hit (stat=%s season=%s schema_version=%s)",
             stat_key,
             season_id,
             SCHEMA_VERSION,
         )
+        return payload
 
-    return payload
+    legacy_key = f"leaderboard:{season_id}:{stat_key}"
+    legacy_payload = cache.get(legacy_key)
+    if legacy_payload:
+        if legacy_payload.get("schema_version") != SCHEMA_VERSION:
+            cache.delete(legacy_key)
+        else:
+            cache.set(key_v2, legacy_payload, timeout=CACHE_TTL)
+            cache.delete(legacy_key)
+            logger.info(
+                "Leaderboard cache migrated legacy key stat=%s season=%s",
+                stat_key,
+                season_id,
+            )
+            return legacy_payload
+
+    logger.info(
+        "Leaderboard cache miss (stat=%s season=%s schema_version=%s)",
+        stat_key,
+        season_id,
+        SCHEMA_VERSION,
+    )
+    return build_leaderboard_cache(stat_key, season_id)
