@@ -1144,9 +1144,13 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         )
     db.session.commit()
 
-    from services.cache_leaderboard import rebuild_leaderboards_after_parse
+    try:
+        from services.cache_leaderboard import rebuild_leaderboards_for_season
 
-    rebuild_leaderboards_after_parse(season_id)
+        rebuild_leaderboards_for_season(season_id=season_id)
+        current_app.logger.info("Rebuilt leaderboard cache after parse.")
+    except Exception as e:  # pragma: no cover - defensive
+        current_app.logger.exception("Cache rebuild failed after parse: %s", e)
 
     # ─── Compute lineup and on/off metrics ───────────────────────────
     lineup_efficiencies = compute_lineup_efficiencies(

@@ -1,6 +1,7 @@
 import os
 import json
-from flask import Flask, redirect, url_for, render_template, request, flash
+import click
+from flask import Flask, redirect, url_for, render_template, request, flash, current_app
 from flask.json.provider import DefaultJSONProvider
 from types import SimpleNamespace
 from flask_sqlalchemy import SQLAlchemy
@@ -290,6 +291,41 @@ def create_app():
 
     from app.cli.import_draft_stock import import_draft_stock
     app.cli.add_command(import_draft_stock)
+
+    # --- BEGIN: cache CLI commands ---
+
+    @app.cli.group("cache")
+    def cache_cli():
+        """Cache utilities."""
+        pass
+
+    @cache_cli.command("rebuild")
+    @click.option("--season", "season_id", required=True, type=int, help="Season ID to rebuild")
+    def cache_rebuild_cmd(season_id: int):
+        """Rebuild all leaderboard caches for a season (formatted payloads)."""
+        from services.cache_leaderboard import rebuild_leaderboards_for_season
+
+        out = rebuild_leaderboards_for_season(season_id=season_id)
+        if current_app:
+            current_app.logger.info(
+                "Rebuilt %s leaderboard keys for season %s", len(out), season_id
+            )
+        click.echo(f"Rebuilt {len(out)} leaderboard keys for season {season_id}")
+
+    @cache_cli.command("rebuild-one")
+    @click.option("--season", "season_id", required=True, type=int)
+    @click.option("--key", "stat_key", required=True, type=str)
+    def cache_rebuild_one_cmd(season_id: int, stat_key: str):
+        """Rebuild a single leaderboard key for a season."""
+        from services.cache_leaderboard import cache_build_one, _import_compute_leaderboard
+
+        compute_fn = _import_compute_leaderboard()
+        cache_build_one(stat_key, season_id=season_id, compute_fn=compute_fn)
+        if current_app:
+            current_app.logger.info("Rebuilt %s for season %s", stat_key, season_id)
+        click.echo(f"Rebuilt {stat_key} (season {season_id})")
+
+    # --- END: cache CLI commands ---
 
     @app.cli.command("seed-presets")
     @with_appcontext
