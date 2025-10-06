@@ -7975,15 +7975,39 @@ def api_leaderboard_one(season_id, stat_key):
 @login_required
 @admin_required
 def admin_rebuild_leaderboards(season_id: int):
-    prog_key = f"leaderboard:progress:{season_id}"
-    clear_progress(prog_key)
-    set_progress(prog_key, 0, "Queued rebuild")
+    PROG_KEY = f"leaderboard:progress:{season_id}"
+    clear_progress(PROG_KEY)
+    set_progress(PROG_KEY, 0, "Queued rebuild")
     current_app.logger.info(
         "Manual leaderboard rebuild queued by %s for season %s",
         getattr(current_user, "username", "unknown"),
         season_id,
     )
-    return jsonify({"ok": True, "season_id": season_id})
+
+    app = current_app._get_current_object()
+    from app import init_scheduler as _init_scheduler
+    from services.leaderboard_jobs import rebuild_leaderboards_job as _rebuild_job
+
+    _init_scheduler(app)
+
+    def _runner(season=season_id, app_obj=app):
+        with app_obj.app_context():
+            _rebuild_job(season)
+
+    job_id = f"rebuild-leaderboards:{season_id}"
+    app.apscheduler.add_job(
+        _runner,
+        id=job_id,
+        trigger="date",
+        run_date=datetime.utcnow(),
+        replace_existing=True,
+    )
+    current_app.logger.info(
+        "Queued leaderboard rebuild job for season %s with id=%s",
+        season_id,
+        job_id,
+    )
+    return jsonify({"ok": True, "job_id": job_id, "season_id": season_id})
 
 
 @admin_bp.get("/admin/cache_status/<int:season_id>")

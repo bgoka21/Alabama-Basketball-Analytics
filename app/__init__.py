@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
-from flask_apscheduler import APScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask.cli import with_appcontext
 from sqlalchemy import inspect
@@ -16,7 +15,6 @@ import pdfkit
 from datetime import datetime, date
 from models.database import db, PageView, SavedStatProfile
 from models.user import User
-from admin.routes import admin_bp
 from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from app.utils.schema import ensure_columns
@@ -30,7 +28,20 @@ def _ns_default(self, obj):
     return _orig_json_default(self, obj)
 DefaultJSONProvider.default = _ns_default
 
-scheduler = APScheduler()
+
+def init_scheduler(app: Flask) -> None:
+    if getattr(app, "_apscheduler_started", False):
+        return
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.start()
+    app.apscheduler = scheduler
+    app.extensions.setdefault("apscheduler", scheduler)
+    app._apscheduler_started = True
+    app.logger.info("APScheduler started")
+
+
+from admin.routes import admin_bp
 
 try:
     PDFKIT_CONFIG = pdfkit.configuration()
@@ -227,19 +238,6 @@ def create_app():
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
 
-    try:
-        if scheduler.state == 0:
-            scheduler.init_app(app)
-            scheduler.start()
-        app.apscheduler = scheduler
-        app.extensions.setdefault("apscheduler", scheduler)
-    except Exception:
-        app.logger.exception("Failed to initialise APScheduler; using fallback scheduler")
-        fallback_scheduler = BackgroundScheduler()
-        fallback_scheduler.start()
-        app.apscheduler = fallback_scheduler
-        app.extensions.setdefault("apscheduler", fallback_scheduler)
-
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')
 
@@ -386,6 +384,8 @@ def create_app():
 
         db.session.commit()
         print(f"Seeded {created} presets.")
+
+    init_scheduler(app)
 
     return app
 
