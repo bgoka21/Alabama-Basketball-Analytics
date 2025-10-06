@@ -16,7 +16,10 @@ from decimal import Decimal
 from time import perf_counter
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
+from flask import current_app
+
 from constants import LEADERBOARD_STAT_KEYS
+from services.leaderboard_source import fetch_stat_rows
 
 logger = logging.getLogger(__name__)
 
@@ -166,13 +169,24 @@ def format_stat_value(stat_key: str, raw: Any) -> str:
     return text
 
 
-def query_stat_rows(stat_key: str, season_id: int) -> Iterable[Any]:  # pragma: no cover - application-specific
-    """Fetch raw leaderboard rows for ``stat_key``.
+def query_stat_rows(stat_key: str, season_id: int) -> Iterable[Any]:
+    """Fetch and normalise leaderboard rows for cache building."""
 
-    Applications should override this with their actual query implementation.
-    """
+    raw = list(fetch_stat_rows(stat_key, season_id))
+    out = []
+    for r in raw:
+        get = (r.get if hasattr(r, "get") else lambda k, d=None: getattr(r, k, d))
+        num = get("player_number") or get("number")
+        name = get("player_name") or get("name")
+        val = get("value")
+        if val is None:
+            val = get(stat_key)
+        out.append({"player_number": num, "player_name": name, "value": val})
 
-    raise NotImplementedError("query_stat_rows must be provided by the application")
+    current_app.logger.info(
+        "query_stat_rows stat=%s season=%s count=%s", stat_key, season_id, len(out)
+    )
+    return out
 
 
 def _payload_key_v2(season_id: int, stat_key: str) -> str:
