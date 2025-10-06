@@ -20,7 +20,7 @@ from admin.routes import (
     _split_leaderboard_rows_for_template,
     get_practice_dual_context,
 )
-from services.cache_leaderboard import (
+from services.cache_leaderboard_hotfix import (
     cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,

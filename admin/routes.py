@@ -98,7 +98,7 @@ from admin._leaderboard_helpers import (
     with_last_practice,
 )
 from constants import LEADERBOARD_STAT_KEYS
-from services.cache_leaderboard import (
+from services.cache_leaderboard_hotfix import (
     cache_build_all,
     cache_build_one,
     cache_get_leaderboard,
