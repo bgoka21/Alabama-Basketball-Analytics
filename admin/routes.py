@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
 import pdfkit
+from apscheduler.schedulers.background import BackgroundScheduler
 
 try:
     from bs4.element import ResultSet as _BeautifulSoupResultSet
@@ -99,7 +100,6 @@ from admin._leaderboard_helpers import (
 )
 from constants import LEADERBOARD_STAT_KEYS
 from services.cache_leaderboard import (
-    cache_build_all,
     cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,
@@ -107,6 +107,8 @@ from services.cache_leaderboard import (
     maybe_schedule_refresh,
     schedule_refresh,
 )
+from services.leaderboard_jobs import STATS_TO_BUILD, rebuild_leaderboards_job
+from services.progress import clear_progress, get_progress, set_progress
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
@@ -7974,29 +7976,96 @@ def api_leaderboard_one(season_id, stat_key):
 @admin_bp.route('/admin/rebuild_leaderboards/<int:season_id>', methods=['POST'])
 @admin_required
 def admin_rebuild_leaderboards(season_id):
-    current_app.logger.info(
-        "Manual leaderboard rebuild requested by %s for season %s",
-        current_user.username,
+    app = current_app._get_current_object()
+    username = getattr(current_user, "username", "unknown")
+    app.logger.info(
+        "Manual leaderboard rebuild queued by %s for season %s",
+        username,
         season_id,
     )
-    try:
-        payloads = cache_build_all(
-            season_id,
-            compute_fn=build_leaderboard_cache_payload,
-            stat_keys=LEADERBOARD_STAT_KEYS,
-        )
-    except Exception as exc:  # pragma: no cover - bubbled to caller but logged for context
-        current_app.logger.exception(
-            "Manual leaderboard rebuild failed for season %s", season_id
-        )
-        return jsonify({"status": "error", "message": str(exc)}), 500
 
-    current_app.logger.info(
-        "Manual leaderboard rebuild complete for season %s (%s keys)",
+    scheduler = getattr(app, "apscheduler", None)
+    if scheduler is None:
+        app.logger.warning(
+            "APScheduler extension missing; starting BackgroundScheduler fallback",
+        )
+        scheduler = BackgroundScheduler()
+        scheduler.start()
+        app.apscheduler = scheduler
+        app.extensions.setdefault("apscheduler", scheduler)
+
+    progress_key = f"leaderboard:progress:{season_id}"
+    clear_progress(progress_key)
+    set_progress(progress_key, 0, "Queued rebuild", done=False)
+
+    job_id = f"rebuild-leaderboards:{season_id}"
+    total_stats = len(STATS_TO_BUILD)
+
+    def _job_wrapper() -> None:
+        with app.app_context():
+            rebuild_leaderboards_job(season_id)
+
+    try:
+        scheduler.add_job(
+            func=_job_wrapper,
+            id=job_id,
+            replace_existing=True,
+            trigger="date",
+            run_date=datetime.utcnow(),
+        )
+    except Exception as exc:  # pragma: no cover - scheduler failure should be surfaced
+        app.logger.exception(
+            "Failed to schedule leaderboard rebuild job for season %s", season_id
+        )
+        set_progress(
+            progress_key,
+            0,
+            "Failed to schedule job",
+            done=True,
+            error=str(exc),
+        )
+        return (
+            jsonify({"ok": False, "season_id": season_id, "error": str(exc)}),
+            500,
+        )
+
+    app.logger.info(
+        "Queued leaderboard rebuild job for season %s (%s stats) with id=%s",
         season_id,
-        len(payloads),
+        total_stats,
+        job_id,
     )
-    return jsonify({"status": "ok", "season_id": season_id, "keys": list(payloads)})
+    return jsonify({"ok": True, "job_id": job_id, "season_id": season_id})
+
+
+@admin_bp.route('/admin/cache_status/<int:season_id>', methods=['GET'])
+@login_required
+@admin_required
+def admin_cache_status(season_id):
+    progress_key = f"leaderboard:progress:{season_id}"
+    progress = get_progress(progress_key) or {}
+
+    percent = progress.get("percent", 0)
+    try:
+        percent = int(percent)
+    except Exception:
+        percent = 0
+
+    message = progress.get("message") or "Idle"
+    done = bool(progress.get("done", False))
+    error = progress.get("error")
+    updated_at = progress.get("updated_at")
+
+    payload = {
+        "percent": max(0, min(percent, 100)),
+        "message": message,
+        "done": done,
+        "error": error,
+        "updated_at": updated_at,
+        "season_id": season_id,
+    }
+
+    return jsonify(payload)
 
 
 @admin_bp.route('/usage')

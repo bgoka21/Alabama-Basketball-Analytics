@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_apscheduler import APScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask.cli import with_appcontext
 from sqlalchemy import inspect
 import pdfkit
@@ -226,9 +227,18 @@ def create_app():
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
 
-    if scheduler.state == 0:
-        scheduler.init_app(app)
-        scheduler.start()
+    try:
+        if scheduler.state == 0:
+            scheduler.init_app(app)
+            scheduler.start()
+        app.apscheduler = scheduler
+        app.extensions.setdefault("apscheduler", scheduler)
+    except Exception:
+        app.logger.exception("Failed to initialise APScheduler; using fallback scheduler")
+        fallback_scheduler = BackgroundScheduler()
+        fallback_scheduler.start()
+        app.apscheduler = fallback_scheduler
+        app.extensions.setdefault("apscheduler", fallback_scheduler)
 
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')
