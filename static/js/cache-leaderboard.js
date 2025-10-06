@@ -29,9 +29,8 @@
         pollTimer = null;
         if (data.error) {
           console.error("Rebuild error:", data.error);
-          document.getElementById("cache-progress-bar")?.classList.add("bg-red-500");
-          const msgEl = document.getElementById("cache-progress-msg");
-          if (msgEl) msgEl.textContent = `Error: ${data.error}`;
+          bar?.classList.add("bg-red-500");
+          if (msg) msg.textContent = `Error: ${data.error}`;
         }
       }
     } catch (e) {
