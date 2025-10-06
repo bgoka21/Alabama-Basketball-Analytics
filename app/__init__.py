@@ -1,6 +1,7 @@
 import os
 import json
 import click
+import fcntl
 from flask import Flask, redirect, url_for, render_template, request, flash, current_app
 from flask.json.provider import DefaultJSONProvider
 from types import SimpleNamespace
@@ -30,15 +31,31 @@ DefaultJSONProvider.default = _ns_default
 
 
 def init_scheduler(app: Flask) -> None:
+    """Start APScheduler exactly once per process (safe across workers)."""
+
+    lock_path = os.path.join(app.instance_path, "apscheduler.lock")
+    os.makedirs(app.instance_path, exist_ok=True)
+    lock_file = open(lock_path, "w")
+
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        app.logger.info("APScheduler already running in another worker.")
+        lock_file.close()
+        return
+
     if getattr(app, "_apscheduler_started", False):
+        app.logger.info("APScheduler already started in this process.")
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
         return
 
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.start()
     app.apscheduler = scheduler
-    app.extensions.setdefault("apscheduler", scheduler)
     app._apscheduler_started = True
-    app.logger.info("APScheduler started")
+    app._apscheduler_lock_file = lock_file
+    app.logger.info("APScheduler started in this worker.")
 
 
 from admin.routes import admin_bp
