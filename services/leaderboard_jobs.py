@@ -12,26 +12,26 @@ from services.leaderboard_cache import (
 
 
 def rebuild_leaderboards_job(season_id: int) -> None:
-    """Rebuild cached leaderboard payloads for ``season_id`` with progress."""
+    """Rebuild leaderboard caches for ``season_id`` inside an app context."""
 
     app = current_app
     log = app.logger
-    prog_key = f"leaderboard:progress:{season_id}"
+    key = f"leaderboard:progress:{season_id}"
     stats = list_all_leaderboard_stats()
     total = len(stats) or 1
 
     try:
-        log.info(f"[LEADERS] START season={season_id} total_stats={total}")
-        set_progress(prog_key, 1, "Starting…")
+        log.info(f"[LEADERS] START season={season_id} total={total}")
+        set_progress(key, 1, "Starting…")
 
         for i, stat_key in enumerate(stats, start=1):
             build_leaderboard_cache(stat_key, season_id)
             pct = max(1, int(i * 100 / total))
-            set_progress(prog_key, pct, f"Built {stat_key} ({i}/{total})")
+            set_progress(key, pct, f"Built {stat_key} ({i}/{total})")
 
-        set_progress(prog_key, 100, "Complete", done=True)
+        set_progress(key, 100, "Complete", done=True)
         log.info(f"[LEADERS] DONE season={season_id}")
     except Exception as exc:  # pragma: no cover - surfaced to scheduler/logs
         log.exception(f"[LEADERS] FAILED season={season_id}: {exc}")
-        set_progress(prog_key, 0, "Failed", done=True, error=str(exc))
+        set_progress(key, 0, "Failed", done=True, error=str(exc))
         raise

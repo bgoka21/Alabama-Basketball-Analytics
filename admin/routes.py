@@ -7985,6 +7985,39 @@ def admin_debug_cache():
     return jsonify({"key": key, "exists": bool(leaderboard_cache.get(key))})
 
 
+@admin_bp.get("/admin/ping_scheduler")
+@login_required
+@admin_required
+def admin_ping_scheduler():
+    scheduler = getattr(current_app, "apscheduler", None)
+    jobs = []
+    if scheduler:
+        try:
+            jobs = [job.id for job in scheduler.get_jobs()]
+        except Exception:
+            jobs = ["<error listing jobs>"]
+    return jsonify({"running": bool(scheduler), "jobs": jobs})
+
+
+@admin_bp.post("/admin/rebuild_sync/<int:season_id>")
+@login_required
+@admin_required
+def admin_rebuild_sync(season_id: int):
+    key = f"leaderboard:progress:{season_id}"
+    clear_progress(key)
+    set_progress(key, 0, "Starting (sync)…")
+    from services.leaderboard_jobs import rebuild_leaderboards_job
+
+    try:
+        rebuild_leaderboards_job(season_id)
+        return jsonify({"ok": True, "mode": "sync", "progress": get_progress(key)})
+    except Exception as exc:  # pragma: no cover - surfaced via response
+        return (
+            jsonify({"ok": False, "error": str(exc), "progress": get_progress(key)}),
+            500,
+        )
+
+
 @admin_bp.post("/admin/rebuild_leaderboards/<int:season_id>")
 @login_required
 @admin_required
@@ -8000,16 +8033,21 @@ def admin_rebuild_leaderboards(season_id: int):
 
     app = current_app._get_current_object()
     from app import init_scheduler as _init_scheduler
-    from services.leaderboard_jobs import rebuild_leaderboards_job as _rebuild_job
+    from services.leaderboard_jobs import rebuild_leaderboards_job
 
     _init_scheduler(app)
+    scheduler = getattr(app, "apscheduler", None)
+    if scheduler is None:
+        current_app.logger.error("APScheduler unavailable; cannot queue leaderboard rebuild.")
+        set_progress(PROG_KEY, 0, "Scheduler unavailable", done=True, error="scheduler unavailable")
+        return jsonify({"ok": False, "error": "scheduler unavailable"}), 503
 
-    def _runner(season=season_id, app_obj=app):
+    def _runner(season=season_id, app_obj=app, rebuild_job=rebuild_leaderboards_job):
         with app_obj.app_context():
-            _rebuild_job(season)
+            rebuild_job(season)
 
     job_id = f"rebuild-leaderboards:{season_id}"
-    app.apscheduler.add_job(
+    scheduler.add_job(
         _runner,
         id=job_id,
         trigger="date",
