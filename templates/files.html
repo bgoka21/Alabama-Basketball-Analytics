@@ -20,29 +20,29 @@
     class="mb-6 bg-white shadow rounded-lg p-4"
     data-cache-container
     data-cache-endpoint-template="{{ url_for('admin.admin_rebuild_leaderboards', season_id=0) | replace('/0', '/__SEASON__') }}"
-    data-cache-status-template="{{ url_for('admin.admin_cache_status', season_id=0) | replace('/0', '/__SEASON__') }}"
-    data-cache-select="#rebuild-season"
+    data-cache-status-template="/admin/cache_status/__SEASON__"
+    data-default-season="{{ seasons[0].id if seasons }}"
   >
     <h2 class="text-lg font-semibold mb-3">Cache Leaderboards</h2>
     <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-3 sm:space-y-0">
-      <label for="rebuild-season" class="font-medium">Select season:</label>
-      <select id="rebuild-season" class="border rounded px-3 py-2 flex-1" data-cache-season-select>
+      <label for="season-select" class="font-medium">Select season:</label>
+      <select id="season-select" class="border rounded px-3 py-2 flex-1">
         <option value="" disabled selected>Choose a season</option>
         {% for season in seasons %}
         <option value="{{ season.id }}">{{ season.season_name or season.id }}</option>
         {% endfor %}
       </select>
-      <button type="button" class="cache-leaderboard-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-60 disabled:cursor-not-allowed">
-        <span class="cache-label">Rebuild Cache</span>
-        <span class="cache-spinner hidden" aria-hidden="true">⏳</span>
+      <button type="button" id="rebuild-cache-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+        Rebuild Cache
       </button>
     </div>
-    <p class="cache-status text-sm mt-3 text-gray-600" aria-live="polite"></p>
-    <div id="cache-progress" class="hidden mt-3 bg-gray-200 rounded overflow-hidden relative h-6">
-      <div id="cache-progress-bar" class="bg-green-600 h-full transition-all duration-300 ease-out" style="width:0%"></div>
-      <span id="cache-progress-text" class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-900">
-        0%
-      </span>
+    <div id="cache-progress" class="hidden mt-3">
+      <div class="w-full bg-gray-200 rounded">
+        <div id="cache-progress-bar" class="h-2 rounded" style="width:0%"></div>
+      </div>
+      <div class="text-sm mt-1">
+        <span id="cache-progress-text">0%</span> — <span id="cache-progress-msg">Idle</span>
+      </div>
     </div>
   </div>
   {% endif %}
