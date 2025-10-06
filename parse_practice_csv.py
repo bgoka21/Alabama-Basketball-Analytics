@@ -903,7 +903,17 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
                         # For 3FG shot types, capture 3FG‐subcategory columns:
                         elif cls == "3fg":
-                            for suffix in ("Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"):
+                            for suffix in (
+                                "Contest",
+                                "Footwork",
+                                "Good/Bad",
+                                "Line",
+                                "Move",
+                                "Balance",
+                                "Pocket",
+                                "Shrink",
+                                "Type",
+                            ):
                                 col_name = f"3FG ({suffix})"
                                 if col_name in df.columns:
                                     json_key = f"3fg_{suffix.lower().replace('/', '_').replace(' ', '_')}"

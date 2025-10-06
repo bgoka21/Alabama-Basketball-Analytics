@@ -112,6 +112,7 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
         "3FG (Good/Bad)":       ["Good", "Bad", "Neutral Three"],
         "3FG (Line)":           ["On The Line", "Off The Line"],
         "3FG (Move)":           ["Stationary", "On Move"],
+        "3FG (Balance)":        ["On Balance", "Off Balance"],
         "3FG (Pocket)":         ["Shot Pocket", "Non-Shot Pocket"],
         "3FG (Shrink)":         ["Shrink", "Non-Shrink"],
         "3FG (Type)":           ["Catch and Shoot", "Pull Up", "Step Back", "Catch and Hold", "Slide Dribble"],
