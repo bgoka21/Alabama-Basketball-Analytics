@@ -7971,6 +7971,20 @@ def api_leaderboard_one(season_id, stat_key):
     return resp
 
 
+@admin_bp.get("/admin/debug_cache")
+@login_required
+@admin_required
+def admin_debug_cache():
+    stat = request.args.get("stat")
+    if not stat:
+        raise BadRequest("Missing required 'stat' query parameter")
+    season = int(request.args.get("season", "1"))
+    from services.leaderboard_cache import _payload_key_v2, cache as leaderboard_cache
+
+    key = _payload_key_v2(season, stat)
+    return jsonify({"key": key, "exists": bool(leaderboard_cache.get(key))})
+
+
 @admin_bp.post("/admin/rebuild_leaderboards/<int:season_id>")
 @login_required
 @admin_required
