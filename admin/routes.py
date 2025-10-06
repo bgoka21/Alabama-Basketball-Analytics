@@ -105,7 +105,6 @@ from services.cache_leaderboard import (
     expand_cached_rows_for_template,
     format_leaderboard_payload,
     maybe_schedule_refresh,
-    rebuild_leaderboards_after_parse,
     schedule_refresh,
 )
 from utils.session_helpers import get_player_stats_for_date_range
@@ -3939,7 +3938,13 @@ def parse_file(file_id):
             uploaded_file.last_parsed  = datetime.utcnow()
             db.session.commit()
 
-            rebuild_leaderboards_after_parse(season_id)
+            try:
+                from services.cache_leaderboard import rebuild_leaderboards_for_season
+
+                rebuild_leaderboards_for_season(season_id=season_id)
+                current_app.logger.info("Rebuilt leaderboard cache after parse.")
+            except Exception as e:
+                current_app.logger.exception("Cache rebuild failed after parse: %s", e)
 
             flash("Practice parsed successfully! You can now edit it.", "success")
             return redirect(
@@ -3984,7 +3989,13 @@ def parse_file(file_id):
             uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
             db.session.commit()
 
-            rebuild_leaderboards_after_parse(season_id)
+            try:
+                from services.cache_leaderboard import rebuild_leaderboards_for_season
+
+                rebuild_leaderboards_for_season(season_id=season_id)
+                current_app.logger.info("Rebuilt leaderboard cache after parse.")
+            except Exception as e:
+                current_app.logger.exception("Cache rebuild failed after parse: %s", e)
 
             # 4) redirect into your game editor
             game = Game.query.filter_by(csv_filename=filename).first()
@@ -4076,7 +4087,13 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     uploaded_file.parse_status = "Parsed Successfully"
     uploaded_file.last_parsed = datetime.utcnow()
     db.session.commit()
-    rebuild_leaderboards_after_parse(season_id)
+    try:
+        from services.cache_leaderboard import rebuild_leaderboards_for_season
+
+        rebuild_leaderboards_for_season(season_id=season_id)
+        current_app.logger.info("Rebuilt leaderboard cache after parse.")
+    except Exception as e:
+        current_app.logger.exception("Cache rebuild failed after parse: %s", e)
     return practice.id, season_id
 
 

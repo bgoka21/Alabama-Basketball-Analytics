@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+import importlib
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -9,6 +10,65 @@ from constants import LEADERBOARD_STAT_KEYS, LEADERBOARD_STATS
 from models.database import CachedLeaderboard, Season, db
 
 from admin._leaderboard_helpers import build_leaderboard_table as _build_leaderboard_table
+
+from sqlalchemy import text
+
+# --- BEGIN: authoritative display formatter for cache ---
+
+
+def format_leaderboard_payload(stat_key, compute_result, *, variant=None):
+    """
+    Return a payload the templates/JS can render directly without extra formatting.
+    {
+      "stat_key": str,
+      "variant": str|None,
+      "columns": [str,...],
+      "column_keys": [str,...],
+      "rows": [ [str,...], ...],   # flat string lists aligned to column_keys
+      "last_built_at": ISO8601Z
+    }
+    """
+    # IMPORTANT: use the same display builder the templates use for live rendering.
+    table = build_leaderboard_table(stat_key, compute_result, variant=variant)
+
+    columns = table["columns"]
+    column_keys = table["column_keys"]
+    rows = []
+    for r in table["rows"]:
+        rows.append(["" if r.get(k) is None else str(r.get(k)) for k in column_keys])
+
+    payload: Dict[str, Any] = {
+        "stat_key": stat_key,
+        "variant": variant,
+        "columns": columns,
+        "column_keys": column_keys,
+        "rows": rows,
+        "last_built_at": datetime.utcnow().isoformat() + "Z",
+    }
+
+    totals = table.get("totals")
+    if isinstance(totals, Mapping):
+        payload["totals"] = [
+            "" if totals.get(k) is None else str(totals.get(k)) for k in column_keys
+        ]
+    elif isinstance(totals, Sequence) and not isinstance(totals, (str, bytes)):
+        payload["totals"] = [
+            "" if idx >= len(totals) or totals[idx] is None else str(totals[idx])
+            for idx, _ in enumerate(column_keys)
+        ]
+
+    default_sort = table.get("default_sort")
+    if default_sort:
+        payload["default_sort"] = default_sort
+
+    has_data = table.get("has_data")
+    if has_data is not None:
+        payload["has_data"] = has_data
+
+    return payload
+
+
+# --- END: authoritative display formatter for cache ---
 
 JsonDict = Dict[str, Any]
 
@@ -98,70 +158,6 @@ def build_leaderboard_table(stat_key: str, compute_result: Any, *, variant: Opti
     return table
 
 
-# --- START: authoritative payload formatter (cache uses this) ---
-
-def format_leaderboard_payload(stat_key, compute_result, *, variant=None):
-    """
-    Produce a payload that the templates/JS can render directly without further formatting.
-    Shape:
-      {
-        "stat_key": str,
-        "variant": str|None,
-        "columns": [str, ...],         # human labels
-        "column_keys": [str, ...],     # stable keys in same order
-        "rows": [ [str, ...], ... ],   # flat string lists aligned with column_keys
-        "last_built_at": ISO8601Z
-      }
-    """
-    # IMPORTANT: use the same display builder the templates use for live rendering.
-    # The project already has this (e.g., build_leaderboard_table). Find it via search.
-    table = build_leaderboard_table(stat_key, compute_result, variant=variant) \
-        if "build_leaderboard_table" in globals() else build_leaderboard_table(stat_key, compute_result)
-
-    columns = table["columns"]
-    column_keys = table["column_keys"]
-    # table["rows"] should be a list of dicts keyed by column_keys.
-    rows_list = []
-    for r in table["rows"]:
-        row = []
-        for k in column_keys:
-            v = r.get(k)
-            row.append("" if v is None else str(v))
-        rows_list.append(row)
-
-    totals_row = None
-    totals = table.get("totals")
-    if isinstance(totals, Mapping):
-        totals_row = ["" if totals.get(k) is None else str(totals.get(k)) for k in column_keys]
-    elif isinstance(totals, Sequence) and not isinstance(totals, (str, bytes)):
-        totals_row = [
-            "" if idx >= len(totals) or totals[idx] is None else str(totals[idx])
-            for idx, _ in enumerate(column_keys)
-        ]
-
-    payload = {
-        "stat_key": stat_key,
-        "variant": variant,
-        "columns": columns,
-        "column_keys": column_keys,
-        "rows": rows_list,
-        "last_built_at": datetime.utcnow().isoformat() + "Z",
-    }
-    if totals_row is not None:
-        payload["totals"] = totals_row
-
-    default_sort = table.get("default_sort")
-    if default_sort:
-        payload["default_sort"] = default_sort
-    has_data = table.get("has_data")
-    if has_data is not None:
-        payload["has_data"] = has_data
-
-    return payload
-
-# --- END: authoritative payload formatter ---
-
-
 def _assert_payload_shape(payload: Dict[str, Any]) -> None:
     rows = payload.get("rows") or []
     columns = payload.get("columns") or []
@@ -175,30 +171,23 @@ def _assert_payload_shape(payload: Dict[str, Any]) -> None:
 
 
 def expand_cached_rows_for_template(payload: JsonDict) -> tuple[Sequence[Any], Sequence[str], List[Dict[str, str]], Optional[Dict[str, str]]]:
-    """Return cached columns/rows without reformatting numeric values."""
+    """Return cached columns/rows with values already formatted as display strings."""
 
     columns = payload.get("columns") or []
     column_keys = list(payload.get("column_keys") or [])
     rows = payload.get("rows") or []
     totals = payload.get("totals")
 
-    expanded_rows: List[Dict[str, str]] = []
-    for row in rows:
+    def _coerce_row(row: Any) -> Dict[str, str]:
         if isinstance(row, Mapping):
-            entry = {}
-            for key in column_keys:
-                value = row.get(key)
-                entry[key] = "" if value is None else str(value)
-            expanded_rows.append(entry)
-        elif isinstance(row, Sequence) and not isinstance(row, (str, bytes)):
-            entry = {
-                key: row[idx] if idx < len(row) else ""
-                for idx, key in enumerate(column_keys)
-            }
-            expanded_rows.append(entry)
-        else:
-            if column_keys:
-                expanded_rows.append({column_keys[0]: "" if row is None else str(row)})
+            return {key: "" if row.get(key) is None else str(row.get(key)) for key in column_keys}
+        if isinstance(row, Sequence) and not isinstance(row, (str, bytes)):
+            return {key: (row[idx] if idx < len(row) else "") for idx, key in enumerate(column_keys)}
+        if column_keys:
+            return {column_keys[0]: "" if row is None else str(row)}
+        return {}
+
+    expanded_rows = [_coerce_row(row) for row in rows]
 
     expanded_totals: Optional[Dict[str, str]] = None
     if isinstance(totals, Mapping):
@@ -362,7 +351,7 @@ def cache_build_all(
     force: bool = False,
 ) -> Dict[str, JsonDict]:
     results: Dict[str, JsonDict] = {}
-    keys = stat_keys or LEADERBOARD_STAT_KEYS
+    keys = list(stat_keys) if stat_keys is not None else list(LEADERBOARD_STAT_KEYS)
     compute = compute_fn or _import_compute_leaderboard()
     for sk in keys:
         results[sk] = cache_build_one(
@@ -375,28 +364,41 @@ def cache_build_all(
     return results
 
 
-# --- BEGIN PATCH: rebuild helpers ---
+def list_cached_stat_keys() -> list[str]:
+    # Fallback: read distinct keys already in cache table
+    rows = db.session.execute(
+        text("SELECT DISTINCT stat_key FROM cached_leaderboards ORDER BY stat_key")
+    ).all()
+    return [r[0] for r in rows]
 
 
-def rebuild_leaderboards_for_season(
-    season_id: Optional[int],
-    stat_keys: Sequence[str] = LEADERBOARD_STAT_KEYS,
-    *,
-    compute_fn: Optional[Callable[[str, Optional[int]], JsonDict]] = None,
-) -> None:
-    """Rebuild cached leaderboards for ``season_id``."""
+def list_known_stat_keys() -> list[str]:
+    # If your compute module exposes a constant (e.g., LEADERBOARD_STAT_KEYS), prefer that.
+    try:
+        compute_fn = _import_compute_leaderboard()
+        module = importlib.import_module(compute_fn.__module__)
+        keys = getattr(module, "LEADERBOARD_STAT_KEYS", None)
+        if keys:
+            return list(keys)
+    except Exception:
+        pass
+    return list(LEADERBOARD_STAT_KEYS) if LEADERBOARD_STAT_KEYS else list_cached_stat_keys()
 
-    if season_id is None:
-        return
 
-    compute = compute_fn or _import_compute_leaderboard()
-    cache_build_all(season_id, compute, stat_keys, force=True)
+def rebuild_leaderboards_for_season(season_id: int) -> dict[str, dict]:
+    compute_fn = _import_compute_leaderboard()
+    keys = list_known_stat_keys()
+    return cache_build_all(
+        season_id=season_id,
+        compute_fn=compute_fn,
+        stat_keys=list(keys),
+    )
 
 
 def rebuild_leaderboards_after_parse(
     season_id: Optional[int],
     *,
-    stat_keys: Sequence[str] = LEADERBOARD_STAT_KEYS,
+    stat_keys: Optional[Sequence[str]] = None,
 ) -> None:
     """Rebuild caches after a successful parse without raising to the caller."""
 
@@ -417,12 +419,13 @@ def rebuild_leaderboards_after_parse(
                 return
             resolved_id = season.id
 
-        rebuild_leaderboards_for_season(resolved_id, stat_keys)
+        if stat_keys is None:
+            rebuild_leaderboards_for_season(resolved_id)
+        else:
+            keys = list(stat_keys)
+            cache_build_all(resolved_id, stat_keys=keys)
         if logger:
             logger.info("Rebuilt leaderboard cache for season %s", resolved_id)
     except Exception as exc:  # pragma: no cover - defensive
         if logger:
             logger.exception("Cache rebuild failed after parse: %s", exc)
-
-
-# --- END PATCH ---
