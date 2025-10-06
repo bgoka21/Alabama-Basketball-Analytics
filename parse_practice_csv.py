@@ -1144,10 +1144,6 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         )
     db.session.commit()
 
-    from services.cache_leaderboard_hotfix import rebuild_leaderboards_after_parse
-
-    rebuild_leaderboards_after_parse(season_id)
-
     # ─── Compute lineup and on/off metrics ───────────────────────────
     lineup_efficiencies = compute_lineup_efficiencies(
         possession_data,

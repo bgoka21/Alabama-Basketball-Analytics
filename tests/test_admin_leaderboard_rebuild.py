@@ -1,6 +1,9 @@
 from datetime import date
 from pathlib import Path
 
+from datetime import date
+from pathlib import Path
+
 import pytest
 from flask import Flask
 from flask_login import LoginManager
@@ -94,9 +97,10 @@ def test_parse_practice_skips_leaderboard_rebuild(client, app, monkeypatch):
     def fail(*args, **kwargs):
         nonlocal called
         called = True
-        raise AssertionError('rebuild_leaderboards_for_season should not be called')
-# HOTFIX disabled: 
-    monkeypatch.setattr('services.cache_leaderboard.rebuild_leaderboards_for_season', fail, raising=False)
+        raise AssertionError('cache rebuild should not be triggered during parse')
+
+    monkeypatch.setattr('admin.routes.cache_build_all', fail)
+    monkeypatch.setattr('admin.routes.cache_build_one', fail)
 
     resp = client.post('/admin/parse/1')
     assert resp.status_code == 302
@@ -107,20 +111,33 @@ def test_parse_practice_skips_leaderboard_rebuild(client, app, monkeypatch):
         assert uploaded.parse_status == 'Parsed Successfully'
 
 
+def test_parse_practice_flash_and_button(client):
+    resp = client.post('/admin/parse/1', follow_redirects=True)
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert "Parsed successfully. You can now build the leaderboard cache for this season." in html
+    assert 'Cache Leaderboards' in html
+    assert 'data-cache-container' in html
+
+
 def test_manual_leaderboard_rebuild_endpoint(client, monkeypatch):
     captured = {}
 
-    def fake_cache_build_all(season_id, builder, keys):
+    def fake_cache_build_all(season_id, *, compute_fn=None, stat_keys=None):
         captured['season_id'] = season_id
-        captured['builder'] = builder
-        captured['keys'] = tuple(keys)
+        captured['compute_fn'] = compute_fn
+        captured['keys'] = tuple(stat_keys or [])
+        return {key: {} for key in captured['keys']}
 
     monkeypatch.setattr('admin.routes.cache_build_all', fake_cache_build_all)
 
     resp = client.post('/admin/admin/rebuild_leaderboards/1')
     assert resp.status_code == 200
-    assert resp.get_json() == {'status': 'ok', 'season_id': 1}
+    payload = resp.get_json()
+    assert payload['status'] == 'ok'
+    assert payload['season_id'] == 1
+    assert payload['keys'] == list(captured['keys'])
 
     assert captured['season_id'] == 1
-    assert captured['builder'] is build_leaderboard_cache_payload
+    assert captured['compute_fn'] is build_leaderboard_cache_payload
     assert captured['keys']
