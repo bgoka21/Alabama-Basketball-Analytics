@@ -3938,15 +3938,10 @@ def parse_file(file_id):
             uploaded_file.last_parsed  = datetime.utcnow()
             db.session.commit()
 
-            try:
-                from services.cache_leaderboard import rebuild_leaderboards_for_season
-
-                rebuild_leaderboards_for_season(season_id=season_id)
-                current_app.logger.info("Rebuilt leaderboard cache after parse.")
-            except Exception as e:
-                current_app.logger.exception("Cache rebuild failed after parse: %s", e)
-
-            flash("Practice parsed successfully! You can now edit it.", "success")
+            flash(
+                "Practice parsed successfully! Rebuild leaderboards from the Files page when ready.",
+                "success",
+            )
             return redirect(
                 url_for('admin.edit_practice',
                         practice_id=practice.id,
@@ -3989,14 +3984,6 @@ def parse_file(file_id):
             uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
             db.session.commit()
 
-            try:
-                from services.cache_leaderboard import rebuild_leaderboards_for_season
-
-                rebuild_leaderboards_for_season(season_id=season_id)
-                current_app.logger.info("Rebuilt leaderboard cache after parse.")
-            except Exception as e:
-                current_app.logger.exception("Cache rebuild failed after parse: %s", e)
-
             # 4) redirect into your game editor
             game = Game.query.filter_by(csv_filename=filename).first()
             if not game:
@@ -4007,7 +3994,7 @@ def parse_file(file_id):
                 return redirect(url_for('admin.dashboard'))
 
             flash(
-                f"File '{filename}' parsed successfully! You can now edit the game.",
+                f"File '{filename}' parsed successfully! Rebuild leaderboards from the Files page when ready.",
                 "success"
             )
             return redirect(url_for('admin.edit_game', game_id=game.id))
@@ -4087,13 +4074,6 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     uploaded_file.parse_status = "Parsed Successfully"
     uploaded_file.last_parsed = datetime.utcnow()
     db.session.commit()
-    try:
-        from services.cache_leaderboard import rebuild_leaderboards_for_season
-
-        rebuild_leaderboards_for_season(season_id=season_id)
-        current_app.logger.info("Rebuilt leaderboard cache after parse.")
-    except Exception as e:
-        current_app.logger.exception("Cache rebuild failed after parse: %s", e)
     return practice.id, season_id
 
 
@@ -4122,7 +4102,10 @@ def reparse_file(file_id):
         uploaded_file.category = category
         if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
             practice_id, season_id = _reparse_uploaded_practice(uploaded_file, upload_path)
-            flash("Practice re-parsed successfully!", "success")
+            flash(
+                "Practice re-parsed successfully! Rebuild leaderboards from the Files page when ready.",
+                "success",
+            )
             return redirect(
                 url_for('admin.edit_practice', practice_id=practice_id, season_id=season_id)
             )
@@ -4319,7 +4302,13 @@ def files_view():
         files = UploadedFile.query.filter_by(category=category_filter).order_by(UploadedFile.upload_date.desc()).all()
     else:
         files = UploadedFile.query.order_by(UploadedFile.upload_date.desc()).all()
-    return render_template('files.html', files=files, selected_category=category_filter)
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    return render_template(
+        'files.html',
+        files=files,
+        selected_category=category_filter,
+        seasons=seasons,
+    )
 
 
 @admin_bp.route('/season/<int:season_id>/stats')

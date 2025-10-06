@@ -15,6 +15,23 @@
     </select>
   </form>
 
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <div class="mb-6 bg-white shadow rounded-lg p-4">
+    <h2 class="text-lg font-semibold mb-3">Rebuild Leaderboards</h2>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-3 sm:space-y-0">
+      <label for="rebuild-season" class="font-medium">Select season:</label>
+      <select id="rebuild-season" class="border rounded px-3 py-2 flex-1">
+        <option value="" disabled selected>Choose a season</option>
+        {% for season in seasons %}
+        <option value="{{ season.id }}">{{ season.season_name or season.id }}</option>
+        {% endfor %}
+      </select>
+      <button type="button" id="trigger-rebuild" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Rebuild</button>
+    </div>
+    <p id="rebuild-status" class="text-sm mt-3"></p>
+  </div>
+  {% endif %}
+
   <!-- Bulk Actions Form -->
   <form method="POST" action="{{ url_for('admin.bulk_action') }}">
     <div class="mb-3 flex flex-col space-y-3 sm:flex-row sm:space-x-3 sm:space-y-0 sm:items-center sm:justify-between">
@@ -69,5 +86,44 @@
   document.getElementById('select-all')?.addEventListener('change', function () {
     document.querySelectorAll('input[name="selected_files"]').forEach(cb => cb.checked = this.checked);
   });
+
+  const rebuildButton = document.getElementById('trigger-rebuild');
+  if (rebuildButton) {
+    const statusEl = document.getElementById('rebuild-status');
+    const seasonSelect = document.getElementById('rebuild-season');
+    const rebuildUrlTemplate = '{{ url_for('admin.admin_rebuild_leaderboards', season_id=0) }}';
+
+    rebuildButton.addEventListener('click', async () => {
+      const seasonId = seasonSelect?.value;
+      if (!seasonId) {
+        statusEl.textContent = 'Please select a season to rebuild.';
+        statusEl.className = 'text-sm mt-3 text-red-600';
+        return;
+      }
+
+      statusEl.textContent = 'Rebuilding leaderboards…';
+      statusEl.className = 'text-sm mt-3 text-gray-600';
+
+      try {
+        const response = await fetch(rebuildUrlTemplate.replace('0', seasonId), {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+
+        const data = await response.json();
+        statusEl.textContent = `Leaderboard rebuild queued for season ${data.season_id}.`;
+        statusEl.className = 'text-sm mt-3 text-green-600';
+      } catch (err) {
+        statusEl.textContent = `Rebuild failed: ${err.message}`;
+        statusEl.className = 'text-sm mt-3 text-red-600';
+      }
+    });
+  }
 </script>
 {% endblock %}
