@@ -1,61 +1,37 @@
-"""Background job definitions for leaderboard cache rebuilding."""
+"""Background job definitions for rebuilding leaderboard caches."""
 
 from __future__ import annotations
 
-import logging
-from typing import Sequence
+from flask import current_app
 
-from constants import LEADERBOARD_STAT_KEYS
 from services.progress_store import set_progress
-
-LOGGER = logging.getLogger(__name__)
-STATS_TO_BUILD: Sequence[str] = tuple(LEADERBOARD_STAT_KEYS)
-
-
-def _progress_key(season_id: int) -> str:
-    return f"leaderboard:progress:{season_id}"
+from services.leaderboard_cache import (
+    build_leaderboard_cache,
+    list_all_leaderboard_stats,
+)
 
 
 def rebuild_leaderboards_job(season_id: int) -> None:
-    """Rebuild cached leaderboard payloads for ``season_id``."""
+    """Rebuild cached leaderboard payloads for ``season_id`` with progress."""
 
-    total = len(STATS_TO_BUILD)
-    key = _progress_key(season_id)
+    app = current_app
+    log = app.logger
+    prog_key = f"leaderboard:progress:{season_id}"
+    stats = list_all_leaderboard_stats()
+    total = len(stats) or 1
 
-    if total == 0:
-        LOGGER.info(
-            "Leaderboard rebuild job finished immediately; no stat keys configured (season=%s)",
-            season_id,
-        )
-        set_progress(key, 100, "Complete", done=True)
-        return
+    try:
+        log.info(f"[LEADERS] START season={season_id} total_stats={total}")
+        set_progress(prog_key, 1, "Starting…")
 
-    LOGGER.info(
-        "Starting leaderboard rebuild job (season=%s, total_stats=%s)",
-        season_id,
-        total,
-    )
-
-    from services.leaderboard_cache import build_leaderboard_cache
-
-    for index, stat_key in enumerate(STATS_TO_BUILD, start=1):
-        try:
+        for i, stat_key in enumerate(stats, start=1):
             build_leaderboard_cache(stat_key, season_id)
-        except Exception as exc:  # pragma: no cover - surfaced to scheduler/logs
-            LOGGER.exception(
-                "Leaderboard rebuild job failed (season=%s, stat=%s)",
-                season_id,
-                stat_key,
-            )
-            set_progress(key, 0, f"Failed on {stat_key}", done=True, error=str(exc))
-            raise
+            pct = max(1, int(i * 100 / total))
+            set_progress(prog_key, pct, f"Built {stat_key} ({i}/{total})")
 
-        percent = int(index * 100 / total)
-        set_progress(key, percent, f"Built {stat_key} ({index}/{total})")
-
-    set_progress(key, 100, "Complete", done=True)
-    LOGGER.info(
-        "Finished leaderboard rebuild job (season=%s, total_stats=%s)",
-        season_id,
-        total,
-    )
+        set_progress(prog_key, 100, "Complete", done=True)
+        log.info(f"[LEADERS] DONE season={season_id}")
+    except Exception as exc:  # pragma: no cover - surfaced to scheduler/logs
+        log.exception(f"[LEADERS] FAILED season={season_id}: {exc}")
+        set_progress(prog_key, 0, "Failed", done=True, error=str(exc))
+        raise
