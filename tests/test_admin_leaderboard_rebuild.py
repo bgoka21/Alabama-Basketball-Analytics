@@ -95,7 +95,7 @@ def test_parse_practice_skips_leaderboard_rebuild(client, app, monkeypatch):
         nonlocal called
         called = True
         raise AssertionError('rebuild_leaderboards_for_season should not be called')
-
+# HOTFIX disabled: 
     monkeypatch.setattr('services.cache_leaderboard.rebuild_leaderboards_for_season', fail, raising=False)
 
     resp = client.post('/admin/parse/1')
