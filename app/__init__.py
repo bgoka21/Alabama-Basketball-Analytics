@@ -303,7 +303,7 @@ def create_app():
     @click.option("--season", "season_id", required=True, type=int, help="Season ID to rebuild")
     def cache_rebuild_cmd(season_id: int):
         """Rebuild all leaderboard caches for a season (formatted payloads)."""
-        from services.cache_leaderboard import rebuild_leaderboards_for_season
+        from services.cache_leaderboard_hotfix import rebuild_leaderboards_for_season
 
         out = rebuild_leaderboards_for_season(season_id=season_id)
         if current_app:
@@ -317,7 +317,7 @@ def create_app():
     @click.option("--key", "stat_key", required=True, type=str)
     def cache_rebuild_one_cmd(season_id: int, stat_key: str):
         """Rebuild a single leaderboard key for a season."""
-        from services.cache_leaderboard import cache_build_one, _import_compute_leaderboard
+        from services.cache_leaderboard_hotfix import cache_build_one, _import_compute_leaderboard
 
         compute_fn = _import_compute_leaderboard()
         cache_build_one(stat_key, season_id=season_id, compute_fn=compute_fn)
