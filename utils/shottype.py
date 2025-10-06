@@ -45,7 +45,17 @@ def gather_labels_for_shot(shot: Mapping) -> set[str]:
     suffix_map = {
         "atr": ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"],
         "2fg": ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"],
-        "3fg": ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"],
+        "3fg": [
+            "Contest",
+            "Footwork",
+            "Good/Bad",
+            "Line",
+            "Move",
+            "Balance",
+            "Pocket",
+            "Shrink",
+            "Type",
+        ],
     }
 
     def _extend_from_value(val):
