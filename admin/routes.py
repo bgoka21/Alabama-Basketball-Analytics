@@ -14,6 +14,7 @@ import re
 import traceback
 import zipfile
 from urllib.parse import urlencode
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
 import pdfkit
@@ -129,6 +130,9 @@ try:  # Optional CSRF protection – not every deployment wires this up
     from app.extensions import csrf  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover - extension not present in some setups
     csrf = None
+
+# Background executor for leaderboard rebuilds
+_executor: Optional[ThreadPoolExecutor] = None
 
 # --- Helper Functions at the top ---
 
@@ -8021,43 +8025,27 @@ def admin_rebuild_sync(season_id: int):
 @login_required
 @admin_required
 def admin_rebuild_leaderboards(season_id: int):
-    PROG_KEY = f"leaderboard:progress:{season_id}"
-    clear_progress(PROG_KEY)
-    set_progress(PROG_KEY, 0, "Queued rebuild")
+    global _executor
+    key = f"leaderboard:progress:{season_id}"
+    clear_progress(key)
+    set_progress(key, 0, "Queued rebuild")
     current_app.logger.info(
         "Manual leaderboard rebuild queued by %s for season %s",
         getattr(current_user, "username", "unknown"),
         season_id,
     )
 
-    app = current_app._get_current_object()
-    from app import init_scheduler as _init_scheduler
+    if _executor is None:
+        _executor = ThreadPoolExecutor(max_workers=1)
 
-    _init_scheduler(app)
-    scheduler = getattr(app, "apscheduler", None)
-    if scheduler is None:
-        current_app.logger.error("APScheduler unavailable; cannot queue leaderboard rebuild.")
-        set_progress(PROG_KEY, 0, "Scheduler unavailable", done=True, error="scheduler unavailable")
-        return jsonify({"ok": False, "error": "scheduler unavailable"}), 503
+    app_obj = current_app._get_current_object()
 
-    def _runner(season=season_id, app_obj=app, rebuild_job=rebuild_leaderboards_job):
-        with app_obj.app_context():
-            rebuild_job(season)
+    def _runner(season=season_id, app=app_obj):
+        with app.app_context():
+            rebuild_leaderboards_job(season)
 
-    job_id = f"rebuild-leaderboards:{season_id}"
-    scheduler.add_job(
-        _runner,
-        id=job_id,
-        trigger="date",
-        run_date=datetime.utcnow(),
-        replace_existing=True,
-    )
-    current_app.logger.info(
-        "Queued leaderboard rebuild job for season %s with id=%s",
-        season_id,
-        job_id,
-    )
-    return jsonify({"ok": True, "job_id": job_id, "season_id": season_id})
+    _executor.submit(_runner)
+    return jsonify({"ok": True, "mode": "thread", "season_id": season_id})
 
 
 @admin_bp.get("/admin/cache_status/<int:season_id>")
