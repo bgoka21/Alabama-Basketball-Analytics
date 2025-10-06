@@ -1169,7 +1169,7 @@ def parse_csv(file_path, game_id, season_id):
 
         db.session.commit()
 
-        from services.cache_leaderboard_hotfix import rebuild_leaderboards_after_parse
+        from services.cache_leaderboard import rebuild_leaderboards_after_parse
 
         rebuild_leaderboards_after_parse(None)
 
@@ -1180,7 +1180,7 @@ def parse_csv(file_path, game_id, season_id):
 
     with app_instance.app_context():
         from constants import LEADERBOARD_STAT_KEYS
-        from services.cache_leaderboard_hotfix import cache_build_all
+        from services.cache_leaderboard import cache_build_all
         from admin.routes import build_leaderboard_cache_payload
 
         cache_build_all(season_id, build_leaderboard_cache_payload, LEADERBOARD_STAT_KEYS)

@@ -1,4 +1,4 @@
-from services.cache_leaderboard_hotfix import format_leaderboard_payload
+from services.cache_leaderboard import format_leaderboard_payload
 from stats_config import LEADERBOARD_STATS
 
 

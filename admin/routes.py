@@ -98,7 +98,7 @@ from admin._leaderboard_helpers import (
     with_last_practice,
 )
 from constants import LEADERBOARD_STAT_KEYS
-from services.cache_leaderboard_hotfix import (
+from services.cache_leaderboard import (
     cache_build_all,
     cache_build_one,
     cache_get_leaderboard,
@@ -3939,7 +3939,7 @@ def parse_file(file_id):
             db.session.commit()
 
             flash(
-                "Practice parsed successfully! Rebuild leaderboards from the Files page when ready.",
+                "Parsed successfully. You can now build the leaderboard cache for this season.",
                 "success",
             )
             return redirect(
@@ -3994,7 +3994,7 @@ def parse_file(file_id):
                 return redirect(url_for('admin.dashboard'))
 
             flash(
-                f"File '{filename}' parsed successfully! Rebuild leaderboards from the Files page when ready.",
+                "Parsed successfully. You can now build the leaderboard cache for this season.",
                 "success"
             )
             return redirect(url_for('admin.edit_game', game_id=game.id))
@@ -4730,7 +4730,8 @@ def edit_practice(practice_id):
         practice     = practice,
         player_stats = player_stats,
         blue_stats   = blue_stats,
-        active_page  = 'practices'
+        active_page  = 'practices',
+        season_id    = practice.season_id,
     )
 
 
@@ -4772,7 +4773,7 @@ def edit_game(game_id):
             db.session.rollback()
             flash(f"Error updating game: {e}", "error")
 
-    return render_template('admin/edit_game.html', game=game)
+    return render_template('admin/edit_game.html', game=game, season_id=game.season_id)
 
 
 
@@ -7786,11 +7787,23 @@ def leaderboard():
     table_payload: Optional[dict[str, Any]] = None
     if sid and not (start_dt or end_dt or label_set):
         cache_payload = cache_get_leaderboard(sid, stat_key)
-        if not cache_payload:
+        if cache_payload:
+            current_app.logger.info(
+                "Leaderboard cache hit for stat=%s season=%s", stat_key, sid
+            )
+        else:
+            current_app.logger.info(
+                "Leaderboard cache miss for stat=%s season=%s; computing payload",
+                stat_key,
+                sid,
+            )
             cache_payload = cache_build_one(stat_key, sid, build_leaderboard_cache_payload)
         table_payload = cache_payload
 
     if table_payload is None:
+        current_app.logger.info(
+            "Rendering leaderboard stat=%s season=%s via compute fallback", stat_key, sid
+        )
         cfg, computed_rows, computed_totals = compute_leaderboard(
             stat_key,
             sid,
@@ -7942,8 +7955,29 @@ def api_leaderboard_one(season_id, stat_key):
 @admin_bp.route('/admin/rebuild_leaderboards/<int:season_id>', methods=['POST'])
 @admin_required
 def admin_rebuild_leaderboards(season_id):
-    cache_build_all(season_id, build_leaderboard_cache_payload, LEADERBOARD_STAT_KEYS)
-    return jsonify({"status": "ok", "season_id": season_id})
+    current_app.logger.info(
+        "Manual leaderboard rebuild requested by %s for season %s",
+        current_user.username,
+        season_id,
+    )
+    try:
+        payloads = cache_build_all(
+            season_id,
+            compute_fn=build_leaderboard_cache_payload,
+            stat_keys=LEADERBOARD_STAT_KEYS,
+        )
+    except Exception as exc:  # pragma: no cover - bubbled to caller but logged for context
+        current_app.logger.exception(
+            "Manual leaderboard rebuild failed for season %s", season_id
+        )
+        return jsonify({"status": "error", "message": str(exc)}), 500
+
+    current_app.logger.info(
+        "Manual leaderboard rebuild complete for season %s (%s keys)",
+        season_id,
+        len(payloads),
+    )
+    return jsonify({"status": "ok", "season_id": season_id, "keys": list(payloads)})
 
 
 @admin_bp.route('/usage')

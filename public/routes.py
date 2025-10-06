@@ -1,6 +1,6 @@
 # basketball_analytics/public/routes.py
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
+from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort, current_app
 from flask_login import login_required, current_user
 from markupsafe import Markup
 from sqlalchemy import func, desc, and_, case
@@ -20,7 +20,7 @@ from admin.routes import (
     _split_leaderboard_rows_for_template,
     get_practice_dual_context,
 )
-from services.cache_leaderboard_hotfix import (
+from services.cache_leaderboard import (
     cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,
@@ -939,7 +939,15 @@ def season_leaderboard():
     table_payload: Optional[dict[str, Any]] = None
     if sid and not label_set:
         cache_payload = cache_get_leaderboard(sid, stat_key)
-        if not cache_payload:
+        if cache_payload:
+            current_app.logger.info(
+                "[Public] Leaderboard cache hit for stat=%s season=%s", stat_key, sid
+            )
+        else:
+            current_app.logger.info(
+                "[Public] Leaderboard cache miss for stat=%s season=%s", stat_key, sid
+            )
+
             def _compute_payload(sk, season):
                 cfg_local, rows_local, team_totals_local = compute_leaderboard(sk, season)
                 return {
@@ -952,6 +960,11 @@ def season_leaderboard():
         table_payload = cache_payload
 
     if table_payload is None:
+        current_app.logger.info(
+            "[Public] Rendering leaderboard stat=%s season=%s via compute fallback",
+            stat_key,
+            sid,
+        )
         cfg, computed_rows, computed_totals = compute_leaderboard(
             stat_key,
             sid,
