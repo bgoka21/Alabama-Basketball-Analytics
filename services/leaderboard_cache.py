@@ -48,12 +48,19 @@ class _InMemoryCache:
 
 
 def _load_cache_backend() -> Any:  # pragma: no cover - depends on application
-    module_spec = importlib.util.find_spec("app.extensions")
+    try:
+        module_spec = importlib.util.find_spec("app.extensions")
+    except ImportError:
+        module_spec = None
     if module_spec is not None:
-        module = importlib.import_module("app.extensions")
-        found = getattr(module, "cache", None)
-        if found is not None:
-            return found
+        try:
+            module = importlib.import_module("app.extensions")
+        except ImportError:
+            module = None
+        if module is not None:
+            found = getattr(module, "cache", None)
+            if found is not None:
+                return found
     return _InMemoryCache()
 
 

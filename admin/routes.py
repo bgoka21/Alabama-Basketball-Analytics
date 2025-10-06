@@ -107,6 +107,7 @@ from services.cache_leaderboard import (
     schedule_refresh,
 )
 from services.progress_store import clear_progress, get_progress, set_progress
+from services.leaderboard_jobs import rebuild_leaderboards_job
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
@@ -7989,14 +7990,14 @@ def admin_debug_cache():
 @login_required
 @admin_required
 def admin_ping_scheduler():
-    scheduler = getattr(current_app, "apscheduler", None)
+    s = getattr(current_app, "apscheduler", None)
     jobs = []
-    if scheduler:
+    if s:
         try:
-            jobs = [job.id for job in scheduler.get_jobs()]
+            jobs = [j.id for j in s.get_jobs()]
         except Exception:
             jobs = ["<error listing jobs>"]
-    return jsonify({"running": bool(scheduler), "jobs": jobs})
+    return jsonify({"running": bool(s), "jobs": jobs})
 
 
 @admin_bp.post("/admin/rebuild_sync/<int:season_id>")
@@ -8006,14 +8007,12 @@ def admin_rebuild_sync(season_id: int):
     key = f"leaderboard:progress:{season_id}"
     clear_progress(key)
     set_progress(key, 0, "Starting (sync)…")
-    from services.leaderboard_jobs import rebuild_leaderboards_job
-
     try:
-        rebuild_leaderboards_job(season_id)
-        return jsonify({"ok": True, "mode": "sync", "progress": get_progress(key)})
-    except Exception as exc:  # pragma: no cover - surfaced via response
+        rebuild_leaderboards_job(season_id)  # runs inline in app context
+        return jsonify({"ok": True, "progress": get_progress(key)})
+    except Exception as e:
         return (
-            jsonify({"ok": False, "error": str(exc), "progress": get_progress(key)}),
+            jsonify({"ok": False, "error": str(e), "progress": get_progress(key)}),
             500,
         )
 
@@ -8033,7 +8032,6 @@ def admin_rebuild_leaderboards(season_id: int):
 
     app = current_app._get_current_object()
     from app import init_scheduler as _init_scheduler
-    from services.leaderboard_jobs import rebuild_leaderboards_job
 
     _init_scheduler(app)
     scheduler = getattr(app, "apscheduler", None)
