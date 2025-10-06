@@ -6,7 +6,7 @@ import logging
 from typing import Sequence
 
 from constants import LEADERBOARD_STAT_KEYS
-from services.progress import set_progress
+from services.progress_store import set_progress
 
 LOGGER = logging.getLogger(__name__)
 STATS_TO_BUILD: Sequence[str] = tuple(LEADERBOARD_STAT_KEYS)
