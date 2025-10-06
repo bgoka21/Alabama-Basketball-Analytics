@@ -19,7 +19,7 @@
   <div
     class="mb-6 bg-white shadow rounded-lg p-4"
     data-cache-container
-    data-cache-endpoint-template="{{ url_for('admin.admin_rebuild_leaderboards', season_id='__SEASON__') }}"
+    data-cache-endpoint-template="{{ url_for('admin.admin_rebuild_leaderboards', season_id=0) | replace('/0', '/__SEASON__') }}"
     data-cache-select="#rebuild-season"
   >
     <h2 class="text-lg font-semibold mb-3">Cache Leaderboards</h2>
