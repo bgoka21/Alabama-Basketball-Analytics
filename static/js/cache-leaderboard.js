@@ -27,7 +27,12 @@
       if (data.done || data.error) {
         clearInterval(pollTimer);
         pollTimer = null;
-        if (data.error) console.error("Rebuild error:", data.error);
+        if (data.error) {
+          console.error("Rebuild error:", data.error);
+          document.getElementById("cache-progress-bar")?.classList.add("bg-red-500");
+          const msgEl = document.getElementById("cache-progress-msg");
+          if (msgEl) msgEl.textContent = `Error: ${data.error}`;
+        }
       }
     } catch (e) {
       console.error("Poll failed", e);
@@ -40,6 +45,7 @@
     const statusUrl = container.dataset.cacheStatusTemplate.replace("__SEASON__", seasonId);
 
     if (progressWrap) progressWrap.classList.remove("hidden");
+    bar?.classList.remove("bg-red-500");
     setBar(0, "Queued rebuild");
 
     try {
