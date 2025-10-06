@@ -106,21 +106,40 @@ def fetch_stat_rows(stat_key: str, season_id: int) -> Iterable[Dict[str, Any]]:
         if value_key:
             numeric_value = entry.get(value_key)
         if numeric_value is None and primary_key:
+            numeric_value = entry.get(f"{primary_key}_value")
+        if numeric_value is None and primary_key:
             numeric_value = entry.get(primary_key)
 
         row: Dict[str, Any] = {
             "player_name": player_name,
+            "player": player_name,
         }
         jersey = roster_numbers.get(player_name)
         if jersey not in (None, ""):
             row["player_number"] = jersey
+            row["number"] = jersey
 
         if numeric_value is not None:
             row["value"] = numeric_value
             row[stat_key] = numeric_value
         elif stat_key in entry:
-            numeric_value = entry.get(stat_key)
-            row["value"] = numeric_value
+            fallback = entry.get(stat_key)
+            cleaned = None
+            if isinstance(fallback, (int, float)):
+                cleaned = float(fallback)
+            elif isinstance(fallback, str):
+                text = fallback.strip()
+                if text.endswith("%"):
+                    text = text[:-1]
+                try:
+                    cleaned = float(text)
+                except (TypeError, ValueError):
+                    cleaned = None
+            if cleaned is not None:
+                row["value"] = cleaned
+                row[stat_key] = cleaned
+            else:
+                row["value"] = None
         else:
             row["value"] = None
 
