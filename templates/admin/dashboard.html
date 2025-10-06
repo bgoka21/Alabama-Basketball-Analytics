@@ -148,13 +148,14 @@
         Logs
       </a>
       <form
-        action="{{ url_for('admin.delete_data', file_id=f.id) }}"
         method="post"
+        action="{{ url_for('admin.delete_data', file_id=f.id) }}"
         class="inline"
+        onsubmit="return confirm('This will delete data. Continue?')"
       >
+        {{ csrf_token() }}
         <button
           type="submit"
-          onclick="return confirm('Delete parsed data for this file?')"
           class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm"
         >
           Delete Data
