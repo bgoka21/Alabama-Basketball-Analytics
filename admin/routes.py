@@ -61,6 +61,7 @@ from models.database import (
     PlayerDevelopmentPlan,
     Setting,
     SavedStatProfile,
+    CachedLeaderboard,
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -7944,31 +7945,197 @@ def leaderboard():
     )
 
 
-@admin_bp.route('/api/leaderboards/<int:season_id>', methods=['GET'])
-@admin_bp.route('/api/leaderboards/<int:season_id>/all', methods=['GET'])
+def _validate_cached_leaderboard_payload(stat_key: str, payload: Mapping[str, Any]) -> bool:
+    """Best-effort validation to ensure cached payloads resemble the expected shape."""
+
+    if not isinstance(payload, Mapping):
+        current_app.logger.warning(
+            "Cached leaderboard payload for stat %s is not a mapping; skipping validation.",
+            stat_key,
+        )
+        return False
+
+    valid = True
+
+    columns = payload.get("columns_manifest")
+    if columns is not None:
+        if not isinstance(columns, list) or any(not isinstance(col, Mapping) for col in columns):
+            current_app.logger.warning(
+                "Cached leaderboard payload for stat %s has invalid columns_manifest.",
+                stat_key,
+            )
+            valid = False
+
+    rows = payload.get("rows")
+    if rows is not None:
+        if not isinstance(rows, list):
+            current_app.logger.warning(
+                "Cached leaderboard payload for stat %s has non-list rows.",
+                stat_key,
+            )
+            valid = False
+        else:
+            for idx, row in enumerate(rows):
+                if not isinstance(row, Mapping):
+                    current_app.logger.warning(
+                        "Cached leaderboard payload for stat %s row %s is not a mapping.",
+                        stat_key,
+                        idx,
+                    )
+                    valid = False
+                    break
+                metrics = row.get("metrics")
+                if metrics is not None and not isinstance(metrics, Mapping):
+                    current_app.logger.warning(
+                        "Cached leaderboard payload for stat %s row %s has invalid metrics.",
+                        stat_key,
+                        idx,
+                    )
+                    valid = False
+                    break
+                display = row.get("display")
+                if display is not None and not isinstance(display, Mapping):
+                    current_app.logger.warning(
+                        "Cached leaderboard payload for stat %s row %s has invalid display block.",
+                        stat_key,
+                        idx,
+                    )
+                    valid = False
+                    break
+
+    aux_table = payload.get("aux_table")
+    if aux_table is not None:
+        if not isinstance(aux_table, Mapping):
+            current_app.logger.warning(
+                "Cached leaderboard payload for stat %s has invalid aux_table block.",
+                stat_key,
+            )
+            valid = False
+        else:
+            aux_columns = aux_table.get("columns_manifest")
+            if aux_columns is not None and (
+                not isinstance(aux_columns, list)
+                or any(not isinstance(col, Mapping) for col in aux_columns)
+            ):
+                current_app.logger.warning(
+                    "Cached leaderboard payload for stat %s has invalid aux_table columns_manifest.",
+                    stat_key,
+                )
+                valid = False
+
+            aux_rows = aux_table.get("rows")
+            if aux_rows is not None:
+                if not isinstance(aux_rows, list):
+                    current_app.logger.warning(
+                        "Cached leaderboard payload for stat %s has non-list aux_table rows.",
+                        stat_key,
+                    )
+                    valid = False
+                else:
+                    for idx, row in enumerate(aux_rows):
+                        if not isinstance(row, Mapping):
+                            current_app.logger.warning(
+                                "Cached leaderboard payload for stat %s aux row %s is not a mapping.",
+                                stat_key,
+                                idx,
+                            )
+                            valid = False
+                            break
+                        metrics = row.get("metrics")
+                        if metrics is not None and not isinstance(metrics, Mapping):
+                            current_app.logger.warning(
+                                "Cached leaderboard payload for stat %s aux row %s has invalid metrics.",
+                                stat_key,
+                                idx,
+                            )
+                            valid = False
+                            break
+
+    return valid
+
+
+def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
+    """Return cached leaderboard payloads for ``season_id`` without recomputation."""
+
+    rows = CachedLeaderboard.query.filter_by(season_id=season_id).all()
+    leaderboards: dict[str, Any] = {}
+    schema_version: Any = None
+    formatter_version: Any = None
+
+    for row in rows:
+        try:
+            payload = json.loads(row.payload_json)
+        except json.JSONDecodeError:
+            current_app.logger.warning(
+                "Failed to decode cached leaderboard payload for season %s stat %s.",
+                season_id,
+                row.stat_key,
+            )
+            continue
+
+        if not isinstance(payload, Mapping):
+            current_app.logger.warning(
+                "Cached leaderboard payload for season %s stat %s is not a mapping.",
+                season_id,
+                row.stat_key,
+            )
+            continue
+
+        _validate_cached_leaderboard_payload(row.stat_key, payload)
+
+        leaderboards[row.stat_key] = payload
+
+        payload_schema_version = payload.get("schema_version")
+        if payload_schema_version is not None:
+            if schema_version is None:
+                schema_version = payload_schema_version
+            elif schema_version != payload_schema_version:
+                current_app.logger.warning(
+                    "Mismatched schema_version in cached leaderboards for season %s (expected %s, found %s).",
+                    season_id,
+                    schema_version,
+                    payload_schema_version,
+                )
+
+        payload_formatter_version = payload.get("formatter_version")
+        if payload_formatter_version is not None:
+            if formatter_version is None:
+                formatter_version = payload_formatter_version
+            elif formatter_version != payload_formatter_version:
+                current_app.logger.warning(
+                    "Mismatched formatter_version in cached leaderboards for season %s (expected %s, found %s).",
+                    season_id,
+                    formatter_version,
+                    payload_formatter_version,
+                )
+
+    missing = [key for key in LEADERBOARD_STAT_KEYS if key not in leaderboards]
+
+    return {
+        "leaderboards": leaderboards,
+        "missing": missing,
+        "schema_version": schema_version,
+        "formatter_version": formatter_version,
+    }
+
+
+@admin_bp.get('/api/leaderboards/<int:season_id>')
+@admin_bp.get('/api/leaderboards/<int:season_id>/all')
+@admin_bp.get('/admin/api/leaderboards/<int:season_id>/all')
 @login_required
 def api_leaderboards_all(season_id):
-    payloads: dict[str, Any] = {}
-    warming: list[str] = []
-    for stat_key in LEADERBOARD_STAT_KEYS:
-        cached = cache_get_leaderboard(season_id, stat_key)
-        if cached:
-            payloads[stat_key] = cached
-            maybe_schedule_refresh(stat_key, season_id, cached.get("variant"), cached.get("last_built_at"))
-        else:
-            warming.append(stat_key)
-            schedule_refresh(stat_key, season_id)
+    data = _load_all_cached_leaderboards(season_id)
+    body = json.dumps(data, separators=(",", ":"), sort_keys=True, default=str)
+    etag = hashlib.sha256(body.encode("utf-8")).hexdigest()
 
-    response_body: dict[str, Any] = {"season_id": season_id, "leaderboards": payloads}
-    if warming:
-        response_body["warming"] = warming
+    if request.if_none_match and request.if_none_match.contains(etag):
+        resp = make_response("", 304)
+    else:
+        resp = make_response(body, 200)
+        resp.headers["Content-Type"] = "application/json"
 
-    status_code = 200 if not warming else 202
-    resp = make_response(jsonify(response_body), status_code)
-    if payloads:
-        etag_source = json.dumps(payloads, sort_keys=True, default=str)
-        resp.set_etag(hashlib.md5(etag_source.encode()).hexdigest())
-    resp.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
+    resp.set_etag(etag)
+    resp.headers["Cache-Control"] = "public, max-age=60"
     return resp
 
 
