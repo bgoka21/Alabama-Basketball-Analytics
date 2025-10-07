@@ -3,7 +3,7 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort, current_app
 from flask_login import login_required, current_user
 from markupsafe import Markup
-from sqlalchemy import func, desc, and_, case
+from sqlalchemy import func, desc, and_, case, or_
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from datetime import date, timedelta
@@ -929,15 +929,56 @@ def season_leaderboard():
     if not stat_key:
         stat_key = LEADERBOARD_STATS[0]['key']
     sid = get_current_season_id()
+    start_date_raw = (request.args.get("start_date") or "").strip()
+    end_date_raw = (request.args.get("end_date") or "").strip()
+    label_list_raw = request.args.getlist("label")
+    label_list = [lbl.strip() for lbl in label_list_raw if lbl and lbl.strip()]
+
+    start_dt = end_dt = None
+    if start_date_raw:
+        try:
+            start_dt = date.fromisoformat(start_date_raw)
+        except ValueError:
+            start_date_raw = ""
+    if end_date_raw:
+        try:
+            end_dt = date.fromisoformat(end_date_raw)
+        except ValueError:
+            end_date_raw = ""
+
     q = PlayerStats.query.filter(PlayerStats.season_id == sid)
+    if start_dt or end_dt:
+        q = (
+            q.outerjoin(Game, PlayerStats.game_id == Game.id)
+            .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+        )
+        if start_dt:
+            q = q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            q = q.filter(
+                or_(
+                    and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                    and_(PlayerStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
     stats_list = q.all()
+
     label_options = collect_practice_labels(stats_list)
-    selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
+    selected_labels = [lbl for lbl in label_list if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
+
+    start_date_value = start_dt.isoformat() if start_dt else start_date_raw
+    end_date_value = end_dt.isoformat() if end_dt else end_date_raw
 
     cache_payload = None
     table_payload: Optional[dict[str, Any]] = None
-    if sid and not label_set:
+    has_filters = bool(start_dt or end_dt or label_set)
+    if sid and stat_key and not has_filters:
         cache_payload = cache_get_leaderboard(sid, stat_key)
         if cache_payload:
             current_app.logger.info(
@@ -968,6 +1009,8 @@ def season_leaderboard():
         cfg, computed_rows, computed_totals = compute_leaderboard(
             stat_key,
             sid,
+            start_dt,
+            end_dt,
             label_set=label_set if label_set else None,
         )
         compute_result = {
@@ -1022,6 +1065,8 @@ def season_leaderboard():
         label_options=label_options,
         selected_labels=selected_labels,
         season_id=sid,
+        start_date=start_date_value,
+        end_date=end_date_value,
         **split_context,
     )
 
