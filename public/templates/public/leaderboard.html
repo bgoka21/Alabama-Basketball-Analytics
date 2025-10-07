@@ -3,8 +3,3 @@
   <a href="{{ url_for('pdf_leaderboard') }}" class="btn no-print">Download PDF</a>
   {% include "_leaderboard_block.html" %}
 {% endblock %}
-
-{% block scripts %}
-  {{ super() }}
-  <script src="{{ url_for('static', filename='js/leaderboard.js') }}" defer></script>
-{% endblock %}
