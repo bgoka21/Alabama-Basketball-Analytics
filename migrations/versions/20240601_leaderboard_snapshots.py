@@ -27,33 +27,61 @@ def _utcnow() -> datetime:
 
 
 def upgrade() -> None:
-    op.add_column(
-        "cached_leaderboards",
-        sa.Column("schema_version", sa.Integer(), nullable=True),
-    )
-    op.add_column(
-        "cached_leaderboards",
-        sa.Column("formatter_version", sa.Integer(), nullable=True),
-    )
-    op.add_column(
-        "cached_leaderboards",
-        sa.Column("etag", sa.String(length=64), nullable=True),
-    )
-    op.add_column(
-        "cached_leaderboards",
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            server_default=sa.func.now(),
-            nullable=True,
-        ),
-    )
-    op.add_column(
-        "cached_leaderboards",
-        sa.Column("build_manifest", sa.Text(), nullable=True),
-    )
+    bind = op.get_bind()
+    dialect = bind.dialect.name
 
-    conn = op.get_bind()
+    # ---- helper: does column already exist? (idempotent) ----
+    insp = sa.inspect(bind)
+    existing_cols = {c["name"] for c in insp.get_columns("cached_leaderboards")}
+
+    # --- created_at (SQLite-safe) ---
+    if "created_at" not in existing_cols:
+        if dialect == "sqlite":
+            # 1) add nullable column (no server_default allowed on ALTER)
+            op.add_column(
+                "cached_leaderboards",
+                sa.Column("created_at", sa.DateTime(), nullable=True),
+            )
+            # 2) backfill existing rows
+            op.execute("UPDATE cached_leaderboards SET created_at = datetime('now') WHERE created_at IS NULL")
+            # 3) enforce NOT NULL
+            op.alter_column("cached_leaderboards", "created_at", nullable=False)
+        else:
+            # Other DBs (e.g., Postgres/MySQL) can add with server_default
+            op.add_column(
+                "cached_leaderboards",
+                sa.Column(
+                    "created_at",
+                    sa.DateTime(),
+                    server_default=sa.text("CURRENT_TIMESTAMP"),
+                    nullable=False,
+                ),
+            )
+            # Optional: drop default after creation if you prefer app-level default
+            op.alter_column("cached_leaderboards", "created_at", server_default=None)
+
+    if "schema_version" not in existing_cols:
+        op.add_column(
+            "cached_leaderboards",
+            sa.Column("schema_version", sa.Integer(), nullable=True),
+        )
+    if "formatter_version" not in existing_cols:
+        op.add_column(
+            "cached_leaderboards",
+            sa.Column("formatter_version", sa.Integer(), nullable=True),
+        )
+    if "etag" not in existing_cols:
+        op.add_column(
+            "cached_leaderboards",
+            sa.Column("etag", sa.String(length=64), nullable=True),
+        )
+    if "build_manifest" not in existing_cols:
+        op.add_column(
+            "cached_leaderboards",
+            sa.Column("build_manifest", sa.Text(), nullable=True),
+        )
+
+    conn = bind
     rows = conn.execute(
         sa.text(
             "SELECT id, payload_json, updated_at, season_id, stat_key "
@@ -119,12 +147,6 @@ def upgrade() -> None:
     )
     op.alter_column(
         "cached_leaderboards",
-        "created_at",
-        existing_type=sa.DateTime(),
-        nullable=False,
-    )
-    op.alter_column(
-        "cached_leaderboards",
         "season_id",
         existing_type=sa.Integer(),
         nullable=False,
@@ -151,17 +173,26 @@ def upgrade() -> None:
     with op.batch_alter_table("cached_leaderboards") as batch_op:
         batch_op.drop_column("updated_at")
 
-
 def downgrade() -> None:
-    op.add_column(
-        "cached_leaderboards",
-        sa.Column(
-            "updated_at",
-            sa.DateTime(),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-    )
+    # Safe to drop if present
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_cols = {c["name"] for c in insp.get_columns("cached_leaderboards")}
+    if "created_at" in existing_cols:
+        op.drop_column("cached_leaderboards", "created_at")
+        insp = sa.inspect(bind)
+        existing_cols = {c["name"] for c in insp.get_columns("cached_leaderboards")}
+
+    if "updated_at" not in existing_cols:
+        op.add_column(
+            "cached_leaderboards",
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                server_default=sa.func.now(),
+                nullable=False,
+            ),
+        )
 
     op.drop_constraint(
         "uq_cached_leaderboards_version",
@@ -189,7 +220,6 @@ def downgrade() -> None:
     )
 
     op.drop_column("build_manifest")
-    op.drop_column("created_at")
     op.drop_column("etag")
     op.drop_column("formatter_version")
     op.drop_column("schema_version")

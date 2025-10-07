@@ -19,9 +19,8 @@ class CachedLeaderboard(db.Model):
     payload_json = db.Column(db.Text, nullable=False)
     created_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        server_default=func.now(),
         nullable=False,
+        default=func.now(),
     )
     build_manifest = db.Column(db.Text, nullable=True)
 
