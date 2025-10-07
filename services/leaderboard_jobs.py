@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+
 from flask import current_app
 
-from services.progress_store import set_progress
-from services.leaderboard_cache import (
-    build_leaderboard_cache,
-    list_all_leaderboard_stats,
+from services.cache_leaderboard import (
+    LEADERBOARD_STAT_KEYS,
+    cache_build_one,
 )
+from services.progress_store import set_progress
 
 
 def rebuild_leaderboards_job(season_id: int) -> None:
@@ -17,7 +19,9 @@ def rebuild_leaderboards_job(season_id: int) -> None:
     app = current_app
     log = app.logger
     key = f"leaderboard:progress:{season_id}"
-    stats = list_all_leaderboard_stats()
+
+    compute = import_module("services.cache_leaderboard")._import_compute_leaderboard()
+    stats = list(LEADERBOARD_STAT_KEYS)
     total = len(stats) or 1
 
     try:
@@ -25,7 +29,7 @@ def rebuild_leaderboards_job(season_id: int) -> None:
         set_progress(key, 1, "Starting…")
 
         for i, stat_key in enumerate(stats, start=1):
-            build_leaderboard_cache(stat_key, season_id)
+            cache_build_one(stat_key, season_id, compute, commit=True)
             pct = max(1, int(i * 100 / total))
             set_progress(key, pct, f"Built {stat_key} ({i}/{total})")
 
