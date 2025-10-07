@@ -43,6 +43,7 @@ from werkzeug.utils import secure_filename
 
 from models.database import (
     db,
+    CachedLeaderboard,
     Game,
     TeamStats,
     PlayerStats,
@@ -8103,6 +8104,68 @@ def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
         "schema_version": schema_version,
         "formatter_version": formatter_version,
     }
+
+
+@admin_bp.get("/admin/diag/leaderboards/<int:season_id>")
+@login_required
+@admin_required
+def admin_leaderboard_diagnostics(season_id: int):
+    season = db.session.get(Season, season_id)
+    if season is None:
+        abort(404, description=f"Season {season_id} not found")
+
+    summary = _load_all_cached_leaderboards(season_id)
+    snapshots = (
+        CachedLeaderboard.query.filter_by(season_id=season_id)
+        .order_by(
+            CachedLeaderboard.stat_key.asc(),
+            CachedLeaderboard.created_at.desc(),
+            CachedLeaderboard.id.desc(),
+        )
+        .all()
+    )
+
+    history: dict[str, list[dict[str, Any]]] = {}
+    latest: dict[str, dict[str, Any]] = {}
+
+    for snap in snapshots:
+        record = {
+            "stat_key": snap.stat_key,
+            "created_at": snap.created_at,
+            "etag": snap.etag,
+            "schema_version": snap.schema_version,
+            "formatter_version": snap.formatter_version,
+            "size_bytes": len((snap.payload_json or "").encode("utf-8")),
+        }
+        history.setdefault(snap.stat_key, []).append(record)
+        if snap.stat_key not in latest:
+            latest[snap.stat_key] = record
+
+    missing_from_constants = [key for key in LEADERBOARD_STAT_KEYS if key not in latest]
+    reported_missing = summary.get("missing", []) if isinstance(summary, Mapping) else []
+    missing: list[str] = list(dict.fromkeys(missing_from_constants + list(reported_missing)))
+
+    known_keys = list(dict.fromkeys(list(LEADERBOARD_STAT_KEYS) + list(latest.keys())))
+    table_rows = [
+        {
+            "stat_key": key,
+            "snapshot": latest.get(key),
+            "history": history.get(key, []),
+        }
+        for key in known_keys
+    ]
+
+    return render_template(
+        "admin/diag_leaderboards.html",
+        season=season,
+        season_id=season_id,
+        rows=table_rows,
+        history=history,
+        missing=missing,
+        schema_version=summary.get("schema_version") if isinstance(summary, Mapping) else None,
+        formatter_version=summary.get("formatter_version") if isinstance(summary, Mapping) else None,
+        active_page="leaderboards",
+    )
 
 
 @admin_bp.get('/api/leaderboards/<int:season_id>')

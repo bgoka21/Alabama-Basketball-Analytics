@@ -213,6 +213,14 @@
     });
     state.snapshots = payloads;
     window.LEADERBOARDS = state.snapshots;
+    state.missingKeys = Array.isArray(data.missing) ? data.missing : [];
+    console.info("[Leaderboards] Loaded snapshots", {
+      keys: Object.keys(payloads),
+      missing: state.missingKeys,
+    });
+    state.missingKeys.forEach((key) => {
+      console.info("[Leaderboards] Missing snapshot", key);
+    });
     return state.snapshots;
   }
 
@@ -221,9 +229,12 @@
     state.currentKey = key;
     const payload = state.snapshots[key];
     if (!payload) {
+      console.info("[Leaderboards] Requested stat missing from cache", { statKey: key });
       console.warn("No snapshot for key", key);
       return;
     }
+    const rowCount = Array.isArray(payload.rows) ? payload.rows.length : 0;
+    console.info("[Leaderboards] Rendering stat", { statKey: key, rows: rowCount });
     renderPayload(payload);
   }
 
@@ -246,6 +257,12 @@
         const initialPayload = JSON.parse(initialPayloadScript.textContent || "{}");
         if (initialPayload && initialKey) {
           state.snapshots[initialKey] = normalizeTablePayload(initialPayload);
+          const initial = state.snapshots[initialKey];
+          const rowCount = initial && Array.isArray(initial.rows) ? initial.rows.length : 0;
+          console.info("[Leaderboards] Initial payload loaded", {
+            statKey: initialKey,
+            rows: rowCount,
+          });
         }
       }
     } catch (e) {
@@ -268,7 +285,13 @@
 
     // Fetch all snapshots once, then stat switches are instant
     fetchAllSnapshots()
-      .then(() => {
+      .then((snapshots) => {
+        const keys = Object.keys(snapshots || {});
+        const missing = Array.isArray(state.missingKeys) ? state.missingKeys : [];
+        console.info("[Leaderboards] /all fetch completed", { keys, missing });
+        missing.forEach((key) => {
+          console.info("[Leaderboards] Missing snapshot", key);
+        });
         // If user has already changed stat before fetch completed, honor current selection
         const key = qs("#stat-select")?.value || initialKey;
         if (state.snapshots[key]) {
