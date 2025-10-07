@@ -7907,6 +7907,15 @@ def leaderboard():
         link for link in practice_links if link["endpoint"] in view_functions
     ]
 
+    stat_options = [
+        (
+            stat.get('key'),
+            stat.get('label') or str(stat.get('key', '')).replace('_', ' ').title(),
+        )
+        for stat in LEADERBOARD_STATS
+        if stat.get('key') and not stat.get('hidden')
+    ]
+
     return render_template(
         'admin/leaderboard.html',
         all_seasons=all_seasons,
@@ -7929,11 +7938,14 @@ def leaderboard():
         selected_session=selected_session,
         sessions=sessions,
         practice_links=filtered_practice_links,
+        stat_options=stat_options,
+        current_stat_key=stat_key,
         **split_context,
     )
 
 
 @admin_bp.route('/api/leaderboards/<int:season_id>', methods=['GET'])
+@admin_bp.route('/api/leaderboards/<int:season_id>/all', methods=['GET'])
 @login_required
 def api_leaderboards_all(season_id):
     payloads: dict[str, Any] = {}
