@@ -1,8 +1,6 @@
 from datetime import date
 from pathlib import Path
-
-from datetime import date
-from pathlib import Path
+import json
 
 import pytest
 from flask import Flask
@@ -11,7 +9,7 @@ from werkzeug.security import generate_password_hash
 
 from models.database import db, Season, UploadedFile, Roster
 from models.user import User
-from admin.routes import admin_bp, build_leaderboard_cache_payload
+from admin.routes import admin_bp
 
 
 @pytest.fixture
@@ -99,8 +97,7 @@ def test_parse_practice_skips_leaderboard_rebuild(client, app, monkeypatch):
         called = True
         raise AssertionError('cache rebuild should not be triggered during parse')
 
-    monkeypatch.setattr('admin.routes.cache_build_all', fail)
-    monkeypatch.setattr('admin.routes.cache_build_one', fail)
+    monkeypatch.setattr('admin.routes.rebuild_leaderboards_job', fail)
 
     resp = client.post('/admin/parse/1')
     assert resp.status_code == 302
@@ -120,24 +117,28 @@ def test_parse_practice_flash_and_button(client):
     assert 'data-cache-container' in html
 
 
-def test_manual_leaderboard_rebuild_endpoint(client, monkeypatch):
+def test_manual_leaderboard_rebuild_endpoint(client, app, monkeypatch):
     captured = {}
 
-    def fake_cache_build_all(season_id, *, compute_fn=None, stat_keys=None):
+    def fake_rebuild_job(season_id, *, stat_keys=None, app=None):
         captured['season_id'] = season_id
-        captured['compute_fn'] = compute_fn
         captured['keys'] = tuple(stat_keys or [])
-        return {key: {} for key in captured['keys']}
 
-    monkeypatch.setattr('admin.routes.cache_build_all', fake_cache_build_all)
+    monkeypatch.setattr('admin.routes.rebuild_leaderboards_job', fake_rebuild_job)
 
     resp = client.post('/admin/admin/rebuild_leaderboards/1')
     assert resp.status_code == 200
     payload = resp.get_json()
-    assert payload['status'] == 'ok'
+    assert payload['queued'] is True
     assert payload['season_id'] == 1
     assert payload['keys'] == list(captured['keys'])
+    assert 'started_at' in payload
 
     assert captured['season_id'] == 1
-    assert captured['compute_fn'] is build_leaderboard_cache_payload
     assert captured['keys']
+
+    progress_path = Path(app.instance_path) / 'progress' / 'leaderboard:progress:1.json'
+    assert progress_path.exists()
+    data = json.loads(progress_path.read_text())
+    assert data['percent'] == 0
+    assert data['message'] == 'Queued'

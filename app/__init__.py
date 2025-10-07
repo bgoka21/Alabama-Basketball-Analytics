@@ -51,7 +51,8 @@ def init_scheduler(app: Flask) -> None:
         return
 
     scheduler = BackgroundScheduler(timezone="UTC")
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.start()
     app.apscheduler = scheduler
     app._apscheduler_started = True
     app._apscheduler_lock_file = lock_file
