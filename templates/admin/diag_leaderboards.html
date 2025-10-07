@@ -1,0 +1,132 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-2xl font-semibold">Leaderboard Cache Diagnostics</h1>
+    <p class="text-sm text-gray-600">
+      Season: {{ season.season_name if season else season_id }} (ID {{ season_id }})
+    </p>
+    <p class="text-xs text-gray-500">
+      Schema version: {{ schema_version or "—" }} · Formatter version: {{ formatter_version or "—" }}
+    </p>
+  </header>
+
+  {% if missing %}
+  <div class="border border-amber-300 bg-amber-50 text-amber-900 p-3 rounded">
+    <p class="font-semibold text-sm">Missing stat keys</p>
+    <p class="text-xs sm:text-sm">{{ missing|join(", ") }}</p>
+  </div>
+  {% endif %}
+
+  <div class="overflow-x-auto bg-white border border-gray-200 rounded">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead class="bg-gray-100 text-left text-xs font-semibold uppercase tracking-wider">
+        <tr>
+          <th class="px-4 py-2">Stat key</th>
+          <th class="px-4 py-2">Created</th>
+          <th class="px-4 py-2">ETag</th>
+          <th class="px-4 py-2">Schema</th>
+          <th class="px-4 py-2">Formatter</th>
+          <th class="px-4 py-2">Size (bytes)</th>
+          <th class="px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for row in rows %}
+        {% set snapshot = row.snapshot %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2 font-mono text-xs sm:text-sm align-top">{{ row.stat_key }}</td>
+          <td class="px-4 py-2 text-xs sm:text-sm align-top">
+            {% if snapshot %}
+              {{ snapshot.created_at.strftime('%Y-%m-%d %H:%M:%S') if snapshot.created_at else '—' }}
+            {% else %}
+              <span class="text-gray-400">Missing</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 text-[11px] sm:text-xs align-top break-all">
+            {% if snapshot %}
+              {{ snapshot.etag }}
+            {% else %}
+              <span class="text-gray-400">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 text-xs sm:text-sm align-top">
+            {{ snapshot.schema_version if snapshot else '—' }}
+          </td>
+          <td class="px-4 py-2 text-xs sm:text-sm align-top">
+            {{ snapshot.formatter_version if snapshot else '—' }}
+          </td>
+          <td class="px-4 py-2 text-xs sm:text-sm align-top">
+            {{ snapshot.size_bytes if snapshot else '0' }}
+          </td>
+          <td class="px-4 py-2 text-xs sm:text-sm align-top space-y-1">
+            <button type="button"
+                    class="no-print inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                    data-action="leaderboard-rebuild"
+                    data-season-id="{{ season_id }}"
+                    data-stat-key="{{ row.stat_key }}">
+              Rebuild this key
+            </button>
+            <a href="#history-{{ row.stat_key }}"
+               class="no-print inline-flex items-center rounded border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+              Rollback (list last {{ row.history|length }})
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <section class="space-y-3">
+    <h2 class="text-xl font-semibold">Snapshot history</h2>
+    <p class="text-sm text-gray-600">Latest snapshot is shown in the table above. Expand a section to view earlier versions for rollback reference.</p>
+    {% if history %}
+      {% for stat_key, entries in history|dictsort %}
+        <details id="history-{{ stat_key }}" class="border border-gray-200 rounded">
+          <summary class="cursor-pointer select-none px-4 py-2 text-sm font-medium">
+            {{ stat_key }} ({{ entries|length }} snapshots)
+          </summary>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-xs">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left">Created</th>
+                  <th class="px-4 py-2 text-left">ETag</th>
+                  <th class="px-4 py-2 text-left">Schema</th>
+                  <th class="px-4 py-2 text-left">Formatter</th>
+                  <th class="px-4 py-2 text-left">Size (bytes)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {% for entry in entries %}
+                <tr>
+                  <td class="px-4 py-2">
+                    {{ entry.created_at.strftime('%Y-%m-%d %H:%M:%S') if entry.created_at else '—' }}
+                  </td>
+                  <td class="px-4 py-2 break-all text-[11px]">
+                    {{ entry.etag }}
+                  </td>
+                  <td class="px-4 py-2">
+                    {{ entry.schema_version }}
+                  </td>
+                  <td class="px-4 py-2">
+                    {{ entry.formatter_version }}
+                  </td>
+                  <td class="px-4 py-2">
+                    {{ entry.size_bytes }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      {% endfor %}
+    {% else %}
+      <p class="text-sm text-gray-500">No snapshots have been captured for this season yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
