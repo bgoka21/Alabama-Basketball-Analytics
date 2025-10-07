@@ -100,7 +100,6 @@ from admin._leaderboard_helpers import (
 )
 from constants import LEADERBOARD_STAT_KEYS
 from services.cache_leaderboard import (
-    cache_build_one,
     cache_get_leaderboard,
     expand_cached_rows_for_template,
     format_leaderboard_payload,
@@ -3336,6 +3335,9 @@ if csrf:
     csrf.exempt(update_preset_api)
     csrf.exempt(delete_preset_api)
     csrf.exempt(ping_presets_api)
+    # Rebuild cache + status endpoints need to accept fetch() POSTs without CSRF
+    csrf.exempt(admin_rebuild_leaderboards)
+    csrf.exempt(admin_cache_status)
 
 
 def _resolve_season_from_request():
@@ -8261,45 +8263,94 @@ def admin_rebuild_sync(season_id: int):
 @login_required
 @admin_required
 def admin_rebuild_leaderboards(season_id: int):
-    payload = request.get_json(silent=True) or {}
-    keys = payload.get("keys") if isinstance(payload, Mapping) else None
+    payload = request.get_json(silent=True)
+    keys_param: Any = payload.get("keys") if isinstance(payload, Mapping) else None
 
-    if keys in (None, "all"):
+    if keys_param in (None, "all"):
         stat_keys = list(LEADERBOARD_STAT_KEYS)
-    elif isinstance(keys, list):
-        stat_keys = [str(k) for k in keys if str(k)]
+    elif isinstance(keys_param, Sequence) and not isinstance(keys_param, (str, bytes)):
+        stat_keys = [str(k) for k in keys_param if str(k)]
         if not stat_keys:
             raise BadRequest("No stat keys provided")
     else:
         raise BadRequest("'keys' must be a list or 'all'")
 
-    current_app.logger.info(
+    app_obj = current_app._get_current_object()
+    username = getattr(current_user, "username", "unknown")
+    app_obj.logger.info(
         "[LEADERS] Warm requested by %s for season=%s keys=%s",
-        getattr(current_user, "username", "unknown"),
+        username,
         season_id,
         stat_keys,
     )
 
-    compute_fn = build_leaderboard_cache_payload
-    built: dict[str, Any] = {}
+    prog_key = f"leaderboard:progress:{season_id}"
+    set_progress(prog_key, 0, "Queued")
 
-    try:
-        for key in stat_keys:
-            built[key] = cache_build_one(key, season_id, compute_fn, commit=False)
-        db.session.commit()
-    except Exception as exc:
-        db.session.rollback()
-        current_app.logger.exception(
-            "[LEADERS] Warm failed for season=%s keys=%s", season_id, stat_keys
-        )
-        return jsonify({"ok": False, "error": str(exc)}), 500
+    scheduler = getattr(app_obj, "apscheduler", None)
+    job_id = f"leaderboard-rebuild:{season_id}"
+    queued = False
 
-    return jsonify({
-        "ok": True,
-        "season_id": season_id,
-        "built": stat_keys,
-        "count": len(stat_keys),
-    })
+    if scheduler is not None:
+        try:
+            scheduler.add_job(
+                rebuild_leaderboards_job,
+                trigger="date",
+                id=job_id,
+                run_date=datetime.utcnow(),
+                args=(season_id,),
+                kwargs={"stat_keys": stat_keys, "app": app_obj},
+                replace_existing=True,
+                coalesce=True,
+                max_instances=1,
+            )
+            queued = True
+            app_obj.logger.info(
+                "[LEADERS] Job queued by %s for season=%s keys=%s",
+                username,
+                season_id,
+                stat_keys,
+            )
+        except Exception:
+            app_obj.logger.exception(
+                "[LEADERS] Failed to enqueue job for season=%s keys=%s",
+                season_id,
+                stat_keys,
+            )
+
+    if not queued:
+        try:
+            rebuild_leaderboards_job(season_id, stat_keys=stat_keys)
+        except Exception as exc:  # pragma: no cover - surfaced via response
+            app_obj.logger.exception(
+                "[LEADERS] Warm failed inline for season=%s keys=%s",
+                season_id,
+                stat_keys,
+            )
+            return (
+                jsonify(
+                    {
+                        "queued": False,
+                        "season_id": season_id,
+                        "keys": stat_keys,
+                        "error": str(exc),
+                    }
+                ),
+                500,
+            )
+
+    started_at = datetime.utcnow().isoformat() + "Z"
+    return (
+        jsonify(
+            {
+                "queued": True,
+                "season_id": season_id,
+                "keys": stat_keys,
+                "started_at": started_at,
+            }
+        ),
+        200,
+    )
 
 
 @admin_bp.post("/admin/leaderboards/<int:season_id>/rollback")
