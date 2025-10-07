@@ -1,51 +1,59 @@
 {% from 'macros/dual_tables.html' import render_dual_section %}
 {% from 'macros/table.html' import render_table %}
 
-<h1 class="text-3xl font-bold mb-6">Season Leaderboard</h1>
+<div id="leaderboard-root" data-season-id="{{ season_id or '' }}" class="space-y-4">
+  <h1 class="text-3xl font-bold">Season Leaderboard</h1>
 
-<form method="get" class="mb-4">
-  <label for="stat-select">Stat:</label>
-  <select id="stat-select" name="stat" onchange="this.form.submit()">
-    {% for s in stats_config if not s.get('hidden') %}
-      <option value="{{ s.key }}" {% if s.key == selected.key %}selected{% endif %}>{{ s.label }}</option>
+  <form method="get" class="flex flex-wrap items-end gap-3" id="leaderboard-controls">
+    <div class="flex flex-col">
+      <label for="stat-select" class="font-semibold text-sm">Stat:</label>
+      <select id="stat-select" name="stat" class="border rounded px-3 py-2">
+        {% for s in stats_config if not s.get('hidden') %}
+          <option value="{{ s.key }}" {% if s.key == selected.key %}selected{% endif %}>{{ s.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <input type="hidden" name="season_id" value="{{ selected_season }}">
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+    {% for lbl in selected_labels %}
+      <input type="hidden" name="label" value="{{ lbl }}">
     {% endfor %}
-  </select>
-  <input type="hidden" name="season_id" value="{{ selected_season }}">
-  <input type="hidden" name="start_date" value="{{ start_date }}">
-  <input type="hidden" name="end_date" value="{{ end_date }}">
-  {% for lbl in selected_labels %}
-    <input type="hidden" name="label" value="{{ lbl }}">
-  {% endfor %}
-</form>
+    <button type="submit" class="px-4 py-2 rounded bg-[#9E1B32] text-white text-sm">Apply</button>
+  </form>
 
-{% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
+  {% set practice_note = last_practice_date.strftime('%b %d, %Y') if last_practice_date else None %}
 
-{% if selected.key == 'defense' %}
-  {% set columns = ["Bump +", "Bump Opps", "Bump %"] %}
-  {% set column_map = {
-    "Bump +": ("plus", "bump_positive"),
-    "Bump Opps": ("opps", "total_opps"),
-    "Bump %": ("pct",),
-  } %}
-  {% set pct_columns = ["Bump %"] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=bump_rows,
-    last_rows=bump_last_rows,
-    season_totals=bump_totals,
-    last_totals=bump_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-defense',
-    default_sort=['pct', 'opps', 'plus']
-  ) %}
-  {{ render_dual_section('Defense — Bumps', table, practice_note) }}
+  {% set main_section %}{% endset %}
+  {% set aux_section %}{% endset %}
 
-{% elif selected.key == 'off_rebounding' %}
-  <div class="space-y-8">
+  {% if selected.key == 'defense' %}
+    {% set columns = ["Bump +", "Bump Opps", "Bump %"] %}
+    {% set column_map = {
+      "Bump +": ("plus", "bump_positive"),
+      "Bump Opps": ("opps", "total_opps"),
+      "Bump %": ("pct",),
+    } %}
+    {% set pct_columns = ["Bump %"] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=bump_rows,
+      last_rows=bump_last_rows,
+      season_totals=bump_totals,
+      last_totals=bump_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-defense',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section('Defense — Bumps', table, practice_note) }}
+    {% endset %}
+
+  {% elif selected.key == 'off_rebounding' %}
     {% set crash_columns = ["Crash +", "Crash Att", "Crash %"] %}
     {% set crash_map = {
       "Crash +": ("plus", "crash_plus"),
@@ -66,8 +74,6 @@
       table_id='leaderboard-offense-crash',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('Offensive Crash', crash_table, practice_note) }}
-
     {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
     {% set back_map = {
       "Back Man +": ("plus", "back_plus"),
@@ -88,171 +94,186 @@
       table_id='leaderboard-offense-back',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('Offensive Back Man', back_table, practice_note) }}
-  </div>
+    {% set main_section %}
+      {{ render_dual_section('Offensive Crash', crash_table, practice_note) }}
+    {% endset %}
+    {% set aux_section %}
+      {{ render_dual_section('Offensive Back Man', back_table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'def_rebounding' %}
-  {% set columns = ["Box Out +", "Box Out Att", "Box Out %", "Off Reb's Given Up"] %}
-  {% set column_map = {
-    "Box Out +": ("plus", "box_plus"),
-    "Box Out Att": ("opps", "box_opp", "box_opps"),
-    "Box Out %": ("pct", "box_pct"),
-    "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
-  } %}
-  {% set pct_columns = ["Box Out %"] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=box_rows,
-    last_rows=box_last_rows,
-    season_totals=box_totals,
-    last_totals=box_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-def-reb',
-    default_sort=['pct', 'opps', 'plus']
-  ) %}
-  {{ render_dual_section('Defensive Rebounding', table, practice_note) }}
+  {% elif selected.key == 'def_rebounding' %}
+    {% set columns = ["Box Out +", "Box Out Att", "Box Out %", "Off Reb's Given Up"] %}
+    {% set column_map = {
+      "Box Out +": ("plus", "box_plus"),
+      "Box Out Att": ("opps", "box_opp", "box_opps"),
+      "Box Out %": ("pct", "box_pct"),
+      "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
+    } %}
+    {% set pct_columns = ["Box Out %"] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=box_rows,
+      last_rows=box_last_rows,
+      season_totals=box_totals,
+      last_totals=box_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-def-reb',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section('Defensive Rebounding', table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'collision_gap_help' %}
-  {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
-  {% set column_map = {
-    "Gap +": ("plus", "gap_plus"),
-    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-    "Gap %": ("pct", "gap_pct"),
-  } %}
-  {% set pct_columns = ["Gap %"] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=collision_rows,
-    last_rows=collision_last_rows,
-    season_totals=collision_totals,
-    last_totals=collision_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-collision-gap',
-    default_sort=['pct', 'opps', 'plus']
-  ) %}
-  {{ render_dual_section('Collisions — Gap Help', table, practice_note) }}
+  {% elif selected.key == 'collision_gap_help' %}
+    {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+    {% set column_map = {
+      "Gap +": ("plus", "gap_plus"),
+      "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+      "Gap %": ("pct", "gap_pct"),
+    } %}
+    {% set pct_columns = ["Gap %"] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=collision_rows,
+      last_rows=collision_last_rows,
+      season_totals=collision_totals,
+      last_totals=collision_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-collision-gap',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section('Collisions — Gap Help', table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'pass_contest' %}
-  {% set columns = ["Contest +", "Contest Att", "Contest %"] %}
-  {% set column_map = {
-    "Contest +": ("plus", "contest_plus", "pass_contest_plus"),
-    "Contest Att": ("opps", "contest_opp", "contest_opps", "pass_contest_opp", "pass_contest_opps"),
-    "Contest %": ("pct", "contest_pct", "pass_contest_pct"),
-  } %}
-  {% set pct_columns = ["Contest %"] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=pass_contest_rows,
-    last_rows=pass_contest_last_rows,
-    season_totals=pass_contest_totals,
-    last_totals=pass_contest_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-pass-contest',
-    default_sort=['pct', 'opps', 'plus']
-  ) %}
-  {{ render_dual_section('Pass Contests', table, practice_note) }}
+  {% elif selected.key == 'pass_contest' %}
+    {% set columns = ["Contest +", "Contest Att", "Contest %"] %}
+    {% set column_map = {
+      "Contest +": ("plus", "contest_plus", "pass_contest_plus"),
+      "Contest Att": ("opps", "contest_opp", "contest_opps", "pass_contest_opp", "pass_contest_opps"),
+      "Contest %": ("pct", "contest_pct", "pass_contest_pct"),
+    } %}
+    {% set pct_columns = ["Contest %"] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=pass_contest_rows,
+      last_rows=pass_contest_last_rows,
+      season_totals=pass_contest_totals,
+      last_totals=pass_contest_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-pass-contest',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section('Pass Contests', table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
-  {% set label_map = {
-    'atr_contest_breakdown': 'ATR',
-    'fg2_contest_breakdown': '2FG',
-    'fg3_contest_breakdown': '3FG',
-  } %}
-  {% set shot_label = label_map.get(selected.key, 'Shot') %}
-  {% set columns = [
-    'Contest Att', 'Contest Makes', 'Contest FG%',
-    'Late Att', 'Late Makes', 'Late FG%',
-    'No Contest Att', 'No Contest Makes', 'No Contest FG%'
-  ] %}
-  {% set column_map = {
-    'Contest Att': ('opps', 'contest_attempts'),
-    'Contest Makes': ('plus', 'contest_makes'),
-    'Contest FG%': ('pct', 'contest_pct'),
-    'Late Att': ('opps', 'late_attempts'),
-    'Late Makes': ('plus', 'late_makes'),
-    'Late FG%': ('pct', 'late_pct'),
-    'No Contest Att': ('opps', 'no_contest_attempts'),
-    'No Contest Makes': ('plus', 'no_contest_makes'),
-    'No Contest FG%': ('pct', 'no_contest_pct'),
-  } %}
-  {% set pct_columns = ['Contest FG%', 'Late FG%', 'No Contest FG%'] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=shot_contest_rows,
-    last_rows=shot_contest_last_rows,
-    season_totals=shot_contest_totals,
-    last_totals=shot_contest_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-shot-contest-' ~ selected.key.split('_')[0],
-  ) %}
-  {{ render_dual_section(shot_label ~ ' Shot Contests', table, practice_note) }}
+  {% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
+    {% set label_map = {
+      'atr_contest_breakdown': 'ATR',
+      'fg2_contest_breakdown': '2FG',
+      'fg3_contest_breakdown': '3FG',
+    } %}
+    {% set shot_label = label_map.get(selected.key, 'Shot') %}
+    {% set columns = [
+      'Contest Att', 'Contest Makes', 'Contest FG%',
+      'Late Att', 'Late Makes', 'Late FG%',
+      'No Contest Att', 'No Contest Makes', 'No Contest FG%'
+    ] %}
+    {% set column_map = {
+      'Contest Att': ('opps', 'contest_attempts'),
+      'Contest Makes': ('plus', 'contest_makes'),
+      'Contest FG%': ('pct', 'contest_pct'),
+      'Late Att': ('opps', 'late_attempts'),
+      'Late Makes': ('plus', 'late_makes'),
+      'Late FG%': ('pct', 'late_pct'),
+      'No Contest Att': ('opps', 'no_contest_attempts'),
+      'No Contest Makes': ('plus', 'no_contest_makes'),
+      'No Contest FG%': ('pct', 'no_contest_pct'),
+    } %}
+    {% set pct_columns = ['Contest FG%', 'Late FG%', 'No Contest FG%'] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=shot_contest_rows,
+      last_rows=shot_contest_last_rows,
+      season_totals=shot_contest_totals,
+      last_totals=shot_contest_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-shot-contest-' ~ selected.key.split('_')[0],
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section(shot_label ~ ' Shot Contests', table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'overall_gap_help' %}
-  {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
-  {% set column_map = {
-    "Gap +": ("plus", "gap_plus"),
-    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-    "Gap %": ("pct", "gap_pct"),
-  } %}
-  {% set pct_columns = ["Gap %"] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=overall_gap_rows,
-    last_rows=overall_gap_last_rows,
-    season_totals=overall_gap_totals,
-    last_totals=overall_gap_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-overall-gap',
-    default_sort=['pct', 'opps', 'plus']
-  ) %}
-  {{ render_dual_section('Overall Gap Help', table, practice_note) }}
+  {% elif selected.key == 'overall_gap_help' %}
+    {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+    {% set column_map = {
+      "Gap +": ("plus", "gap_plus"),
+      "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+      "Gap %": ("pct", "gap_pct"),
+    } %}
+    {% set pct_columns = ["Gap %"] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=overall_gap_rows,
+      last_rows=overall_gap_last_rows,
+      season_totals=overall_gap_totals,
+      last_totals=overall_gap_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-overall-gap',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section('Overall Gap Help', table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'overall_low_man' %}
-  {% set columns = ["Low +", "Low Opp", "Low %"] %}
-  {% set column_map = {
-    "Low +": ("plus", "low_plus"),
-    "Low Opp": ("opps", "low_opp", "low_opps"),
-    "Low %": ("pct", "low_pct"),
-  } %}
-  {% set pct_columns = ["Low %"] %}
-  {% set table = build_dual_table(
-    base_columns=columns,
-    season_rows=overall_low_rows,
-    last_rows=overall_low_last_rows,
-    season_totals=overall_low_totals,
-    last_totals=overall_low_last_totals,
-    column_map=column_map,
-    pct_columns=pct_columns,
-    left_label='Season Totals',
-    right_label='Last Practice',
-    totals_label='Team Totals',
-    table_id='leaderboard-overall-low',
-    default_sort=['pct', 'opps', 'plus']
-  ) %}
-  {{ render_dual_section('Overall Low Man', table, practice_note) }}
+  {% elif selected.key == 'overall_low_man' %}
+    {% set columns = ["Low +", "Low Opp", "Low %"] %}
+    {% set column_map = {
+      "Low +": ("plus", "low_plus"),
+      "Low Opp": ("opps", "low_opp", "low_opps"),
+      "Low %": ("pct", "low_pct"),
+    } %}
+    {% set pct_columns = ["Low %"] %}
+    {% set table = build_dual_table(
+      base_columns=columns,
+      season_rows=overall_low_rows,
+      last_rows=overall_low_last_rows,
+      season_totals=overall_low_totals,
+      last_totals=overall_low_last_totals,
+      column_map=column_map,
+      pct_columns=pct_columns,
+      left_label='Season Totals',
+      right_label='Last Practice',
+      totals_label='Team Totals',
+      table_id='leaderboard-overall-low',
+      default_sort=['pct', 'opps', 'plus']
+    ) %}
+    {% set main_section %}
+      {{ render_dual_section('Overall Low Man', table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'pnr_gap_help' %}
-  <div class="space-y-8">
+  {% elif selected.key == 'pnr_gap_help' %}
     {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
     {% set column_map = {
       "Gap +": ("plus", "gap_plus"),
@@ -274,8 +295,6 @@
       table_id='leaderboard-pnr-gap',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
-
     {% set low_table = build_dual_table(
       base_columns=columns,
       season_rows=low_rows,
@@ -290,11 +309,14 @@
       table_id='leaderboard-pnr-low',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
-  </div>
+    {% set main_section %}
+      {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+    {% endset %}
+    {% set aux_section %}
+      {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+    {% endset %}
 
-{% elif selected.key == 'pnr_grade' %}
-  <div class="space-y-8">
+  {% elif selected.key == 'pnr_grade' %}
     {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
     {% set column_map = {
       "Gap +": ("plus", "gap_plus"),
@@ -316,8 +338,6 @@
       table_id='leaderboard-pnr-gap',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
-
     {% set low_table = build_dual_table(
       base_columns=columns,
       season_rows=shut_rows,
@@ -332,143 +352,48 @@
       table_id='leaderboard-pnr-low',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+    {% set main_section %}
+      {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+    {% endset %}
+    {% set aux_section %}
+      {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+    {% endset %}
+
+  {% else %}
+    {% set table_columns = columns or [] %}
+    {% set table_rows = rows or [] %}
+    {% set table_totals = team_totals %}
+    {% set default_sort = table_default_sort if table_default_sort is defined else none %}
+    {% set main_section %}
+      {% if table_has_data %}
+        {{ render_table(
+          id='leaderboard-table',
+          columns=table_columns,
+          rows=table_rows,
+          totals=table_totals,
+          dense=True,
+          sticky_header=True,
+          caption=selected.label if selected else 'Leaderboard',
+          default_sort=default_sort
+        ) }}
+      {% else %}
+        <p class="text-sm text-gray-600">Select a leaderboard to view details.</p>
+      {% endif %}
+    {% endset %}
+  {% endif %}
+
+  <div id="leaderboard-main" class="mt-2 space-y-6">
+    {{ main_section | safe }}
   </div>
 
-{% else %}
-  {% set table_columns = columns or [] %}
-  {% set table_rows = rows or [] %}
-  {% set table_totals = team_totals %}
-  {% set default_sort = table_default_sort if table_default_sort is defined else none %}
-  {% if table_has_data %}
-    {{ render_table(
-      id='leaderboard-table',
-      columns=table_columns,
-      rows=table_rows,
-      totals=table_totals,
-      dense=True,
-      sticky_header=True,
-      caption=selected.label if selected else 'Leaderboard',
-      default_sort=default_sort
-    ) }}
-  {% else %}
-    <p class="text-sm text-gray-600">Select a leaderboard to view details.</p>
-  {% endif %}
-{% endif %}
+  {% set aux_trimmed = aux_section|trim %}
+  <div id="leaderboard-aux" class="mt-6 space-y-6{% if not aux_trimmed %} hidden{% endif %}">
+    {% if aux_trimmed %}
+      {{ aux_section | safe }}
+    {% endif %}
+  </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', async () => {
-  const seasonId = {{ season_id|tojson }};
-  if (!seasonId) {
-    return;
-  }
-
-  const statSelect = document.getElementById('stat-select');
-  if (!statSelect) {
-    return;
-  }
-
-  const inlineSubmitHandler = statSelect.onchange;
-
-  const table = document.getElementById('leaderboard-table');
-  const tableBody = table ? table.querySelector('tbody') : null;
-  const columnCount = table ? table.querySelectorAll('thead th').length : 0;
-
-  if (!table || !tableBody) {
-    return;
-  }
-
-  const initialPayload = {{ table_payload|tojson }};
-  if (initialPayload && statSelect.value) {
-    window.LEADERBOARDS = window.LEADERBOARDS || {};
-    window.LEADERBOARDS[statSelect.value] = initialPayload;
-  }
-
-  const allEndpoint = {{ url_for('admin.api_leaderboards_all', season_id=season_id)|tojson if season_id is not none else none|tojson }};
-  if (!allEndpoint) {
-    return;
-  }
-
-  try {
-    const res = await fetch(allEndpoint);
-    if (!res.ok) {
-      throw new Error('Failed to load cached leaderboards');
-    }
-    const data = await res.json();
-    window.LEADERBOARDS = window.LEADERBOARDS || {};
-    Object.assign(window.LEADERBOARDS, data.leaderboards || {});
-    // Disable the inline submit handler once JS takes over successfully.
-    statSelect.onchange = null;
-  } catch (err) {
-    console.error(err);
-    if (inlineSubmitHandler) {
-      statSelect.onchange = inlineSubmitHandler;
-    } else {
-      statSelect.addEventListener('change', (event) => {
-        event.target.form?.submit();
-      });
-    }
-    return;
-  }
-
-  function normaliseRow(row) {
-    if (Array.isArray(row)) {
-      return row;
-    }
-    if (row && typeof row === 'object') {
-      if (Array.isArray(row.values)) {
-        return row.values;
-      }
-      return Object.values(row);
-    }
-    return [row];
-  }
-
-  function renderRows(payload) {
-    if (!tableBody || !payload || !Array.isArray(payload.rows)) {
-      return false;
-    }
-
-    tableBody.innerHTML = '';
-    payload.rows.forEach((row) => {
-      const values = normaliseRow(row);
-      const cells = columnCount ? values.slice(0, columnCount) : values;
-      while (columnCount && cells.length < columnCount) {
-        cells.push('');
-      }
-      const tr = document.createElement('tr');
-      cells.forEach((value) => {
-        const td = document.createElement('td');
-        td.textContent = value == null ? '' : value;
-        tr.appendChild(td);
-      });
-      tableBody.appendChild(tr);
-    });
-    return true;
-  }
-
-  function updateFromStat(statKey) {
-    if (!window.LEADERBOARDS) {
-      return false;
-    }
-    const payload = window.LEADERBOARDS[statKey];
-    if (!payload) {
-      return false;
-    }
-    if (Array.isArray(payload.column_keys) && columnCount && payload.column_keys.length !== columnCount) {
-      return false;
-    }
-    return renderRows(payload);
-  }
-
-  // Render initial selection from cache if possible.
-  updateFromStat(statSelect.value);
-
-  statSelect.addEventListener('change', (event) => {
-    const success = updateFromStat(event.target.value);
-    if (!success) {
-      event.target.form?.submit();
-    }
-  });
-});
-</script>
+  <script id="initial-leaderboard-payload" type="application/json">
+    {{ table_payload | tojson }}
+  </script>
+</div>
