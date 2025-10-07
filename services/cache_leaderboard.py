@@ -23,13 +23,19 @@ Key helpers:
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 
 from constants import LEADERBOARD_STAT_KEYS
 from models.database import CachedLeaderboard, db
+from services.leaderboard_cache import (
+    build_leaderboard_payload,
+    delete_snapshots_after_etag,
+    fetch_latest_snapshot,
+    load_latest_snapshots_for_season,
+    save_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +51,6 @@ def _utcnow() -> datetime:
 
 def _isoformat(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _json_default(value: Any) -> Any:
-    """Return JSON-serialisable representations of supported types."""
-
-    if isinstance(value, datetime):
-        return _isoformat(value)
-    raise TypeError(f"Object of type {type(value)!r} is not JSON serialisable")
 
 
 def _import_leaderboard_builder():
@@ -135,38 +133,15 @@ def format_leaderboard_payload(
     return payload
 
 
-def _save_payload(season_id: int, stat_key: str, payload: Mapping[str, Any]) -> None:
-    """Persist ``payload`` into the ``cached_leaderboards`` table."""
-
-    json_payload = json.dumps(payload, default=_json_default)
-    entry = CachedLeaderboard.query.filter_by(season_id=season_id, stat_key=stat_key).first()
-    if entry is None:
-        entry = CachedLeaderboard(season_id=season_id, stat_key=stat_key, payload_json=json_payload)
-        db.session.add(entry)
-    else:
-        entry.payload_json = json_payload
-
-
 def cache_get_leaderboard(season_id: int, stat_key: str) -> Optional[Dict[str, Any]]:
     """Return cached payload for ``(season_id, stat_key)`` if present."""
 
     if season_id is None:
         return None
 
-    entry = CachedLeaderboard.query.filter_by(season_id=season_id, stat_key=stat_key).first()
-    if not entry:
-        return None
-
-    try:
-        payload = json.loads(entry.payload_json)
-        if isinstance(payload, dict):
-            return payload
-    except json.JSONDecodeError:
-        logger.warning(
-            "Failed to decode cached leaderboard payload for season %s stat %s; ignoring.",
-            season_id,
-            stat_key,
-        )
+    payload = fetch_latest_snapshot(season_id, stat_key)
+    if isinstance(payload, dict):
+        return payload
     return None
 
 
@@ -185,15 +160,27 @@ def cache_build_one(
     logger.info("Building leaderboard cache for stat=%s season=%s", stat_key, season_id)
 
     compute_result = compute_fn(stat_key, season_id)
-    payload = format_leaderboard_payload(stat_key, compute_result, season_id=season_id)
+    payload = build_leaderboard_payload(
+        season_id,
+        stat_key,
+        compute_result={
+            "config": compute_result.get("config") if isinstance(compute_result, Mapping) else None,
+            "rows": compute_result.get("rows") if isinstance(compute_result, Mapping) else None,
+            "team_totals": compute_result.get("team_totals") if isinstance(compute_result, Mapping) else None,
+            "variant": compute_result.get("variant") if isinstance(compute_result, Mapping) else None,
+            "aux_table": compute_result.get("aux_table") if isinstance(compute_result, Mapping) else None,
+        }
+        if isinstance(compute_result, Mapping)
+        else compute_result,
+    )
 
     try:
-        _save_payload(season_id, stat_key, payload)
-        if commit:
-            db.session.commit()
+        save_snapshot(season_id, stat_key, payload, commit=commit)
     except Exception:
         db.session.rollback()
-        logger.exception("Failed to persist leaderboard cache for stat=%s season=%s", stat_key, season_id)
+        logger.exception(
+            "Failed to persist leaderboard cache for stat=%s season=%s", stat_key, season_id
+        )
         raise
 
     return payload

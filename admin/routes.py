@@ -3,7 +3,7 @@ import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -14,7 +14,6 @@ import re
 import traceback
 import zipfile
 from urllib.parse import urlencode
-from concurrent.futures import ThreadPoolExecutor
 import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
 import pdfkit
@@ -38,7 +37,7 @@ from flask import (
 )
 from flask_login import login_required, current_user, confirm_login, login_user, logout_user
 from utils.auth       import admin_required
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, NotFound
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -61,7 +60,6 @@ from models.database import (
     PlayerDevelopmentPlan,
     Setting,
     SavedStatProfile,
-    CachedLeaderboard,
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -105,8 +103,10 @@ from services.cache_leaderboard import (
     cache_get_leaderboard,
     expand_cached_rows_for_template,
     format_leaderboard_payload,
-    maybe_schedule_refresh,
-    schedule_refresh,
+)
+from services.leaderboard_cache import (
+    delete_snapshots_after_etag,
+    load_latest_snapshots_for_season,
 )
 from services.progress_store import clear_progress, get_progress, set_progress
 from services.leaderboard_jobs import rebuild_leaderboards_job
@@ -131,9 +131,6 @@ try:  # Optional CSRF protection – not every deployment wires this up
     from app.extensions import csrf  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover - extension not present in some setups
     csrf = None
-
-# Background executor for leaderboard rebuilds
-_executor: Optional[ThreadPoolExecutor] = None
 
 # --- Helper Functions at the top ---
 
@@ -7816,14 +7813,13 @@ def leaderboard():
             current_app.logger.info(
                 "Leaderboard cache hit for stat=%s season=%s", stat_key, sid
             )
+            table_payload = cache_payload
         else:
             current_app.logger.info(
-                "Leaderboard cache miss for stat=%s season=%s; computing payload",
+                "Leaderboard cache miss for stat=%s season=%s; skipping automatic rebuild",
                 stat_key,
                 sid,
             )
-            cache_payload = cache_build_one(stat_key, sid, build_leaderboard_cache_payload)
-        table_payload = cache_payload
 
     if table_payload is None:
         current_app.logger.info(
@@ -8057,33 +8053,23 @@ def _validate_cached_leaderboard_payload(stat_key: str, payload: Mapping[str, An
 def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
     """Return cached leaderboard payloads for ``season_id`` without recomputation."""
 
-    rows = CachedLeaderboard.query.filter_by(season_id=season_id).all()
+    snapshots = load_latest_snapshots_for_season(season_id)
     leaderboards: dict[str, Any] = {}
     schema_version: Any = None
     formatter_version: Any = None
 
-    for row in rows:
-        try:
-            payload = json.loads(row.payload_json)
-        except json.JSONDecodeError:
-            current_app.logger.warning(
-                "Failed to decode cached leaderboard payload for season %s stat %s.",
-                season_id,
-                row.stat_key,
-            )
-            continue
-
+    for stat_key, payload in snapshots.items():
         if not isinstance(payload, Mapping):
             current_app.logger.warning(
                 "Cached leaderboard payload for season %s stat %s is not a mapping.",
                 season_id,
-                row.stat_key,
+                stat_key,
             )
             continue
 
-        _validate_cached_leaderboard_payload(row.stat_key, payload)
+        _validate_cached_leaderboard_payload(stat_key, payload)
 
-        leaderboards[row.stat_key] = payload
+        leaderboards[stat_key] = payload
 
         payload_schema_version = payload.get("schema_version")
         if payload_schema_version is not None:
@@ -8144,13 +8130,20 @@ def api_leaderboards_all(season_id):
 def api_leaderboard_one(season_id, stat_key):
     cached = cache_get_leaderboard(season_id, stat_key)
     if cached:
-        maybe_schedule_refresh(stat_key, season_id, cached.get("variant"), cached.get("last_built_at"))
         resp = make_response(jsonify(cached), 200)
         etag_source = json.dumps(cached, sort_keys=True, default=str)
         resp.set_etag(hashlib.md5(etag_source.encode()).hexdigest())
     else:
-        schedule_refresh(stat_key, season_id)
-        resp = make_response(jsonify({"status": "warming", "stat_key": stat_key}), 202)
+        resp = make_response(
+            jsonify(
+                {
+                    "error": "snapshot_not_found",
+                    "message": "Snapshot not available; warm the cache via POST.",
+                    "stat_key": stat_key,
+                }
+            ),
+            404,
+        )
     resp.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
     return resp
 
@@ -8201,30 +8194,83 @@ def admin_rebuild_sync(season_id: int):
 
 
 @admin_bp.post("/admin/rebuild_leaderboards/<int:season_id>")
+@admin_bp.post("/admin/leaderboards/<int:season_id>/rebuild")
 @login_required
 @admin_required
 def admin_rebuild_leaderboards(season_id: int):
-    global _executor
-    key = f"leaderboard:progress:{season_id}"
-    clear_progress(key)
-    set_progress(key, 0, "Queued rebuild")
+    payload = request.get_json(silent=True) or {}
+    keys = payload.get("keys") if isinstance(payload, Mapping) else None
+
+    if keys in (None, "all"):
+        stat_keys = list(LEADERBOARD_STAT_KEYS)
+    elif isinstance(keys, list):
+        stat_keys = [str(k) for k in keys if str(k)]
+        if not stat_keys:
+            raise BadRequest("No stat keys provided")
+    else:
+        raise BadRequest("'keys' must be a list or 'all'")
+
     current_app.logger.info(
-        "Manual leaderboard rebuild queued by %s for season %s",
+        "[LEADERS] Warm requested by %s for season=%s keys=%s",
         getattr(current_user, "username", "unknown"),
         season_id,
+        stat_keys,
     )
 
-    if _executor is None:
-        _executor = ThreadPoolExecutor(max_workers=1)
+    compute_fn = build_leaderboard_cache_payload
+    built: dict[str, Any] = {}
 
-    app_obj = current_app._get_current_object()
+    try:
+        for key in stat_keys:
+            built[key] = cache_build_one(key, season_id, compute_fn, commit=False)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception(
+            "[LEADERS] Warm failed for season=%s keys=%s", season_id, stat_keys
+        )
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
-    def _runner(season=season_id, app=app_obj):
-        with app.app_context():
-            rebuild_leaderboards_job(season)
+    return jsonify({
+        "ok": True,
+        "season_id": season_id,
+        "built": stat_keys,
+        "count": len(stat_keys),
+    })
 
-    _executor.submit(_runner)
-    return jsonify({"ok": True, "mode": "thread", "season_id": season_id})
+
+@admin_bp.post("/admin/leaderboards/<int:season_id>/rollback")
+@login_required
+@admin_required
+def admin_leaderboard_rollback(season_id: int):
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, Mapping):
+        raise BadRequest("JSON body required")
+
+    stat_key = str(payload.get("stat_key") or "").strip()
+    etag = str(payload.get("etag") or "").strip()
+    if not stat_key or not etag:
+        raise BadRequest("'stat_key' and 'etag' are required")
+
+    try:
+        deleted = delete_snapshots_after_etag(season_id, stat_key, etag)
+    except ValueError as exc:
+        raise NotFound(str(exc)) from exc
+
+    current_app.logger.info(
+        "[LEADERS] Rollback applied by %s for season=%s stat=%s removed=%s",
+        getattr(current_user, "username", "unknown"),
+        season_id,
+        stat_key,
+        deleted,
+    )
+
+    return jsonify({
+        "ok": True,
+        "season_id": season_id,
+        "stat_key": stat_key,
+        "removed": deleted,
+    })
 
 
 @admin_bp.get("/admin/cache_status/<int:season_id>")
