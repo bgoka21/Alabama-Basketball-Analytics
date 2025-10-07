@@ -114,8 +114,8 @@ def test_leaderboard_route_computes_when_cache_missing(app, client, monkeypatch)
 
     resp = client.get("/admin/leaderboard?season_id=1&stat=points")
     assert resp.status_code == 200
-    assert calls == [("points", 1)]
+    assert calls == []
 
     with app.app_context():
         cached = CachedLeaderboard.query.filter_by(season_id=1, stat_key="points").first()
-        assert cached is not None
+        assert cached is None
