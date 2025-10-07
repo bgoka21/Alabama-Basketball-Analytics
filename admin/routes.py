@@ -8058,20 +8058,14 @@ def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
 
     snapshots = load_latest_snapshots_for_season(season_id)
     leaderboards: dict[str, Any] = {}
+    warming: list[str] = []
     schema_version: Any = None
     formatter_version: Any = None
 
-    for stat_key, payload in snapshots.items():
-        if not isinstance(payload, Mapping):
-            current_app.logger.warning(
-                "Cached leaderboard payload for season %s stat %s is not a mapping.",
-                season_id,
-                stat_key,
-            )
-            continue
+    def _record_payload(stat_key: str, payload: Mapping[str, Any]) -> None:
+        nonlocal schema_version, formatter_version
 
         _validate_cached_leaderboard_payload(stat_key, payload)
-
         leaderboards[stat_key] = payload
 
         payload_schema_version = payload.get("schema_version")
@@ -8098,11 +8092,34 @@ def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
                     payload_formatter_version,
                 )
 
+    # Iterate over canonical stat keys first so missing ones can be tracked as "warming".
+    for stat_key in LEADERBOARD_STAT_KEYS:
+        payload = snapshots.get(stat_key)
+        if isinstance(payload, Mapping):
+            _record_payload(stat_key, payload)
+        else:
+            warming.append(stat_key)
+
+    # Include any additional cached snapshots (for example experimental stats).
+    for stat_key, payload in snapshots.items():
+        if stat_key in leaderboards:
+            continue
+        if not isinstance(payload, Mapping):
+            current_app.logger.warning(
+                "Cached leaderboard payload for season %s stat %s is not a mapping.",
+                season_id,
+                stat_key,
+            )
+            continue
+        _record_payload(stat_key, payload)
+
     missing = [key for key in LEADERBOARD_STAT_KEYS if key not in leaderboards]
+    warming = list(dict.fromkeys([key for key in warming if key in missing]))
 
     return {
         "leaderboards": leaderboards,
         "missing": missing,
+        "warming": warming,
         "schema_version": schema_version,
         "formatter_version": formatter_version,
     }
