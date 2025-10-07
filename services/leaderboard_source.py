@@ -6,6 +6,9 @@ from functools import lru_cache
 from importlib import import_module
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
+from flask import current_app
+from sqlalchemy import inspect
+
 from models.database import Roster, db
 
 
@@ -63,14 +66,75 @@ def _resolve_primary_column(table_payload: Mapping[str, Any]) -> tuple[Optional[
     return primary_key, value_key
 
 
+def _pick_roster_number_column() -> Optional[Any]:
+    """
+    Return a Roster column suitable for jersey numbers, or None if not found.
+    Tries common names, then inspects mapped attributes for anything containing
+    'jersey' or 'number'.
+    """
+
+    # Common field names first
+    for cand in ("jersey_number", "number", "uniform_number", "player_number"):
+        if hasattr(Roster, cand):
+            return getattr(Roster, cand)
+    # Fallback: inspect mapped attributes
+    try:
+        mapper = inspect(Roster)
+        for attr in getattr(mapper, "attrs", []):
+            key = getattr(attr, "key", "")
+            if not key:
+                continue
+            low = key.lower()
+            if "jersey" in low or "number" in low:
+                return getattr(Roster, key, None)
+    except Exception:
+        pass
+    return None
+
+
+def _coerce_num_text(num: Any) -> str:
+    """Return a clean jersey number string like '12' (not '12.0')."""
+
+    if num is None:
+        return ""
+    try:
+        f = float(num)
+        if f.is_integer():
+            return str(int(f))
+        s = str(f)
+        if s.endswith(".0"):
+            s = s[:-2]
+        return s
+    except Exception:
+        return str(num).strip()
+
+
 def _load_roster_numbers(season_id: Optional[int]) -> Dict[str, Any]:
+    """
+    Returns {player_name: jersey_number_text}. If there is no number-like column
+    on Roster, logs a warning and returns an empty mapping.
+    """
+
     if season_id is None:
         return {}
+    num_col = _pick_roster_number_column()
+    if not num_col:
+        current_app.logger.warning(
+            "No jersey-number-like column on Roster; proceeding without numbers."
+        )
+        return {}
     query = (
-        db.session.query(Roster.player_name, Roster.jersey_number)
+        db.session.query(Roster.player_name, num_col)
         .filter(Roster.season_id == season_id)
     )
-    return {name: number for name, number in query.all()}
+    mapping: Dict[str, Any] = {}
+    for name, num in query.all():
+        if not name:
+            continue
+        text = _coerce_num_text(num)
+        if text:
+            mapping[name] = text
+    return mapping
 
 
 def fetch_stat_rows(stat_key: str, season_id: int) -> Iterable[Dict[str, Any]]:
