@@ -7730,22 +7730,19 @@ def leaderboard():
         latest = Season.query.order_by(Season.start_date.desc()).first()
         sid = latest.id if latest else None
 
-    start_date_raw = (request.args.get('start_date') or '').strip()
-    end_date_raw = (request.args.get('end_date') or '').strip()
-    label_list_raw = request.args.getlist('label')
-    label_list = [lbl.strip() for lbl in label_list_raw if lbl and lbl.strip()]
-
+    start_date_arg = request.args.get('start_date')
+    end_date_arg = request.args.get('end_date')
     start_dt = end_dt = None
-    if start_date_raw:
+    if start_date_arg:
         try:
-            start_dt = date.fromisoformat(start_date_raw)
+            start_dt = date.fromisoformat(start_date_arg)
         except ValueError:
-            start_date_raw = ''
-    if end_date_raw:
+            start_date_arg = ''
+    if end_date_arg:
         try:
-            end_dt = date.fromisoformat(end_date_raw)
+            end_dt = date.fromisoformat(end_date_arg)
         except ValueError:
-            end_date_raw = ''
+            end_date_arg = ''
 
     session_names = _get_session_names_for_season(sid)
     requested_session = request.args.get('session')
@@ -7774,14 +7771,14 @@ def leaderboard():
                 f"in season_id={sid}; skipping date filter."
             )
             start_dt = end_dt = None
-            start_date_raw = ''
-            end_date_raw = ''
+            start_date_arg = ''
+            end_date_arg = ''
         else:
             start_dt = session_start
             end_dt = session_end
 
-    start_date = start_dt.isoformat() if start_dt else start_date_raw
-    end_date = end_dt.isoformat() if end_dt else end_date_raw
+    start_date = start_dt.isoformat() if start_dt else (start_date_arg or '')
+    end_date = end_dt.isoformat() if end_dt else (end_date_arg or '')
 
     stat_key = request.args.get('stat') or request.args.get('base_stat')
     if not stat_key:
@@ -7807,13 +7804,12 @@ def leaderboard():
     stats_list = q.all()
 
     label_options = collect_practice_labels(stats_list)
-    selected_labels = [lbl for lbl in label_list if lbl.upper() in label_options]
+    selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
 
     cache_payload = None
     table_payload: Optional[dict[str, Any]] = None
-    has_filters = bool(start_dt or end_dt or label_set)
-    if sid and not has_filters:
+    if sid and not (start_dt or end_dt or label_set):
         cache_payload = cache_get_leaderboard(sid, stat_key)
         if cache_payload:
             current_app.logger.info(
@@ -7925,14 +7921,14 @@ def leaderboard():
         table_default_sort=default_sort,
         table_has_data=has_data,
         season_id=sid,
+        start_date=start_date or '',
+        end_date=end_date or '',
         label_options=label_options,
         selected_labels=selected_labels,
         active_page='leaderboard',
         selected_session=selected_session,
         sessions=sessions,
         practice_links=filtered_practice_links,
-        start_date=start_date,
-        end_date=end_date,
         **split_context,
     )
 
