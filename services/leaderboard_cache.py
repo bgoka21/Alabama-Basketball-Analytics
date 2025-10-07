@@ -645,26 +645,44 @@ def save_snapshot(
 ) -> CachedLeaderboard:
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     etag = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    manifest_json = json.dumps(build_manifest_for(season_id, stat_key))
+    now = datetime.utcnow()
 
-    snapshot = CachedLeaderboard(
-        season_id=season_id,
-        stat_key=stat_key,
-        schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
-        formatter_version=int(payload.get("formatter_version", FORMATTER_VERSION)),
-        etag=etag,
-        payload_json=body,
-        build_manifest=json.dumps(build_manifest_for(season_id, stat_key)),
-    )
+    entry = CachedLeaderboard.query.filter_by(
+        season_id=season_id, stat_key=stat_key
+    ).first()
 
-    db.session.add(snapshot)
+    if entry is None:
+        entry = CachedLeaderboard(
+            season_id=season_id,
+            stat_key=stat_key,
+            schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
+            formatter_version=int(payload.get("formatter_version", FORMATTER_VERSION)),
+            etag=etag,
+            payload_json=body,
+            build_manifest=manifest_json,
+            created_at=now,
+            updated_at=now,
+        )
+        db.session.add(entry)
+    else:
+        entry.schema_version = int(payload.get("schema_version", SCHEMA_VERSION))
+        entry.formatter_version = int(payload.get("formatter_version", FORMATTER_VERSION))
+        entry.etag = etag
+        entry.payload_json = body
+        entry.build_manifest = manifest_json
+        entry.updated_at = now
+
     db.session.flush()
 
     _prune_old_snapshots(season_id, stat_key, retain)
 
     if commit:
         db.session.commit()
+    else:
+        db.session.flush()
 
-    return snapshot
+    return entry
 
 
 def _prune_old_snapshots(season_id: int, stat_key: str, retain: int) -> None:

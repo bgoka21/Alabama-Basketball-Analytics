@@ -11,8 +11,8 @@ class CachedLeaderboard(db.Model):
     __tablename__ = 'cached_leaderboards'
 
     id = db.Column(db.Integer, primary_key=True)
-    season_id = db.Column(db.Integer, index=True, nullable=False)
-    stat_key = db.Column(db.String(64), index=True, nullable=False)
+    season_id = db.Column(db.Integer, index=True, nullable=True)
+    stat_key = db.Column(db.String(128), index=True, nullable=False)
     schema_version = db.Column(db.Integer, nullable=False)
     formatter_version = db.Column(db.Integer, nullable=False)
     etag = db.Column(db.String(64), nullable=False)
@@ -22,11 +22,17 @@ class CachedLeaderboard(db.Model):
         nullable=False,
         default=func.now(),
     )
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=func.now(),
+        onupdate=func.now(),
+    )
     build_manifest = db.Column(db.Text, nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint(
-            'season_id', 'stat_key', 'etag', name='uq_cached_leaderboards_version'
+            'season_id', 'stat_key', name='uq_cached_leaderboards_season_stat'
         ),
     )
 
