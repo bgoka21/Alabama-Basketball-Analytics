@@ -1,14 +1,12 @@
 import os
 import json
-import click
-import fcntl
-from flask import Flask, redirect, url_for, render_template, request, flash, current_app
+from flask import Flask, redirect, url_for, render_template, request, flash
 from flask.json.provider import DefaultJSONProvider
 from types import SimpleNamespace
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
-from apscheduler.schedulers.background import BackgroundScheduler
+from flask_apscheduler import APScheduler
 from flask.cli import with_appcontext
 from sqlalchemy import inspect
 import pdfkit
@@ -16,6 +14,7 @@ import pdfkit
 from datetime import datetime, date
 from models.database import db, PageView, SavedStatProfile
 from models.user import User
+from admin.routes import admin_bp
 from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from app.utils.schema import ensure_columns
@@ -29,37 +28,7 @@ def _ns_default(self, obj):
     return _orig_json_default(self, obj)
 DefaultJSONProvider.default = _ns_default
 
-
-def init_scheduler(app: Flask) -> None:
-    """Start APScheduler exactly once per process (safe across workers)."""
-
-    lock_path = os.path.join(app.instance_path, "apscheduler.lock")
-    os.makedirs(app.instance_path, exist_ok=True)
-    lock_file = open(lock_path, "w")
-
-    try:
-        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        app.logger.info("APScheduler already running in another worker.")
-        lock_file.close()
-        return
-
-    if getattr(app, "_apscheduler_started", False):
-        app.logger.info("APScheduler already started in this process.")
-        fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
-        return
-
-    scheduler = BackgroundScheduler(timezone="UTC")
-    if not scheduler.running:
-        scheduler.start()
-    app.apscheduler = scheduler
-    app._apscheduler_started = True
-    app._apscheduler_lock_file = lock_file
-    app.logger.info("APScheduler started in this worker.")
-
-
-from admin.routes import admin_bp
+scheduler = APScheduler()
 
 try:
     PDFKIT_CONFIG = pdfkit.configuration()
@@ -99,16 +68,10 @@ def create_app():
         template_folder=os.path.join(repo_root, 'templates'),
     )
 
-    try:
-        from flask_compress import Compress
-        Compress(app)
-    except Exception:
-        app.logger.warning("Flask-Compress not available; skipping compression")
-
     # Allow JSON serialization of SimpleNamespace objects
     from types import SimpleNamespace
     _json_default = app.json.default
-    def _default(obj):
+    def _default(obj, *_args, **_kwargs):
         if isinstance(obj, SimpleNamespace):
             return obj.__dict__
         return _json_default(obj)
@@ -256,6 +219,10 @@ def create_app():
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
 
+    if scheduler.state == 0:
+        scheduler.init_app(app)
+        scheduler.start()
+
     if AUTH_EXISTS:
         app.register_blueprint(auth_bp, url_prefix='/auth')
 
@@ -272,14 +239,6 @@ def create_app():
                 ("actual_pick_raw",    "TEXT"),
                 ("projected_pick_text","TEXT"),
                 ("actual_pick_text",   "TEXT"),
-            ])
-            # Keep legacy SQLite databases compatible with new leaderboard metadata columns.
-            ensure_columns(db.engine, "cached_leaderboards", [
-                ("schema_version",    "INTEGER"),
-                ("formatter_version", "INTEGER"),
-                ("etag",              "TEXT"),
-                ("created_at",        "DATETIME"),
-                ("build_manifest",    "TEXT"),
             ])
 
     @app.before_request
@@ -325,41 +284,6 @@ def create_app():
 
     from app.cli.import_draft_stock import import_draft_stock
     app.cli.add_command(import_draft_stock)
-
-    # --- BEGIN: cache CLI commands ---
-
-    @app.cli.group("cache")
-    def cache_cli():
-        """Cache utilities."""
-        pass
-
-    @cache_cli.command("rebuild")
-    @click.option("--season", "season_id", required=True, type=int, help="Season ID to rebuild")
-    def cache_rebuild_cmd(season_id: int):
-        """Rebuild all leaderboard caches for a season (formatted payloads)."""
-        from services.cache_leaderboard import rebuild_leaderboards_for_season
-
-        out = rebuild_leaderboards_for_season(season_id=season_id)
-        if current_app:
-            current_app.logger.info(
-                "Rebuilt %s leaderboard keys for season %s", len(out), season_id
-            )
-        click.echo(f"Rebuilt {len(out)} leaderboard keys for season {season_id}")
-
-    @cache_cli.command("rebuild-one")
-    @click.option("--season", "season_id", required=True, type=int)
-    @click.option("--key", "stat_key", required=True, type=str)
-    def cache_rebuild_one_cmd(season_id: int, stat_key: str):
-        """Rebuild a single leaderboard key for a season."""
-        from services.cache_leaderboard import cache_build_one, _import_compute_leaderboard
-
-        compute_fn = _import_compute_leaderboard()
-        cache_build_one(stat_key, season_id=season_id, compute_fn=compute_fn)
-        if current_app:
-            current_app.logger.info("Rebuilt %s for season %s", stat_key, season_id)
-        click.echo(f"Rebuilt {stat_key} (season {season_id})")
-
-    # --- END: cache CLI commands ---
 
     @app.cli.command("seed-presets")
     @with_appcontext
@@ -410,8 +334,6 @@ def create_app():
 
         db.session.commit()
         print(f"Seeded {created} presets.")
-
-    init_scheduler(app)
 
     return app
 

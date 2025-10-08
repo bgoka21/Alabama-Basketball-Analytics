@@ -1,9 +1,8 @@
-import hashlib
 import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any, Mapping, Optional
+from typing import Any
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -37,13 +36,12 @@ from flask import (
 )
 from flask_login import login_required, current_user, confirm_login, login_user, logout_user
 from utils.auth       import admin_required
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from models.database import (
     db,
-    CachedLeaderboard,
     Game,
     TeamStats,
     PlayerStats,
@@ -98,18 +96,6 @@ from admin._leaderboard_helpers import (
     build_pnr_gap_help_context,
     with_last_practice,
 )
-from constants import LEADERBOARD_STAT_KEYS
-from services.cache_leaderboard import (
-    cache_get_leaderboard,
-    expand_cached_rows_for_template,
-    format_leaderboard_payload,
-)
-from services.leaderboard_cache import (
-    delete_snapshots_after_etag,
-    load_latest_snapshots_for_season,
-)
-from services.progress_store import clear_progress, get_progress, set_progress
-from services.leaderboard_jobs import rebuild_leaderboards_job
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
@@ -1184,18 +1170,6 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     return cfg, leaderboard, team_totals
 
 
-def build_leaderboard_cache_payload(stat_key, season_id):
-    cfg, rows, team_totals = compute_leaderboard(stat_key, season_id)
-    return {
-        "config": cfg,
-        "rows": rows,
-        "team_totals": team_totals,
-    }
-
-
-DEFAULT_PRACTICE_EMPTY_MESSAGE = "No stats for the most recent practice."
-
-
 _PRACTICE_DUAL_MAP = {
     "off_rebounding": lambda: compute_offensive_rebounding,
     "def_rebounding": lambda: compute_defensive_rebounding,
@@ -1209,8 +1183,6 @@ _PRACTICE_DUAL_MAP = {
     "fg2_contest_breakdown": lambda: _build_stat_compute("fg2_contest_breakdown"),
     "fg3_contest_breakdown": lambda: _build_stat_compute("fg3_contest_breakdown"),
 }
-
-_PRACTICE_SECTION_KEYS = set(_PRACTICE_DUAL_MAP) | {"pnr_gap_help"}
 
 
 def get_practice_dual_context(stat_key, season_id, *, label_set=None):
@@ -1508,411 +1480,6 @@ def _split_leaderboard_rows_for_template(
     # >>> BLUE COLLAR SPLIT DATA END
 
     return context
-
-
-def _format_practice_note_details(value: Any) -> tuple[Optional[str], Optional[str]]:
-    note_date: Optional[date] = None
-    if isinstance(value, datetime):
-        note_date = value.date()
-    elif isinstance(value, date):
-        note_date = value
-    elif isinstance(value, str):
-        try:
-            note_date = date.fromisoformat(value)
-        except ValueError:
-            note_date = None
-
-    if note_date is None:
-        return None, None
-
-    return note_date.isoformat(), note_date.strftime("%b %d, %Y")
-
-
-def _build_practice_section_payload(
-    split_context: Mapping[str, Any],
-    *,
-    title: str,
-    rows_key: str,
-    last_rows_key: str,
-    totals_key: str,
-    last_totals_key: str,
-    base_columns: Sequence[str],
-    column_map: Mapping[str, Any],
-    table_id: str,
-    pct_columns: Optional[Sequence[str]] = None,
-    default_sort: Optional[Sequence[Any]] = None,
-    empty_message: str = DEFAULT_PRACTICE_EMPTY_MESSAGE,
-) -> dict[str, Any]:
-    context = split_context if isinstance(split_context, Mapping) else {}
-    kwargs: dict[str, Any] = {
-        "base_columns": base_columns,
-        "season_rows": context.get(rows_key),
-        "last_rows": context.get(last_rows_key),
-        "season_totals": context.get(totals_key),
-        "last_totals": context.get(last_totals_key),
-        "column_map": column_map,
-        "left_label": "Season Totals",
-        "right_label": "Last Practice",
-        "totals_label": "Team Totals",
-        "table_id": table_id,
-    }
-    if pct_columns is not None:
-        kwargs["pct_columns"] = pct_columns
-    if default_sort is not None:
-        kwargs["default_sort"] = default_sort
-
-    table = build_dual_table(**kwargs)
-    return {
-        "title": title,
-        "table": table,
-        "empty_message": empty_message,
-    }
-
-
-def _practice_sections_from_split(
-    stat_key: str, split_context: Mapping[str, Any]
-) -> Optional[dict[str, Any]]:
-    if stat_key not in _PRACTICE_SECTION_KEYS:
-        return None
-
-    if not isinstance(split_context, Mapping):
-        return None
-
-    note_iso, note_display = _format_practice_note_details(
-        split_context.get("last_practice_date")
-    )
-
-    sections_main: list[dict[str, Any]] = []
-    sections_aux: list[dict[str, Any]] = []
-
-    dual_default_sort = ["pct", "opps", "plus"]
-
-    if stat_key == "defense":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Defense — Bumps",
-                rows_key="bump_rows",
-                last_rows_key="bump_last_rows",
-                totals_key="bump_totals",
-                last_totals_key="bump_last_totals",
-                base_columns=["Bump +", "Bump Opps", "Bump %"],
-                column_map={
-                    "Bump +": ("plus", "bump_positive"),
-                    "Bump Opps": ("opps", "total_opps"),
-                    "Bump %": ("pct",),
-                },
-                pct_columns=["Bump %"],
-                table_id="leaderboard-defense",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "off_rebounding":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Offensive Crash",
-                rows_key="crash_rows",
-                last_rows_key="crash_last_rows",
-                totals_key="crash_totals",
-                last_totals_key="crash_last_totals",
-                base_columns=["Crash +", "Crash Att", "Crash %"],
-                column_map={
-                    "Crash +": ("plus", "crash_plus"),
-                    "Crash Att": ("opps", "crash_opp", "crash_opps"),
-                    "Crash %": ("pct", "crash_pct"),
-                },
-                pct_columns=["Crash %"],
-                table_id="leaderboard-offense-crash",
-                default_sort=dual_default_sort,
-            )
-        )
-        sections_aux.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Offensive Back Man",
-                rows_key="backman_rows",
-                last_rows_key="backman_last_rows",
-                totals_key="backman_totals",
-                last_totals_key="backman_last_totals",
-                base_columns=["Back Man +", "Back Man Att", "Back Man %"],
-                column_map={
-                    "Back Man +": ("plus", "back_plus"),
-                    "Back Man Att": ("opps", "back_opp", "back_opps"),
-                    "Back Man %": ("pct", "back_pct"),
-                },
-                pct_columns=["Back Man %"],
-                table_id="leaderboard-offense-back",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "def_rebounding":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Defensive Rebounding",
-                rows_key="box_rows",
-                last_rows_key="box_last_rows",
-                totals_key="box_totals",
-                last_totals_key="box_last_totals",
-                base_columns=[
-                    "Box Out +",
-                    "Box Out Att",
-                    "Box Out %",
-                    "Off Reb's Given Up",
-                ],
-                column_map={
-                    "Box Out +": ("plus", "box_plus"),
-                    "Box Out Att": ("opps", "box_opp", "box_opps"),
-                    "Box Out %": ("pct", "box_pct"),
-                    "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
-                },
-                pct_columns=["Box Out %"],
-                table_id="leaderboard-def-reb",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "collision_gap_help":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Collisions — Gap Help",
-                rows_key="collision_rows",
-                last_rows_key="collision_last_rows",
-                totals_key="collision_totals",
-                last_totals_key="collision_last_totals",
-                base_columns=["Gap +", "Gap Opp", "Gap %"],
-                column_map={
-                    "Gap +": ("plus", "gap_plus"),
-                    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-                    "Gap %": ("pct", "gap_pct"),
-                },
-                pct_columns=["Gap %"],
-                table_id="leaderboard-collision-gap",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "pass_contest":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Pass Contests",
-                rows_key="pass_contest_rows",
-                last_rows_key="pass_contest_last_rows",
-                totals_key="pass_contest_totals",
-                last_totals_key="pass_contest_last_totals",
-                base_columns=["Contest +", "Contest Att", "Contest %"],
-                column_map={
-                    "Contest +": ("plus", "contest_plus", "pass_contest_plus"),
-                    "Contest Att": (
-                        "opps",
-                        "contest_opp",
-                        "contest_opps",
-                        "pass_contest_opp",
-                        "pass_contest_opps",
-                    ),
-                    "Contest %": ("pct", "contest_pct", "pass_contest_pct"),
-                },
-                pct_columns=["Contest %"],
-                table_id="leaderboard-pass-contest",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key in {"atr_contest_breakdown", "fg2_contest_breakdown", "fg3_contest_breakdown"}:
-        label_map = {
-            "atr_contest_breakdown": "ATR",
-            "fg2_contest_breakdown": "2FG",
-            "fg3_contest_breakdown": "3FG",
-        }
-        shot_label = label_map.get(stat_key, "Shot")
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title=f"{shot_label} Shot Contests",
-                rows_key="shot_contest_rows",
-                last_rows_key="shot_contest_last_rows",
-                totals_key="shot_contest_totals",
-                last_totals_key="shot_contest_last_totals",
-                base_columns=[
-                    "Contest Att",
-                    "Contest Makes",
-                    "Contest FG%",
-                    "Late Att",
-                    "Late Makes",
-                    "Late FG%",
-                    "No Contest Att",
-                    "No Contest Makes",
-                    "No Contest FG%",
-                ],
-                column_map={
-                    "Contest Att": ("opps", "contest_attempts"),
-                    "Contest Makes": ("plus", "contest_makes"),
-                    "Contest FG%": ("pct", "contest_pct"),
-                    "Late Att": ("opps", "late_attempts"),
-                    "Late Makes": ("plus", "late_makes"),
-                    "Late FG%": ("pct", "late_pct"),
-                    "No Contest Att": ("opps", "no_contest_attempts"),
-                    "No Contest Makes": ("plus", "no_contest_makes"),
-                    "No Contest FG%": ("pct", "no_contest_pct"),
-                },
-                pct_columns=["Contest FG%", "Late FG%", "No Contest FG%"],
-                table_id=f"leaderboard-shot-contest-{stat_key.split('_')[0]}",
-            )
-        )
-    elif stat_key == "overall_gap_help":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Overall Gap Help",
-                rows_key="overall_gap_rows",
-                last_rows_key="overall_gap_last_rows",
-                totals_key="overall_gap_totals",
-                last_totals_key="overall_gap_last_totals",
-                base_columns=["Gap +", "Gap Opp", "Gap %"],
-                column_map={
-                    "Gap +": ("plus", "gap_plus"),
-                    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-                    "Gap %": ("pct", "gap_pct"),
-                },
-                pct_columns=["Gap %"],
-                table_id="leaderboard-overall-gap",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "overall_low_man":
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="Overall Low Man",
-                rows_key="overall_low_rows",
-                last_rows_key="overall_low_last_rows",
-                totals_key="overall_low_totals",
-                last_totals_key="overall_low_last_totals",
-                base_columns=["Low +", "Low Opp", "Low %"],
-                column_map={
-                    "Low +": ("plus", "low_plus"),
-                    "Low Opp": ("opps", "low_opp", "low_opps"),
-                    "Low %": ("pct", "low_pct"),
-                },
-                pct_columns=["Low %"],
-                table_id="leaderboard-overall-low",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "pnr_gap_help":
-        common_columns = ["Gap +", "Gap Opp", "Gap %"]
-        column_map = {
-            "Gap +": ("plus", "gap_plus"),
-            "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-            "Gap %": ("pct", "gap_pct"),
-        }
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="PnR Gap Help",
-                rows_key="gap_rows",
-                last_rows_key="gap_last_rows",
-                totals_key="gap_totals",
-                last_totals_key="gap_last_totals",
-                base_columns=common_columns,
-                column_map=column_map,
-                pct_columns=["Gap %"],
-                table_id="leaderboard-pnr-gap",
-                default_sort=dual_default_sort,
-            )
-        )
-        sections_aux.append(
-            _build_practice_section_payload(
-                split_context,
-                title="PnR Low Man",
-                rows_key="low_rows",
-                last_rows_key="low_last_rows",
-                totals_key="low_totals",
-                last_totals_key="low_last_totals",
-                base_columns=common_columns,
-                column_map=column_map,
-                pct_columns=["Gap %"],
-                table_id="leaderboard-pnr-low",
-                default_sort=dual_default_sort,
-            )
-        )
-    elif stat_key == "pnr_grade":
-        common_columns = ["Gap +", "Gap Opp", "Gap %"]
-        column_map = {
-            "Gap +": ("plus", "gap_plus"),
-            "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-            "Gap %": ("pct", "gap_pct"),
-        }
-        sections_main.append(
-            _build_practice_section_payload(
-                split_context,
-                title="PnR Gap Help",
-                rows_key="close_rows",
-                last_rows_key="close_last_rows",
-                totals_key="close_totals",
-                last_totals_key="close_last_totals",
-                base_columns=common_columns,
-                column_map=column_map,
-                pct_columns=["Gap %"],
-                table_id="leaderboard-pnr-gap",
-                default_sort=dual_default_sort,
-            )
-        )
-        sections_aux.append(
-            _build_practice_section_payload(
-                split_context,
-                title="PnR Low Man",
-                rows_key="shut_rows",
-                last_rows_key="shut_last_rows",
-                totals_key="shut_totals",
-                last_totals_key="shut_last_totals",
-                base_columns=common_columns,
-                column_map=column_map,
-                pct_columns=["Gap %"],
-                table_id="leaderboard-pnr-low",
-                default_sort=dual_default_sort,
-            )
-        )
-
-    # Filter out sections without tables (should be rare but defensive)
-    sections_main = [section for section in sections_main if section]
-    sections_aux = [section for section in sections_aux if section]
-
-    if not sections_main and not sections_aux:
-        return None
-
-    return {
-        "stat_key": stat_key,
-        "last_practice_date": note_iso,
-        "note_display": note_display,
-        "main": sections_main,
-        "aux": sections_aux,
-        "empty_message": DEFAULT_PRACTICE_EMPTY_MESSAGE,
-    }
-
-
-def _build_practice_sections_for_stat(
-    stat_key: str,
-    season_id: Optional[int],
-    *,
-    label_set: Optional[set[str]] = None,
-) -> Optional[dict[str, Any]]:
-    if season_id is None or stat_key not in _PRACTICE_SECTION_KEYS:
-        return None
-
-    ctx = get_practice_dual_context(stat_key, season_id, label_set=label_set)
-    if not ctx:
-        return None
-
-    split_context = _split_leaderboard_rows_for_template(
-        stat_key,
-        ctx.get("season_rows"),
-        ctx.get("season_team_totals"),
-        last_rows=ctx.get("last_rows"),
-        last_team_totals=ctx.get("last_team_totals"),
-        last_practice_date=ctx.get("last_practice_date"),
-    )
-    return _practice_sections_from_split(stat_key, split_context)
 
 
 def _build_stat_compute(default_key):
@@ -3745,9 +3312,6 @@ if csrf:
     csrf.exempt(update_preset_api)
     csrf.exempt(delete_preset_api)
     csrf.exempt(ping_presets_api)
-    # Rebuild cache + status endpoints need to accept fetch() POSTs without CSRF
-    csrf.exempt(admin_rebuild_leaderboards)
-    csrf.exempt(admin_cache_status)
 
 
 def _resolve_season_from_request():
@@ -4354,10 +3918,7 @@ def parse_file(file_id):
             uploaded_file.last_parsed  = datetime.utcnow()
             db.session.commit()
 
-            flash(
-                "Parsed successfully. You can now build the leaderboard cache for this season.",
-                "success",
-            )
+            flash("Practice parsed successfully! You can now edit it.", "success")
             return redirect(
                 url_for('admin.edit_practice',
                         practice_id=practice.id,
@@ -4410,7 +3971,7 @@ def parse_file(file_id):
                 return redirect(url_for('admin.dashboard'))
 
             flash(
-                "Parsed successfully. You can now build the leaderboard cache for this season.",
+                f"File '{filename}' parsed successfully! You can now edit the game.",
                 "success"
             )
             return redirect(url_for('admin.edit_game', game_id=game.id))
@@ -4518,10 +4079,7 @@ def reparse_file(file_id):
         uploaded_file.category = category
         if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
             practice_id, season_id = _reparse_uploaded_practice(uploaded_file, upload_path)
-            flash(
-                "Practice re-parsed successfully! Rebuild leaderboards from the Files page when ready.",
-                "success",
-            )
+            flash("Practice re-parsed successfully!", "success")
             return redirect(
                 url_for('admin.edit_practice', practice_id=practice_id, season_id=season_id)
             )
@@ -4568,13 +4126,11 @@ def delete_file(file_id):
 
 
 @admin_bp.route('/delete-data/<int:file_id>', methods=['POST'])
-@login_required
 @admin_required
 def delete_data(file_id):
     """Delete parsed data associated with an uploaded file."""
     uploaded_file = UploadedFile.query.get_or_404(file_id)
     filename = uploaded_file.filename
-    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
 
     # Determine if this was a practice, recruit, or a game
     category = normalize_category(uploaded_file.category)
@@ -4588,62 +4144,45 @@ def delete_data(file_id):
     ]
     is_recruit = category == 'Recruit'
 
-    try:
-        if is_practice:
-            practice = Practice.query.filter_by(
-                season_id=uploaded_file.season_id,
-                date=uploaded_file.file_date,
-            ).first()
-            if practice:
-                if practice.category != category:
-                    practice.category = category
-                TeamStats.query.filter_by(practice_id=practice.id).delete()
-                PlayerStats.query.filter_by(practice_id=practice.id).delete()
-                BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
-                OpponentBlueCollarStats.query.filter_by(practice_id=practice.id).delete()
-                poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
-                if poss_ids:
-                    PlayerPossession.query.filter(
-                        PlayerPossession.possession_id.in_(poss_ids)
-                    ).delete(synchronize_session=False)
-                Possession.query.filter_by(practice_id=practice.id).delete()
-                db.session.delete(practice)
-        elif is_recruit:
-            RecruitShotTypeStat.query.filter_by(recruit_id=uploaded_file.recruit_id).delete()
-        else:
-            game = Game.query.filter_by(csv_filename=filename).first()
-            if game:
-                TeamStats.query.filter_by(game_id=game.id).delete()
-                PlayerStats.query.filter_by(game_id=game.id).delete()
-                BlueCollarStats.query.filter_by(game_id=game.id).delete()
-                OpponentBlueCollarStats.query.filter_by(game_id=game.id).delete()
-                poss_ids = [p.id for p in Possession.query.filter_by(game_id=game.id).all()]
-                if poss_ids:
-                    PlayerPossession.query.filter(
-                        PlayerPossession.possession_id.in_(poss_ids)
-                    ).delete(synchronize_session=False)
-                Possession.query.filter_by(game_id=game.id).delete()
-                db.session.delete(game)
+    if is_practice:
+        practice = Practice.query.filter_by(
+            season_id=uploaded_file.season_id,
+            date=uploaded_file.file_date,
+        ).first()
+        if practice:
+            if practice.category != category:
+                practice.category = category
+            TeamStats.query.filter_by(practice_id=practice.id).delete()
+            PlayerStats.query.filter_by(practice_id=practice.id).delete()
+            BlueCollarStats.query.filter_by(practice_id=practice.id).delete()
+            OpponentBlueCollarStats.query.filter_by(practice_id=practice.id).delete()
+            poss_ids = [p.id for p in Possession.query.filter_by(practice_id=practice.id).all()]
+            if poss_ids:
+                PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
+            Possession.query.filter_by(practice_id=practice.id).delete()
+            db.session.delete(practice)
+    elif is_recruit:
+        RecruitShotTypeStat.query.filter_by(recruit_id=uploaded_file.recruit_id).delete()
+    else:
+        game = Game.query.filter_by(csv_filename=filename).first()
+        if game:
+            TeamStats.query.filter_by(game_id=game.id).delete()
+            PlayerStats.query.filter_by(game_id=game.id).delete()
+            BlueCollarStats.query.filter_by(game_id=game.id).delete()
+            OpponentBlueCollarStats.query.filter_by(game_id=game.id).delete()
+            poss_ids = [p.id for p in Possession.query.filter_by(game_id=game.id).all()]
+            if poss_ids:
+                PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
+            Possession.query.filter_by(game_id=game.id).delete()
+            db.session.delete(game)
 
-        # Remove the upload record from the database
-        db.session.delete(uploaded_file)
-        db.session.commit()
-    except Exception:
-        current_app.logger.exception("Failed to delete data for uploaded file %s", file_id)
-        db.session.rollback()
-        flash("Failed to delete data.", "error")
-        return redirect(url_for('admin.files_view_unique'))
+    # Remove the upload record
+    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    db.session.delete(uploaded_file)
+    db.session.commit()
 
     if os.path.exists(upload_path):
-        try:
-            os.remove(upload_path)
-        except OSError:
-            current_app.logger.exception("Failed to remove uploaded file %s", upload_path)
-            flash(
-                f"Data for '{filename}' deleted, but removing the uploaded file failed.",
-                "warning",
-            )
-            return redirect(url_for('admin.files_view_unique'))
+        os.remove(upload_path)
 
     flash(f"Data for '{filename}' has been deleted.", "success")
     return redirect(url_for('admin.files_view_unique'))
@@ -4737,13 +4276,7 @@ def files_view():
         files = UploadedFile.query.filter_by(category=category_filter).order_by(UploadedFile.upload_date.desc()).all()
     else:
         files = UploadedFile.query.order_by(UploadedFile.upload_date.desc()).all()
-    seasons = Season.query.order_by(Season.start_date.desc()).all()
-    return render_template(
-        'files.html',
-        files=files,
-        selected_category=category_filter,
-        seasons=seasons,
-    )
+    return render_template('files.html', files=files, selected_category=category_filter)
 
 
 @admin_bp.route('/season/<int:season_id>/stats')
@@ -5165,8 +4698,7 @@ def edit_practice(practice_id):
         practice     = practice,
         player_stats = player_stats,
         blue_stats   = blue_stats,
-        active_page  = 'practices',
-        season_id    = practice.season_id,
+        active_page  = 'practices'
     )
 
 
@@ -5208,7 +4740,7 @@ def edit_game(game_id):
             db.session.rollback()
             flash(f"Error updating game: {e}", "error")
 
-    return render_template('admin/edit_game.html', game=game, season_id=game.season_id)
+    return render_template('admin/edit_game.html', game=game)
 
 
 
@@ -8218,47 +7750,7 @@ def leaderboard():
     selected_labels = [lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    cache_payload = None
-    table_payload: Optional[dict[str, Any]] = None
-    if sid and not (start_dt or end_dt or label_set):
-        cache_payload = cache_get_leaderboard(sid, stat_key)
-        if cache_payload:
-            current_app.logger.info(
-                "Leaderboard cache hit for stat=%s season=%s", stat_key, sid
-            )
-            table_payload = cache_payload
-        else:
-            current_app.logger.info(
-                "Leaderboard cache miss for stat=%s season=%s; skipping automatic rebuild",
-                stat_key,
-                sid,
-            )
-
-    if table_payload is None:
-        current_app.logger.info(
-            "Rendering leaderboard stat=%s season=%s via compute fallback", stat_key, sid
-        )
-        cfg, computed_rows, computed_totals = compute_leaderboard(
-            stat_key,
-            sid,
-            start_dt,
-            end_dt,
-            label_set if label_set else None,
-        )
-        compute_result = {
-            "config": cfg,
-            "rows": computed_rows,
-            "team_totals": computed_totals,
-        }
-        table_payload = format_leaderboard_payload(stat_key, compute_result)
-    else:
-        cfg = next((c for c in LEADERBOARD_STATS if c["key"] == stat_key), None)
-        if cfg is None:
-            cfg = {"key": stat_key, "label": stat_key.replace("_", " ").title()}
-
-    columns, column_keys, rows, team_totals = expand_cached_rows_for_template(table_payload)
-    default_sort = table_payload.get("default_sort")
-    has_data = table_payload.get("has_data", bool(rows) or bool(team_totals))
+    cfg, rows, team_totals = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
     practice_dual_ctx = (
         get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
         if cfg
@@ -8281,12 +7773,6 @@ def leaderboard():
         )
         if cfg
         else {}
-    )
-
-    practice_sections_payload = (
-        _practice_sections_from_split(cfg["key"], split_context)
-        if cfg
-        else None
     )
 
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
@@ -8323,29 +7809,14 @@ def leaderboard():
         link for link in practice_links if link["endpoint"] in view_functions
     ]
 
-    stat_options = [
-        (
-            stat.get('key'),
-            stat.get('label') or str(stat.get('key', '')).replace('_', ' ').title(),
-        )
-        for stat in LEADERBOARD_STATS
-        if stat.get('key') and not stat.get('hidden')
-    ]
-
     return render_template(
         'admin/leaderboard.html',
         all_seasons=all_seasons,
         selected_season=sid,
         stats_config=LEADERBOARD_STATS,
         selected=cfg,
-        columns=columns,
-        column_keys=column_keys,
         rows=rows,
         team_totals=team_totals,
-        table_payload=table_payload,
-        table_default_sort=default_sort,
-        table_has_data=has_data,
-        season_id=sid,
         start_date=start_date or '',
         end_date=end_date or '',
         label_options=label_options,
@@ -8354,496 +7825,8 @@ def leaderboard():
         selected_session=selected_session,
         sessions=sessions,
         practice_links=filtered_practice_links,
-        stat_options=stat_options,
-        current_stat_key=stat_key,
-        practice_sections=practice_sections_payload,
         **split_context,
     )
-
-
-def _validate_cached_leaderboard_payload(stat_key: str, payload: Mapping[str, Any]) -> bool:
-    """Best-effort validation to ensure cached payloads resemble the expected shape."""
-
-    if not isinstance(payload, Mapping):
-        current_app.logger.warning(
-            "Cached leaderboard payload for stat %s is not a mapping; skipping validation.",
-            stat_key,
-        )
-        return False
-
-    valid = True
-
-    columns = payload.get("columns_manifest")
-    if columns is not None:
-        if not isinstance(columns, list) or any(not isinstance(col, Mapping) for col in columns):
-            current_app.logger.warning(
-                "Cached leaderboard payload for stat %s has invalid columns_manifest.",
-                stat_key,
-            )
-            valid = False
-
-    rows = payload.get("rows")
-    if rows is not None:
-        if not isinstance(rows, list):
-            current_app.logger.warning(
-                "Cached leaderboard payload for stat %s has non-list rows.",
-                stat_key,
-            )
-            valid = False
-        else:
-            for idx, row in enumerate(rows):
-                if not isinstance(row, Mapping):
-                    current_app.logger.warning(
-                        "Cached leaderboard payload for stat %s row %s is not a mapping.",
-                        stat_key,
-                        idx,
-                    )
-                    valid = False
-                    break
-                metrics = row.get("metrics")
-                if metrics is not None and not isinstance(metrics, Mapping):
-                    current_app.logger.warning(
-                        "Cached leaderboard payload for stat %s row %s has invalid metrics.",
-                        stat_key,
-                        idx,
-                    )
-                    valid = False
-                    break
-                display = row.get("display")
-                if display is not None and not isinstance(display, Mapping):
-                    current_app.logger.warning(
-                        "Cached leaderboard payload for stat %s row %s has invalid display block.",
-                        stat_key,
-                        idx,
-                    )
-                    valid = False
-                    break
-
-    aux_table = payload.get("aux_table")
-    if aux_table is not None:
-        if not isinstance(aux_table, Mapping):
-            current_app.logger.warning(
-                "Cached leaderboard payload for stat %s has invalid aux_table block.",
-                stat_key,
-            )
-            valid = False
-        else:
-            aux_columns = aux_table.get("columns_manifest")
-            if aux_columns is not None and (
-                not isinstance(aux_columns, list)
-                or any(not isinstance(col, Mapping) for col in aux_columns)
-            ):
-                current_app.logger.warning(
-                    "Cached leaderboard payload for stat %s has invalid aux_table columns_manifest.",
-                    stat_key,
-                )
-                valid = False
-
-            aux_rows = aux_table.get("rows")
-            if aux_rows is not None:
-                if not isinstance(aux_rows, list):
-                    current_app.logger.warning(
-                        "Cached leaderboard payload for stat %s has non-list aux_table rows.",
-                        stat_key,
-                    )
-                    valid = False
-                else:
-                    for idx, row in enumerate(aux_rows):
-                        if not isinstance(row, Mapping):
-                            current_app.logger.warning(
-                                "Cached leaderboard payload for stat %s aux row %s is not a mapping.",
-                                stat_key,
-                                idx,
-                            )
-                            valid = False
-                            break
-                        metrics = row.get("metrics")
-                        if metrics is not None and not isinstance(metrics, Mapping):
-                            current_app.logger.warning(
-                                "Cached leaderboard payload for stat %s aux row %s has invalid metrics.",
-                                stat_key,
-                                idx,
-                            )
-                            valid = False
-                            break
-
-    return valid
-
-
-def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
-    """Return cached leaderboard payloads for ``season_id`` without recomputation."""
-
-    snapshots = load_latest_snapshots_for_season(season_id)
-    leaderboards: dict[str, Any] = {}
-    warming: list[str] = []
-    schema_version: Any = None
-    formatter_version: Any = None
-
-    def _record_payload(stat_key: str, payload: Mapping[str, Any]) -> None:
-        nonlocal schema_version, formatter_version
-
-        _validate_cached_leaderboard_payload(stat_key, payload)
-        leaderboards[stat_key] = payload
-
-        payload_schema_version = payload.get("schema_version")
-        if payload_schema_version is not None:
-            if schema_version is None:
-                schema_version = payload_schema_version
-            elif schema_version != payload_schema_version:
-                current_app.logger.warning(
-                    "Mismatched schema_version in cached leaderboards for season %s (expected %s, found %s).",
-                    season_id,
-                    schema_version,
-                    payload_schema_version,
-                )
-
-        payload_formatter_version = payload.get("formatter_version")
-        if payload_formatter_version is not None:
-            if formatter_version is None:
-                formatter_version = payload_formatter_version
-            elif formatter_version != payload_formatter_version:
-                current_app.logger.warning(
-                    "Mismatched formatter_version in cached leaderboards for season %s (expected %s, found %s).",
-                    season_id,
-                    formatter_version,
-                    payload_formatter_version,
-                )
-
-    # Iterate over canonical stat keys first so missing ones can be tracked as "warming".
-    for stat_key in LEADERBOARD_STAT_KEYS:
-        payload = snapshots.get(stat_key)
-        if isinstance(payload, Mapping):
-            _record_payload(stat_key, payload)
-        else:
-            warming.append(stat_key)
-
-    # Include any additional cached snapshots (for example experimental stats).
-    for stat_key, payload in snapshots.items():
-        if stat_key in leaderboards:
-            continue
-        if not isinstance(payload, Mapping):
-            current_app.logger.warning(
-                "Cached leaderboard payload for season %s stat %s is not a mapping.",
-                season_id,
-                stat_key,
-            )
-            continue
-        _record_payload(stat_key, payload)
-
-    missing = [key for key in LEADERBOARD_STAT_KEYS if key not in leaderboards]
-    warming = list(dict.fromkeys([key for key in warming if key in missing]))
-
-    practice_sections: dict[str, Any] = {}
-    for stat_key in list(leaderboards.keys()):
-        if stat_key not in _PRACTICE_SECTION_KEYS:
-            continue
-        try:
-            sections = _build_practice_sections_for_stat(stat_key, season_id)
-        except Exception:  # pragma: no cover - defensive log guard
-            current_app.logger.exception(
-                "Failed to build practice sections for stat %s season %s",
-                stat_key,
-                season_id,
-            )
-            continue
-        if sections:
-            practice_sections[stat_key] = sections
-
-    return {
-        "leaderboards": leaderboards,
-        "missing": missing,
-        "warming": warming,
-        "schema_version": schema_version,
-        "formatter_version": formatter_version,
-        "practice_sections": practice_sections,
-    }
-
-
-@admin_bp.get("/admin/diag/leaderboards/<int:season_id>")
-@login_required
-@admin_required
-def admin_leaderboard_diagnostics(season_id: int):
-    season = db.session.get(Season, season_id)
-    if season is None:
-        abort(404, description=f"Season {season_id} not found")
-
-    summary = _load_all_cached_leaderboards(season_id)
-    snapshots = (
-        CachedLeaderboard.query.filter_by(season_id=season_id)
-        .order_by(
-            CachedLeaderboard.stat_key.asc(),
-            CachedLeaderboard.created_at.desc(),
-            CachedLeaderboard.id.desc(),
-        )
-        .all()
-    )
-
-    history: dict[str, list[dict[str, Any]]] = {}
-    latest: dict[str, dict[str, Any]] = {}
-
-    for snap in snapshots:
-        record = {
-            "stat_key": snap.stat_key,
-            "created_at": snap.created_at,
-            "etag": snap.etag,
-            "schema_version": snap.schema_version,
-            "formatter_version": snap.formatter_version,
-            "size_bytes": len((snap.payload_json or "").encode("utf-8")),
-        }
-        history.setdefault(snap.stat_key, []).append(record)
-        if snap.stat_key not in latest:
-            latest[snap.stat_key] = record
-
-    missing_from_constants = [key for key in LEADERBOARD_STAT_KEYS if key not in latest]
-    reported_missing = summary.get("missing", []) if isinstance(summary, Mapping) else []
-    missing: list[str] = list(dict.fromkeys(missing_from_constants + list(reported_missing)))
-
-    known_keys = list(dict.fromkeys(list(LEADERBOARD_STAT_KEYS) + list(latest.keys())))
-    table_rows = [
-        {
-            "stat_key": key,
-            "snapshot": latest.get(key),
-            "history": history.get(key, []),
-        }
-        for key in known_keys
-    ]
-
-    return render_template(
-        "admin/diag_leaderboards.html",
-        season=season,
-        season_id=season_id,
-        rows=table_rows,
-        history=history,
-        missing=missing,
-        schema_version=summary.get("schema_version") if isinstance(summary, Mapping) else None,
-        formatter_version=summary.get("formatter_version") if isinstance(summary, Mapping) else None,
-        active_page="leaderboards",
-    )
-
-
-@admin_bp.get('/api/leaderboards/<int:season_id>')
-@admin_bp.get('/api/leaderboards/<int:season_id>/all')
-@admin_bp.get('/admin/api/leaderboards/<int:season_id>/all')
-@login_required
-def api_leaderboards_all(season_id):
-    data = _load_all_cached_leaderboards(season_id)
-    body = json.dumps(data, separators=(",", ":"), sort_keys=True, default=str)
-    etag = hashlib.sha256(body.encode("utf-8")).hexdigest()
-
-    if request.if_none_match and request.if_none_match.contains(etag):
-        resp = make_response("", 304)
-    else:
-        resp = make_response(body, 200)
-        resp.headers["Content-Type"] = "application/json"
-
-    resp.set_etag(etag)
-    resp.headers["Cache-Control"] = "public, max-age=60"
-    return resp
-
-
-@admin_bp.route('/api/leaderboard/<int:season_id>/<stat_key>', methods=['GET'])
-@login_required
-def api_leaderboard_one(season_id, stat_key):
-    cached = cache_get_leaderboard(season_id, stat_key)
-    if cached:
-        resp = make_response(jsonify(cached), 200)
-        etag_source = json.dumps(cached, sort_keys=True, default=str)
-        resp.set_etag(hashlib.md5(etag_source.encode()).hexdigest())
-    else:
-        resp = make_response(
-            jsonify(
-                {
-                    "error": "snapshot_not_found",
-                    "message": "Snapshot not available; warm the cache via POST.",
-                    "stat_key": stat_key,
-                }
-            ),
-            404,
-        )
-    resp.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
-    return resp
-
-
-@admin_bp.get("/admin/debug_cache")
-@login_required
-@admin_required
-def admin_debug_cache():
-    stat = request.args.get("stat")
-    if not stat:
-        raise BadRequest("Missing required 'stat' query parameter")
-    season = int(request.args.get("season", "1"))
-    from services.leaderboard_cache import _payload_key_v2, cache as leaderboard_cache
-
-    key = _payload_key_v2(season, stat)
-    return jsonify({"key": key, "exists": bool(leaderboard_cache.get(key))})
-
-
-@admin_bp.get("/admin/ping_scheduler")
-@login_required
-@admin_required
-def admin_ping_scheduler():
-    s = getattr(current_app, "apscheduler", None)
-    jobs = []
-    if s:
-        try:
-            jobs = [j.id for j in s.get_jobs()]
-        except Exception:
-            jobs = ["<error listing jobs>"]
-    return jsonify({"running": bool(s), "jobs": jobs})
-
-
-@admin_bp.post("/admin/rebuild_sync/<int:season_id>")
-@login_required
-@admin_required
-def admin_rebuild_sync(season_id: int):
-    key = f"leaderboard:progress:{season_id}"
-    clear_progress(key)
-    set_progress(key, 0, "Starting (sync)…")
-    try:
-        rebuild_leaderboards_job(season_id)  # runs inline in app context
-        return jsonify({"ok": True, "progress": get_progress(key)})
-    except Exception as e:
-        return (
-            jsonify({"ok": False, "error": str(e), "progress": get_progress(key)}),
-            500,
-        )
-
-
-@admin_bp.post("/admin/rebuild_leaderboards/<int:season_id>")
-@admin_bp.post("/admin/leaderboards/<int:season_id>/rebuild")
-@login_required
-@admin_required
-def admin_rebuild_leaderboards(season_id: int):
-    payload = request.get_json(silent=True)
-    keys_param: Any = payload.get("keys") if isinstance(payload, Mapping) else None
-
-    if keys_param in (None, "all"):
-        stat_keys = list(LEADERBOARD_STAT_KEYS)
-    elif isinstance(keys_param, Sequence) and not isinstance(keys_param, (str, bytes)):
-        stat_keys = [str(k) for k in keys_param if str(k)]
-        if not stat_keys:
-            raise BadRequest("No stat keys provided")
-    else:
-        raise BadRequest("'keys' must be a list or 'all'")
-
-    app_obj = current_app._get_current_object()
-    username = getattr(current_user, "username", "unknown")
-    app_obj.logger.info(
-        "[LEADERS] Warm requested by %s for season=%s keys=%s",
-        username,
-        season_id,
-        stat_keys,
-    )
-
-    prog_key = f"leaderboard:progress:{season_id}"
-    set_progress(prog_key, 0, "Queued")
-
-    scheduler = getattr(app_obj, "apscheduler", None)
-    job_id = f"leaderboard-rebuild:{season_id}"
-    queued = False
-
-    if scheduler is not None:
-        try:
-            scheduler.add_job(
-                rebuild_leaderboards_job,
-                trigger="date",
-                id=job_id,
-                run_date=datetime.utcnow(),
-                args=(season_id,),
-                kwargs={"stat_keys": stat_keys, "app": app_obj},
-                replace_existing=True,
-                coalesce=True,
-                max_instances=1,
-            )
-            queued = True
-            app_obj.logger.info(
-                "[LEADERS] Job queued by %s for season=%s keys=%s",
-                username,
-                season_id,
-                stat_keys,
-            )
-        except Exception:
-            app_obj.logger.exception(
-                "[LEADERS] Failed to enqueue job for season=%s keys=%s",
-                season_id,
-                stat_keys,
-            )
-
-    if not queued:
-        try:
-            rebuild_leaderboards_job(season_id, stat_keys=stat_keys)
-        except Exception as exc:  # pragma: no cover - surfaced via response
-            app_obj.logger.exception(
-                "[LEADERS] Warm failed inline for season=%s keys=%s",
-                season_id,
-                stat_keys,
-            )
-            return (
-                jsonify(
-                    {
-                        "queued": False,
-                        "season_id": season_id,
-                        "keys": stat_keys,
-                        "error": str(exc),
-                    }
-                ),
-                500,
-            )
-
-    started_at = datetime.utcnow().isoformat() + "Z"
-    return (
-        jsonify(
-            {
-                "queued": True,
-                "season_id": season_id,
-                "keys": stat_keys,
-                "started_at": started_at,
-            }
-        ),
-        200,
-    )
-
-
-@admin_bp.post("/admin/leaderboards/<int:season_id>/rollback")
-@login_required
-@admin_required
-def admin_leaderboard_rollback(season_id: int):
-    payload = request.get_json(silent=True) or {}
-    if not isinstance(payload, Mapping):
-        raise BadRequest("JSON body required")
-
-    stat_key = str(payload.get("stat_key") or "").strip()
-    etag = str(payload.get("etag") or "").strip()
-    if not stat_key or not etag:
-        raise BadRequest("'stat_key' and 'etag' are required")
-
-    try:
-        deleted = delete_snapshots_after_etag(season_id, stat_key, etag)
-    except ValueError as exc:
-        raise NotFound(str(exc)) from exc
-
-    current_app.logger.info(
-        "[LEADERS] Rollback applied by %s for season=%s stat=%s removed=%s",
-        getattr(current_user, "username", "unknown"),
-        season_id,
-        stat_key,
-        deleted,
-    )
-
-    return jsonify({
-        "ok": True,
-        "season_id": season_id,
-        "stat_key": stat_key,
-        "removed": deleted,
-    })
-
-
-@admin_bp.get("/admin/cache_status/<int:season_id>")
-@login_required
-@admin_required
-def admin_cache_status(season_id: int):
-    prog_key = f"leaderboard:progress:{season_id}"
-    return jsonify(get_progress(prog_key))
 
 
 @admin_bp.route('/usage')
