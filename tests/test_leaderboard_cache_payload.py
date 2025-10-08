@@ -1,3 +1,5 @@
+import pytest
+
 from services.cache_leaderboard import format_leaderboard_payload
 from stats_config import LEADERBOARD_STATS
 
@@ -114,3 +116,164 @@ def test_format_payload_fg3_pct_includes_subcolumns():
     assert len(first_row) == len(payload["columns"])
     assert all(isinstance(value, str) for value in first_row)
     assert len(payload["column_keys"]) == len(payload["columns"])
+
+
+@pytest.mark.parametrize(
+    "stat_key, rows, totals, expected_labels",
+    [
+        (
+            "defense",
+            [("#1 Stopper", 10, 20, 50.0)],
+            (10, 20, 50.0),
+            ["#", "Player", "Bump +", "Bump Opps", "Bump %"],
+        ),
+        (
+            "off_rebounding",
+            [("#2 Crasher", 8, 16, 50.0, 4, 8, 50.0)],
+            (8, 16, 50.0, 4, 8, 50.0),
+            [
+                "#",
+                "Player",
+                "Crash +",
+                "Crash Att",
+                "Crash %",
+                "Back Man +",
+                "Back Man Att",
+                "Back Man %",
+            ],
+        ),
+        (
+            "def_rebounding",
+            [("#3 Anchor", 6, 12, 50.0, 2)],
+            (6, 12, 50.0, 2),
+            [
+                "#",
+                "Player",
+                "Box Out +",
+                "Box Out Att",
+                "Box Out %",
+                "Off Reb's Given Up",
+            ],
+        ),
+        (
+            "collision_gap_help",
+            [("#4 Helper", 9, 18, 50.0, 7, 14, 50.0)],
+            (9, 18, 50.0, 7, 14, 50.0),
+            [
+                "#",
+                "Player",
+                "Gap +",
+                "Gap Opp",
+                "Gap %",
+                "Low +",
+                "Low Opp",
+                "Low %",
+            ],
+        ),
+        (
+            "pass_contest",
+            [("#5 Disruptor", 5, 10, 50.0)],
+            (5, 10, 50.0),
+            ["#", "Player", "Contest +", "Contest Att", "Contest %"],
+        ),
+        (
+            "overall_gap_help",
+            [
+                {
+                    "player_name": "#6 Glue",
+                    "plus": 11,
+                    "opps": 22,
+                    "pct": 50.0,
+                }
+            ],
+            {"plus": 11, "opps": 22, "pct": 50.0},
+            ["#", "Player", "Gap +", "Gap Opp", "Gap %"],
+        ),
+        (
+            "overall_low_man",
+            [
+                {
+                    "player_name": "#7 Anchor",
+                    "plus": 13,
+                    "opps": 26,
+                    "pct": 50.0,
+                }
+            ],
+            {"plus": 13, "opps": 26, "pct": 50.0},
+            ["#", "Player", "Low +", "Low Opp", "Low %"],
+        ),
+        (
+            "pnr_gap_help",
+            [("#8 Switch", 7, 14, 50.0, 6, 12, 50.0)],
+            (7, 14, 50.0, 6, 12, 50.0),
+            [
+                "#",
+                "Player",
+                "Gap +",
+                "Gap Opp",
+                "Gap %",
+                "Low +",
+                "Low Opp",
+                "Low %",
+            ],
+        ),
+        (
+            "pnr_grade",
+            [("#9 Wall", 6, 12, 50.0, 5, 10, 50.0)],
+            (6, 12, 50.0, 5, 10, 50.0),
+            [
+                "#",
+                "Player",
+                "Close Window +",
+                "Close Window Att",
+                "Close Window %",
+                "Shut Door +",
+                "Shut Door Att",
+                "Shut Door %",
+            ],
+        ),
+        (
+            "atr_contest_breakdown",
+            [
+                {
+                    "player": "#10 Contestant",
+                    "contest_attempts": 10,
+                    "contest_makes": 4,
+                    "contest_pct": 40.0,
+                    "late_attempts": 6,
+                    "late_makes": 2,
+                    "late_pct": 33.3,
+                    "no_contest_attempts": 3,
+                    "no_contest_makes": 1,
+                    "no_contest_pct": 33.3,
+                }
+            ],
+            {
+                "contest": {"plus": 4, "opps": 10, "pct": 40.0},
+                "late": {"plus": 2, "opps": 6, "pct": 33.3},
+                "no_contest": {"plus": 1, "opps": 3, "pct": 33.3},
+            },
+            [
+                "#",
+                "Player",
+                "Contest Att",
+                "Contest Makes",
+                "Contest FG%",
+                "Late Att",
+                "Late Makes",
+                "Late FG%",
+                "No Contest Att",
+                "No Contest Makes",
+                "No Contest FG%",
+            ],
+        ),
+    ],
+)
+def test_format_payload_special_stats(stat_key, rows, totals, expected_labels):
+    cfg = _config_for(stat_key)
+    compute_result = {"config": cfg, "rows": rows, "team_totals": totals}
+
+    payload = format_leaderboard_payload(stat_key, compute_result)
+
+    labels = [col["label"] for col in payload["columns"]]
+    assert labels == expected_labels
