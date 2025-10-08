@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash
 from admin.routes import admin_bp
 from models.database import CachedLeaderboard, Season, UploadedFile, db
 from models.user import User
-from services.cache_leaderboard import cache_build_one
+from services.cache_leaderboard import cache_build_one, expand_cached_rows_for_template
 
 
 def _dummy_builder(stat_key: str, season_id: int):
@@ -119,3 +119,57 @@ def test_leaderboard_route_computes_when_cache_missing(app, client, monkeypatch)
     with app.app_context():
         cached = CachedLeaderboard.query.filter_by(season_id=1, stat_key="points").first()
         assert cached is None
+
+
+def test_expand_cached_rows_restores_display_and_values():
+    payload = {
+        "columns": [
+            {"key": "rank", "label": "#", "value_key": "rank_value"},
+            {"key": "player", "label": "Player"},
+            {"key": "points", "label": "Points", "value_key": "points_value"},
+        ],
+        "columns_manifest": [
+            {"key": "rank", "label": "#", "value_key": "rank_value"},
+            {"key": "player", "label": "Player"},
+            {"key": "points", "label": "Points", "value_key": "points_value"},
+        ],
+        "column_keys": ["rank", "player", "points"],
+        "rows": [
+            {
+                "rank": 1,
+                "display": {"player": "#1 Example", "rank": 1},
+                "metrics": {
+                    "rank": {"text": "1", "raw": 1.0},
+                    "player": {"text": "#1 Example", "raw": None},
+                    "points": {"text": "12", "raw": 12.0},
+                },
+            }
+        ],
+        "totals": {
+            "display": {"player": "Team Totals", "rank": ""},
+            "metrics": {
+                "rank": {"text": "", "raw": None},
+                "player": {"text": "Team Totals", "raw": None},
+                "points": {"text": "12", "raw": 12.0},
+            },
+        },
+    }
+
+    columns, column_keys, rows, totals = expand_cached_rows_for_template(payload)
+
+    assert column_keys == ["rank", "player", "points"]
+    assert rows == [
+        {
+            "rank": 1,
+            "rank_value": 1.0,
+            "player": "#1 Example",
+            "points": "12",
+            "points_value": 12.0,
+        }
+    ]
+    assert totals == {
+        "rank": "",
+        "player": "Team Totals",
+        "points": "12",
+        "points_value": 12.0,
+    }
