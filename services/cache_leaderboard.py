@@ -30,6 +30,8 @@ from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 from constants import LEADERBOARD_STAT_KEYS
 from models.database import CachedLeaderboard, db
 from services.leaderboard_cache import (
+    FORMATTER_VERSION,
+    SCHEMA_VERSION,
     build_leaderboard_payload,
     delete_snapshots_after_etag,
     fetch_latest_snapshot,
@@ -133,6 +135,18 @@ def format_leaderboard_payload(
     return payload
 
 
+def _is_current_payload(payload: Mapping[str, Any]) -> bool:
+    try:
+        schema_version = int(payload.get("schema_version", 0))
+    except (TypeError, ValueError):
+        schema_version = 0
+    try:
+        formatter_version = int(payload.get("formatter_version", 0))
+    except (TypeError, ValueError):
+        formatter_version = 0
+    return schema_version == SCHEMA_VERSION and formatter_version == FORMATTER_VERSION
+
+
 def cache_get_leaderboard(season_id: int, stat_key: str) -> Optional[Dict[str, Any]]:
     """Return cached payload for ``(season_id, stat_key)`` if present."""
 
@@ -140,8 +154,29 @@ def cache_get_leaderboard(season_id: int, stat_key: str) -> Optional[Dict[str, A
         return None
 
     payload = fetch_latest_snapshot(season_id, stat_key)
-    if isinstance(payload, dict):
-        return payload
+    if isinstance(payload, Mapping):
+        if _is_current_payload(payload):
+            return dict(payload)
+
+        logger.info(
+            "Cached leaderboard payload for stat=%s season=%s is stale (schema=%s formatter=%s); refreshing.",
+            stat_key,
+            season_id,
+            payload.get("schema_version"),
+            payload.get("formatter_version"),
+        )
+        try:
+            schedule_refresh(stat_key, season_id)
+        except Exception:
+            logger.exception(
+                "Failed to rebuild stale leaderboard cache for stat=%s season=%s",
+                stat_key,
+                season_id,
+            )
+        else:
+            refreshed = fetch_latest_snapshot(season_id, stat_key)
+            if isinstance(refreshed, Mapping) and _is_current_payload(refreshed):
+                return dict(refreshed)
     return None
 
 
