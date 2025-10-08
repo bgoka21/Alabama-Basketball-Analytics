@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover
     np = _DummyNP()
 import sqlite3
 from utils.lineup import compute_lineup_efficiencies
-# from utils.shottype import persist_player_shot_details
+from utils.shottype import persist_player_shot_details
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
 
 #print("🔥 parse_csv() function has started executing!")
@@ -112,7 +112,6 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
         "3FG (Good/Bad)":       ["Good", "Bad", "Neutral Three"],
         "3FG (Line)":           ["On The Line", "Off The Line"],
         "3FG (Move)":           ["Stationary", "On Move"],
-        "3FG (Balance)":        ["On Balance", "Off Balance"],
         "3FG (Pocket)":         ["Shot Pocket", "Non-Shot Pocket"],
         "3FG (Shrink)":         ["Shrink", "Non-Shrink"],
         "3FG (Type)":           ["Catch and Shoot", "Pull Up", "Step Back", "Catch and Hold", "Slide Dribble"],
@@ -576,7 +575,7 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
                     points_scored += 1
 
         poss = {
-            "game_id": game_id,
+            "game_id": game_id or 0,
             "season_id": season_id,
             "side": row_type,  # "Offense" or "Defense"
             "possession_start": safe_str(row.get("POSSESSION START", "")),
@@ -1170,22 +1169,11 @@ def parse_csv(file_path, game_id, season_id):
 
         db.session.commit()
 
-        from services.cache_leaderboard import rebuild_leaderboards_after_parse
-
-        rebuild_leaderboards_after_parse(None)
-
     conn.close()
 
     #print("✅ Player Stats Successfully Inserted!")
     calculate_derived_metrics(player_stats_dict)
-
-    with app_instance.app_context():
-        from constants import LEADERBOARD_STAT_KEYS
-        from services.cache_leaderboard import cache_build_all
-        from admin.routes import build_leaderboard_cache_payload
-
-        cache_build_all(season_id, build_leaderboard_cache_payload, LEADERBOARD_STAT_KEYS)
-
+    
     # --- Calculate Possession Type Breakdowns using the new detailed function ---
     # --- Calculate Possession Type & Split Breakdowns ---
     offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \

@@ -66,28 +66,7 @@
       {% endfor %}
     </div>
   </section>
-  <div id="leaderboard-root" data-season-id="{{ season_id or '' }}" class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-    <form id="leaderboard-controls" class="flex flex-col sm:flex-row sm:items-end gap-3">
-      <div class="flex flex-col">
-        <label for="stat-select" class="block text-sm font-medium text-gray-700">Stat</label>
-        <select id="stat-select" name="stat" class="border rounded px-3 py-2">
-          {% for key, label in stat_options %}
-            <option value="{{ key }}" {% if key == current_stat_key %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </form>
-
-    <div id="leaderboard-main" class="mt-4 overflow-x-auto"></div>
-    <div id="leaderboard-aux" class="mt-6 hidden overflow-x-auto"></div>
-
-    <script id="initial-leaderboard-payload" type="application/json">
-      {{ table_payload | tojson }}
-    </script>
-    <script id="initial-practice-sections" type="application/json">
-      {{ practice_sections | tojson }}
-    </script>
-  </div>
+  {% include "_leaderboard_block.html" %}
 
   <section class="mt-10 text-sm text-gray-600">
     <p>
@@ -96,9 +75,4 @@
       to mix and match roster, date, and stat filters on demand.
     </p>
   </section>
-{% endblock %}
-
-{% block scripts %}
-  {{ super() }}
-  <script src="{{ url_for('static', filename='js/leaderboard-controller.js') }}"></script>
 {% endblock %}

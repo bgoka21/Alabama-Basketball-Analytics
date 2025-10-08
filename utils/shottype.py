@@ -146,6 +146,31 @@ def _collect_shots_from_query(rows: Iterable) -> List[Mapping]:
     return shots
 
 
+def persist_player_shot_details(
+    player_stat: PlayerStats,
+    shots: Iterable[Mapping] | None,
+    *,
+    replace: bool = False,
+) -> None:
+    """Persist ``shots`` to ``player_stat.shot_type_details`` as JSON."""
+
+    if player_stat is None:
+        return
+
+    if replace:
+        player_stat.shot_type_details = None
+
+    normalized: list[Mapping] = []
+    for shot in shots or []:
+        if isinstance(shot, Mapping):
+            normalized.append(dict(shot))
+
+    if normalized:
+        player_stat.shot_type_details = json.dumps(normalized)
+    elif replace:
+        player_stat.shot_type_details = None
+
+
 def _apply_common_filters(query, practice, start_date, end_date):
     if practice is True:
         query = query.filter(PlayerStats.practice_id != None)  # noqa: E711

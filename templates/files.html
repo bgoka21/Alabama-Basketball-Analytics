@@ -15,43 +15,6 @@
     </select>
   </form>
 
-  {% if current_user.is_authenticated and current_user.is_admin %}
-  {% set current_season_id = selected_season or (seasons[0].id if seasons else None) %}
-  <div class="mb-6 bg-white shadow rounded-lg p-4">
-    <h2 class="text-lg font-semibold mb-3">Cache Leaderboards</h2>
-    <div
-      id="cache-controls"
-      data-cache-endpoint-template="{{ url_for('admin.admin_rebuild_leaderboards', season_id=0) | replace('/0','/__SEASON__') }}"
-      data-cache-status-template="{{ url_for('admin.admin_cache_status', season_id=0) | replace('/0','/__SEASON__') }}"
-      data-current-season-id="{{ current_season_id or '' }}"
-    >
-      <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-3 sm:space-y-0">
-        <label for="season-select" class="font-medium">Select season:</label>
-        <select id="season-select" class="border rounded px-3 py-2 flex-1">
-          {% for season in seasons %}
-          <option value="{{ season.id }}" {% if season.id == current_season_id %}selected{% endif %}>
-            {{ season.season_name or season.id }}
-          </option>
-          {% endfor %}
-        </select>
-
-        <button id="rebuild-cache-btn" type="button" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
-          Rebuild Cache
-        </button>
-      </div>
-
-      <div id="cache-progress" class="mt-3">
-        <div class="w-full bg-gray-200 rounded">
-          <div id="cache-progress-bar" class="h-2 rounded" style="width:0%"></div>
-        </div>
-        <div class="text-sm mt-1">
-          <span id="cache-progress-text">0%</span> — <span id="cache-progress-msg">Queued rebuild</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
   <!-- Bulk Actions Form -->
   <form method="POST" action="{{ url_for('admin.bulk_action') }}">
     <div class="mb-3 flex flex-col space-y-3 sm:flex-row sm:space-x-3 sm:space-y-0 sm:items-center sm:justify-between">

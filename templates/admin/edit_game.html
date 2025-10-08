@@ -2,8 +2,6 @@
 {% block content %}
 <div class="max-w-lg mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
   <h1 class="text-2xl font-bold mb-4">Edit Game</h1>
-  {% set season_id = game.season_id %}
-  {% include 'admin/_cache_leaderboard_button.html' %}
   <form method="POST">
     <!-- Game Date -->
     <div class="mb-4">

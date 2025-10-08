@@ -22,9 +22,6 @@
         margin-bottom: 1rem;
       }
   </style>
-  <script>
-    window.__CSRF__ = {% if csrf_token is defined %}"{{ csrf_token()|e }}"{% else %}''{% endif %};
-  </script>
     <!-- Print styles (print-only) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}" media="print">
 
@@ -65,24 +62,6 @@
   {# ── Page-specific controls (e.g. season dropdown) ── #}
   {% block page_controls %}{% endblock %}
 
-  {% with messages = get_flashed_messages(with_categories=True) %}
-    {% if messages %}
-      <div class="mb-4 space-y-2">
-        {% for category, msg in messages %}
-          <div class="
-              px-3 py-2 rounded border
-              {% if category in ['success'] %} bg-green-50 border-green-200 text-green-800
-              {% elif category in ['warning'] %} bg-yellow-50 border-yellow-200 text-yellow-800
-              {% elif category in ['danger','error'] %} bg-red-50 border-red-200 text-red-800
-              {% else %} bg-gray-50 border-gray-200 text-gray-800 {% endif %}
-          ">
-            {{ msg }}
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  {% endwith %}
-
   {# ── Main page content ── #}
   {% block content %}{% endblock %}
 </main>
@@ -97,7 +76,6 @@
   </script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="{{ url_for('static', filename='js/table-sort.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/cache-leaderboard.js') }}" defer></script>
 
   {% block scripts %}{% endblock %}
 

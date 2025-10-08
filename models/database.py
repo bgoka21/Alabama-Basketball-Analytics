@@ -7,37 +7,6 @@ from sqlalchemy.sql import func
 db = SQLAlchemy()
 
 
-class CachedLeaderboard(db.Model):
-    __tablename__ = 'cached_leaderboards'
-
-    id = db.Column(db.Integer, primary_key=True)
-    season_id = db.Column(db.Integer, index=True, nullable=True)
-    stat_key = db.Column(db.String(128), index=True, nullable=False)
-    schema_version = db.Column(db.Integer, nullable=False)
-    formatter_version = db.Column(db.Integer, nullable=False)
-    etag = db.Column(db.String(64), nullable=False)
-    payload_json = db.Column(db.Text, nullable=False)
-    created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        default=func.now(),
-    )
-    updated_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        default=func.now(),
-        onupdate=func.now(),
-    )
-    build_manifest = db.Column(db.Text, nullable=True)
-
-    __table_args__ = (
-        db.UniqueConstraint(
-            'season_id', 'stat_key', name='uq_cached_leaderboards_season_stat'
-        ),
-    )
-
-
-
 class Season(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     season_name = db.Column(db.String(20), unique=True, nullable=False)
@@ -298,7 +267,7 @@ class OpponentBlueCollarStats(db.Model):
 
 class Possession(db.Model):
     id                  = db.Column(db.Integer, primary_key=True)
-    game_id             = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False, index=True)
+    game_id             = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True, index=True)
     practice_id         = db.Column(db.Integer, db.ForeignKey('practice.id'), nullable=True, index=True)
     season_id           = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False, index=True)
     time_segment        = db.Column(db.String(20))
