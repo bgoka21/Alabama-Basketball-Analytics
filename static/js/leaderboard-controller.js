@@ -57,19 +57,58 @@
       return payload;
     }
 
-    const columns = Array.isArray(payload.columns) ? payload.columns : [];
-    if (!Array.isArray(payload.columns_manifest) || !payload.columns_manifest.length) {
-      payload.columns_manifest = columns
-        .map(col => ({
-          key: col && col.key ? col.key : (col && col.slug ? col.slug : ""),
-          label: col && col.label ? col.label : (col && col.key ? col.key : ""),
-        }))
-        .filter(col => col.key);
-    }
+    const rawColumns = Array.isArray(payload.columns)
+      ? payload.columns.filter(col => col && typeof col === "object")
+      : [];
+    const rawManifest = Array.isArray(payload.columns_manifest)
+      ? payload.columns_manifest.filter(col => col && typeof col === "object")
+      : [];
 
-    const manifest = Array.isArray(payload.columns_manifest) ? payload.columns_manifest : [];
+    const manifestByKey = new Map();
+    rawManifest.forEach((col) => {
+      const key = col.key || col.slug || "";
+      if (!key) return;
+      manifestByKey.set(key, col);
+    });
+
+    const columnSource = rawColumns.length ? rawColumns : rawManifest;
+    const resolvedColumns = columnSource
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") return null;
+        const key = entry.key || entry.slug || "";
+        if (!key) return null;
+        const fromManifest = manifestByKey.get(key);
+        const merged = { ...(fromManifest || {}), ...entry };
+        merged.key = key;
+        merged.label = merged.label || (fromManifest && fromManifest.label) || key;
+        if (!merged.align && fromManifest && fromManifest.align) {
+          merged.align = fromManifest.align;
+        }
+        if (fromManifest && fromManifest.value_key && !merged.value_key) {
+          merged.value_key = fromManifest.value_key;
+        }
+        if (!Object.prototype.hasOwnProperty.call(merged, "sortable")) {
+          const manifestSortable = fromManifest && fromManifest.sortable;
+          merged.sortable = manifestSortable === false ? false : true;
+        }
+        return merged;
+      })
+      .filter(Boolean);
+
+    const manifest = rawManifest.length
+      ? rawManifest
+      : resolvedColumns.map(col => ({
+        key: col.key,
+        label: col.label,
+        align: col.align,
+        value_key: col.value_key,
+        sortable: col.sortable,
+      }));
+
+    payload.columns_manifest = manifest;
+
     const valueKeyMap = new Map();
-    columns.forEach(col => {
+    resolvedColumns.forEach(col => {
       if (col && col.key) {
         valueKeyMap.set(col.key, col.value_key || null);
       }
@@ -89,7 +128,7 @@
       if (!row.metrics || typeof row.metrics !== "object") {
         row.metrics = {};
       }
-      manifest.forEach((col, index) => {
+      resolvedColumns.forEach((col, index) => {
         const key = col.key;
         if (!key) return;
         let textValue;
@@ -120,7 +159,7 @@
       if (!totals.metrics || typeof totals.metrics !== "object") {
         totals.metrics = {};
       }
-      manifest.forEach((col, index) => {
+      resolvedColumns.forEach((col, index) => {
         const key = col.key;
         if (!key) return;
         let textValue;
@@ -148,6 +187,8 @@
     if (payload.aux_table) {
       payload.aux_table = normalizeTablePayload(payload.aux_table);
     }
+
+    payload.columns_resolved = resolvedColumns;
 
     return payload;
   }
@@ -362,7 +403,7 @@
     const justifyClass = JUSTIFY_CLASS_MAP[alignKey];
     const widthClass = toClassList(column.width);
     const headerExtraClass = toClassList(column.header_class || column.header_classes);
-    const sortable = Boolean(column.sortable);
+    const sortable = column.sortable !== false;
     const th = document.createElement("th");
     th.setAttribute("scope", "col");
     th.dataset.key = key;
@@ -567,9 +608,9 @@
     }
   }
 
-  function buildTable(container, columnsManifest, rows, options = {}) {
+  function buildTable(container, columnDefs, rows, options = {}) {
     container.innerHTML = "";
-    const columns = Array.isArray(columnsManifest) ? columnsManifest : [];
+    const columns = Array.isArray(columnDefs) ? columnDefs : [];
     const tableWrapper = document.createElement("div");
     tableWrapper.className = TABLE_CONTAINER_CLASS;
     const accent = document.createElement("div");
@@ -703,23 +744,38 @@
     } : null;
 
     // Single table
-    if (normalized && normalized.columns_manifest && normalized.rows) {
-      buildTable(main, normalized.columns_manifest, normalized.rows, tableOptions || {});
+    const resolvedColumns = normalized && Array.isArray(normalized.columns_resolved)
+      ? normalized.columns_resolved
+      : null;
+    const columnsForMain = resolvedColumns && resolvedColumns.length
+      ? resolvedColumns
+      : (normalized && normalized.columns_manifest) || [];
+
+    if (normalized && columnsForMain && Array.isArray(normalized.rows)) {
+      buildTable(main, columnsForMain, normalized.rows, tableOptions || {});
     } else {
       main.innerHTML = "<div class='text-sm text-gray-500'>No data</div>";
     }
 
     // Dual table support (optional)
     if (aux) {
-      if (normalized && normalized.aux_table && normalized.aux_table.columns_manifest && normalized.aux_table.rows) {
-        aux.classList.remove("hidden");
-        const auxOptions = {
-          totals: normalized.aux_table.totals,
-          tableId: normalized.aux_table.table_id,
-          defaultSort: normalized.aux_table.default_sort,
-          caption: normalized.aux_table.caption || normalized.aux_table.title || null,
-        };
-        buildTable(aux, normalized.aux_table.columns_manifest, normalized.aux_table.rows, auxOptions);
+      if (normalized && normalized.aux_table) {
+        const auxColumns = Array.isArray(normalized.aux_table.columns_resolved)
+          ? normalized.aux_table.columns_resolved
+          : normalized.aux_table.columns_manifest;
+        if (auxColumns && Array.isArray(normalized.aux_table.rows)) {
+          aux.classList.remove("hidden");
+          const auxOptions = {
+            totals: normalized.aux_table.totals,
+            tableId: normalized.aux_table.table_id,
+            defaultSort: normalized.aux_table.default_sort,
+            caption: normalized.aux_table.caption || normalized.aux_table.title || null,
+          };
+          buildTable(aux, auxColumns, normalized.aux_table.rows, auxOptions);
+        } else {
+          aux.innerHTML = "";
+          aux.classList.add("hidden");
+        }
       } else {
         aux.innerHTML = "";
         aux.classList.add("hidden");
