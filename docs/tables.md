@@ -50,3 +50,6 @@ Shot Type tables intentionally keep legacy styling. Add `class="table-exempt"` t
 - **Do** reuse helpers or the dict shape for percentages, currency, ratios, and dates.
 - **Don’t** add inline styles or custom borders; rely on the shared stylesheet.
 - **Don’t** remove `.table-exempt` from Shot Type tables or migrate them to the macro.
+
+## Related Guides
+- [Leaderboard Cache Guide](./leaderboard_cache.md) – end-to-end reference for the snapshot pipeline powering the admin and public leaderboards.
