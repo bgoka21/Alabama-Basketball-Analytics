@@ -26,6 +26,32 @@
     return pct ? num / 100 : num;
   }
 
+  const TABLE_CONTAINER_CLASS = "rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden";
+  const TABLE_BODY_WRAPPER_CLASS = "overflow-x-auto table-card-body";
+  const TABLE_BASE_CLASS = "min-w-full text-sm table-auto unified-table";
+  const THEAD_BASE_CLASS = "bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700";
+  const TABLE_ROW_CLASS = "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors";
+  const TOTAL_ROW_CLASS = "bg-gray-50 dark:bg-gray-800/60 font-semibold border-t border-gray-200 dark:border-gray-700";
+  const CELL_PADDING_CLASS = "px-4 py-2";
+  const ALIGN_CLASS_MAP = {
+    left: "text-left",
+    right: "text-right",
+    center: "text-center",
+  };
+  const JUSTIFY_CLASS_MAP = {
+    left: "justify-start",
+    right: "justify-end",
+    center: "justify-center",
+  };
+
+  function toClassList(value) {
+    if (!value) return "";
+    if (Array.isArray(value)) {
+      return value.filter(Boolean).join(" ");
+    }
+    return String(value);
+  }
+
   function normalizeTablePayload(payload) {
     if (!payload || typeof payload !== "object") {
       return payload;
@@ -86,6 +112,39 @@
       });
     });
 
+    if (payload.totals && typeof payload.totals === "object") {
+      const totals = payload.totals;
+      if (!totals.display || typeof totals.display !== "object") {
+        totals.display = {};
+      }
+      if (!totals.metrics || typeof totals.metrics !== "object") {
+        totals.metrics = {};
+      }
+      manifest.forEach((col, index) => {
+        const key = col.key;
+        if (!key) return;
+        let textValue;
+        if (Object.prototype.hasOwnProperty.call(totals, key)) {
+          textValue = totals[key];
+        }
+        const text = textValue === null || typeof textValue === "undefined" ? "" : String(textValue);
+        const metric = totals.metrics[key] || {};
+        let raw = metric.raw;
+        if (raw === undefined || raw === null) {
+          const rawKey = valueKeyMap.get(key);
+          raw = rawKey ? totals[rawKey] : undefined;
+        }
+        if (raw === undefined || raw === null) {
+          raw = parseMaybeNumber(textValue);
+        }
+        totals.metrics[key] = {
+          raw: raw,
+          text,
+        };
+      });
+      payload.totals = totals;
+    }
+
     if (payload.aux_table) {
       payload.aux_table = normalizeTablePayload(payload.aux_table);
     }
@@ -93,87 +152,541 @@
     return payload;
   }
 
-  function buildTable(container, columnsManifest, rows) {
-    container.innerHTML = "";
-    const table = document.createElement("table");
-    table.className = "table table-sm w-full";
-    const thead = document.createElement("thead");
-    const tr = document.createElement("tr");
+  function createSortCaret(sortable) {
+    const caret = document.createElement("span");
+    caret.className = sortable ? "sort-caret opacity-0 group-hover:opacity-100 transition" : "sort-caret opacity-0 transition";
+    caret.setAttribute("aria-hidden", "true");
+    return caret;
+  }
 
-    columnsManifest.forEach(col => {
-      const th = document.createElement("th");
-      th.textContent = col.label || col.key;
-      th.dataset.key = col.key;
-      th.className = "whitespace-nowrap";
-      // Click to sort
-      th.addEventListener("click", () => sortBy(table, col.key));
-      tr.appendChild(th);
+  function ensureAlign(value) {
+    const normalized = typeof value === "string" ? value.toLowerCase() : "left";
+    return ALIGN_CLASS_MAP[normalized] ? normalized : "left";
+  }
+
+  function extractSortValue(cell) {
+    if (!cell) {
+      return { text: "", value: 0, type: "text", empty: true };
+    }
+    const dataValue = cell.getAttribute("data-value");
+    const datasetRaw = dataValue !== null ? dataValue : (cell.dataset.raw !== undefined ? cell.dataset.raw : null);
+    const textContent = (cell.textContent || "").trim();
+    let text = datasetRaw !== null && typeof datasetRaw !== "undefined" && String(datasetRaw).trim() !== "" ? String(datasetRaw).trim() : textContent;
+    let numeric = parseMaybeNumber(datasetRaw);
+    if (numeric === null) {
+      numeric = parseMaybeNumber(textContent);
+    }
+    const isNumber = numeric !== null && numeric !== undefined && !Number.isNaN(numeric);
+    if (!text) {
+      text = isNumber ? String(numeric) : "";
+    }
+    return {
+      text,
+      value: isNumber ? numeric : text,
+      type: isNumber ? "number" : "text",
+      empty: !isNumber && !text,
+    };
+  }
+
+  function getHeadersByKey(table, key) {
+    return qsa("thead th[data-key]", table).filter(h => h.dataset.key === key);
+  }
+
+  function getPrimaryHeader(table, key) {
+    const bottomRow = table.querySelector("thead tr:last-of-type");
+    if (bottomRow) {
+      const match = qsa("th[data-key]", bottomRow).find(th => th.dataset.key === key);
+      if (match) {
+        return match;
+      }
+    }
+    const headers = getHeadersByKey(table, key);
+    return headers.length ? headers[0] : null;
+  }
+
+  function updateSortIndicators(table, key, direction) {
+    const allHeaders = qsa("thead th[data-key]", table);
+    allHeaders.forEach((header) => {
+      header.dataset.sortDir = "none";
+      header.setAttribute("aria-sort", "none");
+      header.classList.remove("is-sorted-asc", "is-sorted-desc");
+      const caret = header.querySelector(".sort-caret");
+      if (caret) {
+        caret.classList.add("opacity-0");
+        caret.classList.remove("opacity-100");
+      }
     });
 
-    thead.appendChild(tr);
+    const matching = getHeadersByKey(table, key);
+    matching.forEach((header) => {
+      header.dataset.sortDir = direction;
+      header.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
+      header.classList.remove("is-sorted-asc", "is-sorted-desc");
+      header.classList.add(direction === "asc" ? "is-sorted-asc" : "is-sorted-desc");
+      const caret = header.querySelector(".sort-caret");
+      if (caret) {
+        caret.classList.remove("opacity-0");
+        caret.classList.add("opacity-100");
+      }
+    });
+  }
+
+  function performSort(table, columnIndex, direction, key) {
+    const tbody = table.tBodies[0];
+    if (!tbody) return;
+    const multiplier = direction === "asc" ? 1 : -1;
+    const rows = Array.from(tbody.rows).map((row, index) => {
+      const cell = row.cells[columnIndex];
+      const sortValue = extractSortValue(cell);
+      return { row, index, sortValue };
+    });
+
+    rows.sort((a, b) => {
+      const aVal = a.sortValue;
+      const bVal = b.sortValue;
+      if (aVal.empty && bVal.empty) {
+        return a.index - b.index;
+      }
+      if (aVal.empty) {
+        return 1;
+      }
+      if (bVal.empty) {
+        return -1;
+      }
+      if (aVal.type === "number" && bVal.type === "number") {
+        const diff = aVal.value - bVal.value;
+        if (diff === 0) {
+          return a.index - b.index;
+        }
+        return diff * multiplier;
+      }
+      const comparison = String(aVal.text).localeCompare(String(bVal.text), undefined, { numeric: true, sensitivity: "base" });
+      if (comparison === 0) {
+        return a.index - b.index;
+      }
+      return comparison * multiplier;
+    });
+
+    const fragment = document.createDocumentFragment();
+    rows.forEach(({ row }) => fragment.appendChild(row));
+    tbody.appendChild(fragment);
+
+    table.dataset.sortKey = key;
+    table.dataset.sortDir = direction;
+  }
+
+  function sortBy(table, key, directionOverride = null, columnIndexOverride = null, options = {}) {
+    if (!table) return;
+    const headerCandidates = getHeadersByKey(table, key);
+    if (!headerCandidates.length) return;
+    let header = headerCandidates[0];
+    if (columnIndexOverride !== null && columnIndexOverride !== undefined) {
+      const match = headerCandidates.find(h => Number(h.dataset.columnIndex) === Number(columnIndexOverride));
+      if (match) {
+        header = match;
+      }
+    } else {
+      const primary = getPrimaryHeader(table, key);
+      if (primary) {
+        header = primary;
+      }
+    }
+
+    const columnIndex = columnIndexOverride !== null && columnIndexOverride !== undefined
+      ? Number(columnIndexOverride)
+      : Number(header.dataset.columnIndex);
+    if (Number.isNaN(columnIndex) || columnIndex < 0) return;
+
+    const sortable = header.dataset.sortable !== "false";
+    if (!sortable) return;
+
+    const current = header.dataset.sortDir === "asc" || header.dataset.sortDir === "desc"
+      ? header.dataset.sortDir
+      : "none";
+    const direction = directionOverride || (current === "asc" ? "desc" : "asc");
+
+    performSort(table, columnIndex, direction, key);
+    if (options.updateIndicators !== false) {
+      updateSortIndicators(table, key, direction);
+    } else {
+      table.dataset.sortKey = key;
+      table.dataset.sortDir = direction;
+    }
+  }
+
+  function parseDefaultSort(spec) {
+    if (!spec || typeof spec !== "string") {
+      return [];
+    }
+    return spec
+      .split(";")
+      .map(part => part.trim())
+      .filter(Boolean)
+      .map(chunk => {
+        const pieces = chunk.split(":");
+        const key = pieces[0] ? pieces[0].trim() : "";
+        if (!key) return null;
+        let direction = pieces[1] ? pieces[1].trim().toLowerCase() : "desc";
+        if (direction !== "asc" && direction !== "desc") {
+          direction = "desc";
+        }
+        return { key, direction };
+      })
+      .filter(Boolean);
+  }
+
+  function applyDefaultSort(table, defaultSort) {
+    const spec = parseDefaultSort(defaultSort);
+    if (!table || !spec.length) return;
+    let primary = null;
+    for (let idx = spec.length - 1; idx >= 0; idx -= 1) {
+      const item = spec[idx];
+      if (!item) continue;
+      const header = getPrimaryHeader(table, item.key);
+      if (!header) continue;
+      const columnIndex = Number(header.dataset.columnIndex);
+      if (Number.isNaN(columnIndex)) continue;
+      performSort(table, columnIndex, item.direction, item.key);
+      primary = primary || item;
+    }
+    if (primary) {
+      updateSortIndicators(table, primary.key, primary.direction);
+    }
+  }
+
+  function createColumnHeader(table, column, columnIndex) {
+    const key = column && column.key ? column.key : "";
+    if (!key) return null;
+    const alignKey = ensureAlign(column.align || "left");
+    const alignClass = ALIGN_CLASS_MAP[alignKey];
+    const justifyClass = JUSTIFY_CLASS_MAP[alignKey];
+    const widthClass = toClassList(column.width);
+    const headerExtraClass = toClassList(column.header_class || column.header_classes);
+    const sortable = Boolean(column.sortable);
+    const th = document.createElement("th");
+    th.setAttribute("scope", "col");
+    th.dataset.key = key;
+    th.dataset.columnIndex = String(columnIndex);
+    th.dataset.sortable = sortable ? "true" : "false";
+    th.dataset.sortDir = "none";
+    th.setAttribute("aria-sort", "none");
+    if (column.format || column.sort_type) {
+      th.dataset.sortType = column.sort_type || column.format;
+    }
+    const baseClasses = [
+      CELL_PADDING_CLASS,
+      "font-semibold",
+      "text-gray-700",
+      "dark:text-gray-200",
+      "whitespace-nowrap",
+      "select-none",
+      alignClass,
+    ];
+    if (sortable) {
+      baseClasses.push("sortable");
+    }
+    if (widthClass) {
+      baseClasses.push(widthClass);
+    }
+    if (headerExtraClass) {
+      baseClasses.push(headerExtraClass);
+    }
+    th.className = baseClasses.join(" ");
+
+    const label = column.label || key;
+    if (sortable) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `inline-flex items-center gap-1 w-full ${justifyClass} group`;
+      const span = document.createElement("span");
+      span.innerHTML = label;
+      button.appendChild(span);
+      button.appendChild(createSortCaret(true));
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        sortBy(table, key, null, columnIndex);
+      });
+      th.appendChild(button);
+      th.addEventListener("click", (event) => {
+        if (event.target && event.target.closest("button")) {
+          return;
+        }
+        event.preventDefault();
+        sortBy(table, key, null, columnIndex);
+      });
+    } else {
+      const wrapper = document.createElement("div");
+      wrapper.className = `inline-flex items-center gap-1 w-full ${justifyClass}`;
+      const span = document.createElement("span");
+      span.innerHTML = label;
+      wrapper.appendChild(span);
+      wrapper.appendChild(createSortCaret(false));
+      th.appendChild(wrapper);
+    }
+
+    return th;
+  }
+
+  function createGroupHeader(label) {
+    const th = document.createElement("th");
+    th.setAttribute("scope", "col");
+    th.className = `${CELL_PADDING_CLASS} font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center`;
+    th.dataset.sortable = "false";
+    th.dataset.sortDir = "none";
+    th.setAttribute("aria-sort", "none");
+    th.textContent = label || "";
+    return th;
+  }
+
+  function buildHeader(table, columnsManifest) {
+    const thead = document.createElement("thead");
+    thead.className = THEAD_BASE_CLASS;
+    const hasGroups = columnsManifest.some(col => col && col.group);
+    if (hasGroups) {
+      const headerItems = [];
+      let currentGroup = null;
+      columnsManifest.forEach((col, index) => {
+        const group = col && col.group ? col.group : null;
+        if (group) {
+          if (currentGroup && currentGroup.label === group) {
+            currentGroup.span += 1;
+          } else {
+            if (currentGroup && currentGroup.span > 0) {
+              headerItems.push(currentGroup);
+            }
+            currentGroup = { type: "group", label: group, span: 1 };
+          }
+        } else {
+          if (currentGroup && currentGroup.span > 0) {
+            headerItems.push(currentGroup);
+            currentGroup = null;
+          }
+          headerItems.push({ type: "column", column: col, index });
+        }
+      });
+      if (currentGroup && currentGroup.span > 0) {
+        headerItems.push(currentGroup);
+      }
+
+      const topRow = document.createElement("tr");
+      headerItems.forEach((item) => {
+        if (item.type === "group") {
+          const th = createGroupHeader(item.label);
+          th.colSpan = item.span;
+          topRow.appendChild(th);
+        } else if (item.type === "column") {
+          const th = createColumnHeader(table, item.column, item.index);
+          if (th) {
+            th.rowSpan = 2;
+            topRow.appendChild(th);
+          }
+        }
+      });
+      thead.appendChild(topRow);
+
+      const bottomRow = document.createElement("tr");
+      columnsManifest.forEach((col, index) => {
+        if (!col || !col.group) return;
+        const th = createColumnHeader(table, col, index);
+        if (th) {
+          bottomRow.appendChild(th);
+        }
+      });
+      if (bottomRow.children.length) {
+        thead.appendChild(bottomRow);
+      }
+    } else {
+      const row = document.createElement("tr");
+      columnsManifest.forEach((col, index) => {
+        const th = createColumnHeader(table, col, index);
+        if (th) {
+          row.appendChild(th);
+        }
+      });
+      thead.appendChild(row);
+    }
+
+    return thead;
+  }
+
+  function resolveCellClass(column) {
+    const direct = toClassList(column.cell_class);
+    if (direct) return direct;
+    return toClassList(column.cell_classes);
+  }
+
+  function resolveMetric(source, key) {
+    if (!source || typeof source !== "object") return null;
+    if (source.metrics && typeof source.metrics === "object" && source.metrics[key]) {
+      return source.metrics[key];
+    }
+    return null;
+  }
+
+  function resolveDisplay(source, key) {
+    if (!source || typeof source !== "object") return "";
+    if (source.display && typeof source.display === "object" && key in source.display) {
+      return source.display[key];
+    }
+    if (key in source) {
+      return source[key];
+    }
+    return "";
+  }
+
+  function assignCellValue(cell, column, entity) {
+    const key = column.key;
+    const metric = resolveMetric(entity, key);
+    const displayValue = metric && typeof metric.text !== "undefined"
+      ? metric.text
+      : resolveDisplay(entity, key);
+    const text = displayValue === null || typeof displayValue === "undefined"
+      ? ""
+      : String(displayValue).trim();
+    cell.textContent = text;
+
+    let rawValue = metric && metric.raw;
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+      const valueKey = column.value_key;
+      if (valueKey && entity && typeof entity === "object" && valueKey in entity) {
+        rawValue = entity[valueKey];
+      }
+    }
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+      rawValue = parseMaybeNumber(text);
+    }
+
+    if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+      const valueString = String(rawValue);
+      cell.dataset.raw = valueString;
+      cell.setAttribute("data-value", valueString);
+    } else {
+      delete cell.dataset.raw;
+      cell.removeAttribute("data-value");
+    }
+  }
+
+  function buildTable(container, columnsManifest, rows, options = {}) {
+    container.innerHTML = "";
+    const columns = Array.isArray(columnsManifest) ? columnsManifest : [];
+    const tableWrapper = document.createElement("div");
+    tableWrapper.className = TABLE_CONTAINER_CLASS;
+    const accent = document.createElement("div");
+    accent.className = "table-card-accent";
+    accent.setAttribute("aria-hidden", "true");
+    tableWrapper.appendChild(accent);
+
+    const bodyWrapper = document.createElement("div");
+    bodyWrapper.className = TABLE_BODY_WRAPPER_CLASS;
+    tableWrapper.appendChild(bodyWrapper);
+
+    const table = document.createElement("table");
+    table.className = TABLE_BASE_CLASS;
+    table.setAttribute("role", "table");
+    const tableId = options.tableId || options.id;
+    if (tableId) {
+      table.id = tableId;
+    }
+    if (options.defaultSort) {
+      table.dataset.defaultSort = options.defaultSort;
+    }
+    if (options.caption) {
+      const caption = document.createElement("caption");
+      caption.className = "sr-only";
+      caption.textContent = options.caption;
+      table.appendChild(caption);
+    }
+
+    const thead = buildHeader(table, columns);
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
-    rows.forEach(r => {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    safeRows.forEach((row) => {
       const tr = document.createElement("tr");
-      columnsManifest.forEach((col, idx) => {
+      tr.className = TABLE_ROW_CLASS;
+      columns.forEach((column, index) => {
+        if (!column || !column.key) return;
+        const alignKey = ensureAlign(column.align || "left");
+        const alignClass = ALIGN_CLASS_MAP[alignKey];
+        const numericClass = alignKey === "right" ? "text-right tabular-nums" : "";
+        const cellClass = resolveCellClass(column);
         const td = document.createElement("td");
-        const metric = r.metrics && r.metrics[col.key];
-        if (metric && typeof metric.text !== "undefined") {
-          td.textContent = metric.text;
-          if (metric.raw !== undefined && metric.raw !== null) {
-            td.dataset.raw = String(metric.raw);
-          } else {
-            delete td.dataset.raw;
-          }
-        } else if (metric && typeof metric.raw !== "undefined") {
-          td.textContent = String(metric.raw);
-          td.dataset.raw = String(metric.raw);
-        } else {
-          // Fallback to common display fields
-          const displayValue = (r.display && r.display[col.key]) || "";
-          td.textContent = displayValue;
-          const rawFallback = parseMaybeNumber(displayValue);
-          if (rawFallback !== null) {
-            td.dataset.raw = String(rawFallback);
-          } else {
-            delete td.dataset.raw;
-          }
-        }
+        const classes = [CELL_PADDING_CLASS, alignClass];
+        if (numericClass) classes.push(numericClass);
+        if (cellClass) classes.push(cellClass);
+        td.className = classes.join(" ");
+        td.setAttribute("data-key", column.key);
+        const dataType = column.format || "text";
+        td.setAttribute("data-type", dataType);
+        td.dataset.columnIndex = String(index);
+        assignCellValue(td, column, row);
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    container.appendChild(table);
-  }
 
-  function sortBy(table, key) {
-    const thead = table.querySelector("thead");
-    const headers = qsa("th", thead);
-    const idx = headers.findIndex(h => h.dataset.key === key);
-    if (idx === -1) return;
+    const totals = options.totals && typeof options.totals === "object" ? options.totals : null;
+    if (totals && totals.metrics) {
+      const tfoot = document.createElement("tfoot");
+      const tr = document.createElement("tr");
+      tr.className = TOTAL_ROW_CLASS;
+      tr.setAttribute("data-total", "true");
+      columns.forEach((column, index) => {
+        if (!column || !column.key) return;
+        const alignKey = ensureAlign(column.align || "left");
+        const alignClass = ALIGN_CLASS_MAP[alignKey];
+        const numericClass = alignKey === "right" ? "text-right tabular-nums" : "";
+        const cellClass = resolveCellClass(column);
+        const cellClasses = [CELL_PADDING_CLASS, alignClass];
+        if (numericClass) cellClasses.push(numericClass);
+        if (cellClass) cellClasses.push(cellClass);
+        const metric = totals.metrics[column.key];
+        const cellTag = index === 0 ? "th" : "td";
+        const cell = document.createElement(cellTag);
+        if (cellTag === "th") {
+          cell.setAttribute("scope", "row");
+        }
+        cell.className = cellClasses.join(" ");
+        const display = metric && typeof metric.text !== "undefined"
+          ? metric.text
+          : resolveDisplay(totals, column.key);
+        let text = display === null || typeof display === "undefined" ? "" : String(display).trim();
+        if (index === 0 && !text) {
+          text = totals.display && totals.display.player ? String(totals.display.player) : "Totals";
+        }
+        cell.textContent = text;
+        let rawValue = metric && metric.raw;
+        if (rawValue === undefined || rawValue === null || rawValue === "") {
+          const valueKey = column.value_key;
+          if (valueKey && valueKey in totals) {
+            rawValue = totals[valueKey];
+          }
+        }
+        if (rawValue === undefined || rawValue === null || rawValue === "") {
+          rawValue = parseMaybeNumber(text);
+        }
+        if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+          const valueString = String(rawValue);
+          cell.dataset.raw = valueString;
+          cell.setAttribute("data-value", valueString);
+        }
+        tr.appendChild(cell);
+      });
+      tfoot.appendChild(tr);
+      table.appendChild(tfoot);
+    }
 
-    const tbody = table.querySelector("tbody");
-    const rows = qsa("tr", tbody);
-    // Detect current direction
-    const header = headers[idx];
-    const dir = header.dataset.sortDir === "asc" ? "desc" : "asc";
-    headers.forEach(h => { delete h.dataset.sortDir; });
-    header.dataset.sortDir = dir;
+    bodyWrapper.appendChild(table);
+    container.appendChild(tableWrapper);
 
-    // We need raw values for sorting; store them on cells on render if available
-    rows.sort((a, b) => {
-      const A = a.children[idx].dataset.raw ?? a.children[idx].textContent;
-      const B = b.children[idx].dataset.raw ?? b.children[idx].textContent;
-      const aNum = Number(A); const bNum = Number(B);
-      const bothNums = !Number.isNaN(aNum) && !Number.isNaN(bNum);
-      if (bothNums) return dir === "asc" ? aNum - bNum : bNum - aNum;
-      return dir === "asc" ? String(A).localeCompare(String(B)) : String(B).localeCompare(String(A));
-    });
+    if (options.defaultSort) {
+      applyDefaultSort(table, options.defaultSort);
+    }
 
-    // Re-attach
-    rows.forEach(r => tbody.appendChild(r));
+    return table;
   }
 
   function renderPayload(payload) {
@@ -182,9 +695,16 @@
     const aux = qs("#leaderboard-aux");
     if (!main) return;
 
+    const tableOptions = normalized ? {
+      totals: normalized.totals,
+      tableId: normalized.table_id,
+      defaultSort: normalized.default_sort,
+      caption: normalized.caption || normalized.title || null,
+    } : null;
+
     // Single table
     if (normalized && normalized.columns_manifest && normalized.rows) {
-      buildTable(main, normalized.columns_manifest, normalized.rows);
+      buildTable(main, normalized.columns_manifest, normalized.rows, tableOptions || {});
     } else {
       main.innerHTML = "<div class='text-sm text-gray-500'>No data</div>";
     }
@@ -193,7 +713,13 @@
     if (aux) {
       if (normalized && normalized.aux_table && normalized.aux_table.columns_manifest && normalized.aux_table.rows) {
         aux.classList.remove("hidden");
-        buildTable(aux, normalized.aux_table.columns_manifest, normalized.aux_table.rows);
+        const auxOptions = {
+          totals: normalized.aux_table.totals,
+          tableId: normalized.aux_table.table_id,
+          defaultSort: normalized.aux_table.default_sort,
+          caption: normalized.aux_table.caption || normalized.aux_table.title || null,
+        };
+        buildTable(aux, normalized.aux_table.columns_manifest, normalized.aux_table.rows, auxOptions);
       } else {
         aux.innerHTML = "";
         aux.classList.add("hidden");
