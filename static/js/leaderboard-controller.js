@@ -3,6 +3,7 @@
   const state = {
     seasonId: null,
     snapshots: {}, // statKey -> payload
+    practiceSections: {}, // statKey -> practice section payload
     columnsByKey: {}, // statKey -> columns_manifest
     initialized: false,
     currentKey: null,
@@ -43,6 +44,7 @@
     right: "justify-end",
     center: "justify-center",
   };
+  const PRACTICE_EMPTY_MESSAGE = "No stats for the most recent practice.";
 
   function toClassList(value) {
     if (!value) return "";
@@ -191,6 +193,191 @@
     payload.columns_resolved = resolvedColumns;
 
     return payload;
+  }
+
+  function normalizePracticeSection(section) {
+    if (!section || typeof section !== "object") {
+      return null;
+    }
+    const normalized = { ...section };
+    normalized.title = typeof section.title === "string" ? section.title : "";
+    const empty = section.empty_message;
+    normalized.empty_message = typeof empty === "string" && empty.trim()
+      ? empty
+      : PRACTICE_EMPTY_MESSAGE;
+    if (section.table && typeof section.table === "object") {
+      normalized.table = normalizeTablePayload(section.table);
+    } else {
+      normalized.table = null;
+    }
+    return normalized;
+  }
+
+  function normalizePracticeSectionsPayload(data) {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+    const normalized = { ...data };
+    const mainSections = Array.isArray(data.main)
+      ? data.main.map(normalizePracticeSection).filter(Boolean)
+      : [];
+    const auxSections = Array.isArray(data.aux)
+      ? data.aux.map(normalizePracticeSection).filter(Boolean)
+      : [];
+    normalized.main = mainSections;
+    normalized.aux = auxSections;
+    const empty = data.empty_message;
+    normalized.empty_message = typeof empty === "string" && empty.trim()
+      ? empty.trim()
+      : PRACTICE_EMPTY_MESSAGE;
+    if (normalized.note_display && typeof normalized.note_display === "string") {
+      const trimmed = normalized.note_display.trim();
+      normalized.note_display = trimmed || null;
+    } else {
+      normalized.note_display = null;
+    }
+    if (normalized.last_practice_date !== undefined && normalized.last_practice_date !== null) {
+      normalized.last_practice_date = String(normalized.last_practice_date);
+    } else {
+      normalized.last_practice_date = null;
+    }
+    return normalized;
+  }
+
+  function hasPracticeSections(data) {
+    if (!data || typeof data !== "object") {
+      return false;
+    }
+    const mainCount = Array.isArray(data.main) ? data.main.length : 0;
+    const auxCount = Array.isArray(data.aux) ? data.aux.length : 0;
+    return mainCount > 0 || auxCount > 0;
+  }
+
+  function formatPracticeNote(data) {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+    if (data.note_display && typeof data.note_display === "string" && data.note_display.trim()) {
+      return data.note_display.trim();
+    }
+    const iso = data.last_practice_date;
+    if (!iso) {
+      return null;
+    }
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+    try {
+      return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch (err) {
+      return parsed.toISOString().split("T")[0];
+    }
+  }
+
+  function buildPracticeSection(section, noteText) {
+    if (!section || typeof section !== "object") {
+      return null;
+    }
+
+    const wrapper = document.createElement("section");
+    wrapper.className = "space-y-3";
+
+    const header = document.createElement("div");
+    header.className = "flex items-baseline justify-between";
+    const heading = document.createElement("h3");
+    heading.className = "text-lg font-semibold text-gray-900 dark:text-gray-100";
+    heading.textContent = section.title || "";
+    header.appendChild(heading);
+    if (noteText) {
+      const note = document.createElement("span");
+      note.className = "text-xs opacity-70";
+      note.textContent = `(${noteText})`;
+      header.appendChild(note);
+    }
+    wrapper.appendChild(header);
+
+    const srTotals = document.createElement("span");
+    srTotals.className = "sr-only";
+    srTotals.textContent = `${section.title || ""} — Practice Totals`;
+    wrapper.appendChild(srTotals);
+
+    const srLast = document.createElement("span");
+    srLast.className = "sr-only";
+    srLast.textContent = `${section.title || ""} — Last Practice`;
+    wrapper.appendChild(srLast);
+
+    const tableData = section.table && typeof section.table === "object" ? section.table : null;
+    const hasContent = tableData && ((Array.isArray(tableData.rows) && tableData.rows.length > 0) || tableData.totals);
+
+    if (hasContent) {
+      const host = document.createElement("div");
+      wrapper.appendChild(host);
+      const columns = Array.isArray(tableData.columns_resolved) && tableData.columns_resolved.length
+        ? tableData.columns_resolved
+        : (Array.isArray(tableData.columns) && tableData.columns.length
+          ? tableData.columns
+          : tableData.columns_manifest || []);
+      const options = {
+        totals: tableData.totals,
+        tableId: tableData.table_id || tableData.id,
+        defaultSort: tableData.default_sort,
+        caption: section.title || null,
+      };
+      buildTable(host, columns, Array.isArray(tableData.rows) ? tableData.rows : [], options);
+    } else {
+      const message = document.createElement("div");
+      message.className = "text-sm opacity-70";
+      message.textContent = section.empty_message || PRACTICE_EMPTY_MESSAGE;
+      wrapper.appendChild(message);
+    }
+
+    return wrapper;
+  }
+
+  function renderPracticeSections(data) {
+    const main = qs("#leaderboard-main");
+    const aux = qs("#leaderboard-aux");
+    if (!main) {
+      return;
+    }
+
+    const noteText = formatPracticeNote(data);
+    const emptyMessage = data && typeof data.empty_message === "string" && data.empty_message.trim()
+      ? data.empty_message.trim()
+      : PRACTICE_EMPTY_MESSAGE;
+    const mainSections = Array.isArray(data && data.main) ? data.main : [];
+    const auxSections = Array.isArray(data && data.aux) ? data.aux : [];
+
+    main.innerHTML = "";
+    if (mainSections.length) {
+      mainSections.forEach((section) => {
+        const node = buildPracticeSection(section, noteText);
+        if (node) {
+          main.appendChild(node);
+        }
+      });
+    } else {
+      const message = document.createElement("div");
+      message.className = "text-sm opacity-70";
+      message.textContent = emptyMessage;
+      main.appendChild(message);
+    }
+
+    if (aux) {
+      aux.innerHTML = "";
+      if (auxSections.length) {
+        aux.classList.remove("hidden");
+        auxSections.forEach((section) => {
+          const node = buildPracticeSection(section, noteText);
+          if (node) {
+            aux.appendChild(node);
+          }
+        });
+      } else {
+        aux.classList.add("hidden");
+      }
+    }
   }
 
   function createSortCaret(sortable) {
@@ -783,6 +970,39 @@
     }
   }
 
+  function renderStat(key) {
+    if (!key) {
+      return;
+    }
+
+    const practiceData = state.practiceSections[key];
+    if (practiceData && hasPracticeSections(practiceData)) {
+      const sectionCount = (Array.isArray(practiceData.main) ? practiceData.main.length : 0)
+        + (Array.isArray(practiceData.aux) ? practiceData.aux.length : 0);
+      console.info("[Leaderboards] Rendering practice stat", { statKey: key, sections: sectionCount });
+      renderPracticeSections(practiceData);
+      return;
+    }
+
+    const payload = state.snapshots[key];
+    if (payload) {
+      const rowCount = Array.isArray(payload.rows) ? payload.rows.length : 0;
+      console.info("[Leaderboards] Rendering stat", { statKey: key, rows: rowCount });
+      renderPayload(payload);
+      return;
+    }
+
+    const main = qs("#leaderboard-main");
+    const aux = qs("#leaderboard-aux");
+    if (main) {
+      main.innerHTML = "<div class='text-sm text-gray-500'>No data</div>";
+    }
+    if (aux) {
+      aux.innerHTML = "";
+      aux.classList.add("hidden");
+    }
+  }
+
   async function fetchAllSnapshots() {
     const url = `/admin/api/leaderboards/${state.seasonId}/all`;
     const res = await fetch(url, { credentials: "include" });
@@ -796,6 +1016,14 @@
     state.snapshots = payloads;
     window.LEADERBOARDS = state.snapshots;
     state.missingKeys = Array.isArray(data.missing) ? data.missing : [];
+    const practicePayloads = data.practice_sections || {};
+    Object.keys(practicePayloads).forEach((key) => {
+      const normalized = normalizePracticeSectionsPayload(practicePayloads[key]);
+      if (normalized) {
+        state.practiceSections[key] = normalized;
+      }
+    });
+    window.LEADERBOARD_PRACTICE_SECTIONS = state.practiceSections;
     console.info("[Leaderboards] Loaded snapshots", {
       keys: Object.keys(payloads),
       missing: state.missingKeys,
@@ -809,15 +1037,7 @@
   function onStatChange(e) {
     const key = e.target.value;
     state.currentKey = key;
-    const payload = state.snapshots[key];
-    if (!payload) {
-      console.info("[Leaderboards] Requested stat missing from cache", { statKey: key });
-      console.warn("No snapshot for key", key);
-      return;
-    }
-    const rowCount = Array.isArray(payload.rows) ? payload.rows.length : 0;
-    console.info("[Leaderboards] Rendering stat", { statKey: key, rows: rowCount });
-    renderPayload(payload);
+    renderStat(key);
   }
 
   function hydrateRawOnCells() {
@@ -833,6 +1053,7 @@
 
     // Initial payload from server-render (so first paint is instant)
     const initialKey = statSelect.value;
+    state.currentKey = initialKey;
     try {
       const initialPayloadScript = qs("#initial-leaderboard-payload");
       if (initialPayloadScript) {
@@ -851,7 +1072,29 @@
       console.warn("Failed to read initial payload", e);
     }
 
+    try {
+      const practiceScript = qs("#initial-practice-sections");
+      if (practiceScript) {
+        const practicePayload = JSON.parse(practiceScript.textContent || "null");
+        if (practicePayload && initialKey) {
+          const normalizedPractice = normalizePracticeSectionsPayload(practicePayload);
+          if (normalizedPractice) {
+            state.practiceSections[initialKey] = normalizedPractice;
+            const sectionCount = (Array.isArray(normalizedPractice.main) ? normalizedPractice.main.length : 0)
+              + (Array.isArray(normalizedPractice.aux) ? normalizedPractice.aux.length : 0);
+            console.info("[Leaderboards] Initial practice sections loaded", {
+              statKey: initialKey,
+              sections: sectionCount,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to read initial practice sections", err);
+    }
+
     window.LEADERBOARDS = state.snapshots;
+    window.LEADERBOARD_PRACTICE_SECTIONS = state.practiceSections;
 
     // Disable any inline form submits
     const form = statSelect.closest("form");
@@ -860,10 +1103,8 @@
     }
     statSelect.addEventListener("change", onStatChange);
 
-    // First paint if initial payload exists
-    if (state.snapshots[initialKey]) {
-      renderPayload(state.snapshots[initialKey]);
-    }
+    // First paint using whichever payload is available
+    renderStat(initialKey);
 
     // Fetch all snapshots once, then stat switches are instant
     fetchAllSnapshots()
@@ -876,9 +1117,7 @@
         });
         // If user has already changed stat before fetch completed, honor current selection
         const key = qs("#stat-select")?.value || initialKey;
-        if (state.snapshots[key]) {
-          renderPayload(state.snapshots[key]);
-        }
+        renderStat(key);
       })
       .catch(err => {
         console.error("All-snapshots fetch failed", err);
