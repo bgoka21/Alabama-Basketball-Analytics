@@ -22,8 +22,8 @@ This reference explains how leaderboard snapshots are built, stored, and rendere
 Every stored snapshot is a JSON mapping with the following fields:
 - `schema_version` & `formatter_version` – bump these when the payload contract changes so stale rows are ignored or rebuilt automatically.
 - `season_id`, `stat_key`, `built_at` – identifiers plus an ISO timestamp of when the snapshot was generated.
-- `columns_manifest` – simplified column descriptions the front end uses for rendering and sorting. Each entry includes the rendered key, label, alignment, and any `value_key` that points to the raw metric source.
-- `columns` & `column_keys` – the full column config returned by `build_leaderboard_table` for server-rendered tables. `column_keys` is redundant but convenient for templates that expect just the keys.
+- `columns_manifest` – simplified column descriptions the front end uses for rendering and sorting. Each entry includes the rendered key, label, alignment, and any `value_key` that points to the raw metric source. (The client merges these entries with the richer `columns` metadata to retain grouped headers and sizing.)
+- `columns` & `column_keys` – the full column config returned by `build_leaderboard_table` for server-rendered tables. `column_keys` is redundant but convenient for templates that expect just the keys. Client-side rendering preserves the classes, groups, and sortable hints supplied here so cached payloads match SSR output.
 - `rows` – list of normalized row mappings with:
   - `rank` and `display` (player/rank text) for table headers.
   - `metrics` – per-column objects containing `text` (display value) and `raw` (numeric sort value). When the compute result provides both display/metric fields the `value_key` keeps them in sync; otherwise raw values are inferred from text.
@@ -43,16 +43,16 @@ When `services/leaderboard_cache.compute_columns_for` or related helpers are inv
 ## How Pages Consume Snapshots
 ### Admin
 - `admin/routes.leaderboard` embeds the selected stat’s payload in a `<script id="initial-leaderboard-payload">` tag during SSR so the first paint is instant.
-- Once hydrated, `static/js/leaderboard-controller.js` normalizes that payload (ensuring `columns_manifest`, `rows`, `display`, and `metrics` exist), renders a `<table class="table table-sm w-full">`, and wires click-to-sort behavior using the `metrics[*].raw` values. It then fetches `/admin/api/leaderboards/<season_id>/all` to load every stat’s snapshot in the background for instant dropdown switches.
+- Once hydrated, `static/js/leaderboard-controller.js` normalizes that payload (ensuring `columns_manifest`, `rows`, `display`, and `metrics` exist), merges the manifest with the richer `columns` config, and renders the unified table markup (wrapper div, accent bar, caption, `<thead>/<tfoot>` structure) used by the server macros. Sort buttons continue to rely on the `metrics[*].raw` values. It then fetches `/admin/api/leaderboards/<season_id>/all` to load every stat’s snapshot in the background for instant dropdown switches.
 - Missing snapshots are logged to the console so reviewers can spot cache gaps when QAing.
 
 ### Public
 - `public/routes.season_leaderboard` follows the same flow: try the cached snapshot (`cache_get_leaderboard`), rebuild via `cache_build_one` on a miss, and fall back to `format_leaderboard_payload` when filters (e.g., practice labels) require on-the-fly computation.
-- The public template reuses the shared table macros, so the payload’s `columns`/`rows` align with the SSR expectations while the `columns_manifest`/`metrics` blocks allow client-side enhancements when needed.
+- The public template reuses the shared table macros, so the payload’s `columns`/`rows` align with the SSR expectations while the `columns_manifest`/`metrics` blocks allow client-side enhancements when needed. The browser renderer follows the same merge logic as the admin page so cached payloads continue to respect grouped headers and totals rows.
 
 ## Styling Expectations
 - Server-rendered views use `render_table` from `macros/table.html`, which already applies the shared styles documented in `docs/tables.md`.
-- The client-side renderer replicates those conventions: header labels come from `columns_manifest[*].label`, numeric columns should set `align: 'right'`, and sortable metrics must populate `metrics[*].raw` so JavaScript sorting behaves consistently.
+- The client-side renderer now mirrors that markup exactly: it reuses the accent wrapper, table classes, grouped headers, and totals footer derived from the cached `columns` metadata. Header labels still come from `columns_manifest[*].label`, numeric columns should set `align: 'right'`, and sortable metrics must populate `metrics[*].raw` so JavaScript sorting behaves consistently.
 - Auxiliary tables should follow the same manifest + rows contract; when present the controller renders them into `#leaderboard-aux` with identical styling classes.
 
 By adhering to this structure, cached leaderboards remain interchangeable with live-computed tables, making it safe to review cache-related changes without re-reading every consumer.
