@@ -329,18 +329,107 @@ def expand_cached_rows_for_template(payload: Mapping[str, Any]) -> tuple[list[di
 
     columns = list(payload.get("columns", []))
     column_keys = list(payload.get("column_keys") or [col.get("key") for col in columns])
+    columns_manifest = [
+        col
+        for col in payload.get("columns_manifest", [])
+        if isinstance(col, Mapping)
+    ]
+
+    if not column_keys:
+        column_keys = [col.get("key") for col in columns_manifest if col.get("key")]
+    if not column_keys:
+        column_keys = [col.get("key") for col in columns if isinstance(col, Mapping) and col.get("key")]
+
+    column_value_keys: dict[str, Optional[str]] = {}
+    column_order: list[str] = []
+    for source in (columns_manifest, columns):
+        for column in source:
+            if not isinstance(column, Mapping):
+                continue
+            key = column.get("key")
+            if not key:
+                continue
+            if key not in column_value_keys:
+                column_order.append(key)
+                column_value_keys[key] = column.get("value_key")
+            elif column_value_keys[key] in (None, ""):
+                value_key = column.get("value_key")
+                if value_key:
+                    column_value_keys[key] = value_key
+
+    def _coerce_metric(metric: Any) -> tuple[str, Any]:
+        if isinstance(metric, Mapping):
+            text = metric.get("text")
+            raw = metric.get("raw")
+        else:
+            text = metric
+            raw = None
+        text_str = "" if text is None else str(text)
+        return text_str, raw
+
+    def _rehydrate_entry(entry: Mapping[str, Any]) -> Optional[dict[str, Any]]:
+        metrics = entry.get("metrics")
+        if not isinstance(metrics, Mapping):
+            return None
+
+        hydrated: dict[str, Any] = {}
+        display = entry.get("display")
+        if isinstance(display, Mapping):
+            for key in ("player", "rank"):
+                if key in display:
+                    hydrated[key] = display.get(key)
+
+        if "rank" not in hydrated and entry.get("rank") is not None:
+            hydrated["rank"] = entry.get("rank")
+
+        seen: set[str] = set()
+        for key in column_order:
+            metric = metrics.get(key)
+            if metric is None:
+                continue
+            seen.add(key)
+            text, raw = _coerce_metric(metric)
+            if key not in hydrated or hydrated[key] in (None, ""):
+                hydrated[key] = text
+            value_key = column_value_keys.get(key)
+            if value_key and raw is not None:
+                hydrated[value_key] = raw
+
+        for key, metric in metrics.items():
+            if key in seen:
+                continue
+            text, raw = _coerce_metric(metric)
+            if key not in hydrated or hydrated[key] in (None, ""):
+                hydrated[key] = text
+            value_key = column_value_keys.get(key)
+            if value_key and raw is not None:
+                hydrated[value_key] = raw
+
+        return hydrated
+
     rows_raw = payload.get("rows") or []
     totals_raw = payload.get("totals")
 
     rows: list[dict[str, Any]] = []
     for row in rows_raw:
+        hydrated_row: Optional[dict[str, Any]] = None
+        if isinstance(row, Mapping):
+            hydrated_row = _rehydrate_entry(row)
+        if hydrated_row is not None:
+            rows.append(hydrated_row)
+            continue
         if isinstance(row, Mapping):
             rows.append(dict(row))
         else:
             rows.append({key: value for key, value in zip(column_keys, row)})
 
+    totals: Optional[dict[str, Any]]
     if isinstance(totals_raw, Mapping):
-        totals = dict(totals_raw)
+        hydrated_total = _rehydrate_entry(totals_raw)
+        if hydrated_total is not None:
+            totals = hydrated_total
+        else:
+            totals = dict(totals_raw)
     elif totals_raw is None:
         totals = None
     else:
