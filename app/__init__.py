@@ -273,6 +273,14 @@ def create_app():
                 ("projected_pick_text","TEXT"),
                 ("actual_pick_text",   "TEXT"),
             ])
+            # Keep legacy SQLite databases compatible with new leaderboard metadata columns.
+            ensure_columns(db.engine, "cached_leaderboards", [
+                ("schema_version",    "INTEGER"),
+                ("formatter_version", "INTEGER"),
+                ("etag",              "TEXT"),
+                ("created_at",        "DATETIME"),
+                ("build_manifest",    "TEXT"),
+            ])
 
     @app.before_request
     def restrict_player_routes():
