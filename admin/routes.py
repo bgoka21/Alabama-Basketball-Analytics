@@ -1193,6 +1193,9 @@ def build_leaderboard_cache_payload(stat_key, season_id):
     }
 
 
+DEFAULT_PRACTICE_EMPTY_MESSAGE = "No stats for the most recent practice."
+
+
 _PRACTICE_DUAL_MAP = {
     "off_rebounding": lambda: compute_offensive_rebounding,
     "def_rebounding": lambda: compute_defensive_rebounding,
@@ -1206,6 +1209,8 @@ _PRACTICE_DUAL_MAP = {
     "fg2_contest_breakdown": lambda: _build_stat_compute("fg2_contest_breakdown"),
     "fg3_contest_breakdown": lambda: _build_stat_compute("fg3_contest_breakdown"),
 }
+
+_PRACTICE_SECTION_KEYS = set(_PRACTICE_DUAL_MAP) | {"pnr_gap_help"}
 
 
 def get_practice_dual_context(stat_key, season_id, *, label_set=None):
@@ -1503,6 +1508,411 @@ def _split_leaderboard_rows_for_template(
     # >>> BLUE COLLAR SPLIT DATA END
 
     return context
+
+
+def _format_practice_note_details(value: Any) -> tuple[Optional[str], Optional[str]]:
+    note_date: Optional[date] = None
+    if isinstance(value, datetime):
+        note_date = value.date()
+    elif isinstance(value, date):
+        note_date = value
+    elif isinstance(value, str):
+        try:
+            note_date = date.fromisoformat(value)
+        except ValueError:
+            note_date = None
+
+    if note_date is None:
+        return None, None
+
+    return note_date.isoformat(), note_date.strftime("%b %d, %Y")
+
+
+def _build_practice_section_payload(
+    split_context: Mapping[str, Any],
+    *,
+    title: str,
+    rows_key: str,
+    last_rows_key: str,
+    totals_key: str,
+    last_totals_key: str,
+    base_columns: Sequence[str],
+    column_map: Mapping[str, Any],
+    table_id: str,
+    pct_columns: Optional[Sequence[str]] = None,
+    default_sort: Optional[Sequence[Any]] = None,
+    empty_message: str = DEFAULT_PRACTICE_EMPTY_MESSAGE,
+) -> dict[str, Any]:
+    context = split_context if isinstance(split_context, Mapping) else {}
+    kwargs: dict[str, Any] = {
+        "base_columns": base_columns,
+        "season_rows": context.get(rows_key),
+        "last_rows": context.get(last_rows_key),
+        "season_totals": context.get(totals_key),
+        "last_totals": context.get(last_totals_key),
+        "column_map": column_map,
+        "left_label": "Season Totals",
+        "right_label": "Last Practice",
+        "totals_label": "Team Totals",
+        "table_id": table_id,
+    }
+    if pct_columns is not None:
+        kwargs["pct_columns"] = pct_columns
+    if default_sort is not None:
+        kwargs["default_sort"] = default_sort
+
+    table = build_dual_table(**kwargs)
+    return {
+        "title": title,
+        "table": table,
+        "empty_message": empty_message,
+    }
+
+
+def _practice_sections_from_split(
+    stat_key: str, split_context: Mapping[str, Any]
+) -> Optional[dict[str, Any]]:
+    if stat_key not in _PRACTICE_SECTION_KEYS:
+        return None
+
+    if not isinstance(split_context, Mapping):
+        return None
+
+    note_iso, note_display = _format_practice_note_details(
+        split_context.get("last_practice_date")
+    )
+
+    sections_main: list[dict[str, Any]] = []
+    sections_aux: list[dict[str, Any]] = []
+
+    dual_default_sort = ["pct", "opps", "plus"]
+
+    if stat_key == "defense":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Defense — Bumps",
+                rows_key="bump_rows",
+                last_rows_key="bump_last_rows",
+                totals_key="bump_totals",
+                last_totals_key="bump_last_totals",
+                base_columns=["Bump +", "Bump Opps", "Bump %"],
+                column_map={
+                    "Bump +": ("plus", "bump_positive"),
+                    "Bump Opps": ("opps", "total_opps"),
+                    "Bump %": ("pct",),
+                },
+                pct_columns=["Bump %"],
+                table_id="leaderboard-defense",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "off_rebounding":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Offensive Crash",
+                rows_key="crash_rows",
+                last_rows_key="crash_last_rows",
+                totals_key="crash_totals",
+                last_totals_key="crash_last_totals",
+                base_columns=["Crash +", "Crash Att", "Crash %"],
+                column_map={
+                    "Crash +": ("plus", "crash_plus"),
+                    "Crash Att": ("opps", "crash_opp", "crash_opps"),
+                    "Crash %": ("pct", "crash_pct"),
+                },
+                pct_columns=["Crash %"],
+                table_id="leaderboard-offense-crash",
+                default_sort=dual_default_sort,
+            )
+        )
+        sections_aux.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Offensive Back Man",
+                rows_key="backman_rows",
+                last_rows_key="backman_last_rows",
+                totals_key="backman_totals",
+                last_totals_key="backman_last_totals",
+                base_columns=["Back Man +", "Back Man Att", "Back Man %"],
+                column_map={
+                    "Back Man +": ("plus", "back_plus"),
+                    "Back Man Att": ("opps", "back_opp", "back_opps"),
+                    "Back Man %": ("pct", "back_pct"),
+                },
+                pct_columns=["Back Man %"],
+                table_id="leaderboard-offense-back",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "def_rebounding":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Defensive Rebounding",
+                rows_key="box_rows",
+                last_rows_key="box_last_rows",
+                totals_key="box_totals",
+                last_totals_key="box_last_totals",
+                base_columns=[
+                    "Box Out +",
+                    "Box Out Att",
+                    "Box Out %",
+                    "Off Reb's Given Up",
+                ],
+                column_map={
+                    "Box Out +": ("plus", "box_plus"),
+                    "Box Out Att": ("opps", "box_opp", "box_opps"),
+                    "Box Out %": ("pct", "box_pct"),
+                    "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
+                },
+                pct_columns=["Box Out %"],
+                table_id="leaderboard-def-reb",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "collision_gap_help":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Collisions — Gap Help",
+                rows_key="collision_rows",
+                last_rows_key="collision_last_rows",
+                totals_key="collision_totals",
+                last_totals_key="collision_last_totals",
+                base_columns=["Gap +", "Gap Opp", "Gap %"],
+                column_map={
+                    "Gap +": ("plus", "gap_plus"),
+                    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+                    "Gap %": ("pct", "gap_pct"),
+                },
+                pct_columns=["Gap %"],
+                table_id="leaderboard-collision-gap",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "pass_contest":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Pass Contests",
+                rows_key="pass_contest_rows",
+                last_rows_key="pass_contest_last_rows",
+                totals_key="pass_contest_totals",
+                last_totals_key="pass_contest_last_totals",
+                base_columns=["Contest +", "Contest Att", "Contest %"],
+                column_map={
+                    "Contest +": ("plus", "contest_plus", "pass_contest_plus"),
+                    "Contest Att": (
+                        "opps",
+                        "contest_opp",
+                        "contest_opps",
+                        "pass_contest_opp",
+                        "pass_contest_opps",
+                    ),
+                    "Contest %": ("pct", "contest_pct", "pass_contest_pct"),
+                },
+                pct_columns=["Contest %"],
+                table_id="leaderboard-pass-contest",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key in {"atr_contest_breakdown", "fg2_contest_breakdown", "fg3_contest_breakdown"}:
+        label_map = {
+            "atr_contest_breakdown": "ATR",
+            "fg2_contest_breakdown": "2FG",
+            "fg3_contest_breakdown": "3FG",
+        }
+        shot_label = label_map.get(stat_key, "Shot")
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title=f"{shot_label} Shot Contests",
+                rows_key="shot_contest_rows",
+                last_rows_key="shot_contest_last_rows",
+                totals_key="shot_contest_totals",
+                last_totals_key="shot_contest_last_totals",
+                base_columns=[
+                    "Contest Att",
+                    "Contest Makes",
+                    "Contest FG%",
+                    "Late Att",
+                    "Late Makes",
+                    "Late FG%",
+                    "No Contest Att",
+                    "No Contest Makes",
+                    "No Contest FG%",
+                ],
+                column_map={
+                    "Contest Att": ("opps", "contest_attempts"),
+                    "Contest Makes": ("plus", "contest_makes"),
+                    "Contest FG%": ("pct", "contest_pct"),
+                    "Late Att": ("opps", "late_attempts"),
+                    "Late Makes": ("plus", "late_makes"),
+                    "Late FG%": ("pct", "late_pct"),
+                    "No Contest Att": ("opps", "no_contest_attempts"),
+                    "No Contest Makes": ("plus", "no_contest_makes"),
+                    "No Contest FG%": ("pct", "no_contest_pct"),
+                },
+                pct_columns=["Contest FG%", "Late FG%", "No Contest FG%"],
+                table_id=f"leaderboard-shot-contest-{stat_key.split('_')[0]}",
+            )
+        )
+    elif stat_key == "overall_gap_help":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Overall Gap Help",
+                rows_key="overall_gap_rows",
+                last_rows_key="overall_gap_last_rows",
+                totals_key="overall_gap_totals",
+                last_totals_key="overall_gap_last_totals",
+                base_columns=["Gap +", "Gap Opp", "Gap %"],
+                column_map={
+                    "Gap +": ("plus", "gap_plus"),
+                    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+                    "Gap %": ("pct", "gap_pct"),
+                },
+                pct_columns=["Gap %"],
+                table_id="leaderboard-overall-gap",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "overall_low_man":
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="Overall Low Man",
+                rows_key="overall_low_rows",
+                last_rows_key="overall_low_last_rows",
+                totals_key="overall_low_totals",
+                last_totals_key="overall_low_last_totals",
+                base_columns=["Low +", "Low Opp", "Low %"],
+                column_map={
+                    "Low +": ("plus", "low_plus"),
+                    "Low Opp": ("opps", "low_opp", "low_opps"),
+                    "Low %": ("pct", "low_pct"),
+                },
+                pct_columns=["Low %"],
+                table_id="leaderboard-overall-low",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "pnr_gap_help":
+        common_columns = ["Gap +", "Gap Opp", "Gap %"]
+        column_map = {
+            "Gap +": ("plus", "gap_plus"),
+            "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+            "Gap %": ("pct", "gap_pct"),
+        }
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="PnR Gap Help",
+                rows_key="gap_rows",
+                last_rows_key="gap_last_rows",
+                totals_key="gap_totals",
+                last_totals_key="gap_last_totals",
+                base_columns=common_columns,
+                column_map=column_map,
+                pct_columns=["Gap %"],
+                table_id="leaderboard-pnr-gap",
+                default_sort=dual_default_sort,
+            )
+        )
+        sections_aux.append(
+            _build_practice_section_payload(
+                split_context,
+                title="PnR Low Man",
+                rows_key="low_rows",
+                last_rows_key="low_last_rows",
+                totals_key="low_totals",
+                last_totals_key="low_last_totals",
+                base_columns=common_columns,
+                column_map=column_map,
+                pct_columns=["Gap %"],
+                table_id="leaderboard-pnr-low",
+                default_sort=dual_default_sort,
+            )
+        )
+    elif stat_key == "pnr_grade":
+        common_columns = ["Gap +", "Gap Opp", "Gap %"]
+        column_map = {
+            "Gap +": ("plus", "gap_plus"),
+            "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+            "Gap %": ("pct", "gap_pct"),
+        }
+        sections_main.append(
+            _build_practice_section_payload(
+                split_context,
+                title="PnR Gap Help",
+                rows_key="close_rows",
+                last_rows_key="close_last_rows",
+                totals_key="close_totals",
+                last_totals_key="close_last_totals",
+                base_columns=common_columns,
+                column_map=column_map,
+                pct_columns=["Gap %"],
+                table_id="leaderboard-pnr-gap",
+                default_sort=dual_default_sort,
+            )
+        )
+        sections_aux.append(
+            _build_practice_section_payload(
+                split_context,
+                title="PnR Low Man",
+                rows_key="shut_rows",
+                last_rows_key="shut_last_rows",
+                totals_key="shut_totals",
+                last_totals_key="shut_last_totals",
+                base_columns=common_columns,
+                column_map=column_map,
+                pct_columns=["Gap %"],
+                table_id="leaderboard-pnr-low",
+                default_sort=dual_default_sort,
+            )
+        )
+
+    # Filter out sections without tables (should be rare but defensive)
+    sections_main = [section for section in sections_main if section]
+    sections_aux = [section for section in sections_aux if section]
+
+    if not sections_main and not sections_aux:
+        return None
+
+    return {
+        "stat_key": stat_key,
+        "last_practice_date": note_iso,
+        "note_display": note_display,
+        "main": sections_main,
+        "aux": sections_aux,
+        "empty_message": DEFAULT_PRACTICE_EMPTY_MESSAGE,
+    }
+
+
+def _build_practice_sections_for_stat(
+    stat_key: str,
+    season_id: Optional[int],
+    *,
+    label_set: Optional[set[str]] = None,
+) -> Optional[dict[str, Any]]:
+    if season_id is None or stat_key not in _PRACTICE_SECTION_KEYS:
+        return None
+
+    ctx = get_practice_dual_context(stat_key, season_id, label_set=label_set)
+    if not ctx:
+        return None
+
+    split_context = _split_leaderboard_rows_for_template(
+        stat_key,
+        ctx.get("season_rows"),
+        ctx.get("season_team_totals"),
+        last_rows=ctx.get("last_rows"),
+        last_team_totals=ctx.get("last_team_totals"),
+        last_practice_date=ctx.get("last_practice_date"),
+    )
+    return _practice_sections_from_split(stat_key, split_context)
 
 
 def _build_stat_compute(default_key):
@@ -7873,6 +8283,12 @@ def leaderboard():
         else {}
     )
 
+    practice_sections_payload = (
+        _practice_sections_from_split(cfg["key"], split_context)
+        if cfg
+        else None
+    )
+
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
 
     practice_links = [
@@ -7940,6 +8356,7 @@ def leaderboard():
         practice_links=filtered_practice_links,
         stat_options=stat_options,
         current_stat_key=stat_key,
+        practice_sections=practice_sections_payload,
         **split_context,
     )
 
@@ -8116,12 +8533,29 @@ def _load_all_cached_leaderboards(season_id: int) -> dict[str, Any]:
     missing = [key for key in LEADERBOARD_STAT_KEYS if key not in leaderboards]
     warming = list(dict.fromkeys([key for key in warming if key in missing]))
 
+    practice_sections: dict[str, Any] = {}
+    for stat_key in list(leaderboards.keys()):
+        if stat_key not in _PRACTICE_SECTION_KEYS:
+            continue
+        try:
+            sections = _build_practice_sections_for_stat(stat_key, season_id)
+        except Exception:  # pragma: no cover - defensive log guard
+            current_app.logger.exception(
+                "Failed to build practice sections for stat %s season %s",
+                stat_key,
+                season_id,
+            )
+            continue
+        if sections:
+            practice_sections[stat_key] = sections
+
     return {
         "leaderboards": leaderboards,
         "missing": missing,
         "warming": warming,
         "schema_version": schema_version,
         "formatter_version": formatter_version,
+        "practice_sections": practice_sections,
     }
 
 
