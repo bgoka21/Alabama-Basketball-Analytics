@@ -26,3 +26,12 @@ def test_grade_token_global():
         assert helper('pps', 1.1).startswith('grade-token')
         assert helper('fg3_pct', 0.37).startswith('grade-token')
         assert helper('unknown', 50) is None
+
+
+def test_grade_token_defense_metric():
+    test_app = app.create_app()
+    with test_app.app_context():
+        helper = test_app.jinja_env.globals['grade_token']
+        token = helper('bump_pct', 72.0)
+        assert token is not None
+        assert token.startswith('grade-token')
