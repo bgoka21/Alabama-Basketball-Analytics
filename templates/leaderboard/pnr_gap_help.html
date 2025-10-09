@@ -1,5 +1,6 @@
 {% extends 'admin/base.html' %}
 {% from 'macros/dual_tables.html' import render_dual_section %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -72,6 +73,19 @@
         default_sort=['pct', 'opps', 'plus']
       ) %}
 
+      {% set percent_specs = [
+        {
+          'slug': 'gap_pct',
+          'metric': 'gap_pct',
+          'attempt_slugs': ['gap_opp', 'gap_opps'],
+          'minimum_slugs': [
+            'gap_min', 'gap_min_opp', 'gap_min_opps',
+            'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+          ]
+        }
+      ] %}
+      {{ apply_percent_wrappers(gap_table, percent_specs) }}
+
       <section class="mb-8">
         {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
       </section>
@@ -90,6 +104,8 @@
         table_id='pnr-low-man',
         default_sort=['pct', 'opps', 'plus']
       ) %}
+
+      {{ apply_percent_wrappers(low_table, percent_specs) }}
 
       <section aria-label="PnR Gap Help — Low Man">
         {{ render_dual_section('PnR Low Man', low_table, practice_note) }}

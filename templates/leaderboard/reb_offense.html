@@ -1,5 +1,6 @@
 {% extends 'admin/base.html' %}
 {% from 'macros/dual_tables.html' import render_dual_section %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -174,6 +175,37 @@
         table_id='offensive-rebounding',
         default_sort=['Crash %', 'Crash Att', 'Crash +', 'player']
       ) %}
+
+      {% set percent_specs = [
+        {
+          'slug': 'crash_pct',
+          'metric': 'crash_pct',
+          'attempt_slugs': ['crash_att', 'crash_opp', 'crash_opps'],
+          'minimum_slugs': [
+            'crash_min', 'crash_min_att', 'crash_min_attempts',
+            'crash_att_min', 'min_crash_att', 'crash_opp_min', 'min_crash_opp'
+          ]
+        },
+        {
+          'slug': 'back_man_pct',
+          'metric': 'back_man_pct',
+          'attempt_slugs': ['back_man_att', 'back_man_opp', 'back_man_opps'],
+          'minimum_slugs': [
+            'back_man_min', 'back_man_min_att', 'back_man_min_attempts',
+            'back_man_att_min', 'min_back_man_att', 'back_man_opp_min', 'min_back_man_opp'
+          ]
+        },
+        {
+          'slug': 'box_out_pct',
+          'metric': 'box_out_pct',
+          'attempt_slugs': ['box_out_att', 'box_out_opp', 'box_out_opps'],
+          'minimum_slugs': [
+            'box_out_min', 'box_out_min_att', 'box_out_min_attempts',
+            'box_out_att_min', 'min_box_out_att', 'box_out_opp_min', 'min_box_out_opp'
+          ]
+        }
+      ] %}
+      {{ apply_percent_wrappers(table, percent_specs) }}
 
       {{ render_dual_section(
         "Offensive Rebounding",

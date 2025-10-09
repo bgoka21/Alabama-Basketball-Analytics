@@ -1,0 +1,195 @@
+{% macro percent_box(metric_key, value, display=None, shrink_alias=False, insufficient=False, tooltip=None, placeholder='—') %}
+  {%- set text = display if display is not none else None -%}
+  {%- if insufficient -%}
+    {%- set classes = ['percent-box', 'grade-NA'] -%}
+    {%- set title = tooltip or 'Insufficient sample' -%}
+    {%- if text is none or (text is string and not text.strip()) -%}
+      {%- set text = placeholder -%}
+    {%- endif -%}
+    <span class="{{ classes | join(' ') }}"{% if title %} title="{{ title }}"{% endif %}>{{ text }}</span>
+  {%- else -%}
+    {%- set classes = ['percent-box'] -%}
+    {%- set token = None -%}
+    {%- if metric_key -%}
+      {%- set token = grade_token(metric_key, value) -%}
+    {%- endif -%}
+    {%- if token -%}
+      {%- set classes = classes + [token] -%}
+      {%- if shrink_alias -%}
+        {%- for part in token.split() -%}
+          {%- if part.startswith('grade-token--') -%}
+            {%- set bucket = part.split('--')[-1] -%}
+            {%- set classes = classes + ['shrink-3fg--' ~ bucket] -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if text is none or (text is string and not text.strip()) -%}
+      {%- if value is not none -%}
+        {%- set text = '%0.1f%%' | format(value|float) -%}
+      {%- else -%}
+        {%- set text = placeholder -%}
+      {%- endif -%}
+    {%- endif -%}
+    <span class="{{ classes | join(' ') }}">{{ text }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro apply_percent_wrappers(table, specs) %}
+  {%- if not table -%}
+    {{- '' -}}
+  {%- endif -%}
+  {%- set rows = table.rows if table.rows is defined and table.rows else [] -%}
+  {%- set totals_row = table.totals if table.totals is defined else None -%}
+  {%- for spec in specs or [] -%}
+    {%- set slug = spec.get('slug') -%}
+    {%- if slug -%}
+      {%- set metric_key = spec.get('metric', slug) -%}
+      {%- set shrink_alias = spec.get('shrink_alias', False) -%}
+      {%- set tooltip = spec.get('tooltip', 'Insufficient sample') -%}
+      {%- set placeholder = spec.get('placeholder', '—') -%}
+      {%- set fallback_min = spec.get('minimum') -%}
+      {%- set attempt_slugs = spec.get('attempt_slugs') -%}
+      {%- if attempt_slugs is string -%}
+        {%- set attempt_slugs = [attempt_slugs] -%}
+      {%- endif -%}
+      {%- if not attempt_slugs -%}
+        {%- if slug.endswith('_pct') -%}
+          {%- set root = slug[:-4] -%}
+        {%- else -%}
+          {%- set root = slug -%}
+        {%- endif -%}
+        {%- set attempt_slugs = [
+          root ~ '_opp',
+          root ~ '_opps',
+          root ~ '_att',
+          root ~ '_atts',
+          root ~ '_attempts'
+        ] -%}
+      {%- else -%}
+        {%- if slug.endswith('_pct') -%}
+          {%- set root = slug[:-4] -%}
+        {%- else -%}
+          {%- set root = slug -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- set minimum_slugs = spec.get('minimum_slugs') -%}
+      {%- if minimum_slugs is string -%}
+        {%- set minimum_slugs = [minimum_slugs] -%}
+      {%- endif -%}
+      {%- if not minimum_slugs -%}
+        {%- set derived = [] -%}
+        {%- for attempt_slug in attempt_slugs -%}
+          {%- set derived = derived + [
+            attempt_slug ~ '_min',
+            attempt_slug ~ '_minimum',
+            attempt_slug ~ '_min_required',
+            attempt_slug ~ '_minimum_required',
+            attempt_slug ~ '_min_threshold',
+            attempt_slug ~ '_minimum_threshold',
+            attempt_slug ~ '_min_value',
+            attempt_slug ~ '_minimum_value',
+            'min_' ~ attempt_slug,
+            'minimum_' ~ attempt_slug
+          ] -%}
+        {%- endfor -%}
+        {%- set derived = derived + [
+          root ~ '_min',
+          root ~ '_minimum',
+          root ~ '_min_opp',
+          root ~ '_min_opps',
+          root ~ '_min_att',
+          root ~ '_min_atts',
+          root ~ '_min_attempts',
+          root ~ '_minimum_opp',
+          root ~ '_minimum_opps',
+          root ~ '_minimum_att',
+          root ~ '_minimum_atts',
+          root ~ '_minimum_attempts'
+        ] -%}
+        {%- set minimum_slugs = derived -%}
+      {%- endif -%}
+      {%- for row in rows -%}
+        {%- set _ = _apply_percent_box(row, 'totals_', slug, metric_key, attempt_slugs, minimum_slugs, fallback_min, shrink_alias, tooltip, placeholder) -%}
+        {%- set _ = _apply_percent_box(row, 'last_', slug, metric_key, attempt_slugs, minimum_slugs, fallback_min, shrink_alias, tooltip, placeholder) -%}
+      {%- endfor -%}
+      {%- if totals_row -%}
+        {%- set _ = _apply_percent_box(totals_row, 'totals_', slug, metric_key, attempt_slugs, minimum_slugs, fallback_min, shrink_alias, tooltip, placeholder) -%}
+        {%- set _ = _apply_percent_box(totals_row, 'last_', slug, metric_key, attempt_slugs, minimum_slugs, fallback_min, shrink_alias, tooltip, placeholder) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{- '' -}}
+{% endmacro %}
+
+{% macro _apply_percent_box(row, prefix, slug, metric_key, attempt_slugs, minimum_slugs, fallback_min, shrink_alias, tooltip, placeholder) %}
+  {%- if row is none -%}
+    {{- '' -}}
+  {%- endif -%}
+  {%- set cell_key = prefix ~ slug -%}
+  {%- if cell_key not in row -%}
+    {{- '' -}}
+  {%- endif -%}
+  {%- set display = row.get(cell_key) -%}
+  {%- set value_key = cell_key ~ '_value' -%}
+  {%- set raw_value = row.get(value_key) -%}
+  {%- set attempts = none -%}
+  {%- for attempt_slug in attempt_slugs -%}
+    {%- if attempts is none -%}
+      {%- set attempt_key = prefix ~ attempt_slug -%}
+      {%- set attempts = row.get(attempt_key ~ '_value') -%}
+      {%- if attempts is none -%}
+        {%- set attempts = row.get(attempt_key) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- set min_required = fallback_min -%}
+  {%- for min_slug in minimum_slugs -%}
+    {%- if min_required is none -%}
+      {%- set min_key = prefix ~ min_slug -%}
+      {%- set min_required = row.get(min_key ~ '_value') -%}
+      {%- if min_required is none -%}
+        {%- set min_required = row.get(min_key) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- set attempts_clean = attempts -%}
+  {%- if attempts_clean is string -%}
+    {%- set attempts_clean = attempts_clean|trim -%}
+    {%- if not attempts_clean -%}
+      {%- set attempts_clean = none -%}
+    {%- else -%}
+      {%- set attempts_clean = attempts_clean|float -%}
+    {%- endif -%}
+  {%- elif attempts_clean is not none -%}
+    {%- set attempts_clean = attempts_clean|float -%}
+  {%- endif -%}
+  {%- set min_clean = min_required -%}
+  {%- if min_clean is string -%}
+    {%- set min_clean = min_clean|trim -%}
+    {%- if not min_clean -%}
+      {%- set min_clean = none -%}
+    {%- else -%}
+      {%- set min_clean = min_clean|float -%}
+    {%- endif -%}
+  {%- elif min_clean is not none -%}
+    {%- set min_clean = min_clean|float -%}
+  {%- endif -%}
+  {%- set insufficient = False -%}
+  {%- if min_clean is not none and attempts_clean is not none -%}
+    {%- if attempts_clean < min_clean -%}
+      {%- set insufficient = True -%}
+    {%- endif -%}
+  {%- endif -%}
+  {%- if insufficient -%}
+    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, insufficient=True, tooltip=tooltip, placeholder=placeholder) -%}
+    {%- set _ = row.update({cell_key: rendered, value_key: ''}) -%}
+  {%- else -%}
+    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, placeholder=placeholder) -%}
+    {%- set _ = row.update({cell_key: rendered}) -%}
+    {%- if raw_value is none -%}
+      {%- set _ = row.update({value_key: ''}) -%}
+    {%- endif -%}
+  {%- endif -%}
+  {{- '' -}}
+{% endmacro %}

@@ -1,5 +1,6 @@
 {% extends 'admin/base.html' %}
 {% from 'macros/dual_tables.html' import render_dual_section %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -73,6 +74,19 @@
         table_id='defense-bumps',
         default_sort=['pct', 'opps', 'plus']
       ) %}
+
+      {% set percent_specs = [
+        {
+          'slug': 'bump_pct',
+          'metric': 'bump_pct',
+          'attempt_slugs': ['bump_opps', 'bump_opp'],
+          'minimum_slugs': [
+            'bump_min', 'bump_min_opps', 'bump_min_opp',
+            'bump_opps_min', 'bump_opp_min', 'min_bump_opps', 'min_bump_opp'
+          ]
+        }
+      ] %}
+      {{ apply_percent_wrappers(table, percent_specs) }}
 
       {{ render_dual_section(
         "Defense — Bumps",
