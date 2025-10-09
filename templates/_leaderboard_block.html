@@ -295,44 +295,51 @@
 
 {% elif selected.key == 'pnr_grade' %}
   <div class="space-y-8">
-    {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
-    {% set column_map = {
-      "Gap +": ("plus", "gap_plus"),
-      "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-      "Gap %": ("pct", "gap_pct"),
+    {% set close_columns = ["Close Window +", "Close Window Opp", "Close Window %"] %}
+    {% set close_map = {
+      "Close Window +": ("plus", "cw_plus", "close_window_plus"),
+      "Close Window Opp": ("opps", "cw_opp", "close_window_opp"),
+      "Close Window %": ("pct", "cw_pct", "close_window_pct"),
     } %}
-    {% set pct_columns = ["Gap %"] %}
-    {% set gap_table = build_dual_table(
-      base_columns=columns,
+    {% set close_pct_columns = ["Close Window %"] %}
+    {% set close_table = build_dual_table(
+      base_columns=close_columns,
       season_rows=close_rows,
       last_rows=close_last_rows,
       season_totals=close_totals,
       last_totals=close_last_totals,
-      column_map=column_map,
-      pct_columns=pct_columns,
+      column_map=close_map,
+      pct_columns=close_pct_columns,
       left_label='Season Totals',
       right_label='Last Practice',
       totals_label='Team Totals',
-      table_id='leaderboard-pnr-gap',
+      table_id='leaderboard-pnr-close-window',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+    {{ render_dual_section('Close Window', close_table, practice_note) }}
 
-    {% set low_table = build_dual_table(
-      base_columns=columns,
+    {% set shut_columns = ["Shut Door +", "Shut Door Opp", "Shut Door %"] %}
+    {% set shut_map = {
+      "Shut Door +": ("plus", "sd_plus", "shut_door_plus"),
+      "Shut Door Opp": ("opps", "sd_opp", "shut_door_opp"),
+      "Shut Door %": ("pct", "sd_pct", "shut_door_pct"),
+    } %}
+    {% set shut_pct_columns = ["Shut Door %"] %}
+    {% set shut_table = build_dual_table(
+      base_columns=shut_columns,
       season_rows=shut_rows,
       last_rows=shut_last_rows,
       season_totals=shut_totals,
       last_totals=shut_last_totals,
-      column_map=column_map,
-      pct_columns=pct_columns,
+      column_map=shut_map,
+      pct_columns=shut_pct_columns,
       left_label='Season Totals',
       right_label='Last Practice',
       totals_label='Team Totals',
-      table_id='leaderboard-pnr-low',
+      table_id='leaderboard-pnr-shut-door',
       default_sort=['pct', 'opps', 'plus']
     ) %}
-    {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+    {{ render_dual_section('Shut Door', shut_table, practice_note) }}
   </div>
 
 {% else %}
