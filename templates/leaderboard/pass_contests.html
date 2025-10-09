@@ -1,5 +1,6 @@
 {% extends 'admin/base.html' %}
 {% from 'macros/dual_tables.html' import render_dual_section %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -73,6 +74,19 @@
         table_id='pass-contests',
         default_sort=['pct', 'opps', 'plus']
       ) %}
+
+      {% set percent_specs = [
+        {
+          'slug': 'contest_pct',
+          'metric': 'contest_pct',
+          'attempt_slugs': ['contest_att', 'contest_opp', 'contest_opps'],
+          'minimum_slugs': [
+            'contest_min', 'contest_min_att', 'contest_min_attempts',
+            'contest_att_min', 'min_contest_att', 'contest_opp_min', 'min_contest_opp'
+          ]
+        }
+      ] %}
+      {{ apply_percent_wrappers(table, percent_specs) }}
 
       {{ render_dual_section(
         page_title,
