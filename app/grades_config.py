@@ -45,3 +45,23 @@ GRADES: Dict[str, List[float]] = {
     "late_pct": _CONTEST_BREAKDOWN_THRESHOLDS,
     "no_contest_pct": _CONTEST_BREAKDOWN_THRESHOLDS,
 }
+
+
+GRADE_LABELS: Dict[str, str] = {
+    "pps": "Points Per Shot (PPS)",
+    "atr2fg_pct": "At-Rim FG%",
+    "fg2_pct": "2FG%",
+    "fg3_pct": "3FG%",
+    "ft_pct": "Free Throw %",
+    "bump_pct": "Bump %",
+    "crash_pct": "Crash %",
+    "back_man_pct": "Back Man %",
+    "box_out_pct": "Box Out %",
+    "gap_pct": "Gap %",
+    "low_pct": "Low Man %",
+    "close_window_pct": "Close Window %",
+    "shut_door_pct": "Shut Door %",
+    "contest_pct": "Contest FG%",
+    "late_pct": "Late Contest FG%",
+    "no_contest_pct": "No Contest FG%",
+}
