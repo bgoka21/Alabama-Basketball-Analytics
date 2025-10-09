@@ -5,7 +5,7 @@ from flask import Flask, render_template_string
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
-from models.database import db, Practice, Season
+from models.database import db, Practice, Season, Session
 from models.user import User
 from admin.routes import admin_bp
 
@@ -38,6 +38,15 @@ def app_client():
     with app.app_context():
         db.create_all()
         db.session.add(Season(id=1, season_name="2025-26", start_date=LAST_DT))
+        db.session.add(
+            Session(
+                id=1,
+                season_id=1,
+                name="Official Practice",
+                start_date=LAST_DT - timedelta(days=14),
+                end_date=LAST_DT - timedelta(days=7),
+            )
+        )
         db.session.add(User(username="admin", password_hash=generate_password_hash("pw"), is_admin=True))
         db.session.commit()
 
@@ -161,6 +170,8 @@ class TestDualViews:
         resp = app_client.get("/admin/leaderboard/defense/bumps")
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
+
+        assert "Official Practice" in html
 
         _assert_dual_table_basics(
             html,
