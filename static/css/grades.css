@@ -1,0 +1,56 @@
+/* Shared grade styling for percentage callouts and shrink highlights. */
+
+.percent-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #111827;
+  background-color: #E5E7EB;
+}
+
+.percent-box[class*="grade-"] {
+  color: #111827;
+}
+
+.grade-G1 { background-color: #64c064; }
+.grade-G2 { background-color: #8cd98c; }
+.grade-G3 { background-color: #aaeeaa; }
+.grade-Y1 { background-color: #bef9be; }
+.grade-Y2 { background-color: #ffe138; }
+.grade-Y3 { background-color: #fff5a8; }
+.grade-R1 { background-color: #ffb4b4; }
+.grade-R2 { background-color: #ff8c8c; }
+.grade-R3 { background-color: #ff5050; }
+
+.grade-NA {
+  background-color: #D1D5DB;
+  color: #374151;
+}
+
+/* Legacy Shrink utilities reuse the Shot Type 3FG gradient hues. */
+.shrink-3fg--0 { background-color: #ff5050; }
+.shrink-3fg--1 { background-color: #ff8c8c; }
+.shrink-3fg--2 { background-color: #ffb4b4; }
+.shrink-3fg--3 { background-color: #fff5a8; }
+.shrink-3fg--4 { background-color: #ffe138; }
+.shrink-3fg--5 { background-color: #bef9be; }
+.shrink-3fg--6 { background-color: #aaeeaa; }
+.shrink-3fg--7 { background-color: #8cd98c; }
+.shrink-3fg--8 { background-color: #64c064; }
+
+.shrink-3fg--0,
+.shrink-3fg--1,
+.shrink-3fg--2,
+.shrink-3fg--3,
+.shrink-3fg--4,
+.shrink-3fg--5,
+.shrink-3fg--6,
+.shrink-3fg--7,
+.shrink-3fg--8 {
+  color: #111827;
+}
