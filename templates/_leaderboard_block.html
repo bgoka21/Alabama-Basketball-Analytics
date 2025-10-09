@@ -1,5 +1,6 @@
 {% from 'macros/dual_tables.html' import render_dual_section %}
 {% from 'macros/table.html' import render_table %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
 
 <h1 class="text-3xl font-bold mb-6">Season Leaderboard</h1>
 
@@ -42,6 +43,18 @@
     table_id='leaderboard-defense',
     default_sort=['pct', 'opps', 'plus']
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'bump_pct',
+      'metric': 'bump_pct',
+      'attempt_slugs': ['bump_opps', 'bump_opp'],
+      'minimum_slugs': [
+        'bump_min', 'bump_min_opps', 'bump_min_opp',
+        'bump_opps_min', 'bump_opp_min', 'min_bump_opps', 'min_bump_opp'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Defense — Bumps', table, practice_note) }}
 
 {% elif selected.key == 'off_rebounding' %}
@@ -66,6 +79,18 @@
       table_id='leaderboard-offense-crash',
       default_sort=['pct', 'opps', 'plus']
     ) %}
+    {% set crash_percent_specs = [
+      {
+        'slug': 'crash_pct',
+        'metric': 'crash_pct',
+        'attempt_slugs': ['crash_att', 'crash_opp', 'crash_opps'],
+        'minimum_slugs': [
+          'crash_min', 'crash_min_att', 'crash_min_attempts',
+          'crash_att_min', 'min_crash_att', 'crash_opp_min', 'min_crash_opp'
+        ]
+      }
+    ] %}
+    {{ apply_percent_wrappers(crash_table, crash_percent_specs) }}
     {{ render_dual_section('Offensive Crash', crash_table, practice_note) }}
 
     {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
@@ -88,6 +113,18 @@
       table_id='leaderboard-offense-back',
       default_sort=['pct', 'opps', 'plus']
     ) %}
+    {% set back_percent_specs = [
+      {
+        'slug': 'back_man_pct',
+        'metric': 'back_man_pct',
+        'attempt_slugs': ['back_man_att', 'back_man_opp', 'back_man_opps'],
+        'minimum_slugs': [
+          'back_man_min', 'back_man_min_att', 'back_man_min_attempts',
+          'back_man_att_min', 'min_back_man_att', 'back_man_opp_min', 'min_back_man_opp'
+        ]
+      }
+    ] %}
+    {{ apply_percent_wrappers(back_table, back_percent_specs) }}
     {{ render_dual_section('Offensive Back Man', back_table, practice_note) }}
   </div>
 
@@ -114,6 +151,18 @@
     table_id='leaderboard-def-reb',
     default_sort=['pct', 'opps', 'plus']
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'box_out_pct',
+      'metric': 'box_out_pct',
+      'attempt_slugs': ['box_out_att', 'box_out_opp', 'box_out_opps'],
+      'minimum_slugs': [
+        'box_out_min', 'box_out_min_att', 'box_out_min_attempts',
+        'box_out_att_min', 'min_box_out_att', 'box_out_opp_min', 'min_box_out_opp'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Defensive Rebounding', table, practice_note) }}
 
 {% elif selected.key == 'collision_gap_help' %}
@@ -138,6 +187,18 @@
     table_id='leaderboard-collision-gap',
     default_sort=['pct', 'opps', 'plus']
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'gap_pct',
+      'metric': 'gap_pct',
+      'attempt_slugs': ['gap_opp', 'gap_opps'],
+      'minimum_slugs': [
+        'gap_min', 'gap_min_opp', 'gap_min_opps',
+        'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Collisions — Gap Help', table, practice_note) }}
 
 {% elif selected.key == 'pass_contest' %}
@@ -162,6 +223,18 @@
     table_id='leaderboard-pass-contest',
     default_sort=['pct', 'opps', 'plus']
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'contest_pct',
+      'metric': 'contest_pct',
+      'attempt_slugs': ['contest_att', 'contest_opp', 'contest_opps'],
+      'minimum_slugs': [
+        'contest_min', 'contest_min_att', 'contest_min_attempts',
+        'contest_att_min', 'min_contest_att', 'contest_opp_min', 'min_contest_opp'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Pass Contests', table, practice_note) }}
 
 {% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
@@ -201,6 +274,36 @@
     totals_label='Team Totals',
     table_id='leaderboard-shot-contest-' ~ selected.key.split('_')[0],
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'contest_fg_pct',
+      'metric': 'contest_pct',
+      'attempt_slugs': ['contest_att', 'contest_attempts', 'contest_opp', 'contest_opps'],
+      'minimum_slugs': [
+        'contest_min', 'contest_min_att', 'contest_min_attempts',
+        'contest_att_min', 'min_contest_att', 'contest_opp_min', 'min_contest_opp'
+      ]
+    },
+    {
+      'slug': 'late_fg_pct',
+      'metric': 'late_pct',
+      'attempt_slugs': ['late_att', 'late_attempts', 'late_opp', 'late_opps'],
+      'minimum_slugs': [
+        'late_min', 'late_min_att', 'late_min_attempts',
+        'late_att_min', 'min_late_att', 'late_opp_min', 'min_late_opp'
+      ]
+    },
+    {
+      'slug': 'no_contest_fg_pct',
+      'metric': 'no_contest_pct',
+      'attempt_slugs': ['no_contest_att', 'no_contest_attempts', 'no_contest_opp', 'no_contest_opps'],
+      'minimum_slugs': [
+        'no_contest_min', 'no_contest_min_att', 'no_contest_min_attempts',
+        'no_contest_att_min', 'min_no_contest_att', 'no_contest_opp_min', 'min_no_contest_opp'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section(shot_label ~ ' Shot Contests', table, practice_note) }}
 
 {% elif selected.key == 'overall_gap_help' %}
@@ -225,6 +328,18 @@
     table_id='leaderboard-overall-gap',
     default_sort=['pct', 'opps', 'plus']
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'gap_pct',
+      'metric': 'gap_pct',
+      'attempt_slugs': ['gap_opp', 'gap_opps'],
+      'minimum_slugs': [
+        'gap_min', 'gap_min_opp', 'gap_min_opps',
+        'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Overall Gap Help', table, practice_note) }}
 
 {% elif selected.key == 'overall_low_man' %}
@@ -249,6 +364,18 @@
     table_id='leaderboard-overall-low',
     default_sort=['pct', 'opps', 'plus']
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'low_pct',
+      'metric': 'low_pct',
+      'attempt_slugs': ['low_opp', 'low_opps'],
+      'minimum_slugs': [
+        'low_min', 'low_min_opp', 'low_min_opps',
+        'low_opp_min', 'low_opps_min', 'min_low_opp', 'min_low_opps'
+      ]
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Overall Low Man', table, practice_note) }}
 
 {% elif selected.key == 'pnr_gap_help' %}
@@ -274,6 +401,18 @@
       table_id='leaderboard-pnr-gap',
       default_sort=['pct', 'opps', 'plus']
     ) %}
+    {% set percent_specs = [
+      {
+        'slug': 'gap_pct',
+        'metric': 'gap_pct',
+        'attempt_slugs': ['gap_opp', 'gap_opps'],
+        'minimum_slugs': [
+          'gap_min', 'gap_min_opp', 'gap_min_opps',
+          'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+        ]
+      }
+    ] %}
+    {{ apply_percent_wrappers(gap_table, percent_specs) }}
     {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
 
     {% set low_table = build_dual_table(
@@ -290,6 +429,18 @@
       table_id='leaderboard-pnr-low',
       default_sort=['pct', 'opps', 'plus']
     ) %}
+    {% set percent_specs = [
+      {
+        'slug': 'low_pct',
+        'metric': 'low_pct',
+        'attempt_slugs': ['low_opp', 'low_opps'],
+        'minimum_slugs': [
+          'low_min', 'low_min_opp', 'low_min_opps',
+          'low_opp_min', 'low_opps_min', 'min_low_opp', 'min_low_opps'
+        ]
+      }
+    ] %}
+    {{ apply_percent_wrappers(low_table, percent_specs) }}
     {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
   </div>
 
@@ -316,6 +467,20 @@
       table_id='leaderboard-pnr-close-window',
       default_sort=['pct', 'opps', 'plus']
     ) %}
+    {% set close_percent_specs = [
+      {
+        'slug': 'close_window_pct',
+        'metric': 'close_window_pct',
+        'attempt_slugs': ['close_window_opp', 'close_window_opps', 'cw_opp'],
+        'minimum_slugs': [
+          'close_window_min', 'close_window_min_opp', 'close_window_min_opps',
+          'close_window_opp_min', 'close_window_opps_min',
+          'min_close_window_opp', 'min_close_window_opps',
+          'cw_min', 'cw_opp_min', 'min_cw_opp'
+        ]
+      }
+    ] %}
+    {{ apply_percent_wrappers(close_table, close_percent_specs) }}
     {{ render_dual_section('Close Window', close_table, practice_note) }}
 
     {% set shut_columns = ["Shut Door +", "Shut Door Opp", "Shut Door %"] %}
@@ -339,6 +504,20 @@
       table_id='leaderboard-pnr-shut-door',
       default_sort=['pct', 'opps', 'plus']
     ) %}
+    {% set shut_percent_specs = [
+      {
+        'slug': 'shut_door_pct',
+        'metric': 'shut_door_pct',
+        'attempt_slugs': ['shut_door_opp', 'shut_door_opps', 'sd_opp'],
+        'minimum_slugs': [
+          'shut_door_min', 'shut_door_min_opp', 'shut_door_min_opps',
+          'shut_door_opp_min', 'shut_door_opps_min',
+          'min_shut_door_opp', 'min_shut_door_opps',
+          'sd_min', 'sd_opp_min', 'min_sd_opp'
+        ]
+      }
+    ] %}
+    {{ apply_percent_wrappers(shut_table, shut_percent_specs) }}
     {{ render_dual_section('Shut Door', shut_table, practice_note) }}
   </div>
 
