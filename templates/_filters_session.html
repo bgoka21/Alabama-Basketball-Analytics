@@ -11,10 +11,11 @@
     {% endfor %}
 
     {% set _sessions = sessions or ['Summer 1','Summer 2','Fall','Official Practice','All'] %}
+    {% set _default_session = 'Official Practice' if 'Official Practice' in _sessions else 'All' %}
     {% for s in _sessions %}
       <button type="submit" name="session" value="{{ s }}"
         class="px-3 py-1 rounded-full text-sm border
-               {% if selected_session==s or (not selected_session and s=='All') %} ring-2 {% endif %}">
+               {% if selected_session==s or (not selected_session and s==_default_session) %} ring-2 {% endif %}">
         {{ s }}
       </button>
     {% endfor %}

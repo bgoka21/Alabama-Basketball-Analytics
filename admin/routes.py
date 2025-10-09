@@ -3344,6 +3344,46 @@ def _get_session_names_for_season(season_id):
     return [s.name for s in sessions if s.name]
 
 
+def _normalize_requested_session(raw_session):
+    """Return a normalized session selection from the query string."""
+
+    if not raw_session:
+        return None
+
+    normalized = raw_session.strip()
+    if not normalized:
+        return None
+
+    if normalized.lower() == 'all':
+        return 'All'
+
+    return normalized
+
+
+def _build_session_selection(session_names, raw_session):
+    """Return ``(sessions, selected_session)`` for the current request."""
+
+    requested_session = _normalize_requested_session(raw_session)
+
+    if (
+        requested_session
+        and requested_session not in ('All', None)
+        and requested_session not in session_names
+    ):
+        session_names = session_names + [requested_session]
+
+    sessions = list(dict.fromkeys(session_names + ['All']))
+
+    if requested_session:
+        selected_session = requested_session
+    elif 'Official Practice' in sessions:
+        selected_session = 'Official Practice'
+    else:
+        selected_session = 'All'
+
+    return sessions, selected_session
+
+
 def _get_session_window_from_db(season_id, session_name):
     """Load the session window lazily to avoid circular imports."""
 
@@ -3380,21 +3420,9 @@ def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key,
     ctx = prepare_dual_context(ctx, stat_key)
 
     session_names = _get_session_names_for_season(season_id)
-    requested_session = request.args.get('session')
-    if requested_session:
-        requested_session = requested_session.strip()
-        if requested_session.lower() == 'all':
-            requested_session = 'All'
-    if (
-        requested_session
-        and requested_session not in ('All', None)
-        and requested_session not in session_names
-    ):
-        session_names = session_names + [requested_session]
-    sessions = list(dict.fromkeys(session_names + ['All']))
-    selected_session = 'All'
-    if requested_session:
-        selected_session = 'All' if requested_session == 'All' else requested_session
+    sessions, selected_session = _build_session_selection(
+        session_names, request.args.get('session')
+    )
 
     session_start = session_end = None
     session_range = None
@@ -7484,21 +7512,9 @@ def leaderboard_pnr_gap_help():
     selected_labels, label_set = _extract_label_filters()
 
     session_names = _get_session_names_for_season(season_id)
-    requested_session = request.args.get('session')
-    if requested_session:
-        requested_session = requested_session.strip()
-        if requested_session.lower() == 'all':
-            requested_session = 'All'
-    if (
-        requested_session
-        and requested_session not in ('All', None)
-        and requested_session not in session_names
-    ):
-        session_names = session_names + [requested_session]
-    sessions = list(dict.fromkeys(session_names + ['All']))
-    selected_session = 'All'
-    if requested_session:
-        selected_session = 'All' if requested_session == 'All' else requested_session
+    sessions, selected_session = _build_session_selection(
+        session_names, request.args.get('session')
+    )
 
     session_start = session_end = None
     session_range = None
@@ -7668,21 +7684,9 @@ def leaderboard():
             end_date_arg = ''
 
     session_names = _get_session_names_for_season(sid)
-    requested_session = request.args.get('session')
-    if requested_session:
-        requested_session = requested_session.strip()
-        if requested_session.lower() == 'all':
-            requested_session = 'All'
-    if (
-        requested_session
-        and requested_session not in ('All', None)
-        and requested_session not in session_names
-    ):
-        session_names = session_names + [requested_session]
-    sessions = list(dict.fromkeys(session_names + ['All']))
-    selected_session = 'All'
-    if requested_session:
-        selected_session = 'All' if requested_session == 'All' else requested_session
+    sessions, selected_session = _build_session_selection(
+        session_names, request.args.get('session')
+    )
 
     if sid and selected_session != 'All':
         session_start, session_end = _get_session_window_from_db(

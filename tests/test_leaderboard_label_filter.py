@@ -1,13 +1,16 @@
 import json
+from contextlib import contextmanager
 from datetime import date
 import pytest
 from flask import Flask
+from flask.signals import template_rendered
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-from models.database import db, Season, Practice, PlayerStats, Roster
+import admin.routes as admin_routes
+from models.database import db, Season, Session, Practice, PlayerStats, Roster
 from models.user import User
 from admin.routes import admin_bp
 from utils.shottype import persist_player_shot_details
@@ -35,6 +38,14 @@ def app():
         db.create_all()
         season = Season(id=1, season_name='2024', start_date=date(2024, 1, 1))
         db.session.add(season)
+        session_record = Session(
+            id=1,
+            season_id=1,
+            name='Official Practice',
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 1, 31),
+        )
+        db.session.add(session_record)
         pr1 = Practice(id=1, season_id=1, date=date(2024, 1, 2), category='Official')
         pr2 = Practice(id=2, season_id=1, date=date(2024, 1, 5), category='Official')
         db.session.add_all([pr1, pr2])
@@ -61,6 +72,20 @@ def client(app):
         client.post('/admin/login', data={'username':'admin','password':'pw'})
         yield client
 
+
+@contextmanager
+def captured_templates(app):
+    recorded = []
+
+    def record(sender, template, context, **extra):
+        recorded.append((template, context))
+
+    template_rendered.connect(record, app)
+    try:
+        yield recorded
+    finally:
+        template_rendered.disconnect(record, app)
+
 def _points_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     table = soup.find('table')
@@ -83,11 +108,52 @@ def _points_from_html(html):
             return 0
     return 0
 
-def test_leaderboard_label_filter(client):
-    resp = client.get('/admin/leaderboard', query_string={'season_id':1, 'stat':'points'})
-    html = resp.data.decode('utf-8')
+def test_leaderboard_label_filter(client, app):
+    with captured_templates(app) as templates:
+        resp = client.get('/admin/leaderboard', query_string={'season_id':1, 'stat':'points'})
+        html = resp.data.decode('utf-8')
+
+    assert resp.status_code == 200
     assert _points_from_html(html) == 12
+
+    selected_context = None
+    for template, context in templates:
+        if template.name == 'admin/leaderboard.html':
+            selected_context = context
+            break
+
+    assert selected_context is not None
+    assert selected_context['selected_session'] == 'Official Practice'
+    assert 'Official Practice' in selected_context['sessions']
 
     resp = client.get('/admin/leaderboard', query_string={'season_id':1, 'stat':'points', 'label':'4V4 DRILLS'})
     html = resp.data.decode('utf-8')
     assert _points_from_html(html) == 7
+
+
+def test_dual_leaderboard_defaults_official_session(app, monkeypatch):
+    captured = {}
+
+    def fake_render(template_name, **ctx):
+        captured.update(ctx)
+        return 'ok'
+
+    monkeypatch.setattr(admin_routes, 'render_template', fake_render)
+    monkeypatch.setattr(admin_routes, 'build_dual_context', lambda **kwargs: {})
+    monkeypatch.setattr(admin_routes, 'prepare_dual_context', lambda ctx, stat_key: ctx)
+    monkeypatch.setattr(
+        admin_routes,
+        'resolve_scope',
+        lambda args, season_id, session_range=None: ('season', None, None),
+    )
+
+    with app.test_request_context('/admin/leaderboard/fake?season_id=1'):
+        admin_routes._render_dual_leaderboard(
+            'fake.html',
+            page_title='Fake',
+            compute_fn=lambda **kwargs: ({}, []),
+            stat_key='fake',
+        )
+
+    assert captured['selected_session'] == 'Official Practice'
+    assert 'Official Practice' in captured['sessions']
