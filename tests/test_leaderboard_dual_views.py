@@ -1,13 +1,15 @@
 import pytest
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from flask import Flask
+from flask import Flask, render_template_string
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
 from models.database import db, Practice, Season
 from models.user import User
 from admin.routes import admin_bp
+
+import app as app_module
 
 
 LAST_DT = date(2025, 9, 18)
@@ -430,3 +432,42 @@ class TestDualViews:
             section_title="PnR Grade",
             expected_texts=["A", "B", "C", "D", "F", "Grade"],
         )
+
+
+def test_build_dual_table_includes_grade_tokens():
+    from admin._leaderboard_helpers import build_dual_table
+    from app.grades import grade_token
+
+    table = build_dual_table(
+        base_columns=["FG%"],
+        season_rows=[{"player": "Alpha", "plus": 4, "opps": 8, "pct": 50.0}],
+        last_rows=[{"player": "Alpha", "plus": 2, "opps": 4, "pct": 50.0}],
+        season_totals={"pct": 50.0},
+        last_totals={"pct": 50.0},
+        column_map={"FG%": {"keys": ("pct",), "format": "pct"}},
+        pct_columns=["FG%"],
+        grade_metrics={"fg_pct": "fg3_pct"},
+    )
+
+    expected_token = grade_token("fg3_pct", 50.0)
+    row = table["rows"][0]
+    assert row["totals_fg_pct_value"] == 50.0
+    assert row["totals_fg_pct_token"] == expected_token
+    assert row["last_fg_pct_token"] == expected_token
+    totals = table["totals"]
+    assert totals["totals_fg_pct_token"] == expected_token
+    assert totals["last_fg_pct_token"] == expected_token
+
+
+def test_percent_box_prefers_cached_token():
+    test_app = app_module.create_app()
+    with test_app.app_context():
+        markup = render_template_string(
+            """
+            {% from '_macros/percent_box.html' import percent_box %}
+            {{ percent_box('fg3_pct', 40, token='grade-token grade-token--1') }}
+            """
+        )
+
+    assert "grade-token--1" in markup
+    assert "grade-token--6" not in markup
