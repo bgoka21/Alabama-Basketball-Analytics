@@ -69,3 +69,22 @@
 select option[style*="display: none"] {
   display: none;
 }
+
+/* Grade token background helpers */
+.grade-token {
+  color: #111827;
+}
+
+/*
+  Colors sample the legacy inline gradient at the midpoints of each PPS bin so
+  shot tables retain their original look while using reusable CSS classes.
+*/
+.grade-token--0 { background-color: #ff5050; }
+.grade-token--1 { background-color: #ff8c8c; }
+.grade-token--2 { background-color: #ffb4b4; }
+.grade-token--3 { background-color: #fff5a8; }
+.grade-token--4 { background-color: #ffe138; }
+.grade-token--5 { background-color: #bef9be; }
+.grade-token--6 { background-color: #aaeeaa; }
+.grade-token--7 { background-color: #8cd98c; }
+.grade-token--8 { background-color: #64c064; }

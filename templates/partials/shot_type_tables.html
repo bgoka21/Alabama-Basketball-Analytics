@@ -12,12 +12,11 @@
   <!-- Season Aggregates as big cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <!-- ATR Season -->
+    {% set atr_card_token = grade_token('atr2fg_pct', shot_type_totals.atr.fg_pct) if shot_type_totals.atr.attempts else None %}
     <div
       id="cardATR"
       onclick="showShotTypeDetail('atr')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.atr.fg_pct
-                |grade_atr2fg_pct(shot_type_totals.atr.attempts) }}"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if atr_card_token %} {{ atr_card_token }}{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">ATR Season</div>
       <div class="text-2xl font-bold mt-2 text-black">
@@ -31,12 +30,11 @@
     </div>
 
     <!-- 2FG Season -->
+    {% set fg2_card_token = grade_token('fg2_pct', shot_type_totals.fg2.fg_pct) if shot_type_totals.fg2.attempts else None %}
     <div
       id="cardFG2"
       onclick="showShotTypeDetail('fg2')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.fg2.fg_pct
-                |grade_atr2fg_pct(shot_type_totals.fg2.attempts) }}"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if fg2_card_token %} {{ fg2_card_token }}{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">2FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">
@@ -50,12 +48,11 @@
     </div>
 
     <!-- 3FG Season -->
+    {% set fg3_card_token = grade_token('fg3_pct', shot_type_totals.fg3.fg_pct) if shot_type_totals.fg3.attempts else None %}
     <div
       id="cardFG3"
       onclick="showShotTypeDetail('fg3')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.fg3.fg_pct
-                |grade_3fg_pct(shot_type_totals.fg3.attempts) }}"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if fg3_card_token %} {{ fg3_card_token }}{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">3FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">
@@ -138,13 +135,14 @@
                 <td class="px-2 py-1 text-center">
                   {{ d.total.makes }}-{{ d.total.attempts }}
                 </td>
+                {% set total_fg_token = grade_token('atr2fg_pct', d.total.fg_pct * 100) if d.total.attempts else None %}
                 <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.total.fg_pct*100)|grade_atr2fg_pct(d.total.attempts) }}"
+                  class="px-2 py-1 text-center{% if total_fg_token %} {{ total_fg_token }}{% endif %}"
                 >
                   {{ (d.total.fg_pct*100)|round(1) }}%
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">
+                {% set total_pps_token = grade_token('pps', d.total.pps) if d.total.attempts else None %}
+                <td class="px-2 py-1 text-center{% if total_pps_token %} {{ total_pps_token }}{% endif %}">
                   {{ d.total.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
@@ -159,13 +157,14 @@
                 <td class="px-2 py-1 text-center">
                   {{ d.transition.makes }}-{{ d.transition.attempts }}
                 </td>
+                {% set transition_fg_token = grade_token('atr2fg_pct', d.transition.fg_pct * 100) if d.transition.attempts else None %}
                 <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.transition.fg_pct*100)|grade_atr2fg_pct(d.transition.attempts) }}"
+                  class="px-2 py-1 text-center{% if transition_fg_token %} {{ transition_fg_token }}{% endif %}"
                 >
                   {{ (d.transition.fg_pct*100)|round(1) }}%
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">
+                {% set transition_pps_token = grade_token('pps', d.transition.pps) if d.transition.attempts else None %}
+                <td class="px-2 py-1 text-center{% if transition_pps_token %} {{ transition_pps_token }}{% endif %}">
                   {{ d.transition.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
@@ -180,13 +179,14 @@
                 <td class="px-2 py-1 text-center">
                   {{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}
                 </td>
+                {% set halfcourt_fg_token = grade_token('atr2fg_pct', d.halfcourt.fg_pct * 100) if d.halfcourt.attempts else None %}
                 <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.halfcourt.fg_pct*100)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
+                  class="px-2 py-1 text-center{% if halfcourt_fg_token %} {{ halfcourt_fg_token }}{% endif %}"
                 >
                   {{ (d.halfcourt.fg_pct*100)|round(1) }}%
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">
+                {% set halfcourt_pps_token = grade_token('pps', d.halfcourt.pps) if d.halfcourt.attempts else None %}
+                <td class="px-2 py-1 text-center{% if halfcourt_pps_token %} {{ halfcourt_pps_token }}{% endif %}">
                   {{ d.halfcourt.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
@@ -259,10 +259,13 @@
     
                 {# Totals #}
                 <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | grade_atr2fg_pct(d.total.attempts) }}"{% endif %}>
-                  {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                {% set total_fg_pct = (d.total.makes / d.total.attempts * 100) if d.total.attempts else None %}
+                {% set total_fg_token = grade_token('fg2_pct', total_fg_pct) if total_fg_pct is not none else None %}
+                <td class="px-2 py-1 text-center{% if total_fg_token %} {{ total_fg_token }}{% endif %}">
+                  {% if total_fg_pct is not none %}{{ total_fg_pct | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
+                {% set total_pps_token = grade_token('pps', d.total.pps) if d.total.attempts else None %}
+                <td class="px-2 py-1 text-center{% if total_pps_token %} {{ total_pps_token }}{% endif %}">{{ d.total.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
                     {{ (d.total.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
@@ -271,10 +274,13 @@
     
                 {# Transition #}
                 <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | grade_atr2fg_pct(d.transition.attempts) }}"{% endif %}>
-                  {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                {% set transition_fg_pct = (d.transition.makes / d.transition.attempts * 100) if d.transition.attempts else None %}
+                {% set transition_fg_token = grade_token('fg2_pct', transition_fg_pct) if transition_fg_pct is not none else None %}
+                <td class="px-2 py-1 text-center{% if transition_fg_token %} {{ transition_fg_token }}{% endif %}">
+                  {% if transition_fg_pct is not none %}{{ transition_fg_pct | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
+                {% set transition_pps_token = grade_token('pps', d.transition.pps) if d.transition.attempts else None %}
+                <td class="px-2 py-1 text-center{% if transition_pps_token %} {{ transition_pps_token }}{% endif %}">{{ d.transition.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
                     {{ (d.transition.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
@@ -283,10 +289,13 @@
     
                 {# Half-Court #}
                 <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_atr2fg_pct(d.halfcourt.attempts) }}"{% endif %}>
-                  {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                {% set halfcourt_fg_pct = (d.halfcourt.makes / d.halfcourt.attempts * 100) if d.halfcourt.attempts else None %}
+                {% set halfcourt_fg_token = grade_token('fg2_pct', halfcourt_fg_pct) if halfcourt_fg_pct is not none else None %}
+                <td class="px-2 py-1 text-center{% if halfcourt_fg_token %} {{ halfcourt_fg_token }}{% endif %}">
+                  {% if halfcourt_fg_pct is not none %}{{ halfcourt_fg_pct | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
+                {% set halfcourt_pps_token = grade_token('pps', d.halfcourt.pps) if d.halfcourt.attempts else None %}
+                <td class="px-2 py-1 text-center{% if halfcourt_pps_token %} {{ halfcourt_pps_token }}{% endif %}">{{ d.halfcourt.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
                     {{ (d.halfcourt.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
@@ -356,10 +365,13 @@
     
                 {# Totals #}
                 <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | grade_3fg_pct(d.total.attempts) }}"{% endif %}>
-                  {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                {% set total_fg_pct = (d.total.makes / d.total.attempts * 100) if d.total.attempts else None %}
+                {% set total_fg_token = grade_token('fg3_pct', total_fg_pct) if total_fg_pct is not none else None %}
+                <td class="px-2 py-1 text-center{% if total_fg_token %} {{ total_fg_token }}{% endif %}">
+                  {% if total_fg_pct is not none %}{{ total_fg_pct | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
+                {% set total_pps_token = grade_token('pps', d.total.pps) if d.total.attempts else None %}
+                <td class="px-2 py-1 text-center{% if total_pps_token %} {{ total_pps_token }}{% endif %}">{{ d.total.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.total.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
@@ -368,10 +380,13 @@
     
                 {# Transition #}
                 <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | grade_3fg_pct(d.transition.attempts) }}"{% endif %}>
-                  {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                {% set transition_fg_pct = (d.transition.makes / d.transition.attempts * 100) if d.transition.attempts else None %}
+                {% set transition_fg_token = grade_token('fg3_pct', transition_fg_pct) if transition_fg_pct is not none else None %}
+                <td class="px-2 py-1 text-center{% if transition_fg_token %} {{ transition_fg_token }}{% endif %}">
+                  {% if transition_fg_pct is not none %}{{ transition_fg_pct | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
+                {% set transition_pps_token = grade_token('pps', d.transition.pps) if d.transition.attempts else None %}
+                <td class="px-2 py-1 text-center{% if transition_pps_token %} {{ transition_pps_token }}{% endif %}">{{ d.transition.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.transition.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
@@ -380,10 +395,13 @@
     
                 {# Half-Court #}
                 <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_3fg_pct(d.halfcourt.attempts) }}"{% endif %}>
-                  {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
+                {% set halfcourt_fg_pct = (d.halfcourt.makes / d.halfcourt.attempts * 100) if d.halfcourt.attempts else None %}
+                {% set halfcourt_fg_token = grade_token('fg3_pct', halfcourt_fg_pct) if halfcourt_fg_pct is not none else None %}
+                <td class="px-2 py-1 text-center{% if halfcourt_fg_token %} {{ halfcourt_fg_token }}{% endif %}">
+                  {% if halfcourt_fg_pct is not none %}{{ halfcourt_fg_pct | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
+                {% set halfcourt_pps_token = grade_token('pps', d.halfcourt.pps) if d.halfcourt.attempts else None %}
+                <td class="px-2 py-1 text-center{% if halfcourt_pps_token %} {{ halfcourt_pps_token }}{% endif %}">{{ d.halfcourt.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.halfcourt.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%

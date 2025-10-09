@@ -5,11 +5,11 @@
 
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <!-- ATR Season -->
+    {% set atr_card_token = grade_token('atr2fg_pct', shot_type_totals.atr.fg_pct) if shot_type_totals.atr.attempts else None %}
     <div
       id="cardATR"
       onclick="showShotTypeDetail('atr')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.atr.fg_pct | grade_atr2fg_pct(shot_type_totals.atr.attempts) }}"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if atr_card_token %} {{ atr_card_token }}{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">ATR Season</div>
       <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.atr.fg_pct|round(1) }}%</div>
@@ -19,11 +19,11 @@
     </div>
 
     <!-- 2FG Season -->
+    {% set fg2_card_token = grade_token('fg2_pct', shot_type_totals.fg2.fg_pct) if shot_type_totals.fg2.attempts else None %}
     <div
       id="cardFG2"
       onclick="showShotTypeDetail('fg2')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.fg2.fg_pct | grade_atr2fg_pct(shot_type_totals.fg2.attempts) }}"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if fg2_card_token %} {{ fg2_card_token }}{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">2FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.fg2.fg_pct|round(1) }}%</div>
@@ -33,11 +33,11 @@
     </div>
 
     <!-- 3FG Season -->
+    {% set fg3_card_token = grade_token('fg3_pct', shot_type_totals.fg3.fg_pct) if shot_type_totals.fg3.attempts else None %}
     <div
       id="cardFG3"
       onclick="showShotTypeDetail('fg3')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.fg3.fg_pct | grade_3fg_pct(shot_type_totals.fg3.attempts) }}"
+      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if fg3_card_token %} {{ fg3_card_token }}{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">3FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.fg3.fg_pct|round(1) }}%</div>

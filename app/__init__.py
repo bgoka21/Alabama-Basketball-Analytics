@@ -19,6 +19,7 @@ from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from app.utils.schema import ensure_columns
 from app.utils.formatting import fmt_money, posneg_class
+from app.grades import grade_token
 
 # Allow JSON serialization of SimpleNamespace values across all Flask apps
 _orig_json_default = DefaultJSONProvider.default
@@ -124,67 +125,29 @@ def create_app():
     
 
 
-    # --- Jinja2 Filters for coloring percentages ---
-    @app.template_filter()
-    def grade_atr2fg_pct(pct, attempts):
-        """Return a gradient background-color style for ATR/2FG percentage.
-
-        The color mapping mirrors ``grade_pps`` by converting the field goal
-        percentage into points per shot (value of a made 2-pointer).
-        """
+    # --- Jinja helpers for percentage grading ---
+    def _grade_filter(metric_key, value, attempts):
         if not attempts:
             return ""
+        token = grade_token(metric_key, value)
+        return f" {token}" if token else ""
 
-        pps = (pct / 100.0) * 2
-        return grade_pps(pps, attempts)
+    @app.template_filter()
+    def grade_atr2fg_pct(pct, attempts):
+        return _grade_filter("atr2fg_pct", pct, attempts)
 
     @app.template_filter()
     def grade_3fg_pct(pct, attempts):
-        """Return a gradient background-color style for 3FG percentage.
-
-        The gradient is calculated using ``grade_pps`` with the 3-point shot
-        value so FG% and PPS share the same color logic.
-        """
-        if not attempts:
-            return ""
-
-        pps = (pct / 100.0) * 3
-        return grade_pps(pps, attempts)
+        return _grade_filter("fg3_pct", pct, attempts)
 
     @app.template_filter()
-    def grade_pps(pps, attempts):
-        """Return an inline background-color style for points per shot.
-
-        Shades of green, yellow and red are used for good, average and
-        poor efficiency respectively. No style is returned when there are
-        no attempts.
-        """
-        if not attempts:
-            return ""
-
-        def interpolate(start, end, factor):
-            return tuple(
-                round(s + (e - s) * max(0.0, min(factor, 1.0)))
-                for s, e in zip(start, end)
-            )
-
-        if pps >= 1.1:
-            start, end = (200, 255, 200), (0, 128, 0)
-            factor = min((pps - 1.1) / 0.5, 1.0)
-        elif pps >= 1.0:
-            start, end = (255, 255, 224), (255, 215, 0)
-            factor = (pps - 1.0) / 0.1
-        else:
-            start, end = (255, 200, 200), (255, 0, 0)
-            factor = min((1.0 - pps) / 0.5, 1.0)
-
-        r, g, b = interpolate(start, end, factor)
-        return f"background-color: rgb({r},{g},{b});"
-
+    def grade_pps(value, attempts):
+        return _grade_filter("pps", value, attempts)
 
     app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
     app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
     app.jinja_env.filters['grade_pps'] = grade_pps
+    app.jinja_env.globals['grade_token'] = grade_token
     app.jinja_env.filters["fmt_money"] = fmt_money
     app.jinja_env.filters["posneg"] = posneg_class
 

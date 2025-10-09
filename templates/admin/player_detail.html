@@ -116,10 +116,7 @@
    <!-- Row 2: Shooting Breakdown -->
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
     <!-- ATR -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
-         {% if agg.atr_attempts %}
-           style="{{ (agg.atr_makes / agg.atr_attempts * 100) | grade_atr2fg_pct(agg.atr_attempts) }}"
-         {% endif %}>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{% if agg.atr_attempts %}{{ (agg.atr_makes / agg.atr_attempts * 100) | grade_atr2fg_pct(agg.atr_attempts) }}{% endif %}">
       <div class="text-sm font-medium text-black uppercase">ATR</div>
       <div class="text-3xl font-bold my-2 text-black">
         {% if agg.atr_attempts > 0 %}
@@ -131,10 +128,7 @@
       <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.atr.freq|round(1) }}%</div>
     </div>
     <!-- 2FG -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
-         {% if agg.fg2_attempts %}
-           style="{{ (agg.fg2_makes / agg.fg2_attempts * 100) | grade_atr2fg_pct(agg.fg2_attempts) }}"
-         {% endif %}>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{% if agg.fg2_attempts %}{{ (agg.fg2_makes / agg.fg2_attempts * 100) | grade_atr2fg_pct(agg.fg2_attempts) }}{% endif %}">
       <div class="text-sm font-medium text-black uppercase">2FG</div>
       <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fg2_attempts > 0 %}
@@ -146,10 +140,7 @@
       <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg2.freq|round(1) }}%</div>
     </div>
     <!-- 3FG -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center"
-         {% if agg.fg3_attempts %}
-           style="{{ (agg.fg3_makes / agg.fg3_attempts * 100) | grade_3fg_pct(agg.fg3_attempts) }}"
-         {% endif %}>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{% if agg.fg3_attempts %}{{ (agg.fg3_makes / agg.fg3_attempts * 100) | grade_3fg_pct(agg.fg3_attempts) }}{% endif %}">
       <div class="text-sm font-medium text-black uppercase">3FG</div>
       <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fg3_attempts > 0 %}
@@ -544,12 +535,11 @@
                   {{ d.total.makes }}-{{ d.total.attempts }}
                 </td>
                 <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.total.fg_pct*100)|grade_atr2fg_pct(d.total.attempts) }}"
+                  class="px-2 py-1 text-center{{ (d.total.fg_pct*100)|grade_atr2fg_pct(d.total.attempts) }}"
                 >
                   {{ (d.total.fg_pct*100)|round(1) }}%
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">
+                <td class="px-2 py-1 text-center{{ d.total.pps|grade_pps(d.total.attempts) }}">
                   {{ d.total.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
@@ -565,12 +555,11 @@
                   {{ d.transition.makes }}-{{ d.transition.attempts }}
                 </td>
                 <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.transition.fg_pct*100)|grade_atr2fg_pct(d.transition.attempts) }}"
+                  class="px-2 py-1 text-center{{ (d.transition.fg_pct*100)|grade_atr2fg_pct(d.transition.attempts) }}"
                 >
                   {{ (d.transition.fg_pct*100)|round(1) }}%
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">
+                <td class="px-2 py-1 text-center{{ d.transition.pps|grade_pps(d.transition.attempts) }}">
                   {{ d.transition.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
@@ -586,12 +575,11 @@
                   {{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}
                 </td>
                 <td
-                  class="px-2 py-1 text-center"
-                  style="{{ (d.halfcourt.fg_pct*100)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
+                  class="px-2 py-1 text-center{{ (d.halfcourt.fg_pct*100)|grade_atr2fg_pct(d.halfcourt.attempts) }}"
                 >
                   {{ (d.halfcourt.fg_pct*100)|round(1) }}%
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">
+                <td class="px-2 py-1 text-center{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">
                   {{ d.halfcourt.pps|round(2) }}
                 </td>
                 <td class="px-2 py-1 text-center">
@@ -664,10 +652,10 @@
     
                 {# Totals #}
                 <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | grade_atr2fg_pct(d.total.attempts) }}"{% endif %}>
+                <td class="px-2 py-1 text-center{% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | grade_atr2fg_pct(d.total.attempts) }}{% endif %}">
                   {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
                     {{ (d.total.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
@@ -676,10 +664,10 @@
     
                 {# Transition #}
                 <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | grade_atr2fg_pct(d.transition.attempts) }}"{% endif %}>
+                <td class="px-2 py-1 text-center{% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | grade_atr2fg_pct(d.transition.attempts) }}{% endif %}">
                   {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
                     {{ (d.transition.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
@@ -688,10 +676,10 @@
     
                 {# Half-Court #}
                 <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_atr2fg_pct(d.halfcourt.attempts) }}"{% endif %}>
+                <td class="px-2 py-1 text-center{% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_atr2fg_pct(d.halfcourt.attempts) }}{% endif %}">
                   {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg2.attempts > 0 %}
                     {{ (d.halfcourt.attempts / shot_type_totals.fg2.attempts * 100) | round(1) }}%
@@ -761,10 +749,10 @@
     
                 {# Totals #}
                 <td class="px-2 py-1 text-center">{{ d.total.makes }}-{{ d.total.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.total.attempts > 0 %} style="{{ (d.total.makes / d.total.attempts * 100) | grade_3fg_pct(d.total.attempts) }}"{% endif %}>
+                <td class="px-2 py-1 text-center{% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | grade_3fg_pct(d.total.attempts) }}{% endif %}">
                   {% if d.total.attempts > 0 %}{{ (d.total.makes / d.total.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center{{ d.total.pps|grade_pps(d.total.attempts) }}">{{ d.total.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.total.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
@@ -773,10 +761,10 @@
     
                 {# Transition #}
                 <td class="px-2 py-1 text-center">{{ d.transition.makes }}-{{ d.transition.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.transition.attempts > 0 %} style="{{ (d.transition.makes / d.transition.attempts * 100) | grade_3fg_pct(d.transition.attempts) }}"{% endif %}>
+                <td class="px-2 py-1 text-center{% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | grade_3fg_pct(d.transition.attempts) }}{% endif %}">
                   {% if d.transition.attempts > 0 %}{{ (d.transition.makes / d.transition.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center{{ d.transition.pps|grade_pps(d.transition.attempts) }}">{{ d.transition.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.transition.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
@@ -785,10 +773,10 @@
     
                 {# Half-Court #}
                 <td class="px-2 py-1 text-center">{{ d.halfcourt.makes }}-{{ d.halfcourt.attempts }}</td>
-                <td class="px-2 py-1 text-center"{% if d.halfcourt.attempts > 0 %} style="{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_3fg_pct(d.halfcourt.attempts) }}"{% endif %}>
+                <td class="px-2 py-1 text-center{% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | grade_3fg_pct(d.halfcourt.attempts) }}{% endif %}">
                   {% if d.halfcourt.attempts > 0 %}{{ (d.halfcourt.makes / d.halfcourt.attempts * 100) | round(1) }}%{% else %}0.0%{% endif %}
                 </td>
-                <td class="px-2 py-1 text-center" style="{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
+                <td class="px-2 py-1 text-center{{ d.halfcourt.pps|grade_pps(d.halfcourt.attempts) }}">{{ d.halfcourt.pps | round(2) }}</td>
                 <td class="px-2 py-1 text-center">
                   {% if shot_type_totals.fg3.attempts > 0 %}
                     {{ (d.halfcourt.attempts / shot_type_totals.fg3.attempts * 100) | round(1) }}%
