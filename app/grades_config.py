@@ -12,7 +12,8 @@ from typing import Dict, List
 # when evaluated by ``grade_token``. These values intentionally mirror the
 # previous inline-style gradients so existing visual expectations are kept.
 _DEFENSE_CONTACT_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
-_GAP_HELP_THRESHOLDS = [40.0, 45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0]
+_REBOUND_CONTACT_THRESHOLDS = [50.0, 60.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0]
+_HELP_COVERAGE_THRESHOLDS = [50.0, 60.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0]
 _CONTEST_BREAKDOWN_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
 
 
@@ -32,14 +33,14 @@ GRADES: Dict[str, List[float]] = {
     "ft_pct": [60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0],
     # Defensive rebounding events and contact percentages.
     "bump_pct": _DEFENSE_CONTACT_THRESHOLDS,
-    "crash_pct": _DEFENSE_CONTACT_THRESHOLDS,
-    "back_man_pct": _DEFENSE_CONTACT_THRESHOLDS,
-    "box_out_pct": _DEFENSE_CONTACT_THRESHOLDS,
+    "crash_pct": _REBOUND_CONTACT_THRESHOLDS,
+    "back_man_pct": _REBOUND_CONTACT_THRESHOLDS,
+    "box_out_pct": _REBOUND_CONTACT_THRESHOLDS,
     # Gap / Low man help and pick-and-roll coverage responsibilities.
-    "gap_pct": _GAP_HELP_THRESHOLDS,
-    "low_pct": _GAP_HELP_THRESHOLDS,
-    "close_window_pct": _GAP_HELP_THRESHOLDS,
-    "shut_door_pct": _GAP_HELP_THRESHOLDS,
+    "gap_pct": _HELP_COVERAGE_THRESHOLDS,
+    "low_pct": _HELP_COVERAGE_THRESHOLDS,
+    "close_window_pct": _HELP_COVERAGE_THRESHOLDS,
+    "shut_door_pct": _HELP_COVERAGE_THRESHOLDS,
     # Shot contest breakdowns (contest, late contest, no contest).
     "contest_pct": _CONTEST_BREAKDOWN_THRESHOLDS,
     "late_pct": _CONTEST_BREAKDOWN_THRESHOLDS,
