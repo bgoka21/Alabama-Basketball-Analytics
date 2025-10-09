@@ -589,7 +589,6 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
 
         if row_type in ("Crimson", "White"):
             player_cols = [col for col in row.index if _is_player_column(str(col))]
-            handled = False
             for col in player_cols:
                 tokens = split_tokens(row.get(col, ""))
                 if not tokens:
@@ -604,21 +603,15 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                     if t == "Gap +":
                         bump(slot, "collision_gap_positive", 1)
                         details.append({"event": "collision_gap_positive", "context": row_type})
-                        handled = True
                     elif t == "Gap -":
                         bump(slot, "collision_gap_missed", 1)
                         details.append({"event": "collision_gap_missed", "context": row_type})
-                        handled = True
                     elif t == "Contest Pass +":
                         bump(slot, "pass_contest_positive", 1)
                         details.append({"event": "pass_contest_positive", "context": row_type})
-                        handled = True
                     elif t == "Contest Pass -":
                         bump(slot, "pass_contest_missed", 1)
                         details.append({"event": "pass_contest_missed", "context": row_type})
-                        handled = True
-            if handled:
-                continue
 
         if row_type == "PnR":
             player_cols = [col for col in row.index if _is_player_column(str(col))]
@@ -753,10 +746,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         # we capture these metrics alongside the offensive ones.
         if row_type in ("Crimson", "White", "Alabama", "Blue"):
             for col in player_columns:
-                cell = str(row.get(col, "") or "").strip()
-                if not cell:
-                    continue
-                tokens = [t.strip() for t in cell.split(",") if t.strip()]
+                tokens = split_tokens(row.get(col, ""))
                 if not tokens:
                     continue
 
@@ -808,10 +798,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
         # ─── 3) Offense‐equivalent rows: Shot Type, Mapped Stats ──────────
         if row_type in ("Crimson", "White", "Alabama", "Blue"):
             for col in player_columns:
-                cell = str(row.get(col, "") or "").strip()
-                if not cell:
-                    continue
-                tokens = [t.strip() for t in cell.split(",") if t.strip()]
+                tokens = split_tokens(row.get(col, ""))
                 if not tokens:
                     continue
 
@@ -822,10 +809,7 @@ def parse_practice_csv(practice_csv_path, season_id=None, category=None, file_da
                 # ─── Corrected Assisted‐shot logic ────────────────────────────────
                 assisted_flag = False
                 for other_col in player_columns:
-                    assist_cell = str(row.get(other_col, "") or "").strip()
-                    if not assist_cell:
-                        continue
-                    assist_tokens = [t.strip() for t in assist_cell.split(",") if t.strip()]
+                    assist_tokens = split_tokens(row.get(other_col, ""))
                     if any(t == "Assist" or t == "Pot. Assist" for t in assist_tokens):
                         assisted_flag = True
                         break
