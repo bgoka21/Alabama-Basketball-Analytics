@@ -3529,43 +3529,22 @@ def _render_dual_leaderboard(template_name, *, page_title, compute_fn, stat_key,
 
 @admin_bp.record
 def register_filters(setup_state):
-    """Ensure Jinja filters are available when blueprint is used standalone."""
+    """Ensure Jinja helpers are available when blueprint is used standalone."""
+
     app = setup_state.app
-    def grade_pps(pps, attempts):
+
+    from app.grades import grade_token  # Imported lazily to avoid circular import during app initialization.
+
+    def _grade_filter(metric_key, value, attempts):
         if not attempts:
             return ""
+        token = grade_token(metric_key, value)
+        return f" {token}" if token else ""
 
-        def interpolate(start, end, factor):
-            return tuple(round(s + (e - s) * max(0.0, min(factor, 1.0))) for s, e in zip(start, end))
-
-        if pps >= 1.1:
-            start, end = (200, 255, 200), (0, 128, 0)
-            factor = min((pps - 1.1) / 0.5, 1.0)
-        elif pps >= 1.0:
-            start, end = (255, 255, 224), (255, 215, 0)
-            factor = (pps - 1.0) / 0.1
-        else:
-            start, end = (255, 200, 200), (255, 0, 0)
-            factor = min((1.0 - pps) / 0.5, 1.0)
-
-        r, g, b = interpolate(start, end, factor)
-        return f"background-color: rgb({r},{g},{b});"
-
-    def grade_atr2fg_pct(pct, attempts):
-        if not attempts:
-            return ""
-        pps = (pct / 100.0) * 2
-        return grade_pps(pps, attempts)
-
-    def grade_3fg_pct(pct, attempts):
-        if not attempts:
-            return ""
-        pps = (pct / 100.0) * 3
-        return grade_pps(pps, attempts)
-
-    app.jinja_env.filters['grade_atr2fg_pct'] = grade_atr2fg_pct
-    app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
-    app.jinja_env.filters['grade_pps'] = grade_pps
+    app.jinja_env.filters['grade_atr2fg_pct'] = lambda pct, attempts: _grade_filter("atr2fg_pct", pct, attempts)
+    app.jinja_env.filters['grade_3fg_pct'] = lambda pct, attempts: _grade_filter("fg3_pct", pct, attempts)
+    app.jinja_env.filters['grade_pps'] = lambda value, attempts: _grade_filter("pps", value, attempts)
+    app.jinja_env.globals['grade_token'] = grade_token
     app.jinja_env.globals['view_exists'] = lambda name: name in app.view_functions
 
 try:
