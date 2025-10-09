@@ -11,7 +11,7 @@ from typing import Dict, List
 # Thresholds are ascending lists that produce nine bins (eight thresholds)
 # when evaluated by ``grade_token``. These values intentionally mirror the
 # previous inline-style gradients so existing visual expectations are kept.
-_DEFENSE_CONTACT_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
+_BUMP_CONTACT_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
 _REBOUND_CONTACT_THRESHOLDS = [50.0, 60.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0]
 _HELP_COVERAGE_THRESHOLDS = [50.0, 60.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0]
 _CONTEST_BREAKDOWN_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
@@ -32,7 +32,7 @@ GRADES: Dict[str, List[float]] = {
     # shared grading helper.
     "ft_pct": [60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0],
     # Defensive rebounding events and contact percentages.
-    "bump_pct": _DEFENSE_CONTACT_THRESHOLDS,
+    "bump_pct": _BUMP_CONTACT_THRESHOLDS,
     "crash_pct": _REBOUND_CONTACT_THRESHOLDS,
     "back_man_pct": _REBOUND_CONTACT_THRESHOLDS,
     "box_out_pct": _REBOUND_CONTACT_THRESHOLDS,
