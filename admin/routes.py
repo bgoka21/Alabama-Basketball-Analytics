@@ -3533,7 +3533,7 @@ def register_filters(setup_state):
 
     app = setup_state.app
 
-    from app.grades import grade_token  # Imported lazily to avoid circular import during app initialization.
+    from app.grades import grade_scale, grade_token  # Imported lazily to avoid circular import during app initialization.
 
     def _grade_filter(metric_key, value, attempts):
         if not attempts:
@@ -3545,6 +3545,7 @@ def register_filters(setup_state):
     app.jinja_env.filters['grade_3fg_pct'] = lambda pct, attempts: _grade_filter("fg3_pct", pct, attempts)
     app.jinja_env.filters['grade_pps'] = lambda value, attempts: _grade_filter("pps", value, attempts)
     app.jinja_env.globals['grade_token'] = grade_token
+    app.jinja_env.globals['grade_scale'] = grade_scale
     app.jinja_env.globals['view_exists'] = lambda name: name in app.view_functions
 
 try:

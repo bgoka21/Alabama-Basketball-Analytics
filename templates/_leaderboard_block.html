@@ -1,6 +1,7 @@
 {% from 'macros/dual_tables.html' import render_dual_section %}
 {% from 'macros/table.html' import render_table %}
 {% from '_macros/percent_box.html' import apply_percent_wrappers %}
+{% from '_macros/grade_scale.html' import render_grade_scales_for_specs %}
 
 <h1 class="text-3xl font-bold mb-6">Season Leaderboard</h1>
 
@@ -56,6 +57,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Defense — Bumps', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'off_rebounding' %}
   <div class="space-y-8">
@@ -92,6 +94,7 @@
     ] %}
     {{ apply_percent_wrappers(crash_table, crash_percent_specs) }}
     {{ render_dual_section('Offensive Crash', crash_table, practice_note) }}
+    {{ render_grade_scales_for_specs(crash_percent_specs) }}
 
     {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
     {% set back_map = {
@@ -126,6 +129,7 @@
     ] %}
     {{ apply_percent_wrappers(back_table, back_percent_specs) }}
     {{ render_dual_section('Offensive Back Man', back_table, practice_note) }}
+    {{ render_grade_scales_for_specs(back_percent_specs) }}
   </div>
 
 {% elif selected.key == 'def_rebounding' %}
@@ -164,6 +168,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Defensive Rebounding', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'collision_gap_help' %}
   {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
@@ -200,6 +205,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Collisions — Gap Help', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'pass_contest' %}
   {% set columns = ["Contest +", "Contest Att", "Contest %"] %}
@@ -236,6 +242,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Pass Contests', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
   {% set label_map = {
@@ -305,6 +312,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section(shot_label ~ ' Shot Contests', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'overall_gap_help' %}
   {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
@@ -341,6 +349,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Overall Gap Help', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'overall_low_man' %}
   {% set columns = ["Low +", "Low Opp", "Low %"] %}
@@ -377,6 +386,7 @@
   ] %}
   {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('Overall Low Man', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'pnr_gap_help' %}
   <div class="space-y-8">
@@ -414,6 +424,7 @@
     ] %}
     {{ apply_percent_wrappers(gap_table, percent_specs) }}
     {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+    {{ render_grade_scales_for_specs(percent_specs) }}
 
     {% set low_table = build_dual_table(
       base_columns=columns,
@@ -442,6 +453,7 @@
     ] %}
     {{ apply_percent_wrappers(low_table, percent_specs) }}
     {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+    {{ render_grade_scales_for_specs(percent_specs) }}
   </div>
 
 {% elif selected.key == 'pnr_grade' %}
@@ -482,6 +494,7 @@
     ] %}
     {{ apply_percent_wrappers(close_table, close_percent_specs) }}
     {{ render_dual_section('Close Window', close_table, practice_note) }}
+    {{ render_grade_scales_for_specs(close_percent_specs) }}
 
     {% set shut_columns = ["Shut Door +", "Shut Door Opp", "Shut Door %"] %}
     {% set shut_map = {
@@ -519,6 +532,7 @@
     ] %}
     {{ apply_percent_wrappers(shut_table, shut_percent_specs) }}
     {{ render_dual_section('Shut Door', shut_table, practice_note) }}
+    {{ render_grade_scales_for_specs(shut_percent_specs) }}
   </div>
 
 {% else %}

@@ -1,0 +1,42 @@
+{% macro render_grade_scales(metric_keys, summary_text=None) %}
+  {%- set ns = namespace(items=[]) -%}
+  {%- for key in metric_keys or [] -%}
+    {%- set payload = grade_scale(key) -%}
+    {%- if payload -%}
+      {%- set ns.items = ns.items + [payload] -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- set count = ns.items | length -%}
+  {%- if count -%}
+    {%- set summary_label = summary_text if summary_text is not none else ('View grading scale' if count == 1 else 'View grading scales') -%}
+    <details class="mt-4 text-sm">
+      <summary class="cursor-pointer font-medium text-gray-800">{{ summary_label }}</summary>
+      <div class="mt-3 grid gap-4 text-xs sm:grid-cols-2 lg:grid-cols-3">
+        {%- for item in ns.items -%}
+          <div class="space-y-1">
+            <p class="font-semibold text-gray-700">{{ item.label }}</p>
+            <ul class="space-y-1">
+              {%- for bucket in item.buckets -%}
+                <li class="flex items-center gap-2">
+                  <span class="percent-box text-xs {{ bucket.token }}">{{ bucket.badge }}</span>
+                  <span class="text-gray-600">{{ bucket.range }}</span>
+                </li>
+              {%- endfor -%}
+            </ul>
+          </div>
+        {%- endfor -%}
+      </div>
+    </details>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro render_grade_scales_for_specs(specs, summary_text=None) %}
+  {%- set ns = namespace(metric_keys=[]) -%}
+  {%- for spec in specs or [] -%}
+    {%- set metric_key = spec.get('metric') or spec.get('slug') -%}
+    {%- if metric_key and metric_key not in ns.metric_keys -%}
+      {%- set ns.metric_keys = ns.metric_keys + [metric_key] -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{ render_grade_scales(ns.metric_keys, summary_text) }}
+{% endmacro %}

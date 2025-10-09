@@ -19,7 +19,7 @@ from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from app.utils.schema import ensure_columns
 from app.utils.formatting import fmt_money, posneg_class
-from app.grades import grade_token
+from app.grades import grade_scale, grade_token
 
 # Allow JSON serialization of SimpleNamespace values across all Flask apps
 _orig_json_default = DefaultJSONProvider.default
@@ -148,6 +148,7 @@ def create_app():
     app.jinja_env.filters['grade_3fg_pct'] = grade_3fg_pct
     app.jinja_env.filters['grade_pps'] = grade_pps
     app.jinja_env.globals['grade_token'] = grade_token
+    app.jinja_env.globals['grade_scale'] = grade_scale
     app.jinja_env.filters["fmt_money"] = fmt_money
     app.jinja_env.filters["posneg"] = posneg_class
 

@@ -35,3 +35,16 @@ def test_grade_token_defense_metric():
         token = helper('bump_pct', 72.0)
         assert token is not None
         assert token.startswith('grade-token')
+
+
+def test_grade_scale_global():
+    test_app = app.create_app()
+    with test_app.app_context():
+        helper = test_app.jinja_env.globals['grade_scale']
+        scale = helper('fg3_pct')
+        assert scale is not None
+        assert scale['label'] == '3FG%'
+        assert len(scale['buckets']) == 9
+        assert scale['buckets'][0]['range'].startswith('<')
+        assert scale['buckets'][-1]['range'].startswith('≥')
+        assert helper('unknown_metric') is None
