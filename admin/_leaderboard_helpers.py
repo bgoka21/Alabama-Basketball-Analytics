@@ -856,9 +856,10 @@ def _resolve_column_value(row: Any, keys: Tuple[str, ...]) -> Any:
     return None
 
 
-def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optional[str], Any]:
+def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optional[str], Any, Optional[str]]:
     formatter: Optional[str] = None
     default_value: Any = None
+    grade_metric: Optional[str] = None
 
     if spec is None:
         keys: Tuple[str, ...] = (column,)
@@ -870,6 +871,13 @@ def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optiona
             keys = tuple(raw_keys)
         formatter = spec.get("format")
         default_value = spec.get("default")
+        metric_override = (
+            spec.get("metric")
+            or spec.get("grade_metric")
+            or spec.get("grade_key")
+        )
+        if metric_override:
+            grade_metric = str(metric_override)
     else:
         if isinstance(spec, str):
             keys = (spec,)
@@ -879,7 +887,7 @@ def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optiona
     if not keys:
         keys = (column,)
 
-    return keys, formatter, default_value
+    return keys, formatter, default_value, grade_metric
 
 
 def _format_columns_for_source(
@@ -896,7 +904,7 @@ def _format_columns_for_source(
 
     for column in columns:
         spec = mapping.get(column)
-        keys, formatter, default_value = _parse_column_spec(column, spec)
+        keys, formatter, default_value, _ = _parse_column_spec(column, spec)
         value = _resolve_column_value(source, keys)
         if value is None and default_value is not None:
             value = default_value
@@ -1084,7 +1092,7 @@ def _extract_numeric_for_column(
         return None
 
     spec = mapping.get(column)
-    keys, formatter, default_value = _parse_column_spec(column, spec)
+    keys, formatter, default_value, _ = _parse_column_spec(column, spec)
     value = _resolve_column_value(source, keys)
     if value is None and default_value is not None:
         value = default_value
@@ -1110,6 +1118,7 @@ def build_dual_table(
     table_id: Optional[str] = None,
     default_sort: Optional[Sequence[Any]] = None,
     default_placeholder: str = "—",
+    grade_metrics: Optional[Mapping[str, str]] = None,
 ) -> Dict[str, Any]:
     """Return render_table-ready payload for dual leaderboard tables."""
 
@@ -1217,7 +1226,7 @@ def build_dual_table(
 
     for column in base_columns:
         slug = _slugify_label(column)
-        spec_keys, formatter, _ = _parse_column_spec(column, mapping.get(column))
+        spec_keys, formatter, _, grade_metric = _parse_column_spec(column, mapping.get(column))
         canonical_keys = [
             str(key).lower()
             for key in spec_keys
@@ -1231,6 +1240,8 @@ def build_dual_table(
             "formatter": formatter,
             "is_pct": is_pct,
         }
+        if grade_metric:
+            column_info["grade_metric"] = str(grade_metric)
         column_specs.append(column_info)
         for key in canonical_keys:
             canonical_map.setdefault(key, column_info)
@@ -1242,6 +1253,36 @@ def build_dual_table(
             canonical_map.setdefault("opps", column_info)
         if "+" in str(column) or "plus" in lowered_label:
             canonical_map.setdefault("plus", column_info)
+
+    explicit_grade_map: Dict[str, str] = {}
+    if grade_metrics:
+        for slug, metric in grade_metrics.items():
+            if metric:
+                explicit_grade_map[str(slug)] = str(metric)
+
+    for spec in column_specs:
+        slug = spec["slug"]
+        if slug in explicit_grade_map:
+            continue
+        grade_metric = spec.get("grade_metric")
+        if grade_metric:
+            explicit_grade_map[slug] = grade_metric
+        elif spec.get("is_pct"):
+            explicit_grade_map[slug] = slug
+
+    def _resolve_grade_token(metric_key: Optional[str], numeric_value: Any) -> str:
+        if not metric_key:
+            return ""
+        if numeric_value is None or numeric_value == "":
+            return ""
+        try:
+            numeric_float = float(numeric_value)
+        except (TypeError, ValueError):
+            return ""
+        from app.grades import grade_token as _grade_token
+
+        token = _grade_token(metric_key, numeric_float)
+        return token or ""
 
     columns: list[Dict[str, Any]] = [
         {
@@ -1324,12 +1365,21 @@ def build_dual_table(
                 row_entry[f"totals_{slug}_value"] = value_numeric
             else:
                 row_entry[f"totals_{slug}_value"] = ""
+            metric_key = explicit_grade_map.get(slug)
+            row_entry[f"totals_{slug}_token"] = _resolve_grade_token(
+                metric_key,
+                row_entry.get(f"totals_{slug}_value") or value_numeric,
+            )
             row_entry[f"last_{slug}"] = last_value
             value_numeric = last_numeric.get(label) if last_numeric else None
             if value_numeric is not None:
                 row_entry[f"last_{slug}_value"] = value_numeric
             else:
                 row_entry[f"last_{slug}_value"] = ""
+            row_entry[f"last_{slug}_token"] = _resolve_grade_token(
+                metric_key,
+                row_entry.get(f"last_{slug}_value") or value_numeric,
+            )
 
         rows.append(row_entry)
 
@@ -1357,6 +1407,15 @@ def build_dual_table(
                 totals_row[f"totals_{slug}_value"] = totals_numeric_value
             if last_numeric_value is not None:
                 totals_row[f"last_{slug}_value"] = last_numeric_value
+            metric_key = explicit_grade_map.get(slug)
+            totals_row[f"totals_{slug}_token"] = _resolve_grade_token(
+                metric_key,
+                totals_row.get(f"totals_{slug}_value") or totals_numeric_value,
+            )
+            totals_row[f"last_{slug}_token"] = _resolve_grade_token(
+                metric_key,
+                totals_row.get(f"last_{slug}_value") or last_numeric_value,
+            )
 
     def _resolve_sort_key(key: str) -> Optional[str]:
         lowered = key.lower()

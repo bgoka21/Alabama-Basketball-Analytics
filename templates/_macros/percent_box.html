@@ -1,4 +1,4 @@
-{% macro percent_box(metric_key, value, display=None, shrink_alias=False, insufficient=False, tooltip=None, placeholder='—') %}
+{% macro percent_box(metric_key, value, display=None, shrink_alias=False, insufficient=False, tooltip=None, placeholder='—', token=None) %}
   {%- set text = display if display is not none else None -%}
   {%- if insufficient -%}
     {%- set classes = ['percent-box', 'grade-NA'] -%}
@@ -9,14 +9,17 @@
     <span class="{{ classes | join(' ') }}"{% if title %} title="{{ title }}"{% endif %}>{{ text }}</span>
   {%- else -%}
     {%- set classes = ['percent-box'] -%}
-    {%- set token = None -%}
-    {%- if metric_key -%}
-      {%- set token = grade_token(metric_key, value) -%}
+    {%- set resolved_token = token -%}
+    {%- if resolved_token is string -%}
+      {%- set resolved_token = resolved_token.strip() -%}
     {%- endif -%}
-    {%- if token -%}
-      {%- set classes = classes + [token] -%}
+    {%- if not resolved_token and metric_key -%}
+      {%- set resolved_token = grade_token(metric_key, value) -%}
+    {%- endif -%}
+    {%- if resolved_token -%}
+      {%- set classes = classes + [resolved_token] -%}
       {%- if shrink_alias -%}
-        {%- for part in token.split() -%}
+        {%- for part in resolved_token.split() -%}
           {%- if part.startswith('grade-token--') -%}
             {%- set bucket = part.split('--')[-1] -%}
             {%- set classes = classes + ['shrink-3fg--' ~ bucket] -%}
@@ -133,6 +136,14 @@
   {%- set display = row.get(cell_key) -%}
   {%- set value_key = cell_key ~ '_value' -%}
   {%- set raw_value = row.get(value_key) -%}
+  {%- set token_key = cell_key ~ '_token' -%}
+  {%- set cached_token = row.get(token_key) -%}
+  {%- if cached_token is string -%}
+    {%- set cached_token = cached_token.strip() -%}
+    {%- if not cached_token -%}
+      {%- set cached_token = none -%}
+    {%- endif -%}
+  {%- endif -%}
   {%- set attempts = none -%}
   {%- for attempt_slug in attempt_slugs -%}
     {%- if attempts is none -%}
@@ -182,10 +193,10 @@
     {%- endif -%}
   {%- endif -%}
   {%- if insufficient -%}
-    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, insufficient=True, tooltip=tooltip, placeholder=placeholder) -%}
+    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, insufficient=True, tooltip=tooltip, placeholder=placeholder, token=cached_token) -%}
     {%- set _ = row.update({cell_key: rendered, value_key: ''}) -%}
   {%- else -%}
-    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, placeholder=placeholder) -%}
+    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, placeholder=placeholder, token=cached_token) -%}
     {%- set _ = row.update({cell_key: rendered}) -%}
     {%- if raw_value is none -%}
       {%- set _ = row.update({value_key: ''}) -%}
