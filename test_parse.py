@@ -18,6 +18,12 @@ except ModuleNotFoundError:  # pragma: no cover
 import sqlite3
 from utils.lineup import compute_lineup_efficiencies
 from utils.shottype import persist_player_shot_details
+# BEGIN Advanced Possession
+from services.reports.advanced_possession import (
+    cache_get_or_compute_adv_poss_game,
+    invalidate_adv_poss_game,
+)
+# END Advanced Possession
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
 
 #print("🔥 parse_csv() function has started executing!")
@@ -662,6 +668,9 @@ def parse_csv(file_path, game_id, season_id):
             db.session.add(game_entry)
             db.session.commit()
         game_id = game_entry.id
+        # BEGIN Advanced Possession
+        invalidate_adv_poss_game(game_id)
+        # END Advanced Possession
         print(f"🎯 Assigned Game ID: {game_id}")
 
     if df.empty:
@@ -1187,11 +1196,22 @@ def parse_csv(file_path, game_id, season_id):
         min_poss=10
     )
 
-    return {
+    result = {
       "offensive_breakdown": offensive_breakdown,
       "defensive_breakdown": defensive_breakdown,
       "lineup_efficiencies": efficiencies
     }
+
+    # BEGIN Advanced Possession
+    try:
+        adv_payload, _meta = cache_get_or_compute_adv_poss_game(game_id)
+    except Exception:
+        adv_payload = None
+    if adv_payload is not None:
+        result["advanced_possession_game"] = adv_payload
+    # END Advanced Possession
+
+    return result
 
 
 
