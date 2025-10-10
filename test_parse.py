@@ -48,6 +48,17 @@ def safe_str(val, default=""):
     """Return the string representation of val if not NaN; otherwise, return default (empty string)."""
     return default if pd.isna(val) else str(val)
 
+# BEGIN safe_increment_helper
+def inc_stat(bucket: dict, key: str, by: int = 1):
+    """
+    Increment bucket[key] by `by`, creating the key at 0 if missing.
+    Keeps buckets as plain dicts; no defaultdict required.
+    """
+    if key is None or key == "":
+        return  # ignore empty keys defensively
+    bucket[key] = bucket.get(key, 0) + by
+# END safe_increment_helper
+
 def extract_tokens(cell_value):
     """
     Splits a cell’s string on commas and returns non-empty, trimmed, normalized tokens.
@@ -390,6 +401,7 @@ def process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping,
     )
     player_stats_dict[player_name]["_blue_collar_total"] = blue_total
 
+# BEGIN contest_side_keyerror_fix
 def process_defense_player_row(row, df_columns, player_stats_dict, game_id, season_id):
     defense_mapping = {
         "Foul By": "foul_by",
@@ -413,12 +425,13 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         if col.startswith("#"):
             tokens = extract_tokens(row.get(col, ""))
             if tokens:
-                if col not in player_stats_dict:
+                if col not in player_stats_dict or not isinstance(player_stats_dict.get(col), dict):
                     player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, defense_mapping, {"dummy":0})
                 for token in tokens:
                     if token in defense_mapping:
                         stat_key = defense_mapping[token]
-                        player_stats_dict[col][stat_key] += 1
+                        inc_stat(player_stats_dict[col], stat_key)
+# END contest_side_keyerror_fix
 
 # --- New get_possession_breakdown_detailed() ---
 def get_possession_breakdown_detailed(df):
