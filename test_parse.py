@@ -24,6 +24,12 @@ from services.reports.advanced_possession import (
     invalidate_adv_poss_game,
 )
 # END Advanced Possession
+# BEGIN Playcall Report
+from services.reports.playcall import (
+    compute_playcall_report_from_dataframe,
+    invalidate_playcall_report,
+)
+# END Playcall Report
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
 
 #print("🔥 parse_csv() function has started executing!")
@@ -671,6 +677,9 @@ def parse_csv(file_path, game_id, season_id):
         # BEGIN Advanced Possession
         invalidate_adv_poss_game(game_id)
         # END Advanced Possession
+        # BEGIN Playcall Report
+        invalidate_playcall_report(game_id)
+        # END Playcall Report
         print(f"🎯 Assigned Game ID: {game_id}")
 
     if df.empty:
@@ -1210,6 +1219,16 @@ def parse_csv(file_path, game_id, season_id):
     if adv_payload is not None:
         result["advanced_possession_game"] = adv_payload
     # END Advanced Possession
+    # BEGIN Playcall Report
+    playcall_payload = None
+    try:
+        with app_instance.app_context():
+            playcall_payload, _playcall_meta = compute_playcall_report_from_dataframe(game_id, df)
+    except Exception:
+        playcall_payload = None
+    if playcall_payload is not None:
+        result["playcall_report"] = playcall_payload
+    # END Playcall Report
 
     return result
 
