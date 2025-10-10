@@ -1,4 +1,7 @@
 import os
+import csv
+from io import StringIO
+from typing import Dict, Iterable, Mapping
 import pandas as pd
 from flask import render_template, jsonify, request, current_app, make_response, abort, redirect, url_for, flash
 from werkzeug.utils import secure_filename
@@ -13,7 +16,7 @@ from admin.routes import (
     aggregate_stats,
     compute_team_shot_details,
 )
-from models.database import PlayerStats, Practice, BlueCollarStats
+from models.database import PlayerStats, Practice, BlueCollarStats, Game
 from datetime import date
 from types import SimpleNamespace
 from flask_login import login_required
@@ -28,6 +31,12 @@ from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
 from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 from app.utils.table_cells import num, pct
+# BEGIN Advanced Possession
+from services.reports.advanced_possession import (
+    cache_get_or_compute_adv_poss_game,
+    cache_get_or_compute_adv_poss_practice,
+)
+# END Advanced Possession
 
 
 
@@ -77,6 +86,238 @@ def get_shot_data(shot_type):
 def render_shot_section(shot_type, data):
     """Render a single shot-type section."""
     return render_template('_shot_section.html', shot_type=shot_type, data=data)
+
+
+# BEGIN Advanced Possession
+def _format_adv_table_for_csv(
+    rows: Iterable[Mapping[str, object]],
+    totals: Mapping[str, object],
+) -> str:
+    rows = list(rows or [])
+    totals = totals or {}
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["LABEL", "PTS", "CHANCES", "PPC", "FREQ"])
+    for row in rows:
+        pts = int(row.get("pts", 0) or 0)
+        chances = int(row.get("chances", 0) or 0)
+        ppc_val = float(row.get("ppc", 0.0) or 0.0)
+        freq_val = float(row.get("freq", 0.0) or 0.0)
+        writer.writerow(
+            [
+                row.get("label", ""),
+                pts,
+                chances,
+                f"{ppc_val:.2f}",
+                f"{freq_val:.1f}%",
+            ]
+        )
+    if totals:
+        totals_pts = int(totals.get("pts", 0) or 0)
+        totals_chances = int(totals.get("chances", 0) or 0)
+        totals_ppc = float(totals.get("ppc", 0.0) or 0.0)
+        totals_freq = float(totals.get("freq", 0.0) or 0.0)
+        writer.writerow(
+            [
+                totals.get("label", "Total"),
+                totals_pts,
+                totals_chances,
+                f"{totals_ppc:.2f}",
+                f"{totals_freq:.1f}%",
+            ]
+        )
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def _format_adv_table_for_view(
+    row_entries: Iterable[Mapping[str, object]],
+    totals: Mapping[str, object],
+) -> Dict[str, object]:
+    formatted_rows = []
+    for entry in row_entries or []:
+        pts = int(entry.get("pts", 0) or 0)
+        chances = int(entry.get("chances", 0) or 0)
+        ppc_value = float(entry.get("ppc", 0.0) or 0.0)
+        freq_value = float(entry.get("freq", 0.0) or 0.0)
+        formatted_rows.append(
+            {
+                "label": entry.get("label", ""),
+                "pts": pts,
+                "chances": chances,
+                "ppc": {"display": f"{ppc_value:.2f}", "data_value": ppc_value},
+                "freq": {"display": f"{freq_value:.1f}%", "data_value": freq_value},
+            }
+        )
+    totals = totals or {}
+    totals_pts = int(totals.get("pts", 0) or 0)
+    totals_chances = int(totals.get("chances", 0) or 0)
+    totals_ppc = float(totals.get("ppc", 0.0) or 0.0)
+    totals_freq = float(totals.get("freq", 0.0) or 0.0)
+    return {
+        "rows": formatted_rows,
+        "totals": {
+            "label": totals.get("label", "Totals"),
+            "pts": totals_pts,
+            "chances": totals_chances,
+            "ppc": f"{totals_ppc:.2f}",
+            "freq": f"{totals_freq:.1f}%",
+        },
+    }
+
+
+@app.route("/api/reports/advanced_offense")
+@login_required
+def api_advanced_offense():
+    if not current_app.config.get("ADVANCED_POSSESSION_ENABLED", True):
+        abort(404)
+    practice_id = request.args.get("practice_id", type=int)
+    if not practice_id:
+        return jsonify({"error": "practice_id required"}), 400
+
+    data, meta = cache_get_or_compute_adv_poss_practice(practice_id)
+
+    if request.args.get("format") == "csv":
+        table_key = (request.args.get("table") or "").strip()
+        team_key = (request.args.get("team") or "crimson").strip().lower()
+        team_payload = data.get(team_key) if isinstance(data, Mapping) else None
+        if not team_payload:
+            return jsonify({"error": "invalid team"}), 400
+        rows_payload = []
+        totals_payload: Mapping[str, object] = {}
+        if isinstance(team_payload, Mapping):
+            rows_payload = team_payload.get(table_key) or []
+            totals_payload = (team_payload.get("totals") or {}).get(table_key, {})
+        if not rows_payload and not totals_payload:
+            return jsonify({"error": "invalid table"}), 400
+        csv_body = _format_adv_table_for_csv(rows_payload, totals_payload)
+        response = make_response(csv_body)
+        response.headers["Content-Type"] = "text/csv"
+        filename = f"practice_{practice_id}_{team_key}_{table_key}.csv"
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+
+    return jsonify({"data": data, "meta": meta})
+
+
+@app.route("/api/reports/advanced_offense_game")
+@login_required
+def api_advanced_offense_game():
+    if not current_app.config.get("ADVANCED_POSSESSION_ENABLED", True):
+        abort(404)
+    game_id = request.args.get("game_id", type=int)
+    if not game_id:
+        return jsonify({"error": "game_id required"}), 400
+
+    data, meta = cache_get_or_compute_adv_poss_game(game_id)
+
+    if request.args.get("format") == "csv":
+        table_key = (request.args.get("table") or "").strip()
+        offense_payload = data.get("offense") if isinstance(data, Mapping) else None
+        if not offense_payload:
+            return jsonify({"error": "invalid table"}), 400
+        rows_payload = []
+        totals_payload: Mapping[str, object] = {}
+        if isinstance(offense_payload, Mapping):
+            rows_payload = offense_payload.get(table_key) or []
+            totals_payload = (offense_payload.get("totals") or {}).get(table_key, {})
+        if not rows_payload and not totals_payload:
+            return jsonify({"error": "invalid table"}), 400
+        csv_body = _format_adv_table_for_csv(rows_payload, totals_payload)
+        response = make_response(csv_body)
+        response.headers["Content-Type"] = "text/csv"
+        filename = f"game_{game_id}_{table_key}.csv"
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+
+    return jsonify({"data": data, "meta": meta})
+
+
+@app.route("/reports/advanced_offense")
+@login_required
+def advanced_offense_report():
+    if not current_app.config.get("ADVANCED_POSSESSION_ENABLED", True):
+        abort(404)
+
+    active_tab = request.args.get("tab", "practice")
+    if active_tab not in {"practice", "game"}:
+        active_tab = "practice"
+
+    practices = Practice.query.order_by(Practice.date.desc()).all()
+    games = Game.query.order_by(Game.game_date.desc()).all()
+
+    practice_id = request.args.get("practice_id", type=int)
+    if not practice_id and practices:
+        practice_id = practices[0].id
+
+    game_id = request.args.get("game_id", type=int)
+    if not game_id and games:
+        game_id = games[0].id
+
+    practice_tables: Dict[str, Dict[str, object]] = {}
+    practice_meta = None
+    if practice_id:
+        try:
+            practice_raw, practice_meta = cache_get_or_compute_adv_poss_practice(practice_id)
+        except Exception:
+            practice_raw, practice_meta = {}, None
+        for team_key in ("crimson", "white"):
+            team_payload = practice_raw.get(team_key) if isinstance(practice_raw, Mapping) else {}
+            team_totals = team_payload.get("totals") if isinstance(team_payload, Mapping) else {}
+            practice_tables[team_key] = {
+                "paint_touches": _format_adv_table_for_view(
+                    team_payload.get("paint_touches") if isinstance(team_payload, Mapping) else [],
+                    team_totals.get("paint_touches", {}) if isinstance(team_totals, Mapping) else {},
+                ),
+                "shot_clock": _format_adv_table_for_view(
+                    team_payload.get("shot_clock") if isinstance(team_payload, Mapping) else [],
+                    team_totals.get("shot_clock", {}) if isinstance(team_totals, Mapping) else {},
+                ),
+                "possession_type": _format_adv_table_for_view(
+                    team_payload.get("possession_type") if isinstance(team_payload, Mapping) else [],
+                    team_totals.get("possession_type", {}) if isinstance(team_totals, Mapping) else {},
+                ),
+                "meta": team_payload.get("meta") or {"total_pts": 0, "total_chances": 0},
+            }
+
+    game_tables: Dict[str, Dict[str, object]] = {}
+    game_meta = None
+    if game_id:
+        try:
+            game_raw, game_meta = cache_get_or_compute_adv_poss_game(game_id)
+        except Exception:
+            game_raw, game_meta = {}, None
+        offense_payload = game_raw.get("offense") if isinstance(game_raw, Mapping) else {}
+        offense_totals = offense_payload.get("totals") if isinstance(offense_payload, Mapping) else {}
+        game_tables["offense"] = {
+            "paint_touches": _format_adv_table_for_view(
+                offense_payload.get("paint_touches") if isinstance(offense_payload, Mapping) else [],
+                offense_totals.get("paint_touches", {}) if isinstance(offense_totals, Mapping) else {},
+            ),
+            "shot_clock": _format_adv_table_for_view(
+                offense_payload.get("shot_clock") if isinstance(offense_payload, Mapping) else [],
+                offense_totals.get("shot_clock", {}) if isinstance(offense_totals, Mapping) else {},
+            ),
+            "possession_type": _format_adv_table_for_view(
+                offense_payload.get("possession_type") if isinstance(offense_payload, Mapping) else [],
+                offense_totals.get("possession_type", {}) if isinstance(offense_totals, Mapping) else {},
+            ),
+            "meta": offense_payload.get("meta") or {"total_pts": 0, "total_chances": 0},
+        }
+
+    return render_template(
+        "reports/advanced_offense.html",
+        practices=practices,
+        games=games,
+        selected_practice=practice_id,
+        selected_game=game_id,
+        practice_tables=practice_tables,
+        game_tables=game_tables,
+        practice_meta=practice_meta,
+        game_meta=game_meta,
+        active_tab=active_tab,
+    )
+# END Advanced Possession
 
 
 @app.route('/pdf/home')

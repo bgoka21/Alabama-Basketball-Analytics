@@ -81,6 +81,12 @@ from parse_practice_csv import (
     blue_collar_values,
     _date_from_filename,
 )  # <— make sure this is here
+# BEGIN Advanced Possession
+from services.reports.advanced_possession import (
+    invalidate_adv_poss_game,
+    invalidate_adv_poss_practice,
+)
+# END Advanced Possession
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from admin._leaderboard_helpers import (
@@ -4026,6 +4032,9 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
         db.session.add(practice)
         db.session.flush()
     else:
+        # BEGIN Advanced Possession
+        invalidate_adv_poss_practice(practice.id)
+        # END Advanced Possession
         if practice.category != category:
             practice.category = category
         PlayerStats.query.filter_by(practice_id=practice.id).delete()
@@ -4158,6 +4167,9 @@ def delete_data(file_id):
             date=uploaded_file.file_date,
         ).first()
         if practice:
+            # BEGIN Advanced Possession
+            invalidate_adv_poss_practice(practice.id)
+            # END Advanced Possession
             if practice.category != category:
                 practice.category = category
             TeamStats.query.filter_by(practice_id=practice.id).delete()
@@ -4174,6 +4186,9 @@ def delete_data(file_id):
     else:
         game = Game.query.filter_by(csv_filename=filename).first()
         if game:
+            # BEGIN Advanced Possession
+            invalidate_adv_poss_game(game.id)
+            # END Advanced Possession
             TeamStats.query.filter_by(game_id=game.id).delete()
             PlayerStats.query.filter_by(game_id=game.id).delete()
             BlueCollarStats.query.filter_by(game_id=game.id).delete()

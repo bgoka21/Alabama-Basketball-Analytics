@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% from 'macros/table.html' import render_table %}
+
+{# BEGIN Advanced Possession #}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Advanced Possession Report</h1>
+
+<div class="mb-6 border-b border-gray-200">
+  <nav class="flex">
+    <button
+      type="button"
+      data-adv-tab-trigger="practice"
+      class="px-4 py-2 font-semibold transition-colors border-b-2 {% if active_tab == 'practice' %}border-[#9E1B32] text-[#9E1B32]{% else %}border-transparent text-gray-600 hover:text-[#9E1B32]{% endif %}"
+      aria-selected="{{ 'true' if active_tab == 'practice' else 'false' }}"
+    >Practice</button>
+    <button
+      type="button"
+      data-adv-tab-trigger="game"
+      class="px-4 py-2 font-semibold transition-colors border-b-2 {% if active_tab == 'game' %}border-[#9E1B32] text-[#9E1B32]{% else %}border-transparent text-gray-600 hover:text-[#9E1B32]{% endif %}"
+      aria-selected="{{ 'true' if active_tab == 'game' else 'false' }}"
+    >Game</button>
+  </nav>
+</div>
+
+{% set columns = [
+  {'key': 'label', 'label': 'Label', 'sortable': True, 'align': 'left'},
+  {'key': 'pts', 'label': 'PTS', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'chances', 'label': 'Chances', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'ppc', 'label': 'PPC', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'freq', 'label': 'Freq', 'sortable': True, 'align': 'right', 'format': 'number'},
+] %}
+
+<div data-adv-tab-panel="practice" {% if active_tab != 'practice' %}class="hidden"{% endif %}>
+  <form method="get" class="mb-4 flex flex-wrap items-center gap-3">
+    <input type="hidden" name="tab" value="practice" />
+    {% if selected_game %}<input type="hidden" name="game_id" value="{{ selected_game }}" />{% endif %}
+    <label for="practice-select" class="font-semibold">Practice:</label>
+    <select id="practice-select" name="practice_id" onchange="this.form.submit()" class="border border-gray-300 rounded px-3 py-2">
+      {% for practice in practices %}
+        <option value="{{ practice.id }}" {% if practice.id == selected_practice %}selected{% endif %}>
+          {{ practice.date or "Unknown Date" }} — {{ practice.category or "Practice" }}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% if practice_tables %}
+  <div class="grid gap-6 md:grid-cols-2">
+    {% for team_key, team_label in {'crimson': 'Crimson', 'white': 'White'}.items() %}
+      {% set team = practice_tables.get(team_key, {}) %}
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-4 py-3 bg-[#9E1B32]/90 text-white rounded-t-lg flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold">{{ team_label }}</h2>
+            {% set meta = team.get('meta', {}) %}
+            {% set total_pts = meta.get('total_pts', 0) %}
+            {% set total_chances = meta.get('total_chances', 0) %}
+            {% set total_ppc = (total_pts / total_chances) if total_chances else 0 %}
+            <p class="text-sm text-white/80">Total PTS: {{ total_pts }} · Chances: {{ total_chances }} · PPC: {{ '%.2f' % total_ppc }}</p>
+          </div>
+        </header>
+        <div class="p-4 space-y-6">
+          {% for table_key, table_label in {'paint_touches': 'Paint Touches', 'shot_clock': 'Shot Clock', 'possession_type': 'Possession Type'}.items() %}
+            {% set table = team.get(table_key, {'rows': [], 'totals': {}}) %}
+            <div class="border border-gray-200 rounded-lg">
+              <div class="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-t-lg">
+                <h3 class="font-semibold text-gray-800">{{ table_label }}</h3>
+                {% if selected_practice %}
+                <a
+                  class="text-sm text-[#9E1B32] hover:underline"
+                  href="{{ url_for('api_advanced_offense', practice_id=selected_practice, team=team_key, table=table_key, format='csv', tab='practice') }}"
+                >Download CSV</a>
+                {% endif %}
+              </div>
+              {{ render_table(
+                id='practice-' ~ team_key ~ '-' ~ table_key,
+                columns=columns,
+                rows=table.rows,
+                totals=table.totals,
+                dense=True,
+                sticky_header=True,
+                caption=team_label ~ ' ' ~ table_label
+              ) }}
+              {% if table.rows | length == 0 %}
+                <div class="px-4 py-3 text-sm text-gray-500">No data available.</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="text-gray-600">No practice data available.</p>
+  {% endif %}
+</div>
+
+<div data-adv-tab-panel="game" {% if active_tab != 'game' %}class="hidden"{% endif %}>
+  <form method="get" class="mb-4 flex flex-wrap items-center gap-3">
+    <input type="hidden" name="tab" value="game" />
+    {% if selected_practice %}<input type="hidden" name="practice_id" value="{{ selected_practice }}" />{% endif %}
+    <label for="game-select" class="font-semibold">Game:</label>
+    <select id="game-select" name="game_id" onchange="this.form.submit()" class="border border-gray-300 rounded px-3 py-2">
+      {% for game in games %}
+        <option value="{{ game.id }}" {% if game.id == selected_game %}selected{% endif %}>
+          {{ game.game_date or "Unknown" }} — {{ game.opponent_name or "Opponent" }}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% set offense = game_tables.get('offense', {}) %}
+  {% if offense %}
+    <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <header class="px-4 py-3 bg-[#9E1B32]/90 text-white rounded-t-lg flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold">Offense</h2>
+          {% set meta = offense.get('meta', {}) %}
+          {% set total_pts = meta.get('total_pts', 0) %}
+          {% set total_chances = meta.get('total_chances', 0) %}
+          {% set total_ppc = (total_pts / total_chances) if total_chances else 0 %}
+          <p class="text-sm text-white/80">Total PTS: {{ total_pts }} · Chances: {{ total_chances }} · PPC: {{ '%.2f' % total_ppc }}</p>
+        </div>
+      </header>
+      <div class="p-4 space-y-6">
+        {% for table_key, table_label in {'paint_touches': 'Paint Touches', 'shot_clock': 'Shot Clock', 'possession_type': 'Possession Type'}.items() %}
+          {% set table = offense.get(table_key, {'rows': [], 'totals': {}}) %}
+          <div class="border border-gray-200 rounded-lg">
+            <div class="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-t-lg">
+              <h3 class="font-semibold text-gray-800">{{ table_label }}</h3>
+              {% if selected_game %}
+              <a
+                class="text-sm text-[#9E1B32] hover:underline"
+                href="{{ url_for('api_advanced_offense_game', game_id=selected_game, table=table_key, format='csv', tab='game') }}"
+              >Download CSV</a>
+              {% endif %}
+            </div>
+            {{ render_table(
+              id='game-offense-' ~ table_key,
+              columns=columns,
+              rows=table.rows,
+              totals=table.totals,
+              dense=True,
+              sticky_header=True,
+              caption='Game offense ' ~ table_label
+            ) }}
+            {% if table.rows | length == 0 %}
+              <div class="px-4 py-3 text-sm text-gray-500">No data available.</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    <p class="text-gray-600">No game data available.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/reports/advanced_offense.js') }}" defer></script>
+{% endblock %}
+{# END Advanced Possession #}
