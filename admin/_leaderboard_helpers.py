@@ -9,9 +9,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.database import Practice, db
+from markupsafe import Markup
 
 
 DualContextResult = Dict[str, Any]
+
+
+_GRADE_BUCKET_RE = re.compile(r"grade-token--(\d+)")
 
 
 def _default_context() -> DualContextResult:
@@ -1502,6 +1506,18 @@ def build_leaderboard_table(
     stat_key = str(cfg.get("key") or "").strip()
     label = cfg.get("label") or stat_key.title() or "Stat"
 
+    grade_metric_map: Dict[str, str] = {}
+    shrink_gradient_slugs: set[str] = set()
+    if stat_key == "fg3_fg_pct":
+        grade_metric_map.update(
+            {
+                "fg_pct": "fg3_pct",
+                "shrink_3fg_pct": "fg3_pct",
+                "non_shrink_3fg_pct": "fg3_pct",
+            }
+        )
+        shrink_gradient_slugs.update({"shrink_3fg_pct", "non_shrink_3fg_pct"})
+
     def _spec(
         column_label: str,
         *,
@@ -1743,6 +1759,15 @@ def build_leaderboard_table(
             )
         )
 
+    if grade_metric_map:
+        for spec in column_specs:
+            slug = spec.get("slug")
+            if not slug:
+                continue
+            metric = grade_metric_map.get(slug)
+            if metric:
+                spec["grade_metric"] = metric
+
     columns: list[Dict[str, Any]] = [
         {
             "key": "rank",
@@ -1837,6 +1862,33 @@ def build_leaderboard_table(
             return default_placeholder, None
         return str(text), None
 
+    def _resolve_grade_token(metric_key: Optional[str], numeric_value: Any) -> str:
+        if not metric_key:
+            return ""
+        if numeric_value is None or numeric_value == "":
+            return ""
+        try:
+            numeric_float = float(numeric_value)
+        except (TypeError, ValueError):
+            return ""
+        from app.grades import grade_token as _grade_token
+
+        token = _grade_token(metric_key, numeric_float)
+        return token or ""
+
+    def _wrap_percent_display(display_text: str, slug: str, grade_token: str) -> Markup:
+        classes = ["percent-box"]
+        bucket: Optional[str] = None
+        if grade_token:
+            classes.extend(part for part in grade_token.split() if part)
+            match = _GRADE_BUCKET_RE.search(grade_token)
+            if match:
+                bucket = match.group(1)
+        if slug in shrink_gradient_slugs and bucket is not None:
+            classes.append(f"shrink-3fg--{bucket}")
+        class_attr = " ".join(classes)
+        return Markup(f'<span class="{class_attr}">{Markup.escape(display_text)}</span>')
+
     row_entries: list[Dict[str, Any]] = []
     for index, row in enumerate(rows or [], start=1):
         player = _resolve_value(row, _PLAYER_KEYS, index=0) or ""
@@ -1849,7 +1901,15 @@ def build_leaderboard_table(
 
         for spec in column_specs:
             display, numeric = _format_value(row, spec)
-            entry[spec["key"]] = display if display is not None else default_placeholder
+            metric_key = spec.get("grade_metric")
+            grade_token = _resolve_grade_token(metric_key, numeric) if metric_key else ""
+            display_text = display if display is not None else default_placeholder
+            if spec["slug"] in grade_metric_map:
+                entry[spec["key"]] = _wrap_percent_display(
+                    str(display_text), spec["slug"], grade_token
+                )
+            else:
+                entry[spec["key"]] = display_text
             if numeric is not None:
                 entry[spec["value_key"]] = numeric
 
@@ -1860,7 +1920,15 @@ def build_leaderboard_table(
         totals_entry = {"rank": "", "player": "Team Totals"}
         for spec in column_specs:
             display, numeric = _format_value(team_totals, spec)
-            totals_entry[spec["key"]] = display
+            metric_key = spec.get("grade_metric")
+            grade_token = _resolve_grade_token(metric_key, numeric) if metric_key else ""
+            display_text = display if display is not None else default_placeholder
+            if spec["slug"] in grade_metric_map:
+                totals_entry[spec["key"]] = _wrap_percent_display(
+                    str(display_text), spec["slug"], grade_token
+                )
+            else:
+                totals_entry[spec["key"]] = display_text
             if numeric is not None:
                 totals_entry[spec["value_key"]] = numeric
 
