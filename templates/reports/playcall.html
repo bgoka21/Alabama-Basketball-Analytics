@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% from 'macros/table.html' import render_table %}
+{# BEGIN Playcall Report #}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Playcall Report</h1>
+
+<form method="get" class="mb-6 flex flex-wrap items-center gap-3">
+  <label for="game-select" class="font-semibold">Game:</label>
+  <select id="game-select" name="game_id" onchange="this.form.submit()" class="border border-gray-300 rounded px-3 py-2">
+    {% for game in games %}
+      <option value="{{ game.id }}" {% if game.id == selected_game %}selected{% endif %}>
+        {{ game.game_date or "Unknown" }} — {{ game.opponent_name or "Opponent" }}
+      </option>
+    {% endfor %}
+  </select>
+</form>
+
+{% if meta %}
+  <div class="mb-4 text-sm text-gray-600">
+    <span class="font-semibold">Updated:</span>
+    {{ meta.updated_at }} ·
+    <span class="font-semibold">Off Set Chances:</span> {{ meta.total_chances_off_set }} ·
+    <span class="font-semibold">In Flow Chances:</span> {{ meta.total_chances_in_flow }}
+  </div>
+{% endif %}
+
+<div class="mb-6 flex flex-wrap items-center gap-4">
+  <div>
+    <label for="series-filter" class="block text-sm font-semibold text-gray-700">Series</label>
+    <select id="series-filter" multiple size="4" class="mt-1 border border-gray-300 rounded px-3 py-2 min-w-[12rem]" data-playcall-series-filter>
+      {% for series in series_options %}
+        <option value="{{ series }}" {% if series in selected_series %}selected{% endif %}>{{ series }}</option>
+      {% endfor %}
+    </select>
+    <p class="mt-1 text-xs text-gray-500">Use Ctrl/Cmd to select multiple families.</p>
+  </div>
+  <div class="flex-1 min-w-[12rem]">
+    <label for="playcall-search" class="block text-sm font-semibold text-gray-700">Search Playcall</label>
+    <input
+      type="search"
+      id="playcall-search"
+      value="{{ search_query }}"
+      placeholder="Search by playcall name"
+      class="mt-1 w-full border border-gray-300 rounded px-3 py-2"
+      data-playcall-search
+    />
+  </div>
+</div>
+
+{% set family_columns = [
+  {'key': 'playcall', 'label': 'PLAYCALL', 'sortable': True, 'align': 'left'},
+  {'key': 'ran', 'label': 'RAN', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'off_set_pts', 'label': 'PTS', 'group': 'OFF SET', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'off_set_chances', 'label': 'POSS', 'group': 'OFF SET', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'off_set_ppc', 'label': 'PPC', 'group': 'OFF SET', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'in_flow_pts', 'label': 'PTS', 'group': 'IN FLOW', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'in_flow_chances', 'label': 'POSS', 'group': 'IN FLOW', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'in_flow_ppc', 'label': 'PPC', 'group': 'IN FLOW', 'sortable': True, 'align': 'right', 'format': 'number'},
+] %}
+
+{% set flow_columns = [
+  {'key': 'playcall', 'label': 'PLAYCALL', 'sortable': True, 'align': 'left'},
+  {'key': 'ran_in_flow', 'label': 'RAN (IN FLOW)', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'in_flow_pts', 'label': 'PTS', 'group': 'IN FLOW', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'in_flow_chances', 'label': 'POSS', 'group': 'IN FLOW', 'sortable': True, 'align': 'right', 'format': 'number'},
+  {'key': 'in_flow_ppc', 'label': 'PPC', 'group': 'IN FLOW', 'sortable': True, 'align': 'right', 'format': 'number'},
+] %}
+
+{% if families %}
+  <div class="space-y-6">
+    {% for family in families %}
+      <section
+        class="bg-white border border-gray-200 rounded-lg shadow-sm"
+        data-playcall-card
+        data-playcall-series="{{ family.name }}"
+        {% if family.name not in selected_series %}data-initial-hidden="true"{% endif %}
+      >
+        <header class="px-4 py-3 bg-[#9E1B32] text-white rounded-t-lg flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold">{{ family.name }}</h2>
+          </div>
+          {% if family.csv_url %}
+          <a href="{{ family.csv_url }}" class="text-sm bg-white/10 hover:bg-white/20 transition px-3 py-1 rounded">Download CSV</a>
+          {% endif %}
+        </header>
+        <div class="p-4 space-y-4">
+          {{ render_table(
+            id='playcall-' ~ family.name|replace(' ', '-')|lower,
+            columns=family_columns,
+            rows=family.rows,
+            totals=family.totals,
+            dense=True,
+            sticky_header=True,
+            caption=family.name ~ ' playcall breakdown'
+          ) }}
+          <div class="hidden text-sm text-gray-500" data-no-matches>No matching playcalls.</div>
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+{% elif not flow %}
+  <p class="text-gray-600">No playcall data available for this game.</p>
+{% endif %}
+
+{% if flow %}
+  <section
+    class="mt-8 bg-white border border-gray-200 rounded-lg shadow-sm"
+    data-playcall-card
+    data-playcall-series="FLOW"
+    {% if 'FLOW' not in selected_series %}data-initial-hidden="true"{% endif %}
+  >
+    <header class="px-4 py-3 bg-[#9E1B32] text-white rounded-t-lg flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold">FLOW</h2>
+      </div>
+      {% if flow.csv_url %}
+      <a href="{{ flow.csv_url }}" class="text-sm bg-white/10 hover:bg-white/20 transition px-3 py-1 rounded">Download CSV</a>
+      {% endif %}
+    </header>
+    <div class="p-4 space-y-4">
+      {{ render_table(
+        id='playcall-flow',
+        columns=flow_columns,
+        rows=flow.rows,
+        totals=flow.totals,
+        dense=True,
+        sticky_header=True,
+        caption='FLOW playcall breakdown'
+      ) }}
+      <div class="hidden text-sm text-gray-500" data-no-matches>No matching playcalls.</div>
+    </div>
+  </section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/reports/playcall.js') }}" defer></script>
+{% endblock %}
+{# END Playcall Report #}

@@ -87,6 +87,9 @@ from services.reports.advanced_possession import (
     invalidate_adv_poss_practice,
 )
 # END Advanced Possession
+# BEGIN Playcall Report
+from services.reports.playcall import invalidate_playcall_report
+# END Playcall Report
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
 from admin._leaderboard_helpers import (
@@ -4189,6 +4192,9 @@ def delete_data(file_id):
             # BEGIN Advanced Possession
             invalidate_adv_poss_game(game.id)
             # END Advanced Possession
+            # BEGIN Playcall Report
+            invalidate_playcall_report(game.id)
+            # END Playcall Report
             TeamStats.query.filter_by(game_id=game.id).delete()
             PlayerStats.query.filter_by(game_id=game.id).delete()
             BlueCollarStats.query.filter_by(game_id=game.id).delete()

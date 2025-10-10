@@ -111,6 +111,14 @@ def create_app():
     # Allow up to 32 MB uploads (tune as needed)
     app.config.setdefault("MAX_CONTENT_LENGTH", 32 * 1024 * 1024)
 
+    # BEGIN Playcall Report
+    playcall_flag = os.environ.get("PLAYCALL_REPORT_ENABLED")
+    if playcall_flag is not None:
+        app.config["PLAYCALL_REPORT_ENABLED"] = playcall_flag.strip().lower() not in {"0", "false", "no"}
+    else:
+        app.config.setdefault("PLAYCALL_REPORT_ENABLED", True)
+    # END Playcall Report
+
     # --- Initialize Extensions ---
     db.init_app(app)
     ensure_saved_stat_profile_table(app)
@@ -231,6 +239,15 @@ def create_app():
         )
         db.session.add(pv)
         db.session.commit()
+
+    # BEGIN Playcall Report
+    @app.context_processor
+    def inject_feature_flags():
+        return {
+            "ADVANCED_POSSESSION_ENABLED": app.config.get("ADVANCED_POSSESSION_ENABLED", True),
+            "PLAYCALL_REPORT_ENABLED": app.config.get("PLAYCALL_REPORT_ENABLED", True),
+        }
+    # END Playcall Report
 
     # --- Public Home Route ---
     @app.route('/')
