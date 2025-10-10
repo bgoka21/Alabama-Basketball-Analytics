@@ -9,7 +9,7 @@
     <div
       id="cardATR"
       onclick="showShotTypeDetail('atr')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if atr_card_token %} {{ atr_card_token }}{% endif %}"
+      class="cursor-pointer p-4 rounded shadow-md transition border border-transparent{% if atr_card_token %} {{ atr_card_token }}{% else %} bg-white dark:bg-gray-800{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">ATR Season</div>
       <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.atr.fg_pct|round(1) }}%</div>
@@ -23,7 +23,7 @@
     <div
       id="cardFG2"
       onclick="showShotTypeDetail('fg2')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if fg2_card_token %} {{ fg2_card_token }}{% endif %}"
+      class="cursor-pointer p-4 rounded shadow-md transition border border-transparent{% if fg2_card_token %} {{ fg2_card_token }}{% else %} bg-white dark:bg-gray-800{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">2FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.fg2.fg_pct|round(1) }}%</div>
@@ -37,7 +37,7 @@
     <div
       id="cardFG3"
       onclick="showShotTypeDetail('fg3')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition{% if fg3_card_token %} {{ fg3_card_token }}{% endif %}"
+      class="cursor-pointer p-4 rounded shadow-md transition border border-transparent{% if fg3_card_token %} {{ fg3_card_token }}{% else %} bg-white dark:bg-gray-800{% endif %}"
     >
       <div class="text-sm font-medium text-black uppercase">3FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">{{ shot_type_totals.fg3.fg_pct|round(1) }}%</div>
