@@ -92,6 +92,10 @@ def create_app():
         os.makedirs(instance_path)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 
+    # BEGIN Playcall Report
+    app.config.setdefault("PLAYCALL_REPORT_ENABLED", True)
+    # END Playcall Report
+
     # Ingest directories for EYBL/AAU stats previews and snapshots
     ingest_previews = os.path.join(instance_path, 'ingest_previews')
     ingest_snapshots = os.path.join(instance_path, 'ingest_snapshots')

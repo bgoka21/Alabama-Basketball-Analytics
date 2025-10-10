@@ -19,6 +19,12 @@ import sqlite3
 from utils.lineup import compute_lineup_efficiencies
 from utils.shottype import persist_player_shot_details
 from models.database import db, Game, PlayerStats, Possession, TeamStats, BlueCollarStats, OpponentBlueCollarStats, PlayerPossession, Roster, ShotDetail
+# BEGIN Playcall Report
+from services.reports.playcall import (
+    build_playcall_report_from_frame,
+    store_playcall_report,
+)
+# END Playcall Report
 
 #print("🔥 parse_csv() function has started executing!")
 
@@ -1187,10 +1193,19 @@ def parse_csv(file_path, game_id, season_id):
         min_poss=10
     )
 
+    # BEGIN Playcall Report
+    playcall_report = {}
+    if app_instance.config.get("PLAYCALL_REPORT_ENABLED", True):
+        playcall_report = build_playcall_report_from_frame(df)
+        with app_instance.app_context():
+            store_playcall_report(game_id, playcall_report)
+    # END Playcall Report
+
     return {
       "offensive_breakdown": offensive_breakdown,
       "defensive_breakdown": defensive_breakdown,
-      "lineup_efficiencies": efficiencies
+      "lineup_efficiencies": efficiencies,
+      "playcall_report": playcall_report,
     }
 
 

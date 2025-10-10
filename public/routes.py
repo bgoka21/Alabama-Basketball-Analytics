@@ -1,6 +1,6 @@
 # basketball_analytics/public/routes.py
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
+from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort, current_app, make_response
 from flask_login import login_required, current_user
 from markupsafe import Markup
 from sqlalchemy import func, desc, and_, case
@@ -8,9 +8,17 @@ from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from datetime import date, timedelta
 from collections import defaultdict
+import csv
+import io
 import json
 from types import SimpleNamespace
+from typing import Any, Dict
 from stats_config import LEADERBOARD_STATS
+# BEGIN Playcall Report
+from services.reports.playcall import cache_get_or_compute_playcall_report
+
+FLOW_FAMILY_KEY = "FLOW"
+# END Playcall Report
 from admin.routes import (
     collect_practice_labels,
     compute_filtered_blue,
@@ -113,6 +121,129 @@ def _player_cell(name, can_link=True):
     return {'display': name, 'data_value': name}
 
 
+# BEGIN Playcall Report
+def _slugify_filename(text: str) -> str:
+    cleaned = ''.join(ch.lower() if ch.isalnum() else '_' for ch in text)
+    cleaned = cleaned.strip('_')
+    return cleaned or 'game'
+
+
+def _format_ppc(value: Any) -> str:
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return "0.00"
+
+
+def _playcall_csv_response(game: Game, payload: Dict[str, Any], family: str):
+    series = payload.get("series") or {}
+    requested = (family or "").strip()
+    if not requested:
+        abort(404)
+
+    family_key = None
+    for name in series.keys():
+        if str(name).lower() == requested.lower():
+            family_key = name
+            break
+    if family_key is None and requested.upper() == FLOW_FAMILY_KEY:
+        family_key = FLOW_FAMILY_KEY
+    if family_key is None:
+        abort(404)
+
+    if family_key == FLOW_FAMILY_KEY:
+        flow_payload = series.get(FLOW_FAMILY_KEY) or {}
+        plays = flow_payload.get("plays") or []
+        totals = (flow_payload.get("totals") or {}).get("in_flow", {})
+        headers = [
+            "PLAYCALL",
+            "RAN (IN FLOW)",
+            "IN FLOW PTS",
+            "IN FLOW CHANCES",
+            "IN FLOW PPC",
+        ]
+        rows = []
+        for entry in plays:
+            playcall = entry.get("playcall", "—")
+            inflow = entry.get("in_flow") or {}
+            rows.append([
+                playcall,
+                entry.get("ran_in_flow", 0),
+                inflow.get("pts", 0),
+                inflow.get("chances", 0),
+                _format_ppc(inflow.get("ppc")),
+            ])
+        total_row = [
+            "Totals",
+            sum(row[1] for row in rows),
+            totals.get("pts", 0),
+            totals.get("chances", 0),
+            _format_ppc(totals.get("ppc")),
+        ]
+    else:
+        family_payload = series.get(family_key)
+        if not isinstance(family_payload, dict):
+            abort(404)
+        plays = family_payload.get("plays") or {}
+        totals = family_payload.get("totals") or {}
+        headers = [
+            "PLAYCALL",
+            "RAN",
+            "OFF SET PTS",
+            "OFF SET CHANCES",
+            "OFF SET PPC",
+            "IN FLOW PTS",
+            "IN FLOW CHANCES",
+            "IN FLOW PPC",
+        ]
+        rows = []
+        for playcall, entry in plays.items():
+            off = entry.get("off_set") or {}
+            inflow = entry.get("in_flow") or {}
+            rows.append([
+                playcall,
+                entry.get("ran", 0),
+                off.get("pts", 0),
+                off.get("chances", 0),
+                _format_ppc(off.get("ppc")),
+                inflow.get("pts", 0),
+                inflow.get("chances", 0),
+                _format_ppc(inflow.get("ppc")),
+            ])
+        totals_off = totals.get("off_set") or {}
+        totals_in = totals.get("in_flow") or {}
+        total_row = [
+            "Totals",
+            sum(row[1] for row in rows),
+            totals_off.get("pts", 0),
+            totals_off.get("chances", 0),
+            _format_ppc(totals_off.get("ppc")),
+            totals_in.get("pts", 0),
+            totals_in.get("chances", 0),
+            _format_ppc(totals_in.get("ppc")),
+        ]
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow(row)
+    writer.writerow(total_row)
+    csv_data = buffer.getvalue()
+    buffer.close()
+
+    opponent = getattr(game, "opponent_name", "opponent") or "opponent"
+    slug = _slugify_filename(opponent)
+    family_slug = _slugify_filename(family_key)
+    filename = f"playcall_{family_slug}_{slug}_game{game.id}.csv"
+
+    response = make_response(csv_data)
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = f"attachment; filename=\"{filename}\""
+    return response
+# END Playcall Report
+
+
 # ───────────────────────────────────────────────
 #  Root → Login redirect
 # ───────────────────────────────────────────────
@@ -124,6 +255,91 @@ def root():
     if current_user.is_authenticated:
         return render_template("cover.html")
     return redirect(url_for("admin.login"))
+
+
+# BEGIN Playcall Report
+@public_bp.get("/api/reports/playcall")
+@login_required
+def api_playcall_report():
+    if not current_app.config.get("PLAYCALL_REPORT_ENABLED", True):
+        abort(404)
+
+    game_id = request.args.get("game_id", type=int)
+    if not game_id:
+        return jsonify({"error": "game_id required"}), 400
+
+    try:
+        data, meta = cache_get_or_compute_playcall_report(game_id)
+    except (FileNotFoundError, LookupError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 404
+
+    meta.setdefault("id", game_id)
+    return jsonify({"data": data, "meta": meta}), 200
+
+
+@public_bp.route("/reports/playcall", methods=["GET"])
+@login_required
+def playcall_report():
+    if not current_app.config.get("PLAYCALL_REPORT_ENABLED", True):
+        abort(404)
+
+    games = Game.query.order_by(Game.game_date.desc()).all()
+    selected_game_id = request.args.get("game_id", type=int)
+    if selected_game_id is None and games:
+        selected_game_id = games[0].id
+
+    selected_game = None
+    if selected_game_id is not None:
+        for game in games:
+            if game.id == selected_game_id:
+                selected_game = game
+                break
+        if selected_game is None:
+            selected_game = Game.query.get(selected_game_id)
+            if selected_game is None:
+                abort(404)
+            games.insert(0, selected_game)
+
+    report_data: Dict[str, Any] = {}
+    meta: Dict[str, Any] = {}
+    error_message: str | None = None
+
+    if selected_game is not None:
+        try:
+            report_data, meta = cache_get_or_compute_playcall_report(selected_game.id)
+        except (FileNotFoundError, LookupError, ValueError) as exc:
+            error_message = str(exc)
+            report_data = {}
+            meta = {}
+
+    if request.args.get("format") == "csv":
+        family_param = request.args.get("family", type=str)
+        if not selected_game or not family_param or not report_data:
+            abort(404)
+        return _playcall_csv_response(selected_game, report_data, family_param)
+
+    series_payload = report_data.get("series") if isinstance(report_data, dict) else {}
+    flow_payload = {}
+    series_options = []
+    if isinstance(series_payload, dict):
+        flow_payload = series_payload.get(FLOW_FAMILY_KEY) or {}
+        series_options = [name for name in series_payload.keys() if name != FLOW_FAMILY_KEY]
+
+    context = {
+        "games": games,
+        "selected_game": selected_game,
+        "series_options": series_options,
+        "report": report_data,
+        "flow_report": flow_payload,
+        "meta": meta,
+        "error_message": error_message,
+        "selected_series": request.args.getlist("series"),
+        "search_query": request.args.get("search", ""),
+        "FLOW_FAMILY_KEY": FLOW_FAMILY_KEY,
+    }
+
+    return render_template("reports/playcall.html", **context)
+# END Playcall Report
 
 
 # ───────────────────────────────────────────────

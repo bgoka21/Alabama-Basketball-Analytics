@@ -28,7 +28,9 @@
     </a>
   </li>
   {% endif %}
-  {% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports'] %}
+{# BEGIN Playcall Report #}
+{% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports', 'public.playcall_report'] %}
+{# END Playcall Report #}
   <li class="nav-item">
     <details class="group" {% if reports_active %}open{% endif %}>
       <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
@@ -37,6 +39,11 @@
       <div class="ml-4 mt-2 flex flex-col gap-2">
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.game_reports' %} active{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
+        {# BEGIN Playcall Report #}
+        {% if config.get('PLAYCALL_REPORT_ENABLED', True) and view_exists('public.playcall_report') %}
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'public.playcall_report' %} active{% endif %}" href="{{ url_for('public.playcall_report') }}">Playcall Report</a>
+        {% endif %}
+        {# END Playcall Report #}
       </div>
     </details>
   </li>

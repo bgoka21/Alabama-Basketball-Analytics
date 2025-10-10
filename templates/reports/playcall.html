@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block page_class %}playcall-report{% endblock %}
+
+{% block page_controls %}
+  <form id="playcall-report-form" class="space-y-4" method="get">
+    <div class="flex flex-col gap-4 md:flex-row md:items-end">
+      <div class="md:w-64">
+        <label for="playcall-game-select" class="block text-sm font-medium text-gray-700 dark:text-gray-200">Game</label>
+        <select id="playcall-game-select" name="game_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9E1B32] focus:ring-[#9E1B32]">
+          {% if games %}
+            {% for g in games %}
+              {% set is_selected = selected_game and g.id == selected_game.id %}
+              {% set game_label = (g.game_date.strftime('%b %d, %Y') if g.game_date else 'Game ' ~ g.id) %}
+              {% set opponent = g.opponent_name or 'Opponent' %}
+              <option value="{{ g.id }}" {% if is_selected %}selected{% endif %}>{{ game_label }} — {{ opponent }}</option>
+            {% endfor %}
+          {% else %}
+            <option value="">No games available</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="md:w-64">
+        <label for="series-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-200">Series</label>
+        <select id="series-filter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9E1B32] focus:ring-[#9E1B32]" multiple size="4">
+          {% for family in series_options %}
+            <option value="{{ family }}" {% if family in selected_series %}selected{% endif %}>{{ family }}</option>
+          {% endfor %}
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Use Ctrl/Cmd + click to select multiple series.</p>
+      </div>
+      <div class="md:flex-1">
+        <label for="playcall-search" class="block text-sm font-medium text-gray-700 dark:text-gray-200">Search Playcall</label>
+        <input type="search" id="playcall-search" value="{{ search_query }}" placeholder="Search by playcall name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9E1B32] focus:ring-[#9E1B32]" autocomplete="off">
+      </div>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-semibold text-[#9E1B32]">Playcall Report</h1>
+    {% if meta.updated_at %}
+      <span class="text-sm text-gray-500">Updated {{ meta.updated_at }}</span>
+    {% endif %}
+  </div>
+
+  {% if not selected_game %}
+    <div class="rounded border border-dashed border-gray-300 bg-white p-6 text-center text-gray-600">No games found. Upload a game file to view the report.</div>
+  {% else %}
+    {% if error_message %}
+      <div class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ error_message }}</div>
+    {% endif %}
+
+    {% if meta.total_chances_off_set is not none or meta.total_chances_in_flow is not none %}
+      <div class="mb-6 flex flex-wrap gap-4 text-sm text-gray-600">
+        <span class="font-medium">Off Set Chances: {{ meta.total_chances_off_set or 0 }}</span>
+        <span class="font-medium">In Flow Chances: {{ meta.total_chances_in_flow or 0 }}</span>
+        {% if meta.source %}
+          <span>Source: {{ meta.source|capitalize }}</span>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% set has_series = report.series if report and report.series %}
+    {% if not has_series %}
+      <div class="rounded border border-dashed border-gray-300 bg-white p-6 text-center text-gray-600">No playcall data available for this game.</div>
+    {% else %}
+      {% for family in series_options %}
+        {% set payload = report.series.get(family) %}
+        {% if not payload %}
+          {% continue %}
+        {% endif %}
+        <section class="mb-8" data-family-card="{{ family }}">
+          <div class="flex flex-col gap-3 rounded-t-lg bg-[#9E1B32] p-4 text-white shadow-md md:flex-row md:items-center md:justify-between">
+            <h2 class="text-xl font-semibold">{{ family }}</h2>
+            {% if selected_game %}
+              <div class="flex flex-wrap gap-2">
+                <a href="{{ url_for('public.playcall_report', game_id=selected_game.id, family=family, format='csv') }}" class="inline-flex items-center rounded-md border border-white/50 px-3 py-1 text-sm font-medium text-white hover:bg-white hover:text-[#9E1B32]">Download CSV</a>
+              </div>
+            {% endif %}
+          </div>
+          <div class="overflow-x-auto rounded-b-lg border border-t-0 border-gray-200 shadow-md">
+            <table class="min-w-full divide-y divide-gray-200" data-family-table>
+              <thead class="sticky top-0 z-10 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                <tr>
+                  <th scope="col" class="px-4 py-3 text-left" data-sortable="true">Playcall<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">Ran<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">Off Set Pts<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">Off Set Chances<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">Off Set PPC<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">In Flow Pts<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">In Flow Chances<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                  <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">In Flow PPC<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white">
+                {% for playcall, details in payload.plays.items() %}
+                  {% set off = details.off_set or {} %}
+                  {% set inflow = details.in_flow or {} %}
+                  {% set off_ppc = '{:.2f}'.format(off.ppc|default(0, true)) %}
+                  {% set inflow_ppc = '{:.2f}'.format(inflow.ppc|default(0, true)) %}
+                  <tr data-playcall="{{ playcall|lower }}">
+                    <td class="px-4 py-3 text-left text-sm font-medium text-gray-900 align-top">
+                      <div>{{ playcall }}</div>
+                      <dl class="mt-2 space-y-1 text-xs text-gray-600 md:hidden">
+                        <div class="flex justify-between"><dt class="font-semibold">Ran</dt><dd>{{ details.ran }}</dd></div>
+                        <div>
+                          <dt class="font-semibold">Off Set</dt>
+                          <dd>{{ off.pts or 0 }} pts · {{ off.chances or 0 }} chances · {{ off_ppc }}</dd>
+                        </div>
+                        <div>
+                          <dt class="font-semibold">In Flow</dt>
+                          <dd>{{ inflow.pts or 0 }} pts · {{ inflow.chances or 0 }} chances · {{ inflow_ppc }}</dd>
+                        </div>
+                      </dl>
+                    </td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ details.ran }}</td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ off.pts or 0 }}</td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ off.chances or 0 }}</td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ off_ppc }}</td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ inflow.pts or 0 }}</td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ inflow.chances or 0 }}</td>
+                    <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ inflow_ppc }}</td>
+                  </tr>
+                {% endfor %}
+                {% set totals_off = payload.totals.off_set or {} %}
+                {% set totals_in = payload.totals.in_flow or {} %}
+                <tr class="bg-gray-100 font-semibold text-gray-900" data-total-row="true">
+                  <td class="px-4 py-3 text-left text-sm align-top">
+                    Totals
+                    <dl class="mt-2 space-y-1 text-xs text-gray-600 md:hidden">
+                      <div class="flex justify-between"><dt class="font-semibold">Ran</dt><dd>{{ payload.totals.ran or 0 }}</dd></div>
+                      <div>
+                        <dt class="font-semibold">Off Set</dt>
+                        <dd>{{ totals_off.pts or 0 }} pts · {{ totals_off.chances or 0 }} chances · {{ '{:.2f}'.format(totals_off.ppc|default(0, true)) }}</dd>
+                      </div>
+                      <div>
+                        <dt class="font-semibold">In Flow</dt>
+                        <dd>{{ totals_in.pts or 0 }} pts · {{ totals_in.chances or 0 }} chances · {{ '{:.2f}'.format(totals_in.ppc|default(0, true)) }}</dd>
+                      </div>
+                    </dl>
+                  </td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ payload.totals.ran or 0 }}</td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ totals_off.pts or 0 }}</td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ totals_off.chances or 0 }}</td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ '{:.2f}'.format(totals_off.ppc|default(0, true)) }}</td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ totals_in.pts or 0 }}</td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ totals_in.chances or 0 }}</td>
+                  <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ '{:.2f}'.format(totals_in.ppc|default(0, true)) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="hidden rounded-b-lg border border-t-0 border-gray-200 bg-white p-4 text-sm text-gray-500" data-empty-message>
+            No playcalls match the current filters.
+          </div>
+        </section>
+      {% endfor %}
+    {% endif %}
+
+    {% set flow_payload = flow_report or {} %}
+    <section class="mb-12" data-flow-card>
+      <div class="flex flex-col gap-3 rounded-t-lg bg-[#9E1B32] p-4 text-white shadow-md md:flex-row md:items-center md:justify-between">
+        <h2 class="text-xl font-semibold">Flow Plays</h2>
+        {% if selected_game %}
+          <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('public.playcall_report', game_id=selected_game.id, family=FLOW_FAMILY_KEY, format='csv') }}" class="inline-flex items-center rounded-md border border-white/50 px-3 py-1 text-sm font-medium text-white hover:bg-white hover:text-[#9E1B32]">Download CSV</a>
+          </div>
+        {% endif %}
+      </div>
+      <div class="overflow-x-auto rounded-b-lg border border-t-0 border-gray-200 shadow-md">
+        <table class="min-w-full divide-y divide-gray-200" data-flow-table>
+          <thead class="sticky top-0 z-10 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+            <tr>
+              <th scope="col" class="px-4 py-3 text-left" data-sortable="true">Playcall<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+              <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">Ran (In Flow)<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+              <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">In Flow Pts<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+              <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">In Flow Chances<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+              <th scope="col" class="hidden px-4 py-3 text-right md:table-cell" data-sortable="true" data-sort-type="number">In Flow PPC<span class="sr-only sort-state">unsorted</span><span class="sort-caret opacity-0">▲</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            {% for entry in flow_payload.plays or [] %}
+              {% set inflow = entry.in_flow or {} %}
+              {% set inflow_ppc = '{:.2f}'.format(inflow.ppc|default(0, true)) %}
+              <tr data-playcall="{{ entry.playcall|default('—')|lower }}">
+                <td class="px-4 py-3 text-left text-sm font-medium text-gray-900 align-top">
+                  <div>{{ entry.playcall or '—' }}</div>
+                  <dl class="mt-2 space-y-1 text-xs text-gray-600 md:hidden">
+                    <div class="flex justify-between"><dt class="font-semibold">Ran (In Flow)</dt><dd>{{ entry.ran_in_flow or 0 }}</dd></div>
+                    <div>
+                      <dt class="font-semibold">In Flow</dt>
+                      <dd>{{ inflow.pts or 0 }} pts · {{ inflow.chances or 0 }} chances · {{ inflow_ppc }}</dd>
+                    </div>
+                  </dl>
+                </td>
+                <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ entry.ran_in_flow or 0 }}</td>
+                <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ inflow.pts or 0 }}</td>
+                <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ inflow.chances or 0 }}</td>
+                <td class="hidden px-4 py-3 text-right text-sm text-gray-700 md:table-cell">{{ inflow_ppc }}</td>
+              </tr>
+            {% endfor %}
+            {% set totals = flow_payload.totals.in_flow if flow_payload and flow_payload.totals else {} %}
+            <tr class="bg-gray-100 font-semibold text-gray-900" data-total-row="true">
+              <td class="px-4 py-3 text-left text-sm align-top">
+                Totals
+                <dl class="mt-2 space-y-1 text-xs text-gray-600 md:hidden">
+                  <div class="flex justify-between"><dt class="font-semibold">Ran (In Flow)</dt><dd>{{ flow_payload.totals.ran_in_flow or 0 }}</dd></div>
+                  <div>
+                    <dt class="font-semibold">In Flow</dt>
+                    <dd>{{ totals.pts or 0 }} pts · {{ totals.chances or 0 }} chances · {{ '{:.2f}'.format(totals.ppc|default(0, true)) }}</dd>
+                  </div>
+                </dl>
+              </td>
+              <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ flow_payload.totals.ran_in_flow or 0 }}</td>
+              <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ totals.pts or 0 }}</td>
+              <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ totals.chances or 0 }}</td>
+              <td class="hidden px-4 py-3 text-right text-sm md:table-cell">{{ '{:.2f}'.format(totals.ppc|default(0, true)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hidden rounded-b-lg border border-t-0 border-gray-200 bg-white p-4 text-sm text-gray-500" data-empty-message>
+        No flow plays match the current filters.
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>const FLOW_FAMILY_KEY = '{{ FLOW_FAMILY_KEY }}';</script>
+  <script src="{{ url_for('static', filename='js/reports/playcall.js') }}" defer></script>
+{% endblock %}

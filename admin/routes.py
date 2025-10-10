@@ -111,6 +111,9 @@ from services.eybl_ingest import (
     auto_match_to_recruits,
     promote_verified_stats,
 )
+# BEGIN Playcall Report
+from services.reports.playcall import invalidate_playcall_report_cache
+# END Playcall Report
 from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 
 try:  # Optional CSRF protection – not every deployment wires this up
@@ -4182,6 +4185,9 @@ def delete_data(file_id):
             if poss_ids:
                 PlayerPossession.query.filter(PlayerPossession.possession_id.in_(poss_ids)).delete(synchronize_session=False)
             Possession.query.filter_by(game_id=game.id).delete()
+            # BEGIN Playcall Report
+            invalidate_playcall_report_cache(game.id)
+            # END Playcall Report
             db.session.delete(game)
 
     # Remove the upload record
