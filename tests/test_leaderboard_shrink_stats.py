@@ -4,6 +4,8 @@ import pytest
 from flask import Flask
 
 from admin.routes import compute_leaderboard
+from admin._leaderboard_helpers import build_leaderboard_table
+from markupsafe import Markup
 from models.database import db, Season, PlayerStats, Roster
 from utils.shottype import persist_player_shot_details
 
@@ -131,3 +133,52 @@ def test_unlabeled_three_is_excluded_from_non_shrink_totals(app):
 
     assert row[2] == 5  # total attempts include unlabeled 3FG
     assert row[9] == 2  # only explicitly tagged Non-Shrink attempts are counted
+
+
+def test_build_leaderboard_table_shrink_cells_are_styled(app):
+    with app.app_context():
+        cfg, rows, totals = compute_leaderboard("fg3_fg_pct", season_id=1)
+        if totals is None:
+            total_makes = sum(r[1] for r in rows)
+            total_attempts = sum(r[2] for r in rows)
+            shrink_makes = sum(r[5] for r in rows)
+            shrink_attempts = sum(r[6] for r in rows)
+            non_shrink_makes = sum(r[8] for r in rows)
+            non_shrink_attempts = sum(r[9] for r in rows)
+
+            def pct(makes: float, attempts: float) -> float:
+                return (makes / attempts * 100.0) if attempts else 0.0
+
+            totals = {
+                "fg3_fg_pct": pct(total_makes, total_attempts),
+                "fg3_makes": total_makes,
+                "fg3_attempts": total_attempts,
+                "fg3_freq_pct": sum(r[4] for r in rows),
+                "fg3_shrink_makes": shrink_makes,
+                "fg3_shrink_att": shrink_attempts,
+                "fg3_shrink_pct": pct(shrink_makes, shrink_attempts),
+                "fg3_nonshrink_makes": non_shrink_makes,
+                "fg3_nonshrink_att": non_shrink_attempts,
+                "fg3_nonshrink_pct": pct(non_shrink_makes, non_shrink_attempts),
+            }
+
+        table = build_leaderboard_table(config=cfg, rows=rows, team_totals=totals)
+
+    player_row = next(entry for entry in table["rows"] if entry["player"] == "Test Player")
+
+    for slug in ("shrink_3fg_pct", "non_shrink_3fg_pct"):
+        cell = player_row[slug]
+        assert isinstance(cell, Markup)
+        rendered = str(cell)
+        assert "percent-box" in rendered
+        assert "grade-token" in rendered
+        assert "shrink-3fg--" in rendered
+
+    totals_entry = table["totals"]
+    assert totals_entry is not None
+    totals_cell = totals_entry["shrink_3fg_pct"]
+    assert isinstance(totals_cell, Markup)
+    totals_rendered = str(totals_cell)
+    assert "percent-box" in totals_rendered
+    assert "grade-token" in totals_rendered
+    assert "shrink-3fg--" in totals_rendered
