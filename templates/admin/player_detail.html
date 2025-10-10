@@ -408,12 +408,12 @@
   <!-- Season Aggregates as big cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <!-- ATR Season -->
+    {% set atr_grade_token = shot_type_totals.atr.fg_pct
+          |grade_atr2fg_pct(shot_type_totals.atr.attempts) %}
     <div
       id="cardATR"
       onclick="showShotTypeDetail('atr')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.atr.fg_pct
-                |grade_atr2fg_pct(shot_type_totals.atr.attempts) }}"
+      class="cursor-pointer p-4 rounded shadow-md transition{{ atr_grade_token or ' bg-white dark:bg-gray-800' }}"
     >
       <div class="text-sm font-medium text-black uppercase">ATR Season</div>
       <div class="text-2xl font-bold mt-2 text-black">
@@ -427,12 +427,12 @@
     </div>
 
     <!-- 2FG Season -->
+    {% set fg2_grade_token = shot_type_totals.fg2.fg_pct
+          |grade_atr2fg_pct(shot_type_totals.fg2.attempts) %}
     <div
       id="cardFG2"
       onclick="showShotTypeDetail('fg2')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.fg2.fg_pct
-                |grade_atr2fg_pct(shot_type_totals.fg2.attempts) }}"
+      class="cursor-pointer p-4 rounded shadow-md transition{{ fg2_grade_token or ' bg-white dark:bg-gray-800' }}"
     >
       <div class="text-sm font-medium text-black uppercase">2FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">
@@ -446,12 +446,12 @@
     </div>
 
     <!-- 3FG Season -->
+    {% set fg3_grade_token = shot_type_totals.fg3.fg_pct
+          |grade_3fg_pct(shot_type_totals.fg3.attempts) %}
     <div
       id="cardFG3"
       onclick="showShotTypeDetail('fg3')"
-      class="cursor-pointer bg-white dark:bg-gray-800 p-4 rounded shadow-md transition"
-      style="{{ shot_type_totals.fg3.fg_pct
-                |grade_3fg_pct(shot_type_totals.fg3.attempts) }}"
+      class="cursor-pointer p-4 rounded shadow-md transition{{ fg3_grade_token or ' bg-white dark:bg-gray-800' }}"
     >
       <div class="text-sm font-medium text-black uppercase">3FG Season</div>
       <div class="text-2xl font-bold mt-2 text-black">
@@ -848,14 +848,13 @@ function showShotTypeDetail(detail) {
   const map = { atr:'ATR', fg2:'FG2', fg3:'FG3' };
   Object.entries(map).forEach(([type,suf]) => {
     const card = document.getElementById('card' + suf);
+    if (!card) return;
     if (type === detail) {
-      card.classList.replace('bg-white','bg-gray-100');
-      card.classList.replace('dark:bg-gray-800','dark:bg-gray-700');
-      card.classList.replace('shadow-md','shadow-inner');
+      card.classList.remove('shadow-md');
+      card.classList.add('ring-2', 'ring-[#9E1B32]', 'shadow-lg');
     } else {
-      card.classList.replace('bg-gray-100','bg-white');
-      card.classList.replace('dark:bg-gray-700','dark:bg-gray-800');
-      card.classList.replace('shadow-inner','shadow-md');
+      card.classList.remove('ring-2', 'ring-[#9E1B32]', 'shadow-lg');
+      card.classList.add('shadow-md');
     }
   });
 }
