@@ -99,13 +99,11 @@ function showShotTypeDetail(detail) {
     const card = document.getElementById('card' + suf);
     if (!card) return;
     if (type === detail) {
-      card.classList.replace('bg-white','bg-gray-100');
-      card.classList.replace('dark:bg-gray-800','dark:bg-gray-700');
-      card.classList.replace('shadow-md','shadow-inner');
+      card.classList.add('ring-2','ring-offset-2','ring-[#9E1B32]','border-[#9E1B32]','shadow-lg');
+      card.classList.remove('border-transparent','shadow-md');
     } else {
-      card.classList.replace('bg-gray-100','bg-white');
-      card.classList.replace('dark:bg-gray-700','dark:bg-gray-800');
-      card.classList.replace('shadow-inner','shadow-md');
+      card.classList.remove('ring-2','ring-offset-2','ring-[#9E1B32]','border-[#9E1B32]','shadow-lg');
+      card.classList.add('border-transparent','shadow-md');
     }
   });
 }
