@@ -2,7 +2,7 @@ import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Dict
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -7678,6 +7678,127 @@ def leaderboard_pnr_grade():
         page_title='PnR – Grade',
         compute_fn=compute_pnr_grade,
         stat_key='pnr_grade',
+    )
+
+
+@admin_bp.route('/leaderboard/game')
+@login_required
+def leaderboard_game():
+    all_seasons = Season.query.order_by(Season.start_date.desc()).all()
+    selected_season = request.args.get('season', type=int)
+    if not selected_season and all_seasons:
+        selected_season = all_seasons[0].id
+
+    start_date_arg = request.args.get('start_date', '')
+    end_date_arg = request.args.get('end_date', '')
+
+    start_date = None
+    if start_date_arg:
+        try:
+            start_date = date.fromisoformat(start_date_arg)
+        except ValueError:
+            start_date_arg = ''
+
+    end_date = None
+    if end_date_arg:
+        try:
+            end_date = date.fromisoformat(end_date_arg)
+        except ValueError:
+            end_date_arg = ''
+
+    def _empty_table(slug: str) -> Dict[str, Any]:
+        return {
+            'id': f'game-leaderboard-{slug}',
+            'columns': [],
+            'rows': [],
+            'totals': None,
+            'default_sort': None,
+        }
+
+    leaderboard_groups = [
+        {
+            'title': 'Offense',
+            'items': [
+                {
+                    'label': '3FG (Shrinks)',
+                    'slug': 'offense-3fg-shrinks',
+                    'table': _empty_table('offense-3fg-shrinks'),
+                },
+                {
+                    'label': 'ATR Finishing',
+                    'slug': 'offense-atr-finishing',
+                    'table': _empty_table('offense-atr-finishing'),
+                },
+            ],
+        },
+        {
+            'title': 'Rebounding',
+            'items': [
+                {
+                    'label': 'Offensive Rebounding',
+                    'slug': 'rebounding-offensive',
+                    'table': _empty_table('rebounding-offensive'),
+                },
+                {
+                    'label': 'Defensive Rebounding',
+                    'slug': 'rebounding-defensive',
+                    'table': _empty_table('rebounding-defensive'),
+                },
+            ],
+        },
+        {
+            'title': 'Defense',
+            'items': [
+                {
+                    'label': 'Collisions',
+                    'slug': 'defense-collisions',
+                    'table': _empty_table('defense-collisions'),
+                },
+                {
+                    'label': 'Pass Contest',
+                    'slug': 'defense-pass-contest',
+                    'table': _empty_table('defense-pass-contest'),
+                },
+                {
+                    'label': 'Overall Gap Help',
+                    'slug': 'defense-overall-gap-help',
+                    'table': _empty_table('defense-overall-gap-help'),
+                },
+                {
+                    'label': 'Overall Low Man',
+                    'slug': 'defense-overall-low-man',
+                    'table': _empty_table('defense-overall-low-man'),
+                },
+            ],
+        },
+        {
+            'title': 'PnR Grade',
+            'items': [
+                {
+                    'label': 'PnR Grade',
+                    'slug': 'pnr-grade',
+                    'table': _empty_table('pnr-grade'),
+                },
+            ],
+        },
+    ]
+
+    start_date_value = start_date.isoformat() if start_date else ''
+    if not start_date and start_date_arg:
+        start_date_value = start_date_arg
+
+    end_date_value = end_date.isoformat() if end_date else ''
+    if not end_date and end_date_arg:
+        end_date_value = end_date_arg
+
+    return render_template(
+        'admin/game_leaderboard.html',
+        all_seasons=all_seasons,
+        selected_season=selected_season,
+        start_date=start_date_value,
+        end_date=end_date_value,
+        leaderboard_groups=leaderboard_groups,
+        active_page='leaderboard',
     )
 
 
