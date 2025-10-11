@@ -79,10 +79,20 @@
       Team Totals
     </a>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.leaderboard' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.leaderboard') }}">
-      Leaderboard
-    </a>
+  {% set leaderboard_endpoints = ['admin.leaderboard', 'admin.leaderboard_game'] %}
+  {% set leaderboards_active = request.endpoint in leaderboard_endpoints %}
+  <li class="nav-item">
+    <details class="group" {% if leaderboards_active %}open{% endif %}>
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
+        Leaderboards
+      </summary>
+      <div class="ml-4 mt-2 flex flex-col gap-2">
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.leaderboard' %} active{% endif %}"
+           href="{{ url_for('admin.leaderboard') }}">Practice Leaderboard</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.leaderboard_game' %} active{% endif %}"
+           href="{{ url_for('admin.leaderboard_game') }}">Game Leaderboard</a>
+      </div>
+    </details>
   </li>
   {% set summer_url = url_for('public.summer_stats') if view_exists('public.summer_stats') else '#' %}
   <li class="nav-item{% if request.endpoint == 'public.summer_stats' %} active{% endif %}">
