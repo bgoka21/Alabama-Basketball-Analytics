@@ -50,8 +50,9 @@
       </summary>
       <div class="border-t border-gray-200 px-6 py-6 space-y-6">
         {% for item in group.items %}
+          {% set note = item.note_date.strftime('%b %d, %Y') if item.note_date else None %}
           <div id="{{ item.slug }}" class="space-y-4">
-            {{ render_dual_section(item.label, item.table, None, 'No stats for the most recent game.') }}
+            {{ render_dual_section(item.label, item.table, note, 'No stats for the most recent game.') }}
           </div>
         {% endfor %}
       </div>

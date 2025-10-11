@@ -120,6 +120,28 @@ from services.eybl_ingest import (
     auto_match_to_recruits,
     promote_verified_stats,
 )
+from services.leaderboard_game import (
+    LeaderboardSlice,
+    fetch_atr_finishing,
+    fetch_atr_finishing_last_game,
+    fetch_collisions,
+    fetch_collisions_last_game,
+    fetch_dreb,
+    fetch_dreb_last_game,
+    fetch_gap_help,
+    fetch_gap_help_last_game,
+    fetch_low_man,
+    fetch_low_man_last_game,
+    fetch_offense_shrinks,
+    fetch_offense_shrinks_last_game,
+    fetch_oreb,
+    fetch_oreb_last_game,
+    fetch_pass_contest,
+    fetch_pass_contest_last_game,
+    fetch_pnr_grade,
+    fetch_pnr_grade_last_game,
+    get_season_window,
+)
 from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 
 try:  # Optional CSRF protection – not every deployment wires this up
@@ -7685,6 +7707,7 @@ def leaderboard_pnr_grade():
 @login_required
 def leaderboard_game():
     all_seasons = Season.query.order_by(Season.start_date.desc()).all()
+    season_list = all_seasons
     selected_season = request.args.get('season', type=int)
     if not selected_season and all_seasons:
         selected_season = all_seasons[0].id
@@ -7706,14 +7729,282 @@ def leaderboard_game():
         except ValueError:
             end_date_arg = ''
 
-    def _empty_table(slug: str) -> Dict[str, Any]:
-        return {
-            'id': f'game-leaderboard-{slug}',
-            'columns': [],
-            'rows': [],
-            'totals': None,
-            'default_sort': None,
-        }
+    def _empty_slice() -> LeaderboardSlice:
+        return LeaderboardSlice(rows=[], totals=None, note_date=None)
+
+    def _build_tables(season_id: int, window_start: Optional[date], window_end: Optional[date]):
+        if not season_id:
+            return _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice()
+
+        shrinks_season = fetch_offense_shrinks(season_id, window_start, window_end)
+        shrinks_last = fetch_offense_shrinks_last_game(season_id, window_start, window_end)
+        atr_season = fetch_atr_finishing(season_id, window_start, window_end)
+        atr_last = fetch_atr_finishing_last_game(season_id, window_start, window_end)
+        oreb_season = fetch_oreb(season_id, window_start, window_end)
+        oreb_last = fetch_oreb_last_game(season_id, window_start, window_end)
+        dreb_season = fetch_dreb(season_id, window_start, window_end)
+        dreb_last = fetch_dreb_last_game(season_id, window_start, window_end)
+        collision_season = fetch_collisions(season_id, window_start, window_end)
+        collision_last = fetch_collisions_last_game(season_id, window_start, window_end)
+        pass_season = fetch_pass_contest(season_id, window_start, window_end)
+        pass_last = fetch_pass_contest_last_game(season_id, window_start, window_end)
+        gap_season = fetch_gap_help(season_id, window_start, window_end)
+        gap_last = fetch_gap_help_last_game(season_id, window_start, window_end)
+        low_season = fetch_low_man(season_id, window_start, window_end)
+        low_last = fetch_low_man_last_game(season_id, window_start, window_end)
+        pnr_season = fetch_pnr_grade(season_id, window_start, window_end)
+        pnr_last = fetch_pnr_grade_last_game(season_id, window_start, window_end)
+
+        return (
+            shrinks_season,
+            shrinks_last,
+            atr_season,
+            atr_last,
+            oreb_season,
+            oreb_last,
+            dreb_season,
+            dreb_last,
+            collision_season,
+            collision_last,
+            pass_season,
+            pass_last,
+            gap_season,
+            gap_last,
+            low_season,
+            low_last,
+            pnr_season,
+            pnr_last,
+        )
+
+    if selected_season:
+        window_start, window_end = get_season_window(selected_season, start_date, end_date)
+    else:
+        window_start, window_end = (start_date, end_date)
+
+    slices = _build_tables(selected_season, window_start, window_end)
+    (
+        shrinks_season,
+        shrinks_last,
+        atr_season,
+        atr_last,
+        oreb_season,
+        oreb_last,
+        dreb_season,
+        dreb_last,
+        collision_season,
+        collision_last,
+        pass_season,
+        pass_last,
+        gap_season,
+        gap_last,
+        low_season,
+        low_last,
+        pnr_season,
+        pnr_last,
+    ) = slices
+
+    def _build_table(
+        *,
+        base_columns: Sequence[str],
+        column_map: Dict[str, Sequence[str]],
+        pct_columns: Sequence[str],
+        table_id: str,
+        default_sort: Sequence[Any],
+        season_slice: LeaderboardSlice,
+        last_slice: LeaderboardSlice,
+    ) -> Dict[str, Any]:
+        return build_dual_table(
+            base_columns=base_columns,
+            season_rows=season_slice.rows,
+            last_rows=last_slice.rows,
+            season_totals=season_slice.totals,
+            last_totals=last_slice.totals,
+            column_map=column_map,
+            pct_columns=pct_columns,
+            left_label='Season Totals',
+            right_label='Last Game',
+            totals_label='Team Totals',
+            table_id=table_id,
+            default_sort=list(default_sort),
+        )
+
+    offense_shrink_columns = [
+        'Games',
+        '3FG Att',
+        '3FG Makes',
+        '3FG %',
+        'Shrink Att',
+        'Shrink Makes',
+        'Shrink %',
+        'Non-Shrink Att',
+        'Non-Shrink Makes',
+        'Non-Shrink %',
+    ]
+    offense_shrink_map = {
+        'Games': ('games',),
+        '3FG Att': ('fg3_att',),
+        '3FG Makes': ('fg3_make',),
+        '3FG %': ('fg3_pct',),
+        'Shrink Att': ('fg3_shrink_att',),
+        'Shrink Makes': ('fg3_shrink_make',),
+        'Shrink %': ('fg3_shrink_pct',),
+        'Non-Shrink Att': ('fg3_nonshrink_att',),
+        'Non-Shrink Makes': ('fg3_nonshrink_make',),
+        'Non-Shrink %': ('fg3_nonshrink_pct',),
+    }
+    offense_shrink_table = _build_table(
+        base_columns=offense_shrink_columns,
+        column_map=offense_shrink_map,
+        pct_columns=['3FG %', 'Shrink %', 'Non-Shrink %'],
+        table_id='game-leaderboard-offense-3fg-shrinks',
+        default_sort=['fg3_shrink_pct', 'fg3_shrink_att', 'fg3_shrink_make', 'player'],
+        season_slice=shrinks_season,
+        last_slice=shrinks_last,
+    )
+
+    atr_columns = ['Games', 'ATR Att', 'ATR Makes', 'ATR %', 'And-1']
+    atr_map = {
+        'Games': ('games',),
+        'ATR Att': ('atr_att',),
+        'ATR Makes': ('atr_make',),
+        'ATR %': ('atr_pct',),
+        'And-1': ('atr_and1',),
+    }
+    atr_table = _build_table(
+        base_columns=atr_columns,
+        column_map=atr_map,
+        pct_columns=['ATR %'],
+        table_id='game-leaderboard-offense-atr-finishing',
+        default_sort=['atr_pct', 'atr_att', 'atr_make', 'player'],
+        season_slice=atr_season,
+        last_slice=atr_last,
+    )
+
+    oreb_columns = ['Games', 'Crash +', 'Crash Opps', 'Crash %', 'Back Man +', 'Back Man Opps', 'Back Man %']
+    oreb_map = {
+        'Games': ('games',),
+        'Crash +': ('crash_plus',),
+        'Crash Opps': ('crash_opps',),
+        'Crash %': ('crash_pct',),
+        'Back Man +': ('back_plus',),
+        'Back Man Opps': ('back_opps',),
+        'Back Man %': ('back_pct',),
+    }
+    oreb_table = _build_table(
+        base_columns=oreb_columns,
+        column_map=oreb_map,
+        pct_columns=['Crash %', 'Back Man %'],
+        table_id='game-leaderboard-rebounding-offensive',
+        default_sort=['crash_pct', 'crash_opps', 'crash_plus', 'player'],
+        season_slice=oreb_season,
+        last_slice=oreb_last,
+    )
+
+    dreb_columns = ['Games', 'Box Out +', 'Box Out Opps', 'Box Out %', "Off Reb's Given Up"]
+    dreb_map = {
+        'Games': ('games',),
+        'Box Out +': ('box_plus',),
+        'Box Out Opps': ('box_opps',),
+        'Box Out %': ('box_pct',),
+        "Off Reb's Given Up": ('off_reb_given_up',),
+    }
+    dreb_table = _build_table(
+        base_columns=dreb_columns,
+        column_map=dreb_map,
+        pct_columns=['Box Out %'],
+        table_id='game-leaderboard-rebounding-defensive',
+        default_sort=['box_pct', 'box_opps', 'box_plus', 'player'],
+        season_slice=dreb_season,
+        last_slice=dreb_last,
+    )
+
+    collision_columns = ['Games', 'Gap +', 'Gap Opps', 'Gap %']
+    collision_map = {
+        'Games': ('games',),
+        'Gap +': ('gap_plus',),
+        'Gap Opps': ('gap_opps',),
+        'Gap %': ('gap_pct',),
+    }
+    collision_table = _build_table(
+        base_columns=collision_columns,
+        column_map=collision_map,
+        pct_columns=['Gap %'],
+        table_id='game-leaderboard-defense-collisions',
+        default_sort=['gap_pct', 'gap_opps', 'gap_plus', 'player'],
+        season_slice=collision_season,
+        last_slice=collision_last,
+    )
+
+    pass_columns = ['Games', 'Contest +', 'Contest Opps', 'Contest %']
+    pass_map = {
+        'Games': ('games',),
+        'Contest +': ('contest_plus',),
+        'Contest Opps': ('contest_opps',),
+        'Contest %': ('contest_pct',),
+    }
+    pass_table = _build_table(
+        base_columns=pass_columns,
+        column_map=pass_map,
+        pct_columns=['Contest %'],
+        table_id='game-leaderboard-defense-pass-contest',
+        default_sort=['contest_pct', 'contest_opps', 'contest_plus', 'player'],
+        season_slice=pass_season,
+        last_slice=pass_last,
+    )
+
+    gap_columns = ['Games', 'Gap +', 'Gap Opps', 'Gap %']
+    gap_map = {
+        'Games': ('games',),
+        'Gap +': ('gap_plus',),
+        'Gap Opps': ('gap_opps',),
+        'Gap %': ('gap_pct',),
+    }
+    gap_table = _build_table(
+        base_columns=gap_columns,
+        column_map=gap_map,
+        pct_columns=['Gap %'],
+        table_id='game-leaderboard-defense-gap',
+        default_sort=['gap_pct', 'gap_opps', 'gap_plus', 'player'],
+        season_slice=gap_season,
+        last_slice=gap_last,
+    )
+
+    low_columns = ['Games', 'Low Man +', 'Low Man Opps', 'Low Man %']
+    low_map = {
+        'Games': ('games',),
+        'Low Man +': ('low_plus',),
+        'Low Man Opps': ('low_opps',),
+        'Low Man %': ('low_pct',),
+    }
+    low_table = _build_table(
+        base_columns=low_columns,
+        column_map=low_map,
+        pct_columns=['Low Man %'],
+        table_id='game-leaderboard-defense-low-man',
+        default_sort=['low_pct', 'low_opps', 'low_plus', 'player'],
+        season_slice=low_season,
+        last_slice=low_last,
+    )
+
+    pnr_columns = ['Games', 'Close Window +', 'Close Window Opps', 'Close Window %', 'Shut Door +', 'Shut Door Opps', 'Shut Door %']
+    pnr_map = {
+        'Games': ('games',),
+        'Close Window +': ('close_plus',),
+        'Close Window Opps': ('close_opps',),
+        'Close Window %': ('close_pct',),
+        'Shut Door +': ('shut_plus',),
+        'Shut Door Opps': ('shut_opps',),
+        'Shut Door %': ('shut_pct',),
+    }
+    pnr_table = _build_table(
+        base_columns=pnr_columns,
+        column_map=pnr_map,
+        pct_columns=['Close Window %', 'Shut Door %'],
+        table_id='game-leaderboard-pnr-grade',
+        default_sort=['close_pct', 'close_opps', 'close_plus', 'player'],
+        season_slice=pnr_season,
+        last_slice=pnr_last,
+    )
 
     leaderboard_groups = [
         {
@@ -7722,12 +8013,14 @@ def leaderboard_game():
                 {
                     'label': '3FG (Shrinks)',
                     'slug': 'offense-3fg-shrinks',
-                    'table': _empty_table('offense-3fg-shrinks'),
+                    'table': offense_shrink_table,
+                    'note_date': shrinks_last.note_date,
                 },
                 {
                     'label': 'ATR Finishing',
                     'slug': 'offense-atr-finishing',
-                    'table': _empty_table('offense-atr-finishing'),
+                    'table': atr_table,
+                    'note_date': atr_last.note_date,
                 },
             ],
         },
@@ -7737,12 +8030,14 @@ def leaderboard_game():
                 {
                     'label': 'Offensive Rebounding',
                     'slug': 'rebounding-offensive',
-                    'table': _empty_table('rebounding-offensive'),
+                    'table': oreb_table,
+                    'note_date': oreb_last.note_date,
                 },
                 {
                     'label': 'Defensive Rebounding',
                     'slug': 'rebounding-defensive',
-                    'table': _empty_table('rebounding-defensive'),
+                    'table': dreb_table,
+                    'note_date': dreb_last.note_date,
                 },
             ],
         },
@@ -7752,22 +8047,26 @@ def leaderboard_game():
                 {
                     'label': 'Collisions',
                     'slug': 'defense-collisions',
-                    'table': _empty_table('defense-collisions'),
+                    'table': collision_table,
+                    'note_date': collision_last.note_date,
                 },
                 {
                     'label': 'Pass Contest',
                     'slug': 'defense-pass-contest',
-                    'table': _empty_table('defense-pass-contest'),
+                    'table': pass_table,
+                    'note_date': pass_last.note_date,
                 },
                 {
                     'label': 'Overall Gap Help',
                     'slug': 'defense-overall-gap-help',
-                    'table': _empty_table('defense-overall-gap-help'),
+                    'table': gap_table,
+                    'note_date': gap_last.note_date,
                 },
                 {
                     'label': 'Overall Low Man',
                     'slug': 'defense-overall-low-man',
-                    'table': _empty_table('defense-overall-low-man'),
+                    'table': low_table,
+                    'note_date': low_last.note_date,
                 },
             ],
         },
@@ -7777,7 +8076,8 @@ def leaderboard_game():
                 {
                     'label': 'PnR Grade',
                     'slug': 'pnr-grade',
-                    'table': _empty_table('pnr-grade'),
+                    'table': pnr_table,
+                    'note_date': pnr_last.note_date,
                 },
             ],
         },
@@ -7794,6 +8094,7 @@ def leaderboard_game():
     return render_template(
         'admin/game_leaderboard.html',
         all_seasons=all_seasons,
+        season_list=season_list,
         selected_season=selected_season,
         start_date=start_date_value,
         end_date=end_date_value,
