@@ -9,6 +9,14 @@
   {% set explicit_id = table.id if table.id is defined else None %}
   {% set table_id = explicit_id or title|lower|replace(' ', '-')|replace('—', '-')|replace('–', '-')|replace("'", '') %}
   {% set has_content = rows|length or totals %}
+  {% set sr_groups = [] %}
+  {% for col in columns if col.group is defined and col.group %}
+    {% if col.group not in sr_groups %}
+      {% set sr_groups = sr_groups + [col.group] %}
+    {% endif %}
+  {% endfor %}
+  {% set sr_left = sr_groups[0] if sr_groups|length > 0 else 'Season Totals' %}
+  {% set sr_right = sr_groups[1] if sr_groups|length > 1 else 'Last Practice' %}
   <section class="space-y-3">
     <div class="flex items-baseline justify-between">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h3>
@@ -16,6 +24,12 @@
     </div>
     <span class="sr-only">{{ title }} — Practice Totals</span>
     <span class="sr-only">{{ title }} — Last Practice</span>
+    {% if sr_left not in ['Practice Totals', 'Last Practice'] %}
+      <span class="sr-only">{{ title }} — {{ sr_left }}</span>
+    {% endif %}
+    {% if sr_right not in ['Practice Totals', 'Last Practice', sr_left] %}
+      <span class="sr-only">{{ title }} — {{ sr_right }}</span>
+    {% endif %}
     {% if has_content %}
       {{ render_table(
         id=table_id,

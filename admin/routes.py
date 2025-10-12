@@ -105,6 +105,16 @@ from admin._leaderboard_helpers import (
     build_pnr_gap_help_context,
     with_last_practice,
 )
+from admin.game_leaderboard_config import (
+    columns_for as game_columns_for,
+    column_map_for as game_column_map_for,
+    pct_columns_for as game_pct_columns_for,
+    table_id_for as game_table_id_for,
+    sort_default_for as game_sort_default_for,
+    percent_specs_for as game_percent_specs_for,
+    helptext_for as game_helptext_for,
+    guards_for as game_guards_for,
+)
 from utils.session_helpers import get_player_stats_for_date_range
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
@@ -1916,6 +1926,14 @@ admin_bp.add_app_template_filter(combine_dual_rows, name="combine_dual_rows")
 admin_bp.add_app_template_filter(combine_dual_totals, name="combine_dual_totals")
 admin_bp.add_app_template_global(build_dual_table, name="build_dual_table")
 admin_bp.add_app_template_global(build_leaderboard_table, name="build_leaderboard_table")
+admin_bp.add_app_template_global(game_columns_for, name="columns_for")
+admin_bp.add_app_template_global(game_column_map_for, name="column_map_for")
+admin_bp.add_app_template_global(game_pct_columns_for, name="pct_columns_for")
+admin_bp.add_app_template_global(game_table_id_for, name="table_id_for")
+admin_bp.add_app_template_global(game_sort_default_for, name="sort_default_for")
+admin_bp.add_app_template_global(game_percent_specs_for, name="percent_specs_for")
+admin_bp.add_app_template_global(game_helptext_for, name="helptext_for")
+admin_bp.add_app_template_global(game_guards_for, name="guards_for")
 
 
 def _coerce_player_id(value):
@@ -7803,282 +7821,56 @@ def leaderboard_game():
         pnr_last,
     ) = slices
 
-    def _build_table(
-        *,
-        base_columns: Sequence[str],
-        column_map: Dict[str, Sequence[str]],
-        pct_columns: Sequence[str],
-        table_id: str,
-        default_sort: Sequence[Any],
+    def _format_note(value: Optional[date]) -> Optional[str]:
+        if not value:
+            return None
+        return value.strftime('%b %d, %Y')
+
+    def _group_item(
+        key: str,
+        label: str,
         season_slice: LeaderboardSlice,
         last_slice: LeaderboardSlice,
     ) -> Dict[str, Any]:
-        return build_dual_table(
-            base_columns=base_columns,
-            season_rows=season_slice.rows,
-            last_rows=last_slice.rows,
-            season_totals=season_slice.totals,
-            last_totals=last_slice.totals,
-            column_map=column_map,
-            pct_columns=pct_columns,
-            left_label='Season Totals',
-            right_label='Last Game',
-            totals_label='Team Totals',
-            table_id=table_id,
-            default_sort=list(default_sort),
-        )
-
-    offense_shrink_columns = [
-        'Games',
-        '3FG Att',
-        '3FG Makes',
-        '3FG %',
-        'Shrink Att',
-        'Shrink Makes',
-        'Shrink %',
-        'Non-Shrink Att',
-        'Non-Shrink Makes',
-        'Non-Shrink %',
-    ]
-    offense_shrink_map = {
-        'Games': ('games',),
-        '3FG Att': ('fg3_att',),
-        '3FG Makes': ('fg3_make',),
-        '3FG %': ('fg3_pct',),
-        'Shrink Att': ('fg3_shrink_att',),
-        'Shrink Makes': ('fg3_shrink_make',),
-        'Shrink %': ('fg3_shrink_pct',),
-        'Non-Shrink Att': ('fg3_nonshrink_att',),
-        'Non-Shrink Makes': ('fg3_nonshrink_make',),
-        'Non-Shrink %': ('fg3_nonshrink_pct',),
-    }
-    offense_shrink_table = _build_table(
-        base_columns=offense_shrink_columns,
-        column_map=offense_shrink_map,
-        pct_columns=['3FG %', 'Shrink %', 'Non-Shrink %'],
-        table_id='game-leaderboard-offense-3fg-shrinks',
-        default_sort=['fg3_shrink_pct', 'fg3_shrink_att', 'fg3_shrink_make', 'player'],
-        season_slice=shrinks_season,
-        last_slice=shrinks_last,
-    )
-
-    atr_columns = ['Games', 'ATR Att', 'ATR Makes', 'ATR %', 'And-1']
-    atr_map = {
-        'Games': ('games',),
-        'ATR Att': ('atr_att',),
-        'ATR Makes': ('atr_make',),
-        'ATR %': ('atr_pct',),
-        'And-1': ('atr_and1',),
-    }
-    atr_table = _build_table(
-        base_columns=atr_columns,
-        column_map=atr_map,
-        pct_columns=['ATR %'],
-        table_id='game-leaderboard-offense-atr-finishing',
-        default_sort=['atr_pct', 'atr_att', 'atr_make', 'player'],
-        season_slice=atr_season,
-        last_slice=atr_last,
-    )
-
-    oreb_columns = ['Games', 'Crash +', 'Crash Opps', 'Crash %', 'Back Man +', 'Back Man Opps', 'Back Man %']
-    oreb_map = {
-        'Games': ('games',),
-        'Crash +': ('crash_plus',),
-        'Crash Opps': ('crash_opps',),
-        'Crash %': ('crash_pct',),
-        'Back Man +': ('back_plus',),
-        'Back Man Opps': ('back_opps',),
-        'Back Man %': ('back_pct',),
-    }
-    oreb_table = _build_table(
-        base_columns=oreb_columns,
-        column_map=oreb_map,
-        pct_columns=['Crash %', 'Back Man %'],
-        table_id='game-leaderboard-rebounding-offensive',
-        default_sort=['crash_pct', 'crash_opps', 'crash_plus', 'player'],
-        season_slice=oreb_season,
-        last_slice=oreb_last,
-    )
-
-    dreb_columns = ['Games', 'Box Out +', 'Box Out Opps', 'Box Out %', "Off Reb's Given Up"]
-    dreb_map = {
-        'Games': ('games',),
-        'Box Out +': ('box_plus',),
-        'Box Out Opps': ('box_opps',),
-        'Box Out %': ('box_pct',),
-        "Off Reb's Given Up": ('off_reb_given_up',),
-    }
-    dreb_table = _build_table(
-        base_columns=dreb_columns,
-        column_map=dreb_map,
-        pct_columns=['Box Out %'],
-        table_id='game-leaderboard-rebounding-defensive',
-        default_sort=['box_pct', 'box_opps', 'box_plus', 'player'],
-        season_slice=dreb_season,
-        last_slice=dreb_last,
-    )
-
-    collision_columns = ['Games', 'Gap +', 'Gap Opps', 'Gap %']
-    collision_map = {
-        'Games': ('games',),
-        'Gap +': ('gap_plus',),
-        'Gap Opps': ('gap_opps',),
-        'Gap %': ('gap_pct',),
-    }
-    collision_table = _build_table(
-        base_columns=collision_columns,
-        column_map=collision_map,
-        pct_columns=['Gap %'],
-        table_id='game-leaderboard-defense-collisions',
-        default_sort=['gap_pct', 'gap_opps', 'gap_plus', 'player'],
-        season_slice=collision_season,
-        last_slice=collision_last,
-    )
-
-    pass_columns = ['Games', 'Contest +', 'Contest Opps', 'Contest %']
-    pass_map = {
-        'Games': ('games',),
-        'Contest +': ('contest_plus',),
-        'Contest Opps': ('contest_opps',),
-        'Contest %': ('contest_pct',),
-    }
-    pass_table = _build_table(
-        base_columns=pass_columns,
-        column_map=pass_map,
-        pct_columns=['Contest %'],
-        table_id='game-leaderboard-defense-pass-contest',
-        default_sort=['contest_pct', 'contest_opps', 'contest_plus', 'player'],
-        season_slice=pass_season,
-        last_slice=pass_last,
-    )
-
-    gap_columns = ['Games', 'Gap +', 'Gap Opps', 'Gap %']
-    gap_map = {
-        'Games': ('games',),
-        'Gap +': ('gap_plus',),
-        'Gap Opps': ('gap_opps',),
-        'Gap %': ('gap_pct',),
-    }
-    gap_table = _build_table(
-        base_columns=gap_columns,
-        column_map=gap_map,
-        pct_columns=['Gap %'],
-        table_id='game-leaderboard-defense-gap',
-        default_sort=['gap_pct', 'gap_opps', 'gap_plus', 'player'],
-        season_slice=gap_season,
-        last_slice=gap_last,
-    )
-
-    low_columns = ['Games', 'Low Man +', 'Low Man Opps', 'Low Man %']
-    low_map = {
-        'Games': ('games',),
-        'Low Man +': ('low_plus',),
-        'Low Man Opps': ('low_opps',),
-        'Low Man %': ('low_pct',),
-    }
-    low_table = _build_table(
-        base_columns=low_columns,
-        column_map=low_map,
-        pct_columns=['Low Man %'],
-        table_id='game-leaderboard-defense-low-man',
-        default_sort=['low_pct', 'low_opps', 'low_plus', 'player'],
-        season_slice=low_season,
-        last_slice=low_last,
-    )
-
-    pnr_columns = ['Games', 'Close Window +', 'Close Window Opps', 'Close Window %', 'Shut Door +', 'Shut Door Opps', 'Shut Door %']
-    pnr_map = {
-        'Games': ('games',),
-        'Close Window +': ('close_plus',),
-        'Close Window Opps': ('close_opps',),
-        'Close Window %': ('close_pct',),
-        'Shut Door +': ('shut_plus',),
-        'Shut Door Opps': ('shut_opps',),
-        'Shut Door %': ('shut_pct',),
-    }
-    pnr_table = _build_table(
-        base_columns=pnr_columns,
-        column_map=pnr_map,
-        pct_columns=['Close Window %', 'Shut Door %'],
-        table_id='game-leaderboard-pnr-grade',
-        default_sort=['close_pct', 'close_opps', 'close_plus', 'player'],
-        season_slice=pnr_season,
-        last_slice=pnr_last,
-    )
+        return {
+            'key': key,
+            'label': label,
+            'season_rows': season_slice.rows,
+            'season_totals': season_slice.totals,
+            'last_rows': last_slice.rows,
+            'last_totals': last_slice.totals,
+            'note_date': _format_note(last_slice.note_date),
+            'slug': key.replace('_', '-'),
+        }
 
     leaderboard_groups = [
         {
             'title': 'Offense',
             'items': [
-                {
-                    'label': '3FG (Shrinks)',
-                    'slug': 'offense-3fg-shrinks',
-                    'table': offense_shrink_table,
-                    'note_date': shrinks_last.note_date,
-                },
-                {
-                    'label': 'ATR Finishing',
-                    'slug': 'offense-atr-finishing',
-                    'table': atr_table,
-                    'note_date': atr_last.note_date,
-                },
+                _group_item('shrinks_offense', '3FG (Shrinks)', shrinks_season, shrinks_last),
+                _group_item('atr_finishing', 'ATR Finishing', atr_season, atr_last),
             ],
         },
         {
             'title': 'Rebounding',
             'items': [
-                {
-                    'label': 'Offensive Rebounding',
-                    'slug': 'rebounding-offensive',
-                    'table': oreb_table,
-                    'note_date': oreb_last.note_date,
-                },
-                {
-                    'label': 'Defensive Rebounding',
-                    'slug': 'rebounding-defensive',
-                    'table': dreb_table,
-                    'note_date': dreb_last.note_date,
-                },
+                _group_item('rebounding_offense', 'Offensive Rebounding', oreb_season, oreb_last),
+                _group_item('rebounding_defense', 'Defensive Rebounding', dreb_season, dreb_last),
             ],
         },
         {
             'title': 'Defense',
             'items': [
-                {
-                    'label': 'Collisions',
-                    'slug': 'defense-collisions',
-                    'table': collision_table,
-                    'note_date': collision_last.note_date,
-                },
-                {
-                    'label': 'Pass Contest',
-                    'slug': 'defense-pass-contest',
-                    'table': pass_table,
-                    'note_date': pass_last.note_date,
-                },
-                {
-                    'label': 'Overall Gap Help',
-                    'slug': 'defense-overall-gap-help',
-                    'table': gap_table,
-                    'note_date': gap_last.note_date,
-                },
-                {
-                    'label': 'Overall Low Man',
-                    'slug': 'defense-overall-low-man',
-                    'table': low_table,
-                    'note_date': low_last.note_date,
-                },
+                _group_item('collisions', 'Collisions', collision_season, collision_last),
+                _group_item('pass_contest', 'Pass Contest', pass_season, pass_last),
+                _group_item('overall_gap_help', 'Overall Gap Help', gap_season, gap_last),
+                _group_item('overall_low_man', 'Overall Low Man', low_season, low_last),
             ],
         },
         {
             'title': 'PnR Grade',
             'items': [
-                {
-                    'label': 'PnR Grade',
-                    'slug': 'pnr-grade',
-                    'table': pnr_table,
-                    'note_date': pnr_last.note_date,
-                },
+                _group_item('pnr_grade', 'PnR Grade', pnr_season, pnr_last),
             ],
         },
     ]
