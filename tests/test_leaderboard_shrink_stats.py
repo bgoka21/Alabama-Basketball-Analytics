@@ -103,9 +103,11 @@ def test_leaderboard_shrink_percentages_use_fg_pct(app):
     assert row[5] == 1  # shrink makes
     assert row[6] == 2  # shrink attempts
     assert row[7] == pytest.approx(50.0)
-    assert row[8] == 1  # non-shrink makes
-    assert row[9] == 2  # non-shrink attempts
-    assert row[10] == pytest.approx(50.0)
+    assert row[8] == pytest.approx(40.0)  # shrink freq of total 3FG
+    assert row[9] == 1  # non-shrink makes
+    assert row[10] == 2  # non-shrink attempts
+    assert row[11] == pytest.approx(50.0)
+    assert row[12] == pytest.approx(40.0)
 
 
 def test_leaderboard_label_filtered_shrink_stats(app):
@@ -120,9 +122,11 @@ def test_leaderboard_label_filtered_shrink_stats(app):
     assert row[5] == 1
     assert row[6] == 2
     assert row[7] == pytest.approx(50.0)
-    assert row[8] == 1
+    assert row[8] == pytest.approx(50.0)
     assert row[9] == 1
-    assert row[10] == pytest.approx(100.0)
+    assert row[10] == 1
+    assert row[11] == pytest.approx(100.0)
+    assert row[12] == pytest.approx(25.0)
 
 
 def test_unlabeled_three_is_excluded_from_non_shrink_totals(app):
@@ -132,7 +136,7 @@ def test_unlabeled_three_is_excluded_from_non_shrink_totals(app):
     row = next(r for r in rows if r[0] == "Test Player")
 
     assert row[2] == 5  # total attempts include unlabeled 3FG
-    assert row[9] == 2  # only explicitly tagged Non-Shrink attempts are counted
+    assert row[10] == 2  # only explicitly tagged Non-Shrink attempts are counted
 
 
 def test_build_leaderboard_table_shrink_cells_are_styled(app):
@@ -143,8 +147,8 @@ def test_build_leaderboard_table_shrink_cells_are_styled(app):
             total_attempts = sum(r[2] for r in rows)
             shrink_makes = sum(r[5] for r in rows)
             shrink_attempts = sum(r[6] for r in rows)
-            non_shrink_makes = sum(r[8] for r in rows)
-            non_shrink_attempts = sum(r[9] for r in rows)
+            non_shrink_makes = sum(r[9] for r in rows)
+            non_shrink_attempts = sum(r[10] for r in rows)
 
             def pct(makes: float, attempts: float) -> float:
                 return (makes / attempts * 100.0) if attempts else 0.0
@@ -157,9 +161,11 @@ def test_build_leaderboard_table_shrink_cells_are_styled(app):
                 "fg3_shrink_makes": shrink_makes,
                 "fg3_shrink_att": shrink_attempts,
                 "fg3_shrink_pct": pct(shrink_makes, shrink_attempts),
+                "fg3_shrink_freq_pct": sum(r[8] for r in rows),
                 "fg3_nonshrink_makes": non_shrink_makes,
                 "fg3_nonshrink_att": non_shrink_attempts,
                 "fg3_nonshrink_pct": pct(non_shrink_makes, non_shrink_attempts),
+                "fg3_nonshrink_freq_pct": sum(r[12] for r in rows),
             }
 
         table = build_leaderboard_table(config=cfg, rows=rows, team_totals=totals)

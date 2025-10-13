@@ -579,15 +579,19 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
                         details.get('fg3_shrink_makes', 0),
                         details.get('fg3_shrink_att', 0),
                         details.get('fg3_shrink_pct', 0.0),
+                        details.get('fg3_shrink_freq_pct', 0.0),
                         details.get('fg3_nonshrink_makes', 0),
                         details.get('fg3_nonshrink_att', 0),
                         details.get('fg3_nonshrink_pct', 0.0),
+                        details.get('fg3_nonshrink_freq_pct', 0.0),
                     )
                 )
             else:
                 leaderboard.append((player, makes, attempts, pct, freq))
 
         if stat_key == 'fg3_fg_pct':
+            shrink_freq = (shrink_attempts / total_attempts * 100.0) if total_attempts else 0.0
+            nonshrink_freq = (nonshrink_attempts / total_attempts * 100.0) if total_attempts else 0.0
             team_totals = {
                 'fg3_makes': total_makes,
                 'fg3_attempts': total_attempts,
@@ -596,9 +600,11 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
                 'fg3_shrink_makes': shrink_makes,
                 'fg3_shrink_att': shrink_attempts,
                 'fg3_shrink_pct': make_pct(shrink_makes, shrink_attempts),
+                'fg3_shrink_freq_pct': shrink_freq,
                 'fg3_nonshrink_makes': nonshrink_makes,
                 'fg3_nonshrink_att': nonshrink_attempts,
                 'fg3_nonshrink_pct': make_pct(nonshrink_makes, nonshrink_attempts),
+                'fg3_nonshrink_freq_pct': nonshrink_freq,
             }
         leaderboard.sort(key=lambda x: x[3], reverse=True)
     else:
@@ -1181,9 +1187,11 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             "fg3_shrink_att": breakdown["fg3_shrink_att"],
             "fg3_shrink_makes": breakdown["fg3_shrink_makes"],
             "fg3_shrink_pct": breakdown["fg3_shrink_pct"],
+            "fg3_shrink_freq_pct": breakdown["fg3_shrink_freq_pct"],
             "fg3_nonshrink_att": breakdown["fg3_nonshrink_att"],
             "fg3_nonshrink_makes": breakdown["fg3_nonshrink_makes"],
             "fg3_nonshrink_pct": breakdown["fg3_nonshrink_pct"],
+            "fg3_nonshrink_freq_pct": breakdown["fg3_nonshrink_freq_pct"],
         })
 
         shot_details[player] = flat

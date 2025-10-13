@@ -117,6 +117,9 @@ def compute_3fg_breakdown_from_shots(shot_list: Iterable[Mapping]) -> MutableMap
     def pct(makes: int, attempts: int) -> float:
         return (makes / attempts * 100.0) if attempts else 0.0
 
+    def freq(attempts: int, total: int) -> float:
+        return (attempts / total * 100.0) if total else 0.0
+
     return {
         "fg3_makes": total_makes,
         "fg3_att": total_att,
@@ -124,9 +127,11 @@ def compute_3fg_breakdown_from_shots(shot_list: Iterable[Mapping]) -> MutableMap
         "fg3_shrink_makes": shrink_makes,
         "fg3_shrink_att": shrink_att,
         "fg3_shrink_pct": pct(shrink_makes, shrink_att),
+        "fg3_shrink_freq_pct": freq(shrink_att, total_att),
         "fg3_nonshrink_makes": non_makes,
         "fg3_nonshrink_att": non_att,
         "fg3_nonshrink_pct": pct(non_makes, non_att),
+        "fg3_nonshrink_freq_pct": freq(non_att, total_att),
     }
 
 
