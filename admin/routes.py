@@ -2,7 +2,7 @@ import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
