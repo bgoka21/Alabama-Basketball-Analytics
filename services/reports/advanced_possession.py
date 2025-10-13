@@ -275,32 +275,21 @@ def compute_advanced_possession_practice(practice_id: int) -> Dict[str, object]:
             Possession.points_scored.label("points_scored"),
             Possession.drill_labels.label("drill_labels"),
         )
-        .filter(Possession.practice_id == practice_id)
+        .filter(
+            Possession.practice_id == practice_id,
+            func.lower(Possession.time_segment) == "offense",
+        )
         .all()
     )
     events = _fetch_event_counts(row.id for row in rows)
 
-    team_rows: Dict[str, List[Mapping[str, object]]] = {key: [] for key in _PRACTICE_TEAM_KEYS}
-    for row in rows:
-        side = _normalize_side(row.possession_side)
-        if side in team_rows:
-            team_rows[side].append(_row_to_dict(row))
-
-    if not any(team_rows.values()):
-        offense: List[Mapping[str, object]] = []
-        defense: List[Mapping[str, object]] = []
-        for row in rows:
-            side = _normalize_side(row.possession_side)
-            if side == "offense":
-                offense.append(_row_to_dict(row))
-            elif side == "defense":
-                defense.append(_row_to_dict(row))
-        team_rows["crimson"] = offense
-        team_rows["white"] = defense
-
     results: Dict[str, object] = {}
     for key in _PRACTICE_TEAM_KEYS:
-        bucket_rows = team_rows.get(key, [])
+        bucket_rows = [
+            _row_to_dict(row)
+            for row in rows
+            if _normalize_side(row.possession_side) == key
+        ]
         results[key] = _aggregate_rows(bucket_rows, events)
     return results
 

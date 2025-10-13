@@ -76,23 +76,44 @@ def app():
         db.session.add(player_stat)
         persist_player_shot_details(player_stat, shots, replace=True)
 
-        poss1 = Possession(id=1, practice_id=1, season_id=1, game_id=None,
-                           possession_side='Offense', points_scored=3,
-                           drill_labels='4V4 DRILLS')
+        poss1 = Possession(
+            id=1,
+            practice_id=1,
+            season_id=1,
+            game_id=None,
+            possession_side='Crimson',
+            time_segment='Offense',
+            points_scored=3,
+            drill_labels='4V4 DRILLS',
+        )
         db.session.add(poss1)
         db.session.add(PlayerPossession(possession_id=1, player_id=1))
         db.session.add(ShotDetail(possession_id=1, event_type='3FG+'))
         db.session.add(ShotDetail(possession_id=1, event_type='Off Rebound'))
 
-        poss2 = Possession(id=2, practice_id=1, season_id=1, game_id=None,
-                           possession_side='Offense', points_scored=2,
-                           drill_labels='4V4 DRILLS')
+        poss2 = Possession(
+            id=2,
+            practice_id=1,
+            season_id=1,
+            game_id=None,
+            possession_side='Crimson',
+            time_segment='Offense',
+            points_scored=2,
+            drill_labels='4V4 DRILLS',
+        )
         db.session.add(poss2)
         db.session.add(PlayerPossession(possession_id=2, player_id=2))
         db.session.add(ShotDetail(possession_id=2, event_type='2FG+'))
 
-        poss3 = Possession(id=3, practice_id=1, season_id=1, game_id=None,
-                           possession_side='Offense', points_scored=2)
+        poss3 = Possession(
+            id=3,
+            practice_id=1,
+            season_id=1,
+            game_id=None,
+            possession_side='Crimson',
+            time_segment='Offense',
+            points_scored=2,
+        )
         db.session.add(poss3)
         db.session.add(PlayerPossession(possession_id=3, player_id=1))
         db.session.add(ShotDetail(possession_id=3, event_type='2FG+'))

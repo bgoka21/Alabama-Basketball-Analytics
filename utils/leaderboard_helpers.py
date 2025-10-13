@@ -142,6 +142,15 @@ def _apply_playerstats_filters(
     return query
 
 
+def _apply_side_filter(query: Query, side: str) -> Query:
+    normalized = (side or "").strip().lower()
+    if not normalized:
+        return query
+    if normalized in ("offense", "defense"):
+        return query.filter(func.lower(Possession.time_segment) == normalized)
+    return query.filter(func.lower(Possession.possession_side) == normalized)
+
+
 def _row_to_dict(row, keys: Tuple[str, ...]) -> Dict[str, float]:
     if row is None:
         return {key: 0 for key in keys}
@@ -168,9 +177,9 @@ def _get_player_possession_totals(
         .filter(
             PlayerPossession.player_id == player_id,
             Possession.season_id == roster.season_id,
-            Possession.possession_side == side,
         )
     )
+    q = _apply_side_filter(q, side)
     q = _apply_possession_filters(q, start_dt, end_dt, label_set)
     count, points = q.one()
     return int(count or 0), float(points or 0)
@@ -190,9 +199,9 @@ def _get_team_possession_totals(
         )
         .filter(
             Possession.season_id == season_id,
-            Possession.possession_side == side,
         )
     )
+    q = _apply_side_filter(q, side)
     q = _apply_possession_filters(q, start_dt, end_dt, label_set)
     count, points = q.one()
     return int(count or 0), float(points or 0)
@@ -207,8 +216,8 @@ def _get_possession_ids(
 ) -> Tuple[List[int], List[int]]:
     q = db.session.query(Possession.practice_id, Possession.game_id).filter(
         Possession.season_id == season_id,
-        Possession.possession_side == side,
     )
+    q = _apply_side_filter(q, side)
     q = _apply_possession_filters(q, start_dt, end_dt, label_set)
     rows = q.distinct().all()
     practice_ids = [pid for pid, gid in rows if pid]
@@ -266,9 +275,9 @@ def _get_offense_events(
         .filter(
             PlayerPossession.player_id == player_id,
             Possession.season_id == roster.season_id,
-            Possession.possession_side == "Offense",
         )
     )
+    events_q = _apply_side_filter(events_q, "Offense")
     events_q = _apply_possession_filters(events_q, start_dt, end_dt, label_set)
     row = events_q.one_or_none()
     return _row_to_dict(row, _OFFENSE_EVENT_COLUMNS)
@@ -327,9 +336,9 @@ def _get_defense_events(
         .filter(
             PlayerPossession.player_id == player_id,
             Possession.season_id == roster.season_id,
-            Possession.possession_side == "Defense",
         )
     )
+    events_q = _apply_side_filter(events_q, "Defense")
     events_q = _apply_possession_filters(events_q, start_dt, end_dt, label_set)
     row = events_q.one_or_none()
     return _row_to_dict(row, _DEFENSE_EVENT_COLUMNS)
@@ -580,25 +589,6 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
     label_set = {lbl.strip().upper() for lbl in labels or [] if lbl.strip()}
     offense_sides = ("Offense", "Crimson", "White")
 
-    # Determine the player's squad based on practice scrimmage data. If the
-    # player appears in possessions tagged with a specific squad name (e.g.
-    # "Crimson" or "White"), treat the most common value as the player's squad
-    # and restrict team calculations to that side.  This allows us to exclude
-    # possessions from the opposing squad when computing PPP_on/PPP_off.
-    squad_row = (
-        db.session.query(Possession.possession_side, func.count(Possession.id))
-        .join(PlayerPossession, Possession.id == PlayerPossession.possession_id)
-        .filter(
-            PlayerPossession.player_id == player_id,
-            Possession.season_id == roster.season_id,
-            Possession.possession_side.in_(('Crimson', 'White')),
-        )
-        .group_by(Possession.possession_side)
-        .order_by(func.count(Possession.id).desc())
-        .first()
-    )
-    player_squad = squad_row[0] if squad_row else None
-
     poss_q = (
         db.session.query(
             func.count(PlayerPossession.id),
@@ -610,10 +600,8 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
             Possession.season_id == roster.season_id,
         )
     )
-    if player_squad:
-        poss_q = poss_q.filter(Possession.possession_side == player_squad)
-    else:
-        poss_q = poss_q.filter(Possession.possession_side.in_(offense_sides))
+    poss_q = poss_q.filter(Possession.possession_side.in_(offense_sides))
+    poss_q = poss_q.filter(func.lower(Possession.time_segment) == 'offense')
     if start_date or end_date:
         poss_q = (
             poss_q.outerjoin(Game, Possession.game_id == Game.id)
@@ -645,10 +633,8 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
         )
         .filter(Possession.season_id == roster.season_id)
     )
-    if player_squad:
-        team_q = team_q.filter(Possession.possession_side == player_squad)
-    else:
-        team_q = team_q.filter(Possession.possession_side.in_(offense_sides))
+    team_q = team_q.filter(Possession.possession_side.in_(offense_sides))
+    team_q = team_q.filter(func.lower(Possession.time_segment) == 'offense')
     if start_date or end_date:
         team_q = (
             team_q.outerjoin(Game, Possession.game_id == Game.id)
@@ -684,10 +670,8 @@ def get_on_court_metrics(player_id, start_date=None, end_date=None, labels=None)
                 ShotDetail.event_type == ev_type,
             )
         )
-        if player_squad:
-            q = q.filter(Possession.possession_side == player_squad)
-        else:
-            q = q.filter(Possession.possession_side.in_(offense_sides))
+        q = q.filter(Possession.possession_side.in_(offense_sides))
+        q = q.filter(func.lower(Possession.time_segment) == 'offense')
         if start_date or end_date:
             q = q.outerjoin(Game, Possession.game_id == Game.id).outerjoin(Practice, Possession.practice_id == Practice.id)
             if start_date:
