@@ -607,6 +607,79 @@ def _normalize_split_totals(totals: Any, specs: Tuple[Dict[str, Any], ...]) -> D
     return result
 
 
+def _format_fg_summary(makes: int, attempts: int) -> str:
+    return f"{makes}\u2013{attempts}"
+
+
+def _normalize_fg_pct_rows(rows: Any, *, stat_key: str) -> list[Dict[str, Any]]:
+    base = stat_key[:-len("_fg_pct")] if stat_key.endswith("_fg_pct") else stat_key
+    make_keys = (f"{base}_makes", "makes", "fgm", "plus")
+    attempt_keys = (f"{base}_attempts", "attempts", "fga", "opps")
+    pct_keys = (stat_key, "pct", "percentage", f"{base}_pct")
+    freq_keys = (f"{base}_freq_pct", "freq_pct", "frequency", "freq")
+
+    normalized: list[Dict[str, Any]] = []
+
+    for row in rows or []:
+        player = _resolve_value(row, _PLAYER_KEYS, index=0)
+        if player is None:
+            continue
+
+        jersey = _resolve_value(row, _JERSEY_KEYS, index=1)
+        makes_raw = _resolve_value(row, make_keys, index=1)
+        attempts_raw = _resolve_value(row, attempt_keys, index=2)
+        pct_raw = _resolve_value(row, pct_keys, index=3)
+        freq_raw = _resolve_value(row, freq_keys, index=4)
+
+        makes = _to_int(makes_raw)
+        attempts = _to_int(attempts_raw)
+        pct = _to_pct(pct_raw, makes, attempts)
+        freq = _to_pct(freq_raw)
+
+        normalized.append(
+            {
+                "player_name": player,
+                "jersey": jersey,
+                "makes": makes,
+                "attempts": attempts,
+                "fg_pct": pct,
+                "freq": freq,
+                "fg_summary": _format_fg_summary(makes, attempts),
+            }
+        )
+
+    return normalized
+
+
+def _normalize_fg_pct_totals(totals: Any, *, stat_key: str) -> Optional[Dict[str, Any]]:
+    if totals is None:
+        return None
+
+    base = stat_key[:-len("_fg_pct")] if stat_key.endswith("_fg_pct") else stat_key
+    make_keys = (f"{base}_makes", "makes", "fgm", "plus")
+    attempt_keys = (f"{base}_attempts", "attempts", "fga", "opps")
+    pct_keys = (stat_key, "pct", "percentage", f"{base}_pct")
+    freq_keys = (f"{base}_freq_pct", "freq_pct", "frequency", "freq")
+
+    makes_raw = _resolve_value(totals, make_keys, index=0)
+    attempts_raw = _resolve_value(totals, attempt_keys, index=1)
+    pct_raw = _resolve_value(totals, pct_keys, index=2)
+    freq_raw = _resolve_value(totals, freq_keys, index=3)
+
+    makes = _to_int(makes_raw)
+    attempts = _to_int(attempts_raw)
+    pct = _to_pct(pct_raw, makes, attempts)
+    freq = _to_pct(freq_raw)
+
+    return {
+        "makes": makes,
+        "attempts": attempts,
+        "fg_pct": pct,
+        "freq": freq,
+        "fg_summary": _format_fg_summary(makes, attempts),
+    }
+
+
 def prepare_dual_context(context: DualContextResult, stat_key: Optional[str]) -> DualContextResult:
     """Normalize ``context`` so templates receive predictable structures."""
 
@@ -688,6 +761,13 @@ def prepare_dual_context(context: DualContextResult, stat_key: Optional[str]) ->
         ctx["last_team_totals"] = _normalize_split_totals(ctx.get("last_team_totals"), specs)
         ctx["season_rows_by_subtype"] = _group_by_subtype(ctx.get("season_rows"))
         ctx["last_rows_by_subtype"] = _group_by_subtype(ctx.get("last_rows"))
+        return ctx
+
+    if stat_key and stat_key.endswith("_fg_pct"):
+        ctx["season_rows"] = _normalize_fg_pct_rows(ctx.get("season_rows"), stat_key=stat_key)
+        ctx["last_rows"] = _normalize_fg_pct_rows(ctx.get("last_rows"), stat_key=stat_key)
+        ctx["season_team_totals"] = _normalize_fg_pct_totals(ctx.get("season_team_totals"), stat_key=stat_key)
+        ctx["last_team_totals"] = _normalize_fg_pct_totals(ctx.get("last_team_totals"), stat_key=stat_key)
         return ctx
 
     if stat_key == "def_rebounding":
@@ -1101,10 +1181,26 @@ def _extract_numeric_for_column(
     if value is None and default_value is not None:
         value = default_value
 
-    if (column in pct_set) or (formatter == "pct"):
-        return _to_pct(value)
+    numeric_value = None
+    if isinstance(spec, Mapping):
+        raw_numeric = spec.get("numeric_keys") or spec.get("numeric_key")
+        numeric_keys: Tuple[str, ...] = ()
+        if isinstance(raw_numeric, (str, bytes)):
+            numeric_keys = (str(raw_numeric),)
+        elif isinstance(raw_numeric, Sequence):
+            numeric_keys = tuple(str(key) for key in raw_numeric if key)
+        if numeric_keys:
+            numeric_value = _resolve_column_value(source, numeric_keys)
+            if numeric_value is None and default_value is not None:
+                numeric_value = default_value
 
-    return _to_float(value)
+    if numeric_value is None:
+        numeric_value = value
+
+    if (column in pct_set) or (formatter == "pct"):
+        return _to_pct(numeric_value)
+
+    return _to_float(numeric_value)
 
 
 def build_dual_table(
