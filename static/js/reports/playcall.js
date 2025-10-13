@@ -41,7 +41,8 @@
       }
       const totals = card.querySelector('tfoot');
       if (totals) {
-        totals.classList.toggle('hidden', !anyVisible);
+        totals.classList.remove('hidden');
+        totals.classList.toggle('opacity-50', !anyVisible);
       }
     });
   }

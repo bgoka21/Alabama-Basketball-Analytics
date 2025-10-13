@@ -331,6 +331,237 @@ def cache_get_or_compute_playcall_report(game_id: int):
     return data, meta
 
 
+def aggregate_playcall_reports(game_ids: Iterable[int]):
+    """Aggregate multiple game-level playcall payloads into a combined view."""
+
+    ordered_ids = []
+    seen: set[int] = set()
+    for raw_id in game_ids:
+        try:
+            game_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if game_id in seen:
+            continue
+        seen.add(game_id)
+        ordered_ids.append(game_id)
+
+    processed_ids: list[int] = []
+    families_agg: "OrderedDict[str, Dict[str, object]]" = OrderedDict()
+    flow_map: "OrderedDict[str, Dict[str, object]]" = OrderedDict()
+    flow_only_chances = 0
+    updated_at_values: list[str] = []
+
+    for game_id in ordered_ids:
+        try:
+            raw_data, meta = cache_get_or_compute_playcall_report(game_id)
+        except Exception:  # pragma: no cover - errors are logged and skipped
+            _LOGGER.exception("Failed to load playcall report for aggregation (game_id=%s)", game_id)
+            continue
+
+        if not isinstance(raw_data, Mapping):
+            continue
+
+        processed_ids.append(game_id)
+
+        if isinstance(meta, Mapping):
+            updated_val = meta.get("updated_at")
+            if isinstance(updated_val, str):
+                updated_at_values.append(updated_val)
+
+        series_payload = raw_data.get("series") if isinstance(raw_data, Mapping) else {}
+        if not isinstance(series_payload, Mapping):
+            series_payload = {}
+
+        data_meta = raw_data.get("meta") if isinstance(raw_data, Mapping) else {}
+        total_in_flow_meta = 0
+        if isinstance(data_meta, Mapping):
+            try:
+                total_in_flow_meta = int(data_meta.get("total_chances_in_flow", 0) or 0)
+            except (TypeError, ValueError):
+                total_in_flow_meta = 0
+
+        family_in_flow_sum = 0
+
+        for family_name, payload in series_payload.items():
+            if not isinstance(family_name, str):
+                continue
+            if not isinstance(payload, Mapping):
+                continue
+            if family_name == "FLOW":
+                plays_payload = payload.get("plays")
+                if isinstance(plays_payload, Iterable):
+                    for entry in plays_payload:
+                        if not isinstance(entry, Mapping):
+                            continue
+                        playcall = str(entry.get("playcall", "")) or "UNKNOWN"
+                        if playcall not in flow_map:
+                            flow_map[playcall] = {
+                                "playcall": playcall,
+                                "ran_in_flow": 0,
+                                "in_flow": {"pts": 0, "chances": 0},
+                            }
+                        flow_entry = flow_map[playcall]
+                        flow_entry["ran_in_flow"] += int(entry.get("ran_in_flow", 0) or 0)
+                        in_flow_bucket = entry.get("in_flow") if isinstance(entry.get("in_flow"), Mapping) else {}
+                        if isinstance(in_flow_bucket, Mapping):
+                            flow_entry["in_flow"]["pts"] += int(in_flow_bucket.get("pts", 0) or 0)
+                            flow_entry["in_flow"]["chances"] += int(in_flow_bucket.get("chances", 0) or 0)
+                continue
+
+            if family_name not in families_agg:
+                families_agg[family_name] = {
+                    "plays": OrderedDict(),
+                    "totals": {
+                        "off_set": {"pts": 0, "chances": 0},
+                        "in_flow": {"pts": 0, "chances": 0},
+                    },
+                }
+
+            family_payload = families_agg[family_name]
+            plays_map: MutableMapping[str, Dict[str, object]] = family_payload["plays"]  # type: ignore[assignment]
+
+            source_plays = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
+            if isinstance(source_plays, Mapping):
+                for playcall, entry in source_plays.items():
+                    if not isinstance(playcall, str) or not isinstance(entry, Mapping):
+                        continue
+                    if playcall not in plays_map:
+                        plays_map[playcall] = {
+                            "ran": 0,
+                            "off_set": {"pts": 0, "chances": 0},
+                            "in_flow": {"pts": 0, "chances": 0},
+                        }
+                    dest_entry = plays_map[playcall]
+                    dest_entry["ran"] += int(entry.get("ran", 0) or 0)
+                    for bucket in ("off_set", "in_flow"):
+                        bucket_payload = entry.get(bucket)
+                        if isinstance(bucket_payload, Mapping):
+                            dest = dest_entry[bucket]
+                            dest["pts"] += int(bucket_payload.get("pts", 0) or 0)
+                            dest["chances"] += int(bucket_payload.get("chances", 0) or 0)
+
+            totals_payload = payload.get("totals") if isinstance(payload.get("totals"), Mapping) else {}
+            if isinstance(totals_payload, Mapping):
+                for bucket in ("off_set", "in_flow"):
+                    bucket_payload = totals_payload.get(bucket)
+                    if isinstance(bucket_payload, Mapping):
+                        family_bucket = family_payload["totals"][bucket]
+                        family_bucket["pts"] += int(bucket_payload.get("pts", 0) or 0)
+                        family_bucket["chances"] += int(bucket_payload.get("chances", 0) or 0)
+                        if bucket == "in_flow":
+                            family_in_flow_sum += int(bucket_payload.get("chances", 0) or 0)
+
+        if total_in_flow_meta and family_in_flow_sum <= total_in_flow_meta:
+            flow_only_chances += total_in_flow_meta - family_in_flow_sum
+
+    if not processed_ids:
+        empty = _empty_payload()
+        return empty, {
+            "source": "aggregate",
+            "scope": "season",
+            "game_ids": [],
+            "game_count": 0,
+        }
+
+    series_payload = OrderedDict()
+    total_off_set_chances = 0
+    total_in_flow_chances = 0
+
+    for family_name, payload in families_agg.items():
+        plays_map = OrderedDict()
+        for playcall, entry in payload["plays"].items():
+            ran_val = int(entry.get("ran", 0) or 0)
+            formatted_entry = {
+                "ran": ran_val,
+                "off_set": {
+                    "pts": int(entry["off_set"]["pts"]),
+                    "chances": int(entry["off_set"]["chances"]),
+                },
+                "in_flow": {
+                    "pts": int(entry["in_flow"]["pts"]),
+                    "chances": int(entry["in_flow"]["chances"]),
+                },
+            }
+            for bucket in ("off_set", "in_flow"):
+                bucket_payload = formatted_entry[bucket]
+                chances = bucket_payload["chances"]
+                pts = bucket_payload["pts"]
+                bucket_payload["ppc"] = round(pts / chances, 2) if chances else 0.0
+            plays_map[playcall] = formatted_entry
+
+        totals_payload = payload["totals"]
+        formatted_totals = {"off_set": {}, "in_flow": {}}
+        for bucket in ("off_set", "in_flow"):
+            pts = int(totals_payload[bucket]["pts"])
+            chances = int(totals_payload[bucket]["chances"])
+            formatted_totals[bucket] = {
+                "pts": pts,
+                "chances": chances,
+                "ppc": round(pts / chances, 2) if chances else 0.0,
+            }
+            if bucket == "off_set":
+                total_off_set_chances += chances
+            else:
+                total_in_flow_chances += chances
+
+        series_payload[family_name] = {
+            "plays": dict(plays_map),
+            "totals": formatted_totals,
+        }
+
+    flow_entries = []
+    flow_total_pts = 0
+    flow_total_chances = 0
+    for playcall, entry in flow_map.items():
+        pts = int(entry["in_flow"]["pts"])
+        chances = int(entry["in_flow"]["chances"])
+        flow_total_pts += pts
+        flow_total_chances += chances
+        flow_entries.append(
+            {
+                "playcall": playcall,
+                "ran_in_flow": int(entry.get("ran_in_flow", 0) or 0),
+                "in_flow": {
+                    "pts": pts,
+                    "chances": chances,
+                    "ppc": round(pts / chances, 2) if chances else 0.0,
+                },
+            }
+        )
+
+    flow_totals = {
+        "in_flow": {
+            "pts": flow_total_pts,
+            "chances": flow_total_chances,
+            "ppc": round(flow_total_pts / flow_total_chances, 2) if flow_total_chances else 0.0,
+        }
+    }
+
+    total_in_flow_chances += flow_only_chances
+
+    series_payload["FLOW"] = {"plays": flow_entries, "totals": flow_totals}
+
+    data = {
+        "series": dict(series_payload),
+        "meta": {
+            "total_chances_off_set": int(total_off_set_chances),
+            "total_chances_in_flow": int(total_in_flow_chances),
+        },
+    }
+
+    display_meta: Dict[str, object] = {
+        "source": "aggregate",
+        "scope": "season",
+        "game_ids": processed_ids,
+        "game_count": len(processed_ids),
+    }
+    if updated_at_values:
+        display_meta["updated_at"] = max(updated_at_values)
+
+    return data, display_meta
+
+
 def invalidate_playcall_report(game_id: int) -> None:
     _IN_MEMORY_CACHE.pop(game_id, None)
     _delete_cache_value(_cache_key(game_id))
