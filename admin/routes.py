@@ -8749,7 +8749,18 @@ def _ft_redirect_args_from_form(form):
 
 def _ft_daily_data_core(start_date, end_date, since_date, hide_zeros, sort, dir_):
     """Collect rows and totals for the ft_daily views."""
-    valid_sorts = {'makes', 'attempts', 'pct', 'name', 'total'}
+    valid_sorts = {
+        'makes',
+        'attempts',
+        'pct',
+        'name',
+        'total',
+        'non_ft',
+        'ftm_since',
+        'fta_since',
+        'pct_since',
+        'total_since',
+    }
     if sort not in valid_sorts:
         sort = 'attempts'
     dir_ = _normalize_sort_dir(dir_)

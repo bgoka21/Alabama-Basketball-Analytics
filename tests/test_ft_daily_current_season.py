@@ -49,3 +49,35 @@ def test_ft_daily_uses_current_season(app):
         names = [r['player_name'] for r in rows]
         assert 'Current Player' in names
         assert 'Old Player' not in names
+
+
+def test_ft_daily_respects_total_since_sort(app):
+    start_date = end_date = date(2024, 1, 5)
+    since_date = date(2024, 1, 1)
+
+    with app.app_context():
+        db.session.add(
+            Roster(id=3, season_id=1, player_name='Current Player 2')
+        )
+        db.session.add_all([
+            # Player 2: fewer total shots since the anchor date
+            SkillEntry(player_id=2, date=start_date, shot_class='ft', makes=6, attempts=8),
+            SkillEntry(player_id=2, date=since_date, shot_class='3pt', makes=4, attempts=10),
+            # Player 3: more total shots since the anchor date
+            SkillEntry(player_id=3, date=start_date, shot_class='ft', makes=5, attempts=6),
+            SkillEntry(player_id=3, date=since_date, shot_class='mid', makes=7, attempts=20),
+        ])
+        db.session.commit()
+
+        rows, _totals, _has_entries, sort = _ft_daily_data(
+            start_date,
+            end_date,
+            since_date,
+            hide_zeros=False,
+            sort='total_since',
+            dir_='desc',
+        )
+
+        assert sort == 'total_since'
+        assert rows[0]['player_name'] == 'Current Player 2'
+        assert rows[0]['total_shots_since'] > rows[1]['total_shots_since']
