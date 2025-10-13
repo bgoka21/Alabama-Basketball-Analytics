@@ -262,7 +262,7 @@
   } %}
   {% set pct_columns = ["FG%", "Freq"] %}
   {% set grade_metrics = {
-    'fg_pct': 'atr_fg_pct',
+    'fg_pct': 'atr2fg_pct',
     'freq': 'atr_freq_pct'
   } %}
   {% set table = build_dual_table(
@@ -280,7 +280,16 @@
     default_sort=['fg_pct', 'freq', 'makes'],
     grade_metrics=grade_metrics,
   ) %}
+  {% set percent_specs = [
+    {
+      'slug': 'fg_pct',
+      'metric': 'atr2fg_pct',
+      'attempt_slugs': ['attempts', 'atr_attempts', 'fg_m_a'],
+    }
+  ] %}
+  {{ apply_percent_wrappers(table, percent_specs) }}
   {{ render_dual_section('ATR FG%', table, practice_note) }}
+  {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
   {% set label_map = {

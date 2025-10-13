@@ -336,6 +336,8 @@ class TestDualViews:
         assert "Sep 18, 2025" in html
         assert "5–10" in html
         assert "50.0%" in html
+        assert html.count("percent-box") >= 2
+        assert "grade-token--" in html
 
     def test_overall_gap_help_leaderboard_block(self, monkeypatch, app_client):
         import admin.routes as rmod
