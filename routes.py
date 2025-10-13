@@ -841,7 +841,6 @@ def player_view(player_name):
     label_set = {lbl.upper() for lbl in selected_labels}
 
     # 1. On-court offensive possessions & points
-    offense_sides = ('Offense',)
     helper_labels = list(label_set) if label_set else None
     summary = get_on_off_summary(
         player_id=player.id,
@@ -868,7 +867,7 @@ def player_view(player_name):
             .join(PossessionPlayer, Possession.id == PossessionPlayer.possession_id)
             .filter(
                 PossessionPlayer.player_id == player.id,
-                Possession.possession_side.in_(offense_sides),
+                func.lower(Possession.time_segment) == 'offense',
                 ShotDetail.event_type == ev_type,
             )
         )

@@ -783,7 +783,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         db.session.query(Possession.practice_id, Possession.game_id)
         .filter(
             Possession.season_id == season_id,
-            Possession.possession_side == 'Offense'
+            func.lower(Possession.time_segment) == 'offense'
         )
     )
     if label_set:
@@ -877,7 +877,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         .filter(
             Roster.season_id == season_id,
             Possession.season_id == season_id,
-            Possession.possession_side == 'Offense'
+            func.lower(Possession.time_segment) == 'offense'
         )
     )
     if label_set:
@@ -5656,7 +5656,7 @@ def player_detail(player_name):
             .join(PlayerPossession, Possession.id == PlayerPossession.possession_id)
             .filter(
                 PlayerPossession.player_id == player.id,
-                Possession.possession_side == 'Offense',
+                func.lower(Possession.time_segment) == 'offense',
                 ShotDetail.event_type == ev_type,
             )
         )
