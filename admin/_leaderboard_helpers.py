@@ -1800,6 +1800,9 @@ def build_leaderboard_table(
             )
         )
 
+        if stat_key == "atr_fg_pct":
+            grade_metric_map["fg_pct"] = "atr2fg_pct"
+
         if stat_key == "fg3_fg_pct":
             column_specs.append(
                 _spec(
