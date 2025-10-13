@@ -62,6 +62,11 @@
         <option value="pct" {% if sort == 'pct' %}selected{% endif %}>FT %</option>
         <option value="total" {% if sort == 'total' %}selected{% endif %}>Weekly Total Shots</option>
         <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+        <option value="non_ft" {% if sort == 'non_ft' %}selected{% endif %}>Non-FT's</option>
+        <option value="ftm_since" {% if sort == 'ftm_since' %}selected{% endif %}>FTM (Since {{ since_date }})</option>
+        <option value="fta_since" {% if sort == 'fta_since' %}selected{% endif %}>FTA (Since {{ since_date }})</option>
+        <option value="pct_since" {% if sort == 'pct_since' %}selected{% endif %}>FT% (Since {{ since_date }})</option>
+        <option value="total_since" {% if sort == 'total_since' %}selected{% endif %}>Total Shots (Since {{ since_date }})</option>
       </select>
     </div>
     <div>
@@ -86,10 +91,13 @@
   <table class="w-full table-auto border border-gray-200 rounded-md border-collapse">
     <thead>
         <tr class="bg-gray-200">
+          <th class="px-4 py-2 text-center text-sm font-medium">Rank</th>
           <th class="px-4 py-2 text-left text-sm font-medium">
             <a href="{{ sort_urls.name }}" class="inline-flex items-center">Player{% if sort == 'name' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
-          <th class="px-4 py-2 text-center text-sm font-medium">Non-FT's</th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.non_ft }}" class="inline-flex items-center justify-center w-full">Non-FT's{% if sort == 'non_ft' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
           <th class="px-4 py-2 text-center text-sm font-medium">
             <a href="{{ sort_urls.makes }}" class="inline-flex items-center">FT Makes{% if sort == 'makes' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
@@ -102,15 +110,24 @@
           <th class="px-4 py-2 text-center text-sm font-medium">
             <a href="{{ sort_urls.total }}" class="inline-flex items-center">Weekly Total Shots{% if sort == 'total' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
           </th>
-          <th class="px-4 py-2 text-center text-sm font-medium">FTM (Since {{ since_date }})</th>
-          <th class="px-4 py-2 text-center text-sm font-medium">FTA (Since {{ since_date }})</th>
-          <th class="px-4 py-2 text-center text-sm font-medium">FT% (Since {{ since_date }})</th>
-          <th class="px-4 py-2 text-center text-sm font-medium">Total Shots (Since {{ since_date }})</th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.ftm_since }}" class="inline-flex items-center justify-center w-full">FTM (Since {{ since_date }}){% if sort == 'ftm_since' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.fta_since }}" class="inline-flex items-center justify-center w-full">FTA (Since {{ since_date }}){% if sort == 'fta_since' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.pct_since }}" class="inline-flex items-center justify-center w-full">FT% (Since {{ since_date }}){% if sort == 'pct_since' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
+          <th class="px-4 py-2 text-center text-sm font-medium">
+            <a href="{{ sort_urls.total_since }}" class="inline-flex items-center justify-center w-full">Total Shots (Since {{ since_date }}){% if sort == 'total_since' %}<span class="ml-1 text-xs">{% if dir == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a>
+          </th>
         </tr>
     </thead>
     <tbody>
       {% for row in rows %}
       <tr class="{{ loop.cycle('bg-white','bg-gray-50') }}">
+        <td class="px-4 py-2 text-center text-sm font-semibold">#{{ row.rank }}</td>
         <td class="px-4 py-2 text-sm whitespace-nowrap">{{ row.player_name }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ row.non_ft }}</td>
         <td class="px-4 py-2 text-center text-sm">{{ row.ft_makes }}</td>
@@ -126,6 +143,7 @@
     </tbody>
     <tfoot>
       <tr class="bg-gray-200 font-semibold">
+        <td class="px-4 py-2 text-center text-sm font-semibold">&nbsp;</td>
         <td class="px-4 py-2 text-sm font-semibold">Totals</td>
         <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.non_ft }}</td>
         <td class="px-4 py-2 text-center text-sm font-semibold">{{ totals.ft_makes }}</td>
