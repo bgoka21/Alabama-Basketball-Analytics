@@ -533,16 +533,42 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
             for subtype, totals in team_totals_map.items()
         }
     elif stat_key.endswith('_fg_pct'):
+        att_key = stat_key.replace('_fg_pct', '_attempts')
+        make_key = stat_key.replace('_fg_pct', '_makes')
+        freq_key = stat_key.replace('_fg_pct', '_freq_pct')
+
+        total_makes = 0
+        total_attempts = 0
+        total_shots = 0
+        shrink_makes = 0
+        shrink_attempts = 0
+        nonshrink_makes = 0
+        nonshrink_attempts = 0
+
         for player in players:
             details = shot_details.get(player, {})
+            base = core_rows.get(player, {})
             pct = details.get(stat_key, 0)
-            att_key = stat_key.replace('_fg_pct', '_attempts')
-            make_key = stat_key.replace('_fg_pct', '_makes')
-            freq_key = stat_key.replace('_fg_pct', '_freq_pct')
-            attempts = details.get(att_key, 0)
-            makes = details.get(make_key, 0)
-            freq = details.get(freq_key, 0)
+            attempts = details.get(att_key, base.get(att_key, 0))
+            makes = details.get(make_key, base.get(make_key, 0))
+            freq = details.get(freq_key, base.get(freq_key, 0))
+
+            attempts_int = safe_int(attempts)
+            makes_int = safe_int(makes)
+            total_attempts += attempts_int
+            total_makes += makes_int
+
+            total_shots += (
+                safe_int(base.get('atr_attempts'))
+                + safe_int(base.get('fg2_attempts'))
+                + safe_int(base.get('fg3_attempts'))
+            )
+
             if stat_key == 'fg3_fg_pct':
+                shrink_makes += safe_int(details.get('fg3_shrink_makes'))
+                shrink_attempts += safe_int(details.get('fg3_shrink_att'))
+                nonshrink_makes += safe_int(details.get('fg3_nonshrink_makes'))
+                nonshrink_attempts += safe_int(details.get('fg3_nonshrink_att'))
                 leaderboard.append(
                     (
                         player,
@@ -560,6 +586,20 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
                 )
             else:
                 leaderboard.append((player, makes, attempts, pct, freq))
+
+        if stat_key == 'fg3_fg_pct':
+            team_totals = {
+                'fg3_makes': total_makes,
+                'fg3_attempts': total_attempts,
+                'fg3_fg_pct': make_pct(total_makes, total_attempts),
+                'fg3_freq_pct': make_pct(total_attempts, total_shots),
+                'fg3_shrink_makes': shrink_makes,
+                'fg3_shrink_att': shrink_attempts,
+                'fg3_shrink_pct': make_pct(shrink_makes, shrink_attempts),
+                'fg3_nonshrink_makes': nonshrink_makes,
+                'fg3_nonshrink_att': nonshrink_attempts,
+                'fg3_nonshrink_pct': make_pct(nonshrink_makes, nonshrink_attempts),
+            }
         leaderboard.sort(key=lambda x: x[3], reverse=True)
     else:
         for player in players:
