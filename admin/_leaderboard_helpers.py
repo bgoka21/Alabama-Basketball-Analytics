@@ -1770,7 +1770,7 @@ def build_leaderboard_table(
 
         column_specs.append(
             _spec(
-                "FG (M–A)",
+                "FG",
                 compose="makes_attempts",
                 make_keys=make_keys,
                 make_index=1,
@@ -1806,7 +1806,7 @@ def build_leaderboard_table(
         if stat_key == "fg3_fg_pct":
             column_specs.append(
                 _spec(
-                    "Shrink 3FG (M–A)",
+                    "Shrink 3FG",
                     compose="makes_attempts",
                     make_keys=("fg3_shrink_makes", "shrink_makes"),
                     make_index=5,
@@ -1834,7 +1834,7 @@ def build_leaderboard_table(
             )
             column_specs.append(
                 _spec(
-                    "Non-Shrink 3FG (M–A)",
+                    "Non-Shrink 3FG",
                     compose="makes_attempts",
                     make_keys=("fg3_nonshrink_makes", "nonshrink_makes"),
                     make_index=9,

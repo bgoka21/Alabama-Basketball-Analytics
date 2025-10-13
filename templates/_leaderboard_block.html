@@ -245,9 +245,9 @@
   {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'atr_fg_pct' %}
-  {% set columns = ["FG (M–A)", "FG%", "Freq"] %}
+  {% set columns = ["FG", "FG%", "Freq"] %}
   {% set column_map = {
-    "FG (M–A)": {
+    "FG": {
       "keys": ("fg_summary", "makes"),
       "numeric_keys": ("makes", "attempts"),
     },
