@@ -536,6 +536,7 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
         att_key = stat_key.replace('_fg_pct', '_attempts')
         make_key = stat_key.replace('_fg_pct', '_makes')
         freq_key = stat_key.replace('_fg_pct', '_freq_pct')
+        base_key = stat_key[:-len('_fg_pct')]
 
         total_makes = 0
         total_attempts = 0
@@ -589,14 +590,18 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
             else:
                 leaderboard.append((player, makes, attempts, pct, freq))
 
+        freq_pct = make_pct(total_attempts, total_shots)
+        team_totals = {
+            f'{base_key}_makes': total_makes,
+            f'{base_key}_attempts': total_attempts,
+            stat_key: make_pct(total_makes, total_attempts),
+            f'{base_key}_freq_pct': freq_pct,
+        }
+
         if stat_key == 'fg3_fg_pct':
             shrink_freq = (shrink_attempts / total_attempts * 100.0) if total_attempts else 0.0
             nonshrink_freq = (nonshrink_attempts / total_attempts * 100.0) if total_attempts else 0.0
-            team_totals = {
-                'fg3_makes': total_makes,
-                'fg3_attempts': total_attempts,
-                'fg3_fg_pct': make_pct(total_makes, total_attempts),
-                'fg3_freq_pct': make_pct(total_attempts, total_shots),
+            team_totals.update({
                 'fg3_shrink_makes': shrink_makes,
                 'fg3_shrink_att': shrink_attempts,
                 'fg3_shrink_pct': make_pct(shrink_makes, shrink_attempts),
@@ -605,7 +610,7 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
                 'fg3_nonshrink_att': nonshrink_attempts,
                 'fg3_nonshrink_pct': make_pct(nonshrink_makes, nonshrink_attempts),
                 'fg3_nonshrink_freq_pct': nonshrink_freq,
-            }
+            })
         leaderboard.sort(key=lambda x: x[3], reverse=True)
     else:
         for player in players:

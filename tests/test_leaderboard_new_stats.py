@@ -130,6 +130,22 @@ def test_fg_pct_table_includes_frequency(client):
     assert '40.0%' in html
 
 
+def test_atr_fg_pct_team_totals_row(client):
+    resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'atr_fg_pct'})
+    soup = BeautifulSoup(resp.data, 'html.parser')
+
+    tfoot = soup.find('tfoot')
+    assert tfoot is not None
+    cells = [c.get_text(strip=True) for c in tfoot.find_all(['th', 'td'])]
+
+    # Ensure the totals row exists with the expected label and aggregate values
+    assert cells[0] == 'Totals'
+    assert cells[1] == 'Team Totals'
+    assert cells[2] == '1–2'
+    assert cells[3] == '50.0%'
+    assert cells[4] == '40.0%'
+
+
 def test_assist_summary_table(client):
     resp = client.get('/admin/leaderboard', query_string={'season_id': 1, 'stat': 'assist_summary'})
     html = resp.data.decode('utf-8')
