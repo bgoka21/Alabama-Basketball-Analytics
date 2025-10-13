@@ -1220,6 +1220,7 @@ _PRACTICE_DUAL_MAP = {
     "overall_gap_help": lambda: compute_overall_gap_help,
     "overall_low_man": lambda: compute_overall_low_man,
     "pnr_grade": lambda: compute_pnr_grade,
+    "atr_fg_pct": lambda: _build_stat_compute("atr_fg_pct"),
     "atr_contest_breakdown": lambda: _build_stat_compute("atr_contest_breakdown"),
     "fg2_contest_breakdown": lambda: _build_stat_compute("fg2_contest_breakdown"),
     "fg3_contest_breakdown": lambda: _build_stat_compute("fg3_contest_breakdown"),
@@ -1362,6 +1363,7 @@ def _split_leaderboard_rows_for_template(
         "pass_contest",
         "overall_gap_help",
         "overall_low_man",
+        "atr_fg_pct",
         "atr_contest_breakdown",
         "fg2_contest_breakdown",
         "fg3_contest_breakdown",
@@ -1379,6 +1381,15 @@ def _split_leaderboard_rows_for_template(
         },
         stat_key,
     )
+
+    if stat_key == "atr_fg_pct":
+        return {
+            "atr_fg_rows": normalized.get("season_rows") or [],
+            "atr_fg_totals": normalized.get("season_team_totals") or {},
+            "atr_fg_last_rows": normalized.get("last_rows") or [],
+            "atr_fg_last_totals": normalized.get("last_team_totals") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
 
     if stat_key == "off_rebounding":
         season_by = normalized.get("season_rows_by_subtype") or {}
@@ -8850,3 +8861,12 @@ def _ft_daily_data(*args, **kwargs):
         )
 
     return _ft_daily_data_core(*args, **kwargs)
+    if stat_key == "atr_fg_pct":
+        return {
+            "atr_fg_rows": normalized.get("season_rows") or [],
+            "atr_fg_totals": normalized.get("season_team_totals") or {},
+            "atr_fg_last_rows": normalized.get("last_rows") or [],
+            "atr_fg_last_totals": normalized.get("last_team_totals") or {},
+            "last_practice_date": normalized.get("last_practice_date"),
+        }
+

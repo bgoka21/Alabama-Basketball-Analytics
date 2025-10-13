@@ -305,6 +305,38 @@ class TestDualViews:
             expected_texts=["4", "5", "2", "2", "80.0%", "100.0%"],
         )
 
+    def test_atr_fg_pct_dual_view(self, monkeypatch, app_client):
+        import admin.routes as rmod
+
+        _patch_last_practice(monkeypatch)
+
+        season_rows = [
+            ("Player One", 5, 10, 50.0, 30.0),
+            ("Player Two", 3, 6, 50.0, 20.0),
+        ]
+        season_totals = (8, 16, 50.0, 50.0)
+
+        last_rows = [
+            ("Player One", 2, 4, 50.0, 25.0),
+        ]
+        last_totals = (2, 4, 50.0, 25.0)
+
+        fake = _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals)
+        monkeypatch.setitem(rmod._PRACTICE_DUAL_MAP, "atr_fg_pct", lambda: fake)
+
+        resp = app_client.get(
+            "/admin/leaderboard",
+            query_string={"season_id": 1, "stat": "atr_fg_pct"},
+        )
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+
+        assert "Season Totals" in html
+        assert "Last Practice" in html
+        assert "Sep 18, 2025" in html
+        assert "5–10" in html
+        assert "50.0%" in html
+
     def test_overall_gap_help_leaderboard_block(self, monkeypatch, app_client):
         import admin.routes as rmod
 

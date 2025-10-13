@@ -244,6 +244,44 @@
   {{ render_dual_section('Pass Contests', table, practice_note) }}
   {{ render_grade_scales_for_specs(percent_specs) }}
 
+{% elif selected.key == 'atr_fg_pct' %}
+  {% set columns = ["FG (M–A)", "FG%", "Freq"] %}
+  {% set column_map = {
+    "FG (M–A)": {
+      "keys": ("fg_summary", "makes"),
+      "numeric_keys": ("makes", "attempts"),
+    },
+    "FG%": {
+      "keys": ("fg_pct", "atr_fg_pct", "pct"),
+      "format": 'pct',
+    },
+    "Freq": {
+      "keys": ("freq", "atr_freq_pct", "freq_pct"),
+      "format": 'pct',
+    }
+  } %}
+  {% set pct_columns = ["FG%", "Freq"] %}
+  {% set grade_metrics = {
+    'fg_pct': 'atr_fg_pct',
+    'freq': 'atr_freq_pct'
+  } %}
+  {% set table = build_dual_table(
+    base_columns=columns,
+    season_rows=atr_fg_rows,
+    last_rows=atr_fg_last_rows,
+    season_totals=atr_fg_totals,
+    last_totals=atr_fg_last_totals,
+    column_map=column_map,
+    pct_columns=pct_columns,
+    left_label='Season Totals',
+    right_label='Last Practice',
+    totals_label='Team Totals',
+    table_id='leaderboard-atr_fg_pct',
+    default_sort=['fg_pct', 'freq', 'makes'],
+    grade_metrics=grade_metrics,
+  ) %}
+  {{ render_dual_section('ATR FG%', table, practice_note) }}
+
 {% elif selected.key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
   {% set label_map = {
     'atr_contest_breakdown': 'ATR',
