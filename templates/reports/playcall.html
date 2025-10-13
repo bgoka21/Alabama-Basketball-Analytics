@@ -5,23 +5,89 @@
 {% block content %}
 <h1 class="text-2xl font-bold mb-6">Playcall Report</h1>
 
-<form method="get" class="mb-6 flex flex-wrap items-center gap-3">
-  <label for="game-select" class="font-semibold">Game:</label>
-  <select id="game-select" name="game_id" onchange="this.form.submit()" class="border border-gray-300 rounded px-3 py-2">
-    {% for game in games %}
-      <option value="{{ game.id }}" {% if game.id == selected_game %}selected{% endif %}>
-        {{ game.game_date or "Unknown" }} — {{ game.opponent_name or "Opponent" }}
-      </option>
-    {% endfor %}
-  </select>
+<form method="get" class="mb-6 flex flex-wrap items-center gap-4">
+  <fieldset class="flex items-center gap-3">
+    <legend class="font-semibold">View:</legend>
+    <label class="flex items-center gap-1 text-sm">
+      <input
+        type="radio"
+        name="view"
+        value="game"
+        {% if selected_view == 'game' %}checked{% endif %}
+        onchange="this.form.submit()"
+      />
+      Game
+    </label>
+    <label class="flex items-center gap-1 text-sm">
+      <input
+        type="radio"
+        name="view"
+        value="season"
+        {% if selected_view == 'season' %}checked{% endif %}
+        onchange="this.form.submit()"
+      />
+      Season
+    </label>
+  </fieldset>
+
+  <div class="flex items-center gap-2">
+    <label for="season-select" class="font-semibold text-sm">Season:</label>
+    <select
+      id="season-select"
+      name="season_id"
+      onchange="this.form.submit()"
+      class="border border-gray-300 rounded px-3 py-2"
+    >
+      {% for season in seasons %}
+        <option value="{{ season.id }}" {% if season.id == selected_season %}selected{% endif %}>
+          {{ season.season_name or ('Season ' ~ season.id) }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if selected_view == 'game' %}
+    <div class="flex items-center gap-2">
+      <label for="game-select" class="font-semibold text-sm">Game:</label>
+      <select
+        id="game-select"
+        name="game_id"
+        onchange="this.form.submit()"
+        class="border border-gray-300 rounded px-3 py-2"
+      >
+        {% for game in games %}
+          <option value="{{ game.id }}" {% if game.id == selected_game %}selected{% endif %}>
+            {{ game.game_date or "Unknown" }} — {{ game.opponent_name or "Opponent" }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
 </form>
 
 {% if meta %}
   <div class="mb-4 text-sm text-gray-600">
-    <span class="font-semibold">Updated:</span>
-    {{ meta.updated_at }} ·
-    <span class="font-semibold">Off Set Chances:</span> {{ meta.total_chances_off_set }} ·
-    <span class="font-semibold">In Flow Chances:</span> {{ meta.total_chances_in_flow }}
+    <span class="font-semibold">Scope:</span>
+    {% if selected_view == 'season' %}
+      Season Totals{% if meta.season_name %} — {{ meta.season_name }}{% endif %}
+      {% if meta.game_count is defined %}
+        · <span class="font-semibold">Games:</span> {{ meta.game_count }}
+      {% endif %}
+    {% else %}
+      Game Totals
+      {% if selected_game_obj %}
+        — {{ selected_game_obj.game_date|date('%b %d, %Y') }} vs. {{ selected_game_obj.opponent_name }}
+      {% endif %}
+    {% endif %}
+    {% if meta.updated_at %}
+      · <span class="font-semibold">Updated:</span> {{ meta.updated_at }}
+    {% endif %}
+    {% if meta.total_chances_off_set is not none %}
+      · <span class="font-semibold">Off Set Chances:</span> {{ meta.total_chances_off_set }}
+    {% endif %}
+    {% if meta.total_chances_in_flow is not none %}
+      · <span class="font-semibold">In Flow Chances:</span> {{ meta.total_chances_in_flow }}
+    {% endif %}
   </div>
 {% endif %}
 
@@ -100,7 +166,7 @@
     {% endfor %}
   </div>
 {% elif not flow %}
-  <p class="text-gray-600">No playcall data available for this game.</p>
+  <p class="text-gray-600">No playcall data available for this view.</p>
 {% endif %}
 
 {% if flow %}

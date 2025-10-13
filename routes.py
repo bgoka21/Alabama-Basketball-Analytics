@@ -16,7 +16,7 @@ from admin.routes import (
     aggregate_stats,
     compute_team_shot_details,
 )
-from models.database import PlayerStats, Practice, BlueCollarStats, Game
+from models.database import PlayerStats, Practice, BlueCollarStats, Game, Season
 from datetime import date
 from types import SimpleNamespace
 from flask_login import login_required
@@ -38,7 +38,10 @@ from services.reports.advanced_possession import (
 )
 # END Advanced Possession
 # BEGIN Playcall Report
-from services.reports.playcall import cache_get_or_compute_playcall_report
+from services.reports.playcall import (
+    aggregate_playcall_reports,
+    cache_get_or_compute_playcall_report,
+)
 # END Playcall Report
 
 
@@ -357,11 +360,68 @@ def api_playcall_report():
     if not current_app.config.get("PLAYCALL_REPORT_ENABLED", True):
         abort(404)
 
+    view_scope = (request.args.get("view") or "game").lower()
+    if view_scope not in {"game", "season"}:
+        view_scope = "game"
+
+    if view_scope == "season":
+        season_id = request.args.get("season_id", type=int)
+        if not season_id:
+            return jsonify({"error": "season_id required"}), 400
+        season = Season.query.get(season_id)
+        if not season:
+            return jsonify({"error": "season not found"}), 404
+        games = (
+            Game.query.filter(Game.season_id == season_id)
+            .order_by(Game.game_date.asc(), Game.id.asc())
+            .all()
+        )
+        game_ids = [game.id for game in games]
+        data, meta = aggregate_playcall_reports(game_ids)
+        meta = dict(meta or {})
+        meta.update(
+            {
+                "view": "season",
+                "season_id": season_id,
+                "season_name": season.season_name,
+            }
+        )
+
+        if request.args.get("format") == "csv":
+            family_key = (request.args.get("family") or "").strip()
+            if not family_key:
+                return jsonify({"error": "family required"}), 400
+            series_payload = data.get("series") if isinstance(data, Mapping) else None
+            if not isinstance(series_payload, Mapping) or family_key not in series_payload:
+                return jsonify({"error": "invalid family"}), 400
+            family_payload = series_payload[family_key]
+            label = season.season_name or f"season_{season_id}"
+            safe_label = "".join(
+                ch.lower() if ch.isalnum() else "_" for ch in label
+            ).strip("_")
+            if not safe_label:
+                safe_label = f"season_{season_id}"
+            if family_key == "FLOW":
+                csv_body = _format_playcall_flow_csv(family_payload)
+                filename = f"season_{safe_label}_flow.csv"
+            else:
+                csv_body = _format_playcall_family_csv(family_payload)
+                safe_family = family_key.lower().replace(" ", "_")
+                filename = f"season_{safe_label}_{safe_family}.csv"
+            response = make_response(csv_body)
+            response.headers["Content-Type"] = "text/csv"
+            response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+            return response
+
+        return jsonify({"data": data, "meta": meta})
+
     game_id = request.args.get("game_id", type=int)
     if not game_id:
         return jsonify({"error": "game_id required"}), 400
 
     data, meta = cache_get_or_compute_playcall_report(game_id)
+    meta = dict(meta or {})
+    meta.update({"view": "game", "game_id": game_id})
 
     if request.args.get("format") == "csv":
         family_key = (request.args.get("family") or "").strip()
@@ -481,29 +541,73 @@ def playcall_report():
     if not current_app.config.get("PLAYCALL_REPORT_ENABLED", True):
         abort(404)
 
-    games = Game.query.order_by(Game.game_date.desc()).all()
+    view_scope = (request.args.get("view") or "game").lower()
+    if view_scope not in {"game", "season"}:
+        view_scope = "game"
+
+    seasons = (
+        Season.query.order_by(Season.start_date.desc(), Season.id.desc()).all()
+    )
+    season_id = request.args.get("season_id", type=int)
     game_id = request.args.get("game_id", type=int)
-    if not game_id and games:
-        game_id = games[0].id
 
-    series_options: list[str] = []
-    families_view: list[Dict[str, object]] = []
-    flow_view: Optional[Dict[str, object]] = None
-    playcall_meta = None
+    selected_game = Game.query.get(game_id) if game_id else None
+    if selected_game:
+        season_id = selected_game.season_id
 
-    if game_id:
-        try:
-            raw_data, playcall_meta = cache_get_or_compute_playcall_report(game_id)
-        except Exception:
-            raw_data, playcall_meta = {}, None
-        series_payload = raw_data.get("series") if isinstance(raw_data, Mapping) else {}
-        flow_payload = {}
+    if season_id is None and seasons:
+        season_id = seasons[0].id
+
+    selected_season = next((season for season in seasons if season.id == season_id), None)
+    if season_id and selected_season is None:
+        selected_season = Season.query.get(season_id)
+
+    def _games_for_season(season_value: Optional[int], ascending: bool = False):
+        query = Game.query
+        if season_value:
+            query = query.filter(Game.season_id == season_value)
+        if ascending:
+            query = query.order_by(Game.game_date.asc(), Game.id.asc())
+        else:
+            query = query.order_by(Game.game_date.desc(), Game.id.desc())
+        return query.all()
+
+    games = _games_for_season(season_id)
+
+    if view_scope == "game":
+        if not selected_game and game_id:
+            selected_game = next((game for game in games if game.id == game_id), None)
+        if not selected_game and games:
+            selected_game = games[0]
+            game_id = selected_game.id
+        if selected_game:
+            season_id = selected_game.season_id
+            if not selected_season or selected_season.id != season_id:
+                selected_season = next(
+                    (season for season in seasons if season.id == season_id),
+                    None,
+                )
+                if not selected_season:
+                    selected_season = Season.query.get(season_id)
+            games = _games_for_season(season_id)
+
+    def _build_playcall_views(
+        raw_payload: Mapping[str, object], csv_kwargs: Mapping[str, object]
+    ):
+        options: list[str] = []
+        family_sections: list[Dict[str, object]] = []
+        flow_section: Optional[Dict[str, object]] = None
+
+        series_payload = raw_payload.get("series") if isinstance(raw_payload, Mapping) else {}
+        flow_payload: Mapping[str, object] = {}
         if isinstance(series_payload, Mapping):
             for family_name, payload in series_payload.items():
-                if family_name == "FLOW":
-                    flow_payload = payload if isinstance(payload, Mapping) else {}
+                if not isinstance(payload, Mapping):
                     continue
-                plays_map = payload.get("plays") if isinstance(payload, Mapping) else {}
+                if family_name == "FLOW":
+                    flow_payload = payload
+                    continue
+                plays_map = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
                 rows: list[Dict[str, object]] = []
                 total_ran = 0
                 if isinstance(plays_map, Mapping):
@@ -515,25 +619,26 @@ def playcall_report():
                         in_flow = entry.get("in_flow", {}) if isinstance(entry.get("in_flow"), Mapping) else {}
                         off_ppc_val = float((off_set or {}).get("ppc", 0.0) or 0.0)
                         in_ppc_val = float((in_flow or {}).get("ppc", 0.0) or 0.0)
-                        row = {
-                            "playcall": playcall,
-                            "ran": ran_val,
-                            "off_set_pts": int((off_set or {}).get("pts", 0) or 0),
-                            "off_set_chances": int((off_set or {}).get("chances", 0) or 0),
-                            "off_set_ppc": {
-                                "display": f"{off_ppc_val:.2f}",
-                                "data_value": off_ppc_val,
-                            },
-                            "in_flow_pts": int((in_flow or {}).get("pts", 0) or 0),
-                            "in_flow_chances": int((in_flow or {}).get("chances", 0) or 0),
-                            "in_flow_ppc": {
-                                "display": f"{in_ppc_val:.2f}",
-                                "data_value": in_ppc_val,
-                            },
-                        }
-                        rows.append(row)
+                        rows.append(
+                            {
+                                "playcall": playcall,
+                                "ran": ran_val,
+                                "off_set_pts": int((off_set or {}).get("pts", 0) or 0),
+                                "off_set_chances": int((off_set or {}).get("chances", 0) or 0),
+                                "off_set_ppc": {
+                                    "display": f"{off_ppc_val:.2f}",
+                                    "data_value": off_ppc_val,
+                                },
+                                "in_flow_pts": int((in_flow or {}).get("pts", 0) or 0),
+                                "in_flow_chances": int((in_flow or {}).get("chances", 0) or 0),
+                                "in_flow_ppc": {
+                                    "display": f"{in_ppc_val:.2f}",
+                                    "data_value": in_ppc_val,
+                                },
+                            }
+                        )
                         total_ran += ran_val
-                totals_payload = payload.get("totals") if isinstance(payload, Mapping) else {}
+                totals_payload = payload.get("totals") if isinstance(payload.get("totals"), Mapping) else {}
                 off_totals = totals_payload.get("off_set") if isinstance(totals_payload, Mapping) else {}
                 in_totals = totals_payload.get("in_flow") if isinstance(totals_payload, Mapping) else {}
                 off_totals_ppc = float((off_totals or {}).get("ppc", 0.0) or 0.0)
@@ -550,13 +655,11 @@ def playcall_report():
                 }
                 csv_url = url_for(
                     "api_playcall_report",
-                    game_id=game_id,
-                    family=family_name,
-                    format="csv",
+                    **{**csv_kwargs, "family": family_name, "format": "csv"},
                 )
-                if family_name not in series_options:
-                    series_options.append(family_name)
-                families_view.append(
+                if family_name not in options:
+                    options.append(family_name)
+                family_sections.append(
                     {
                         "name": family_name,
                         "rows": rows,
@@ -564,10 +667,11 @@ def playcall_report():
                         "csv_url": csv_url,
                     }
                 )
-        if flow_payload:
+
+        if isinstance(flow_payload, Mapping) and flow_payload:
             flow_rows: list[Dict[str, object]] = []
             total_ran_flow = 0
-            plays_payload = flow_payload.get("plays") if isinstance(flow_payload, Mapping) else []
+            plays_payload = flow_payload.get("plays") if isinstance(flow_payload.get("plays"), Iterable) else []
             if isinstance(plays_payload, Iterable):
                 for entry in plays_payload:
                     if not isinstance(entry, Mapping):
@@ -588,7 +692,7 @@ def playcall_report():
                         }
                     )
                     total_ran_flow += ran_val
-            totals_payload = flow_payload.get("totals") if isinstance(flow_payload, Mapping) else {}
+            totals_payload = flow_payload.get("totals") if isinstance(flow_payload.get("totals"), Mapping) else {}
             totals_in_flow = totals_payload.get("in_flow") if isinstance(totals_payload, Mapping) else {}
             flow_ppc_val = float((totals_in_flow or {}).get("ppc", 0.0) or 0.0)
             flow_totals = {
@@ -600,17 +704,43 @@ def playcall_report():
             }
             flow_csv_url = url_for(
                 "api_playcall_report",
-                game_id=game_id,
-                family="FLOW",
-                format="csv",
+                **{**csv_kwargs, "family": "FLOW", "format": "csv"},
             )
-            flow_view = {
+            flow_section = {
                 "rows": flow_rows,
                 "totals": flow_totals,
                 "csv_url": flow_csv_url,
             }
-            if "FLOW" not in series_options:
-                series_options.append("FLOW")
+            if "FLOW" not in options:
+                options.append("FLOW")
+
+        return options, family_sections, flow_section
+
+    series_options: list[str] = []
+    families_view: list[Dict[str, object]] = []
+    flow_view: Optional[Dict[str, object]] = None
+    raw_data: Mapping[str, object] = {}
+    playcall_meta: Mapping[str, object] = {}
+
+    try:
+        if view_scope == "season" and season_id:
+            game_ids = [game.id for game in _games_for_season(season_id, ascending=True)]
+            raw_data, playcall_meta = aggregate_playcall_reports(game_ids)
+        elif view_scope == "game" and selected_game:
+            raw_data, playcall_meta = cache_get_or_compute_playcall_report(selected_game.id)
+    except Exception:
+        raw_data, playcall_meta = {}, {}
+
+    csv_kwargs: Dict[str, object] = {"view": view_scope}
+    if view_scope == "game" and selected_game:
+        csv_kwargs["game_id"] = selected_game.id
+    elif view_scope == "season" and season_id:
+        csv_kwargs["season_id"] = season_id
+
+    if isinstance(raw_data, Mapping) and raw_data:
+        built = _build_playcall_views(raw_data, csv_kwargs)
+        if built:
+            series_options, families_view, flow_view = built
 
     selected_series = [
         value for value in request.args.getlist("series") if value in series_options
@@ -618,18 +748,33 @@ def playcall_report():
     if not selected_series and series_options:
         selected_series = list(series_options)
 
-    search_query = request.args.get("q", "")
+    search_query = request.args.get("search", "")
+
+    data_meta = raw_data.get("meta") if isinstance(raw_data, Mapping) else {}
+    display_meta: Dict[str, object] = {}
+    if isinstance(playcall_meta, Mapping):
+        display_meta.update({k: v for k, v in playcall_meta.items() if v is not None})
+    if isinstance(data_meta, Mapping):
+        display_meta.update({k: v for k, v in data_meta.items() if v is not None})
+    display_meta.setdefault("view", view_scope)
+    if selected_season:
+        display_meta.setdefault("season_id", selected_season.id)
+        display_meta.setdefault("season_name", selected_season.season_name)
 
     return render_template(
         "reports/playcall.html",
         games=games,
-        selected_game=game_id,
+        seasons=seasons,
+        selected_game=selected_game.id if selected_game else None,
+        selected_season=season_id,
+        selected_view=view_scope,
         families=families_view,
         flow=flow_view,
         series_options=series_options,
         selected_series=selected_series,
         search_query=search_query,
-        meta=playcall_meta,
+        meta=display_meta,
+        selected_game_obj=selected_game,
     )
 # END Playcall Report
 
