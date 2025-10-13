@@ -7001,6 +7001,7 @@ def ft_daily():
         output = io.StringIO()
         writer = csv.writer(output)
         headers = [
+            'Rank',
             'Player',
             'Non-FTs',
             'FT Makes',
@@ -7017,6 +7018,7 @@ def ft_daily():
             weekly_pct = f"{r['ft_pct']:.1f}" if r['ft_attempts'] else ''
             since_pct = f"{r['ft_pct_since']:.1f}" if r['fta_since'] else ''
             writer.writerow([
+                r['rank'],
                 r['player_name'],
                 r['non_ft'],
                 r['ft_makes'],
@@ -7057,12 +7059,21 @@ def ft_daily():
     def _next_dir(col):
         return 'asc' if (sort == col and dir_ == 'desc') else 'desc'
 
+    sortable_columns = (
+        'name',
+        'non_ft',
+        'makes',
+        'attempts',
+        'pct',
+        'total',
+        'ftm_since',
+        'fta_since',
+        'pct_since',
+        'total_since',
+    )
     sort_urls = {
-        'name': _build_url({'sort': 'name', 'dir': _next_dir('name')}),
-        'makes': _build_url({'sort': 'makes', 'dir': _next_dir('makes')}),
-        'attempts': _build_url({'sort': 'attempts', 'dir': _next_dir('attempts')}),
-        'pct': _build_url({'sort': 'pct', 'dir': _next_dir('pct')}),
-        'total': _build_url({'sort': 'total', 'dir': _next_dir('total')}),
+        column: _build_url({'sort': column, 'dir': _next_dir(column)})
+        for column in sortable_columns
     }
 
     return render_template(
@@ -8664,11 +8675,16 @@ def _parse_date_param(value):
 def _ft_sort_key(sort):
     """Return a sorting key function for ft_daily rows."""
     mapping = {
+        'non_ft': lambda r: r.get('non_ft', 0),
         'makes': lambda r: r['ft_makes'],
         'attempts': lambda r: r['ft_attempts'],
         'pct': lambda r: r.get('ft_pct') or 0.0,
         'total': lambda r: r.get('total_shots_weekly', 0),
         'name': lambda r: r['player_name'].lower(),
+        'ftm_since': lambda r: r.get('ftm_since', 0),
+        'fta_since': lambda r: r.get('fta_since', 0),
+        'pct_since': lambda r: r.get('ft_pct_since') or 0.0,
+        'total_since': lambda r: r.get('total_shots_since', 0),
     }
     return mapping.get(sort, lambda r: r['ft_attempts'])
 
@@ -8855,6 +8871,9 @@ def _ft_daily_data_core(start_date, end_date, since_date, hide_zeros, sort, dir_
         rows = [r for r in rows if r['ft_attempts'] > 0]
 
     rows.sort(key=_ft_sort_key(sort), reverse=(dir_ == 'desc'))
+
+    for index, row in enumerate(rows, start=1):
+        row['rank'] = index
 
     totals = {
         'non_ft': sum(r['non_ft'] for r in rows),
