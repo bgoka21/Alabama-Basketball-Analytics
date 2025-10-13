@@ -138,9 +138,11 @@ def _aggregate_rows(rows: Iterable[PlayerStats]) -> Dict[str, Dict[str, Any]]:
         entry["fg3_shrink_makes"] = breakdown.get("fg3_shrink_makes", 0)
         entry["fg3_shrink_att"] = breakdown.get("fg3_shrink_att", 0)
         entry["fg3_shrink_pct"] = breakdown.get("fg3_shrink_pct")
+        entry["fg3_shrink_freq_pct"] = breakdown.get("fg3_shrink_freq_pct")
         entry["fg3_nonshrink_makes"] = breakdown.get("fg3_nonshrink_makes", 0)
         entry["fg3_nonshrink_att"] = breakdown.get("fg3_nonshrink_att", 0)
         entry["fg3_nonshrink_pct"] = breakdown.get("fg3_nonshrink_pct")
+        entry["fg3_nonshrink_freq_pct"] = breakdown.get("fg3_nonshrink_freq_pct")
 
     return players
 
@@ -253,9 +255,11 @@ def _build_shrink_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
             "fg3_shrink_att": data.get("fg3_shrink_att", 0),
             "fg3_shrink_make": data.get("fg3_shrink_makes", 0),
             "fg3_shrink_pct": data.get("fg3_shrink_pct"),
+            "fg3_shrink_freq_pct": data.get("fg3_shrink_freq_pct"),
             "fg3_nonshrink_att": data.get("fg3_nonshrink_att", 0),
             "fg3_nonshrink_make": data.get("fg3_nonshrink_makes", 0),
             "fg3_nonshrink_pct": data.get("fg3_nonshrink_pct"),
+            "fg3_nonshrink_freq_pct": data.get("fg3_nonshrink_freq_pct"),
         }
     )
     return row
@@ -412,6 +416,10 @@ def _build_totals(rows: Sequence[Dict[str, Any]], mappings: Sequence[Tuple[str, 
         numer_key, denom_key = pct_source
         if numer_key in totals and denom_key in totals:
             totals[pct_key] = _safe_pct(totals[numer_key], totals[denom_key])
+    if "fg3_shrink_att" in totals and "fg3_att" in totals:
+        totals["fg3_shrink_freq_pct"] = _safe_pct(totals["fg3_shrink_att"], totals["fg3_att"])
+    if "fg3_nonshrink_att" in totals and "fg3_att" in totals:
+        totals["fg3_nonshrink_freq_pct"] = _safe_pct(totals["fg3_nonshrink_att"], totals["fg3_att"])
     return totals
 
 

@@ -1826,12 +1826,20 @@ def build_leaderboard_table(
             )
             column_specs.append(
                 _spec(
+                    "Shrink 3FG Freq",
+                    keys=("fg3_shrink_freq_pct", "shrink_freq"),
+                    index=8,
+                    fmt="pct",
+                )
+            )
+            column_specs.append(
+                _spec(
                     "Non-Shrink 3FG (M–A)",
                     compose="makes_attempts",
                     make_keys=("fg3_nonshrink_makes", "nonshrink_makes"),
-                    make_index=8,
+                    make_index=9,
                     attempt_keys=("fg3_nonshrink_att", "nonshrink_attempts"),
-                    attempt_index=9,
+                    attempt_index=10,
                     align="center",
                     sort_source="makes",
                 )
@@ -1840,7 +1848,15 @@ def build_leaderboard_table(
                 _spec(
                     "Non-Shrink 3FG %",
                     keys=("fg3_nonshrink_pct", "nonshrink_pct"),
-                    index=10,
+                    index=11,
+                    fmt="pct",
+                )
+            )
+            column_specs.append(
+                _spec(
+                    "Non-Shrink 3FG Freq",
+                    keys=("fg3_nonshrink_freq_pct", "nonshrink_freq"),
+                    index=12,
                     fmt="pct",
                 )
             )
