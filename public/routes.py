@@ -335,11 +335,11 @@ def game_homepage():
     record = f"{wins}–{losses}"
 
     # 2) Avg. BCP per game over those same games (USE weighted total_blue_collar)
-    team_records = TeamStats.query.filter(
+    team_stats = TeamStats.query.filter(
         TeamStats.is_opponent == False, TeamStats.game_id.in_(game_ids)
     ).all()
-    team_total_bcp = sum(r.total_blue_collar for r in team_records)
-    avg_bcp = round(team_total_bcp / len(team_records), 1) if team_records else 0
+    team_total_bcp = sum(r.total_blue_collar or 0 for r in team_stats)
+    avg_bcp = round(team_total_bcp / len(team_stats), 1) if team_stats else 0
 
     # 3) Avg. 3FG% this season (skip any None values)
     pct3s = [row.fg3_pct for row in fg3_leaders]
@@ -350,14 +350,22 @@ def game_homepage():
         avg_fg3 = "0%"
 
     # 4) Avg. Team Points Per Game
-    team_stats = TeamStats.query.filter(
-        TeamStats.game_id.in_(game_ids), TeamStats.is_opponent == False
-    ).all()
     if team_stats:
-        total_points = sum(ts.total_points for ts in team_stats)
+        total_points = sum(ts.total_points or 0 for ts in team_stats)
         avg_ppg = round(total_points / len(team_stats), 1)
     else:
         avg_ppg = 0
+
+    team_fg3_makes = sum(ts.total_fg3_makes or 0 for ts in team_stats)
+    team_fg3_attempts = sum(ts.total_fg3_attempts or 0 for ts in team_stats)
+    team_fg3_pct = (
+        team_fg3_makes / team_fg3_attempts if team_fg3_attempts else None
+    )
+    fg3_totals = {
+        "player": "Team Totals",
+        "fg": f"{int(team_fg3_makes)}/{int(team_fg3_attempts)}",
+        "fg_pct": f"{team_fg3_pct * 100:.1f}%" if team_fg3_pct is not None else "0.0%",
+    }
 
     summary = {
         "record": record,
@@ -428,6 +436,7 @@ def game_homepage():
         bcp_rows=bcp_rows,
         hard_hat_rows=hard_hat_rows,
         fg3_rows=fg3_rows,
+        fg3_totals=fg3_totals,
         atr_rows=atr_rows,
         filter_opt=filter_opt,
         view_opt=view_opt,
@@ -443,6 +452,7 @@ def practice_homepage(active_page="practice_home"):
     """Leaderboard-style homepage for practice statistics."""
     season_id = get_current_season_id()
     if not season_id:
+        empty_totals = {"player": "Team Totals", "fg": "0/0", "pct": "0.0%"}
         return render_template(
             "practice_home.html",
             dunks=[],
@@ -453,6 +463,7 @@ def practice_homepage(active_page="practice_home"):
             overall_records=[],
             sprint_wins=[],
             sprint_losses=[],
+            fg3_totals=empty_totals,
             active_page=active_page,
             label_options=collect_practice_labels([]),
             selected_labels=[],
@@ -477,6 +488,7 @@ def practice_homepage(active_page="practice_home"):
             pass
     practice_ids = [p.id for p in practice_q.all()]
     if not practice_ids:
+        empty_totals = {"player": "Team Totals", "fg": "0/0", "pct": "0.0%"}
         return render_template(
             "practice_home.html",
             dunks=[],
@@ -487,6 +499,7 @@ def practice_homepage(active_page="practice_home"):
             overall_records=[],
             sprint_wins=[],
             sprint_losses=[],
+            fg3_totals=empty_totals,
             active_page=active_page,
             label_options=collect_practice_labels([]),
             selected_labels=[],
@@ -501,6 +514,8 @@ def practice_homepage(active_page="practice_home"):
         lbl for lbl in request.args.getlist("label") if lbl.upper() in label_options
     ]
     label_set = {lbl.upper() for lbl in selected_labels}
+    fg3_total_makes = 0
+    fg3_total_attempts = 0
 
     # ─── Dunks Get You Paid ────────────────────────────────────────────
     dunk_counts = defaultdict(int)
@@ -565,6 +580,8 @@ def practice_homepage(active_page="practice_home"):
         pps_rows = []
         for player, rows in stats_by_player.items():
             totals = compute_filtered_totals(rows, label_set)
+            fg3_total_makes += totals.fg3_makes or 0
+            fg3_total_attempts += totals.fg3_attempts or 0
             if totals.atr_attempts >= 10:
                 atr_pct = (
                     round(totals.atr_makes / totals.atr_attempts * 100, 1)
@@ -697,6 +714,14 @@ def practice_homepage(active_page="practice_home"):
         )
         fg3_leaders = q3.all()
 
+        totals_query = db.session.query(
+            func.coalesce(func.sum(PlayerStats.fg3_makes), 0),
+            func.coalesce(func.sum(PlayerStats.fg3_attempts), 0),
+        ).filter(PlayerStats.practice_id.in_(practice_ids))
+        total_makes, total_attempts = totals_query.one()
+        fg3_total_makes = total_makes or 0
+        fg3_total_attempts = total_attempts or 0
+
         # ─── Overall Practice Record ─────────────────────────────────────────
         records_q = (
             db.session.query(
@@ -771,6 +796,15 @@ def practice_homepage(active_page="practice_home"):
             pps_leaders.append((name, pps))
 
         pps_leaders.sort(key=lambda x: x[1], reverse=True)
+
+    fg3_total_pct = (
+        fg3_total_makes / fg3_total_attempts if fg3_total_attempts else None
+    )
+    fg3_totals = {
+        "player": "Team Totals",
+        "fg": f"{int(fg3_total_makes)}/{int(fg3_total_attempts)}",
+        "pct": f"{fg3_total_pct * 100:.1f}%" if fg3_total_pct is not None else "0.0%",
+    }
 
     can_link = current_user.is_authenticated and (
         current_user.is_admin or not current_user.is_player
@@ -864,6 +898,7 @@ def practice_homepage(active_page="practice_home"):
         bcp_rows=bcp_rows,
         atr_rows=atr_rows,
         fg3_rows=fg3_rows,
+        fg3_totals=fg3_totals,
         pps_rows=pps_rows,
         overall_record_rows=overall_record_rows,
         sprint_win_rows=sprint_win_rows,
