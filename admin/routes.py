@@ -7958,16 +7958,20 @@ def leaderboard_game():
     if not end_date and end_date_arg:
         end_date_value = end_date_arg
 
-    return render_template(
-        'admin/game_leaderboard.html',
-        all_seasons=all_seasons,
-        season_list=season_list,
-        selected_season=selected_season,
-        start_date=start_date_value,
-        end_date=end_date_value,
-        leaderboard_groups=leaderboard_groups,
-        active_page='leaderboard',
-    )
+    context = {
+        'all_seasons': all_seasons,
+        'season_list': season_list,
+        'selected_season': selected_season,
+        'start_date': start_date_value,
+        'end_date': end_date_value,
+        'leaderboard_groups': leaderboard_groups,
+        'active_page': 'leaderboard',
+    }
+
+    if request.headers.get('HX-Request') == 'true':
+        return render_template('admin/_game_leaderboard_results.html', **context)
+
+    return render_template('admin/game_leaderboard.html', **context)
 
 
 @admin_bp.route('/leaderboard')

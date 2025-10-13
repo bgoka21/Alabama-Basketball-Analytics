@@ -1,0 +1,47 @@
+<div id="game-leaderboard-results">
+  <section class="mb-6">
+    <h1 class="text-3xl font-bold mb-2">Game Leaderboard</h1>
+    <p class="text-sm text-gray-600">Season Totals vs Last Game snapshots for each focus area.</p>
+  </section>
+
+  {% set no_data_message = 'No stats for the most recent game.' %}
+
+  <div class="space-y-6">
+    {% for group in leaderboard_groups %}
+      <details class="bg-white rounded shadow group" open>
+        <summary class="flex items-center justify-between px-6 py-4 cursor-pointer select-none">
+          <span class="text-lg font-semibold text-gray-900">{{ group.title }}</span>
+          <span class="text-sm text-gray-500 transition-transform group-open:-rotate-180">&#9662;</span>
+        </summary>
+        <div class="border-t border-gray-200 px-6 py-6 space-y-6">
+          {% for item in group.items %}
+            <div id="{{ item.slug }}" class="space-y-4">
+              {% set table = build_dual_table(
+                base_columns=columns_for(item.key),
+                season_rows=item.season_rows,
+                last_rows=item.last_rows,
+                season_totals=item.season_totals,
+                last_totals=item.last_totals,
+                column_map=column_map_for(item.key),
+                pct_columns=pct_columns_for(item.key),
+                left_label='Season Totals',
+                right_label='Last Game',
+                totals_label='Team Totals',
+                table_id=table_id_for(item.key),
+                default_sort=sort_default_for(item.key)
+              ) %}
+              {% set percent_specs = percent_specs_for(item.key) %}
+              {% if percent_specs %}
+                {% set _ = apply_percent_wrappers(table, percent_specs) %}
+              {% endif %}
+              {{ render_dual_section(item.label, table, note_date=item.note_date, empty_message=no_data_message) }}
+              {% if percent_specs %}
+                {{ render_grade_scales_for_specs(percent_specs) }}
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </details>
+    {% endfor %}
+  </div>
+</div>
