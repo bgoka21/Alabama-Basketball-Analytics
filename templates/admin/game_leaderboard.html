@@ -4,10 +4,24 @@
 {% from '_macros/grade_scale.html' import render_grade_scales_for_specs %}
 
 {% block page_controls %}
-<form method="get" class="mb-4 flex flex-wrap items-end gap-4">
+<form
+  method="get"
+  id="game-leaderboard-form"
+  class="mb-4 flex flex-wrap items-end gap-4"
+>
   <div>
     <label class="font-semibold mr-2">Season:</label>
-    <select name="season" class="border p-2 rounded">
+    <select
+      name="season"
+      class="border p-2 rounded"
+      hx-get="{{ url_for('admin.leaderboard_game') }}"
+      hx-trigger="change delay:250ms"
+      hx-target="#game-leaderboard-results"
+      hx-include="#game-leaderboard-form"
+      hx-select="#game-leaderboard-results"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >
       {% for s in all_seasons %}
         <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>
           {{ s.season_name }}
@@ -24,9 +38,33 @@
   {% endfor %}
   <div class="flex items-center gap-2">
     <label class="text-sm font-medium">Date:</label>
-    <input type="date" name="start_date" value="{{ start_date or '' }}" class="border px-2 py-1 text-sm">
+    <input
+      type="date"
+      name="start_date"
+      value="{{ start_date or '' }}"
+      class="border px-2 py-1 text-sm"
+      hx-get="{{ url_for('admin.leaderboard_game') }}"
+      hx-trigger="change delay:250ms"
+      hx-target="#game-leaderboard-results"
+      hx-include="#game-leaderboard-form"
+      hx-select="#game-leaderboard-results"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >
     <span class="text-sm">–</span>
-    <input type="date" name="end_date" value="{{ end_date or '' }}" class="border px-2 py-1 text-sm">
+    <input
+      type="date"
+      name="end_date"
+      value="{{ end_date or '' }}"
+      class="border px-2 py-1 text-sm"
+      hx-get="{{ url_for('admin.leaderboard_game') }}"
+      hx-trigger="change delay:250ms"
+      hx-target="#game-leaderboard-results"
+      hx-include="#game-leaderboard-form"
+      hx-select="#game-leaderboard-results"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >
   </div>
   <div>
     <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
@@ -38,49 +76,5 @@
 {% endblock %}
 
 {% block content %}
-<section class="mb-6">
-  <h1 class="text-3xl font-bold mb-2">Game Leaderboard</h1>
-  <p class="text-sm text-gray-600">Season Totals vs Last Game snapshots for each focus area.</p>
-</section>
-
-{% set no_data_message = 'No stats for the most recent game.' %}
-
-<div class="space-y-6">
-  {% for group in leaderboard_groups %}
-    <details class="bg-white rounded shadow group" open>
-      <summary class="flex items-center justify-between px-6 py-4 cursor-pointer select-none">
-        <span class="text-lg font-semibold text-gray-900">{{ group.title }}</span>
-        <span class="text-sm text-gray-500 transition-transform group-open:-rotate-180">&#9662;</span>
-      </summary>
-      <div class="border-t border-gray-200 px-6 py-6 space-y-6">
-        {% for item in group.items %}
-          <div id="{{ item.slug }}" class="space-y-4">
-            {% set table = build_dual_table(
-              base_columns=columns_for(item.key),
-              season_rows=item.season_rows,
-              last_rows=item.last_rows,
-              season_totals=item.season_totals,
-              last_totals=item.last_totals,
-              column_map=column_map_for(item.key),
-              pct_columns=pct_columns_for(item.key),
-              left_label='Season Totals',
-              right_label='Last Game',
-              totals_label='Team Totals',
-              table_id=table_id_for(item.key),
-              default_sort=sort_default_for(item.key)
-            ) %}
-            {% set percent_specs = percent_specs_for(item.key) %}
-            {% if percent_specs %}
-              {% set _ = apply_percent_wrappers(table, percent_specs) %}
-            {% endif %}
-            {{ render_dual_section(item.label, table, note_date=item.note_date, empty_message=no_data_message) }}
-            {% if percent_specs %}
-              {{ render_grade_scales_for_specs(percent_specs) }}
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
-    </details>
-  {% endfor %}
-</div>
+  {% include 'admin/_game_leaderboard_results.html' %}
 {% endblock %}
