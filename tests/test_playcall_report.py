@@ -3,6 +3,7 @@ import importlib
 import sys
 from datetime import date
 
+import pandas as pd
 import pytest
 
 import app as app_module
@@ -17,6 +18,49 @@ def _make_play_payload(ran, off_set_pts, off_set_chances, in_flow_pts, in_flow_c
         "off_set": {"pts": off_set_pts, "chances": off_set_chances, "ppc": 0.0},
         "in_flow": {"pts": in_flow_pts, "chances": in_flow_chances, "ppc": 0.0},
     }
+
+
+def test_compute_from_dataframe_normalizes_playcall_tokens():
+    df = pd.DataFrame(
+        [
+            {
+                "Row": "Offense",
+                "SERIES": "2 Keep M Rip",
+                "PLAYCALL": "2 Keep M Rip",
+                "TEAM": "Alabama",
+                "#1": "2FG+",
+            },
+            {
+                "Row": "Offense",
+                "SERIES": "2 Keep M Rip, Flow",
+                "PLAYCALL": "2 Keep M Rip, Flow - Power",
+                "TEAM": "Alabama",
+                "#1": "3FG+",
+            },
+        ]
+    )
+
+    payload = playcall_service._compute_from_dataframe(df)
+
+    family_payload = payload["series"].get("2 Keep M Rip")
+    assert family_payload is not None
+    plays = family_payload["plays"]
+    assert set(plays.keys()) == {"2 Keep M Rip"}
+
+    base_play = plays["2 Keep M Rip"]
+    assert base_play["ran"] == 2
+    assert base_play["off_set"]["pts"] == 2
+    assert base_play["off_set"]["chances"] == 1
+    assert base_play["in_flow"]["pts"] == 3
+    assert base_play["in_flow"]["chances"] == 1
+
+    flow_entries = payload["series"]["FLOW"]["plays"]
+    assert len(flow_entries) == 1
+    flow_entry = flow_entries[0]
+    assert flow_entry["playcall"] == "2 Keep M Rip"
+    assert flow_entry["ran_in_flow"] == 1
+    assert flow_entry["in_flow"]["pts"] == 3
+    assert flow_entry["in_flow"]["chances"] == 1
 
 
 @pytest.fixture

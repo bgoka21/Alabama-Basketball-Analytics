@@ -153,8 +153,10 @@ def _compute_from_dataframe(df: pd.DataFrame) -> Dict[str, object]:
         row_mapping: Mapping[str, object] = row.to_dict()
         series_value, in_flow, flow_only, _tokens = _series_tokens(row_mapping.get("SERIES"))
         playcall_raw = _normalize_string(row_mapping.get("PLAYCALL"))
+        playcall_tokens = list(_extract_tokens(playcall_raw)) if playcall_raw else []
+        primary_playcall = playcall_tokens[0] if playcall_tokens else ""
+        playcall_label = primary_playcall or (playcall_raw or "UNKNOWN")
         has_playcall = bool(playcall_raw)
-        playcall_label = playcall_raw or "UNKNOWN"
         team_val = _normalize_string(row_mapping.get("TEAM"))
         team_lower = team_val.lower()
         is_neutral = "neutral" in team_lower
