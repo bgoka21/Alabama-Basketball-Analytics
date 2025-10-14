@@ -12,6 +12,7 @@ from sqlalchemy import inspect
 import pdfkit
 
 from datetime import datetime, date
+from typing import Optional
 from models.database import db, PageView, SavedStatProfile
 from models.user import User
 from admin.routes import admin_bp
@@ -159,6 +160,44 @@ def create_app():
     app.jinja_env.globals['grade_scale'] = grade_scale
     app.jinja_env.filters["fmt_money"] = fmt_money
     app.jinja_env.filters["posneg"] = posneg_class
+
+    @app.template_filter("date")
+    def format_date(value, format_str="%Y-%m-%d"):
+        """Format dates and datetimes safely for templates."""
+        if value is None:
+            return ""
+
+        if isinstance(value, (datetime, date)):
+            return value.strftime(format_str)
+
+        if isinstance(value, str):
+            candidate: Optional[str] = value.strip()
+            if not candidate:
+                return ""
+
+            iso_candidate = candidate.rstrip("Z")
+            try:
+                parsed = datetime.fromisoformat(iso_candidate)
+            except ValueError:
+                for fmt in (
+                    "%Y-%m-%d",
+                    "%Y-%m-%d %H:%M:%S",
+                    "%m/%d/%Y",
+                    "%m/%d/%Y %H:%M:%S",
+                ):
+                    try:
+                        parsed = datetime.strptime(candidate, fmt)
+                        break
+                    except ValueError:
+                        parsed = None  # type: ignore[assignment]
+                else:
+                    return candidate
+
+            return parsed.strftime(format_str) if parsed else candidate
+
+        return value
+
+    app.jinja_env.filters["date"] = format_date
 
     def display_pick(value):
         try:
