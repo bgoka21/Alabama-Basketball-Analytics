@@ -1,13 +1,16 @@
 import copy
+import csv
 import importlib
 import sys
 from datetime import date
+from io import StringIO
 
 import pandas as pd
 import pytest
 
 import app as app_module
 from app import db
+from flask import template_rendered
 from models.database import Game, Season
 from services.reports import playcall as playcall_service
 
@@ -17,6 +20,57 @@ def _make_play_payload(ran, off_set_pts, off_set_chances, in_flow_pts, in_flow_c
         "ran": ran,
         "off_set": {"pts": off_set_pts, "chances": off_set_chances, "ppc": 0.0},
         "in_flow": {"pts": in_flow_pts, "chances": in_flow_chances, "ppc": 0.0},
+    }
+
+
+def _build_sample_series_payload():
+    return {
+        "series": {
+            "HORNS": {
+                "plays": {
+                    "Horns Flex": {
+                        "ran": 2,
+                        "off_set": {"pts": 4, "chances": 2, "ppc": 2.0},
+                        "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
+                    }
+                },
+                "totals": {
+                    "off_set": {"pts": 4, "chances": 2, "ppc": 2.0},
+                    "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
+                },
+            },
+            "ZONE": {
+                "plays": {
+                    "Zone 23": {
+                        "ran": 1,
+                        "off_set": {"pts": 0, "chances": 0, "ppc": 0.0},
+                        "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
+                    }
+                },
+                "totals": {
+                    "off_set": {"pts": 0, "chances": 0, "ppc": 0.0},
+                    "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
+                },
+            },
+            "FLOW": {
+                "plays": [
+                    {
+                        "playcall": "Horns Flex",
+                        "ran_in_flow": 1,
+                        "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
+                    },
+                    {
+                        "playcall": "FLOW",
+                        "ran_in_flow": 2,
+                        "in_flow": {"pts": 5, "chances": 2, "ppc": 2.5},
+                    },
+                ],
+                "totals": {
+                    "in_flow": {"pts": 8, "chances": 3, "ppc": 2.67},
+                },
+            },
+        },
+        "meta": {"total_chances_off_set": 2, "total_chances_in_flow": 4},
     }
 
 
@@ -301,3 +355,187 @@ def test_api_playcall_report_season_view(app, monkeypatch):
     assert "season_2023_24_flow.csv" in disposition
     assert calls[-1] == season_game_ids
     assert len(calls) == 2
+
+
+def test_playcall_report_all_card_includes_flow_only(app, monkeypatch):
+    payload = _build_sample_series_payload()
+    meta = {"updated_at": "2024-01-02T00:00:00Z"}
+
+    app_module.app = app
+    if "routes" in sys.modules:
+        routes_module = importlib.reload(sys.modules["routes"])
+    else:
+        routes_module = importlib.import_module("routes")
+
+    def fake_cache(game_id):
+        return copy.deepcopy(payload), dict(meta)
+
+    monkeypatch.setattr(
+        routes_module,
+        "cache_get_or_compute_playcall_report",
+        fake_cache,
+    )
+
+    app.jinja_env.filters.setdefault(
+        "date",
+        lambda value, fmt="%Y-%m-%d": value.strftime(fmt)
+        if hasattr(value, "strftime")
+        else value,
+    )
+
+    with app.app_context():
+        app.config["PLAYCALL_REPORT_ENABLED"] = True
+        season = Season(season_name="2024-25")
+        db.session.add(season)
+        db.session.flush()
+        game = Game(
+            season_id=season.id,
+            game_date=date(2024, 1, 5),
+            opponent_name="Sample Opponent",
+            home_or_away="Home",
+        )
+        db.session.add(game)
+        db.session.commit()
+        game_id = game.id
+
+    captured = {}
+
+    def record(sender, template, context, **extra):
+        if template.name == "reports/playcall.html":
+            captured["context"] = context
+
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = "1"
+        session["_fresh"] = True
+
+    with template_rendered.connected_to(record, app):
+        response = client.get(
+            "/reports/playcall",
+            query_string={"view": "game", "game_id": game_id},
+        )
+
+    assert response.status_code == 200
+    assert "context" in captured
+    context = captured["context"]
+
+    assert context["series_options"][0] == "ALL"
+    assert "ALL" in context["selected_series"]
+
+    all_section = context["all_section"]
+    assert all_section is not None
+    rows = all_section["rows"]
+    assert len(rows) == 3
+    combos = {(row["series"], row["playcall"]) for row in rows}
+    assert combos == {("HORNS", "Horns Flex"), ("ZONE", "Zone 23"), ("FLOW", "FLOW")}
+
+    flow_row = next(row for row in rows if row["series"] == "FLOW")
+    assert flow_row["ran"] == 2
+    assert flow_row["off_set_pts"] == 0
+    assert flow_row["off_set_chances"] == 0
+    assert flow_row["in_flow_pts"] == 5
+    assert flow_row["in_flow_chances"] == 2
+
+    totals = all_section["totals"]
+    assert totals["ran"] == 5
+    assert totals["off_set_pts"] == 4
+    assert totals["off_set_chances"] == 2
+    assert totals["in_flow_pts"] == 11
+    assert totals["in_flow_chances"] == 4
+    assert totals["off_set_ppc"] == "2.00"
+    assert totals["in_flow_ppc"] == "2.75"
+
+
+def test_api_playcall_all_csv_and_json(app, monkeypatch):
+    payload = _build_sample_series_payload()
+    meta = {"updated_at": "2024-01-02T00:00:00Z"}
+
+    app_module.app = app
+    if "routes" in sys.modules:
+        routes_module = importlib.reload(sys.modules["routes"])
+    else:
+        routes_module = importlib.import_module("routes")
+
+    def fake_cache(game_id):
+        return copy.deepcopy(payload), dict(meta)
+
+    monkeypatch.setattr(
+        routes_module,
+        "cache_get_or_compute_playcall_report",
+        fake_cache,
+    )
+
+    with app.app_context():
+        app.config["PLAYCALL_REPORT_ENABLED"] = True
+        season = Season(season_name="2024-25")
+        db.session.add(season)
+        db.session.flush()
+        game = Game(
+            season_id=season.id,
+            game_date=date(2024, 1, 5),
+            opponent_name="Sample Opponent",
+            home_or_away="Home",
+        )
+        db.session.add(game)
+        db.session.commit()
+        game_id = game.id
+
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = "1"
+        session["_fresh"] = True
+
+    json_response = client.get(
+        "/api/reports/playcall",
+        query_string={"game_id": game_id},
+    )
+    assert json_response.status_code == 200
+    body = json_response.get_json()
+    assert body["data"]["meta"] == payload["meta"]
+
+    flat = routes_module._flatten_playcall_series(body["data"].get("series"))
+    rows = flat["rows"]
+    assert len(rows) == 3
+    pairs = {(row["series"], row["playcall"]) for row in rows}
+    assert pairs == {("HORNS", "Horns Flex"), ("ZONE", "Zone 23"), ("FLOW", "FLOW")}
+
+    flow_entry = next(row for row in rows if row["series"] == "FLOW")
+    assert flow_entry["off_set"]["pts"] == 0
+    assert flow_entry["off_set"]["chances"] == 0
+    assert flow_entry["ran"] == 2
+    assert flow_entry["in_flow"]["pts"] == 5
+    assert flow_entry["in_flow"]["chances"] == 2
+
+    totals = flat["totals"]
+    assert totals["ran"] == 5
+    assert totals["off_set"]["pts"] == 4
+    assert totals["off_set"]["chances"] == 2
+    assert totals["in_flow"]["pts"] == 11
+    assert totals["in_flow"]["chances"] == 4
+
+    csv_response = client.get(
+        "/api/reports/playcall",
+        query_string={"game_id": game_id, "format": "csv", "family": "ALL"},
+    )
+    assert csv_response.status_code == 200
+    assert csv_response.headers["Content-Type"] == "text/csv"
+    assert f"game_{game_id}_all.csv" in csv_response.headers["Content-Disposition"]
+
+    csv_reader = csv.DictReader(StringIO(csv_response.data.decode("utf-8")))
+    csv_rows = list(csv_reader)
+    assert len(csv_rows) == 4
+    flow_csv = next(row for row in csv_rows if row["SERIES"] == "FLOW")
+    assert flow_csv["OFF SET PTS"] == "0"
+    assert flow_csv["OFF SET CHANCES"] == "0"
+    assert flow_csv["RAN"] == "2"
+
+    totals_row = csv_rows[-1]
+    assert totals_row["SERIES"] == "Totals"
+    assert totals_row["PLAYCALL"] == "Totals"
+    assert totals_row["RAN"] == "5"
+    assert totals_row["OFF SET PTS"] == "4"
+    assert totals_row["OFF SET CHANCES"] == "2"
+    assert totals_row["IN FLOW PTS"] == "11"
+    assert totals_row["IN FLOW CHANCES"] == "4"
+    assert totals_row["OFF SET PPC"] == "2.00"
+    assert totals_row["IN FLOW PPC"] == "2.75"
