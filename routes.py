@@ -1,5 +1,6 @@
 import os
 import csv
+import re
 from io import StringIO
 from typing import Dict, Iterable, Mapping, Optional
 import pandas as pd
@@ -43,6 +44,20 @@ from services.reports.playcall import (
     cache_get_or_compute_playcall_report,
 )
 # END Playcall Report
+
+
+_FLOW_PREFIX_PATTERN = re.compile(r"^\s*flow\s*[–-]\s*", flags=re.IGNORECASE)
+
+
+def _normalize_flow_label(label: object) -> str:
+    """Normalize a FLOW playcall label for display or export."""
+    if not isinstance(label, str):
+        if label is None:
+            return ""
+        label = str(label)
+    trimmed = label.strip()
+    normalized = _FLOW_PREFIX_PATTERN.sub("", trimmed)
+    return normalized.strip()
 
 
 
@@ -254,7 +269,7 @@ def _format_playcall_flow_csv(flow_payload: Mapping[str, object]) -> str:
         for entry in plays_payload:
             if not isinstance(entry, Mapping):
                 continue
-            playcall = entry.get("playcall", "")
+            playcall = _normalize_flow_label(entry.get("playcall", ""))
             ran = int(entry.get("ran_in_flow", 0) or 0)
             in_flow = entry.get("in_flow", {}) if isinstance(entry.get("in_flow"), Mapping) else {}
             in_pts = int(in_flow.get("pts", 0) or 0)
@@ -681,7 +696,7 @@ def playcall_report():
                     in_ppc_val = float((in_flow or {}).get("ppc", 0.0) or 0.0)
                     flow_rows.append(
                         {
-                            "playcall": entry.get("playcall", ""),
+                            "playcall": _normalize_flow_label(entry.get("playcall", "")),
                             "ran_in_flow": ran_val,
                             "in_flow_pts": int((in_flow or {}).get("pts", 0) or 0),
                             "in_flow_chances": int((in_flow or {}).get("chances", 0) or 0),
