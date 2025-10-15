@@ -61,11 +61,16 @@ def inc_stat(bucket: dict, key: str, by: int = 1):
 
 def extract_tokens(cell_value):
     """
-    Splits a cell’s string on commas and returns non-empty, trimmed, normalized tokens.
+    Splits a cell’s string into normalized tokens, handling commas, semicolons and newlines.
     """
-    if pd.isna(cell_value) or not isinstance(cell_value, str):
+    if pd.isna(cell_value):
         return []
-    return [token.strip().replace("–", "-") for token in cell_value.split(",") if token.strip()]
+    if not isinstance(cell_value, str):
+        cell_value = str(cell_value)
+    normalized = cell_value.replace("–", "-")
+    for sep in (";", "\n", "\r", "\t"):
+        normalized = normalized.replace(sep, ",")
+    return [token.strip() for token in normalized.split(",") if token.strip()]
 
 def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_collar_values):
     """
@@ -93,6 +98,26 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
         "atr_fouled":      0,
         "fg2_fouled":      0,
         "fg3_fouled":      0,
+        # Rebounding duties & practice-only metrics (mirrored for games)
+        "crash_positive":        0,
+        "crash_missed":         0,
+        "back_man_positive":    0,
+        "back_man_missed":      0,
+        "box_out_positive":     0,
+        "box_out_missed":       0,
+        "off_reb_given_up":     0,
+        "collision_gap_positive": 0,
+        "collision_gap_missed":   0,
+        "pass_contest_positive":  0,
+        "pass_contest_missed":    0,
+        "pnr_gap_positive":       0,
+        "pnr_gap_missed":         0,
+        "low_help_positive":      0,
+        "low_help_missed":        0,
+        "close_window_positive":  0,
+        "close_window_missed":    0,
+        "shut_door_positive":     0,
+        "shut_door_missed":       0,
         "shot_type_details": [],
         "blue_collar_accum": {key: 0 for key in blue_collar_values.keys()}
     }
@@ -416,21 +441,40 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         "Bump -": "bump_missed",
         "Low Man +": "low_help_positive",
         "Low Man -": "low_help_missed",
+        "Gap +": "collision_gap_positive",
+        "Gap -": "collision_gap_missed",
+        "Contest Pass +": "pass_contest_positive",
+        "Contest Pass -": "pass_contest_missed",
         "Blowby": "blowby_total",
         "Triple Threat": "blowby_triple_threat",
         "Closeout": "blowby_closeout",
         "Isolation": "blowby_isolation"
     }
     for col in df_columns:
-        if col.startswith("#"):
-            tokens = extract_tokens(row.get(col, ""))
-            if tokens:
-                if col not in player_stats_dict or not isinstance(player_stats_dict.get(col), dict):
-                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, defense_mapping, {"dummy":0})
-                for token in tokens:
-                    if token in defense_mapping:
-                        stat_key = defense_mapping[token]
-                        inc_stat(player_stats_dict[col], stat_key)
+        if not col.startswith("#"):
+            continue
+
+        tokens = extract_tokens(row.get(col, ""))
+        if not tokens:
+            continue
+
+        if col not in player_stats_dict or not isinstance(player_stats_dict.get(col), dict):
+            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, defense_mapping, {"dummy": 0})
+
+        slot = player_stats_dict[col]
+        for token in tokens:
+            if token == "Bump +":
+                inc_stat(slot, "bump_positive")
+                inc_stat(slot, "collision_gap_positive")
+                continue
+            if token == "Bump -":
+                inc_stat(slot, "bump_missed")
+                inc_stat(slot, "collision_gap_missed")
+                continue
+
+            if token in defense_mapping:
+                stat_key = defense_mapping[token]
+                inc_stat(slot, stat_key)
 # END contest_side_keyerror_fix
 
 # --- New get_possession_breakdown_detailed() ---
@@ -785,6 +829,64 @@ def parse_csv(file_path, game_id, season_id):
     # --- Process Each Row ---
     for index, row in df.iterrows():
         row_type = str(row.get("Row", "")).strip()
+        row_type_lower = row_type.lower()
+
+        if row_type_lower == "rebound opportunities":
+            for col in df.columns:
+                if not col.startswith("#"):
+                    continue
+                tokens = extract_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                if col not in player_stats_dict:
+                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+                slot = player_stats_dict[col]
+                for token in tokens:
+                    if token == "Off +":
+                        inc_stat(slot, "crash_positive")
+                    elif token == "Off -":
+                        inc_stat(slot, "crash_missed")
+                    elif token == "BM +":
+                        inc_stat(slot, "back_man_positive")
+                    elif token == "BM -":
+                        inc_stat(slot, "back_man_missed")
+                    elif token == "Def +":
+                        inc_stat(slot, "box_out_positive")
+                    elif token == "Def -":
+                        inc_stat(slot, "box_out_missed")
+                    elif token == "Given Up":
+                        inc_stat(slot, "off_reb_given_up")
+            continue
+
+        if row_type_lower in ("pnr", "pnr file"):
+            for col in df.columns:
+                if not col.startswith("#"):
+                    continue
+                tokens = extract_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                if col not in player_stats_dict:
+                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+                slot = player_stats_dict[col]
+                for token in tokens:
+                    if token == "Gap +":
+                        inc_stat(slot, "pnr_gap_positive")
+                    elif token == "Gap -":
+                        inc_stat(slot, "pnr_gap_missed")
+                    elif token == "Low +":
+                        inc_stat(slot, "low_help_positive")
+                    elif token == "Low -":
+                        inc_stat(slot, "low_help_missed")
+                    elif token == "CW +":
+                        inc_stat(slot, "close_window_positive")
+                    elif token == "CW -":
+                        inc_stat(slot, "close_window_missed")
+                    elif token == "SD +":
+                        inc_stat(slot, "shut_door_positive")
+                    elif token == "SD -":
+                        inc_stat(slot, "shut_door_missed")
+            continue
+
         if row_type == "Offense":
             process_offense_row(row, df.columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values)
         elif row_type == "Defense":
