@@ -2,7 +2,7 @@ import os
 import csv
 import re
 from io import StringIO
-from typing import Dict, Iterable, Mapping, Optional
+from typing import Dict, Iterable, Mapping, Optional, List
 import pandas as pd
 from flask import render_template, jsonify, request, current_app, make_response, abort, redirect, url_for, flash
 from werkzeug.utils import secure_filename
@@ -58,6 +58,113 @@ def _normalize_flow_label(label: object) -> str:
     trimmed = label.strip()
     normalized = _FLOW_PREFIX_PATTERN.sub("", trimmed)
     return normalized.strip()
+
+
+
+def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, object]:
+    """Flatten a playcall series payload into row-level entries with totals."""
+
+    rows: List[Dict[str, object]] = []
+    totals = {
+        "ran": 0,
+        "off_set": {"pts": 0, "chances": 0, "ppc": 0.0},
+        "in_flow": {"pts": 0, "chances": 0, "ppc": 0.0},
+    }
+
+    if not isinstance(series_payload, Mapping):
+        return {"rows": rows, "totals": totals}
+
+    seen_playcalls: set[str] = set()
+    flow_payload: Mapping[str, object] = {}
+
+    for family_name, payload in series_payload.items():
+        if not isinstance(payload, Mapping):
+            continue
+        if family_name == "FLOW":
+            flow_payload = payload
+            continue
+
+        plays_map = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
+        if not isinstance(plays_map, Mapping):
+            continue
+
+        for playcall, entry in plays_map.items():
+            if not isinstance(entry, Mapping):
+                continue
+
+            ran_val = int(entry.get("ran", 0) or 0)
+            off_set = entry.get("off_set", {}) if isinstance(entry.get("off_set"), Mapping) else {}
+            in_flow = entry.get("in_flow", {}) if isinstance(entry.get("in_flow"), Mapping) else {}
+
+            off_pts = int((off_set or {}).get("pts", 0) or 0)
+            off_chances = int((off_set or {}).get("chances", 0) or 0)
+            off_ppc = float((off_set or {}).get("ppc", 0.0) or 0.0)
+
+            in_pts = int((in_flow or {}).get("pts", 0) or 0)
+            in_chances = int((in_flow or {}).get("chances", 0) or 0)
+            in_ppc = float((in_flow or {}).get("ppc", 0.0) or 0.0)
+
+            rows.append(
+                {
+                    "series": family_name,
+                    "playcall": playcall,
+                    "ran": ran_val,
+                    "off_set": {"pts": off_pts, "chances": off_chances, "ppc": off_ppc},
+                    "in_flow": {"pts": in_pts, "chances": in_chances, "ppc": in_ppc},
+                }
+            )
+
+            totals["ran"] += ran_val
+            totals["off_set"]["pts"] += off_pts
+            totals["off_set"]["chances"] += off_chances
+            totals["in_flow"]["pts"] += in_pts
+            totals["in_flow"]["chances"] += in_chances
+
+            seen_playcalls.add(playcall)
+
+    if isinstance(flow_payload, Mapping):
+        plays_payload = flow_payload.get("plays")
+        if isinstance(plays_payload, Iterable):
+            for entry in plays_payload:
+                if not isinstance(entry, Mapping):
+                    continue
+
+                playcall = _normalize_flow_label(entry.get("playcall", ""))
+                if playcall in seen_playcalls:
+                    continue
+
+                ran_in_flow = int(entry.get("ran_in_flow", 0) or 0)
+                in_flow = entry.get("in_flow", {}) if isinstance(entry.get("in_flow"), Mapping) else {}
+
+                in_pts = int((in_flow or {}).get("pts", 0) or 0)
+                in_chances = int((in_flow or {}).get("chances", 0) or 0)
+                in_ppc = float((in_flow or {}).get("ppc", 0.0) or 0.0)
+
+                rows.append(
+                    {
+                        "series": "FLOW",
+                        "playcall": playcall,
+                        "ran": ran_in_flow,
+                        "off_set": {"pts": 0, "chances": 0, "ppc": 0.0},
+                        "in_flow": {"pts": in_pts, "chances": in_chances, "ppc": in_ppc},
+                    }
+                )
+
+                totals["ran"] += ran_in_flow
+                totals["in_flow"]["pts"] += in_pts
+                totals["in_flow"]["chances"] += in_chances
+
+    off_total_chances = totals["off_set"]["chances"] or 0
+    in_total_chances = totals["in_flow"]["chances"] or 0
+
+    totals["off_set"]["ppc"] = (
+        totals["off_set"]["pts"] / off_total_chances if off_total_chances else 0.0
+    )
+    totals["in_flow"]["ppc"] = (
+        totals["in_flow"]["pts"] / in_total_chances if in_total_chances else 0.0
+    )
+
+    return {"rows": rows, "totals": totals}
 
 
 
@@ -298,6 +405,72 @@ def _format_playcall_flow_csv(flow_payload: Mapping[str, object]) -> str:
     ])
     buffer.seek(0)
     return buffer.getvalue()
+
+
+def _format_playcall_all_csv(flat_payload: Mapping[str, object]) -> str:
+    rows_payload = flat_payload.get("rows") if isinstance(flat_payload, Mapping) else None
+    totals_payload = flat_payload.get("totals") if isinstance(flat_payload, Mapping) else {}
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "SERIES",
+            "PLAYCALL",
+            "RAN",
+            "OFF SET PTS",
+            "OFF SET CHANCES",
+            "OFF SET PPC",
+            "IN FLOW PTS",
+            "IN FLOW CHANCES",
+            "IN FLOW PPC",
+        ]
+    )
+    total_ran = 0
+    if isinstance(rows_payload, Iterable):
+        for entry in rows_payload:
+            if not isinstance(entry, Mapping):
+                continue
+            off_set = entry.get("off_set", {}) if isinstance(entry.get("off_set"), Mapping) else {}
+            in_flow = entry.get("in_flow", {}) if isinstance(entry.get("in_flow"), Mapping) else {}
+            ran_val = int(entry.get("ran", 0) or 0)
+            off_ppc = float((off_set or {}).get("ppc", 0.0) or 0.0)
+            in_ppc = float((in_flow or {}).get("ppc", 0.0) or 0.0)
+            writer.writerow(
+                [
+                    entry.get("series", ""),
+                    entry.get("playcall", ""),
+                    ran_val,
+                    int((off_set or {}).get("pts", 0) or 0),
+                    int((off_set or {}).get("chances", 0) or 0),
+                    f"{off_ppc:.2f}",
+                    int((in_flow or {}).get("pts", 0) or 0),
+                    int((in_flow or {}).get("chances", 0) or 0),
+                    f"{in_ppc:.2f}",
+                ]
+            )
+            total_ran += ran_val
+
+    off_totals = totals_payload.get("off_set") if isinstance(totals_payload, Mapping) else {}
+    in_totals = totals_payload.get("in_flow") if isinstance(totals_payload, Mapping) else {}
+    off_ppc_total = float((off_totals or {}).get("ppc", 0.0) or 0.0)
+    in_ppc_total = float((in_totals or {}).get("ppc", 0.0) or 0.0)
+
+    writer.writerow(
+        [
+            "Totals",
+            "Totals",
+            total_ran,
+            int((off_totals or {}).get("pts", 0) or 0),
+            int((off_totals or {}).get("chances", 0) or 0),
+            f"{off_ppc_total:.2f}",
+            int((in_totals or {}).get("pts", 0) or 0),
+            int((in_totals or {}).get("chances", 0) or 0),
+            f"{in_ppc_total:.2f}",
+        ]
+    )
+
+    buffer.seek(0)
+    return buffer.getvalue()
 # END Playcall Report
 
 
@@ -407,22 +580,29 @@ def api_playcall_report():
             if not family_key:
                 return jsonify({"error": "family required"}), 400
             series_payload = data.get("series") if isinstance(data, Mapping) else None
-            if not isinstance(series_payload, Mapping) or family_key not in series_payload:
-                return jsonify({"error": "invalid family"}), 400
-            family_payload = series_payload[family_key]
             label = season.season_name or f"season_{season_id}"
             safe_label = "".join(
                 ch.lower() if ch.isalnum() else "_" for ch in label
             ).strip("_")
             if not safe_label:
                 safe_label = f"season_{season_id}"
-            if family_key == "FLOW":
-                csv_body = _format_playcall_flow_csv(family_payload)
-                filename = f"season_{safe_label}_flow.csv"
+            if family_key == "ALL":
+                flat_payload = _flatten_playcall_series(
+                    series_payload if isinstance(series_payload, Mapping) else {}
+                )
+                csv_body = _format_playcall_all_csv(flat_payload)
+                filename = f"season_{safe_label}_all.csv"
             else:
-                csv_body = _format_playcall_family_csv(family_payload)
-                safe_family = family_key.lower().replace(" ", "_")
-                filename = f"season_{safe_label}_{safe_family}.csv"
+                if not isinstance(series_payload, Mapping) or family_key not in series_payload:
+                    return jsonify({"error": "invalid family"}), 400
+                family_payload = series_payload[family_key]
+                if family_key == "FLOW":
+                    csv_body = _format_playcall_flow_csv(family_payload)
+                    filename = f"season_{safe_label}_flow.csv"
+                else:
+                    csv_body = _format_playcall_family_csv(family_payload)
+                    safe_family = family_key.lower().replace(" ", "_")
+                    filename = f"season_{safe_label}_{safe_family}.csv"
             response = make_response(csv_body)
             response.headers["Content-Type"] = "text/csv"
             response.headers["Content-Disposition"] = f"attachment; filename={filename}"
@@ -443,16 +623,23 @@ def api_playcall_report():
         if not family_key:
             return jsonify({"error": "family required"}), 400
         series_payload = data.get("series") if isinstance(data, Mapping) else None
-        if not isinstance(series_payload, Mapping) or family_key not in series_payload:
-            return jsonify({"error": "invalid family"}), 400
-        family_payload = series_payload[family_key]
-        if family_key == "FLOW":
-            csv_body = _format_playcall_flow_csv(family_payload)
-            filename = f"game_{game_id}_flow.csv"
+        if family_key == "ALL":
+            flat_payload = _flatten_playcall_series(
+                series_payload if isinstance(series_payload, Mapping) else {}
+            )
+            csv_body = _format_playcall_all_csv(flat_payload)
+            filename = f"game_{game_id}_all.csv"
         else:
-            csv_body = _format_playcall_family_csv(family_payload)
-            safe_family = family_key.lower().replace(" ", "_")
-            filename = f"game_{game_id}_{safe_family}.csv"
+            if not isinstance(series_payload, Mapping) or family_key not in series_payload:
+                return jsonify({"error": "invalid family"}), 400
+            family_payload = series_payload[family_key]
+            if family_key == "FLOW":
+                csv_body = _format_playcall_flow_csv(family_payload)
+                filename = f"game_{game_id}_flow.csv"
+            else:
+                csv_body = _format_playcall_family_csv(family_payload)
+                safe_family = family_key.lower().replace(" ", "_")
+                filename = f"game_{game_id}_{safe_family}.csv"
         response = make_response(csv_body)
         response.headers["Content-Type"] = "text/csv"
         response.headers["Content-Disposition"] = f"attachment; filename={filename}"
@@ -612,6 +799,7 @@ def playcall_report():
         options: list[str] = []
         family_sections: list[Dict[str, object]] = []
         flow_section: Optional[Dict[str, object]] = None
+        all_section: Optional[Dict[str, object]] = None
 
         series_payload = raw_payload.get("series") if isinstance(raw_payload, Mapping) else {}
         flow_payload: Mapping[str, object] = {}
@@ -636,6 +824,7 @@ def playcall_report():
                         in_ppc_val = float((in_flow or {}).get("ppc", 0.0) or 0.0)
                         rows.append(
                             {
+                                "series": family_name,
                                 "playcall": playcall,
                                 "ran": ran_val,
                                 "off_set_pts": int((off_set or {}).get("pts", 0) or 0),
@@ -659,6 +848,7 @@ def playcall_report():
                 off_totals_ppc = float((off_totals or {}).get("ppc", 0.0) or 0.0)
                 in_totals_ppc = float((in_totals or {}).get("ppc", 0.0) or 0.0)
                 totals_row = {
+                    "series": family_name,
                     "playcall": "Totals",
                     "ran": total_ran,
                     "off_set_pts": int((off_totals or {}).get("pts", 0) or 0),
@@ -729,11 +919,80 @@ def playcall_report():
             if "FLOW" not in options:
                 options.append("FLOW")
 
-        return options, family_sections, flow_section
+        flat_payload = _flatten_playcall_series(
+            series_payload if isinstance(series_payload, Mapping) else {}
+        )
+        flat_rows = flat_payload.get("rows") if isinstance(flat_payload, Mapping) else []
+        if flat_rows:
+            formatted_rows: list[Dict[str, object]] = []
+            for entry in sorted(
+                flat_rows,
+                key=lambda item: (
+                    (item.get("series") or "") if isinstance(item, Mapping) else "",
+                    (item.get("playcall") or "") if isinstance(item, Mapping) else "",
+                ),
+            ):
+                if not isinstance(entry, Mapping):
+                    continue
+                off_set = entry.get("off_set", {}) if isinstance(entry.get("off_set"), Mapping) else {}
+                in_flow = entry.get("in_flow", {}) if isinstance(entry.get("in_flow"), Mapping) else {}
+                off_ppc_val = float((off_set or {}).get("ppc", 0.0) or 0.0)
+                in_ppc_val = float((in_flow or {}).get("ppc", 0.0) or 0.0)
+                formatted_rows.append(
+                    {
+                        "series": entry.get("series", ""),
+                        "playcall": entry.get("playcall", ""),
+                        "ran": int(entry.get("ran", 0) or 0),
+                        "off_set_pts": int((off_set or {}).get("pts", 0) or 0),
+                        "off_set_chances": int((off_set or {}).get("chances", 0) or 0),
+                        "off_set_ppc": {
+                            "display": f"{off_ppc_val:.2f}",
+                            "data_value": off_ppc_val,
+                        },
+                        "in_flow_pts": int((in_flow or {}).get("pts", 0) or 0),
+                        "in_flow_chances": int((in_flow or {}).get("chances", 0) or 0),
+                        "in_flow_ppc": {
+                            "display": f"{in_ppc_val:.2f}",
+                            "data_value": in_ppc_val,
+                        },
+                    }
+                )
+
+            totals_payload = flat_payload.get("totals") if isinstance(flat_payload, Mapping) else {}
+            off_totals = totals_payload.get("off_set") if isinstance(totals_payload, Mapping) else {}
+            in_totals = totals_payload.get("in_flow") if isinstance(totals_payload, Mapping) else {}
+            off_ppc_total = float((off_totals or {}).get("ppc", 0.0) or 0.0)
+            in_ppc_total = float((in_totals or {}).get("ppc", 0.0) or 0.0)
+            totals_row_all = {
+                "series": "Totals",
+                "playcall": "Totals",
+                "ran": int((totals_payload or {}).get("ran", 0) or 0),
+                "off_set_pts": int((off_totals or {}).get("pts", 0) or 0),
+                "off_set_chances": int((off_totals or {}).get("chances", 0) or 0),
+                "off_set_ppc": f"{off_ppc_total:.2f}",
+                "in_flow_pts": int((in_totals or {}).get("pts", 0) or 0),
+                "in_flow_chances": int((in_totals or {}).get("chances", 0) or 0),
+                "in_flow_ppc": f"{in_ppc_total:.2f}",
+            }
+
+            all_section = {
+                "name": "ALL",
+                "rows": formatted_rows,
+                "totals": totals_row_all,
+                "csv_url": url_for(
+                    "api_playcall_report",
+                    **{**csv_kwargs, "family": "ALL", "format": "csv"},
+                ),
+            }
+            if "ALL" not in options:
+                options.insert(0, "ALL")
+
+        return options, family_sections, flow_section, all_section
 
     series_options: list[str] = []
     families_view: list[Dict[str, object]] = []
     flow_view: Optional[Dict[str, object]] = None
+    all_view: Optional[Dict[str, object]] = None
     raw_data: Mapping[str, object] = {}
     playcall_meta: Mapping[str, object] = {}
 
@@ -755,7 +1014,7 @@ def playcall_report():
     if isinstance(raw_data, Mapping) and raw_data:
         built = _build_playcall_views(raw_data, csv_kwargs)
         if built:
-            series_options, families_view, flow_view = built
+            series_options, families_view, flow_view, all_view = built
 
     selected_series = [
         value for value in request.args.getlist("series") if value in series_options
@@ -784,6 +1043,7 @@ def playcall_report():
         selected_season=season_id,
         selected_view=view_scope,
         families=families_view,
+        all_section=all_view,
         flow=flow_view,
         series_options=series_options,
         selected_series=selected_series,
