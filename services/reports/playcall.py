@@ -88,10 +88,25 @@ def _series_tokens(value: object) -> Tuple[str, bool, bool, Iterable[str]]:
     tokens = [tok.strip() for tok in _normalize_string(value).split(",") if tok.strip()]
     if not tokens:
         return "UNKNOWN", False, False, ()
-    in_flow = any(tok.upper() == "FLOW" for tok in tokens)
-    base = tokens[0]
-    flow_only = in_flow and len(tokens) == 1 and base.upper() == "FLOW"
-    return base, in_flow, flow_only, tokens
+
+    base_label: Optional[str] = None
+    in_flow = False
+    for tok in tokens:
+        upper_tok = tok.upper()
+        if upper_tok == "FLOW":
+            in_flow = True
+        elif base_label is None:
+            base_label = tok
+
+    if base_label is None:
+        if in_flow:
+            base_label = next((tok for tok in tokens if tok.upper() == "FLOW"), "FLOW")
+        else:
+            base_label = tokens[0]
+
+    base_label = base_label or "UNKNOWN"
+    flow_only = in_flow and len(tokens) == 1 and base_label.upper() == "FLOW"
+    return base_label, in_flow, flow_only, tokens
 
 
 def _player_columns(df: pd.DataFrame) -> Iterable[str]:

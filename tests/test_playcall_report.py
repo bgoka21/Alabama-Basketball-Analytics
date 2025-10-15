@@ -63,6 +63,41 @@ def test_compute_from_dataframe_normalizes_playcall_tokens():
     assert flow_entry["in_flow"]["chances"] == 1
 
 
+def test_compute_from_dataframe_prefers_non_flow_series_label():
+    df = pd.DataFrame(
+        [
+            {
+                "Row": "Offense",
+                "SERIES": "FLOW, NOVA",
+                "PLAYCALL": "NOVA Rip",
+                "TEAM": "Alabama",
+                "#1": "3FG+",
+            }
+        ]
+    )
+
+    payload = playcall_service._compute_from_dataframe(df)
+
+    nova_family = payload["series"].get("NOVA")
+    assert nova_family is not None
+    assert "NOVA Rip" in nova_family["plays"]
+
+    nova_play = nova_family["plays"]["NOVA Rip"]
+    assert nova_play["ran"] == 1
+    assert nova_play["in_flow"]["pts"] == 3
+    assert nova_play["in_flow"]["chances"] == 1
+
+    flow_payload = payload["series"].get("FLOW")
+    assert flow_payload is not None
+
+    flow_entries = flow_payload["plays"]
+    assert any(entry["playcall"] == "NOVA Rip" for entry in flow_entries)
+
+    flow_totals = flow_payload["totals"]["in_flow"]
+    assert flow_totals["pts"] == 3
+    assert flow_totals["chances"] == 1
+
+
 @pytest.fixture
 def sample_game_payloads():
     game_one = {
