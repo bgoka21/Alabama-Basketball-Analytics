@@ -12,12 +12,12 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Set
 
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Query
 
-from models.database import Game, PlayerStats, Season, db
+from models.database import Game, PlayerStats, Season, Roster, db
 from utils.shottype import compute_3fg_breakdown_from_shots
 
 
@@ -64,6 +64,24 @@ _AGGREGATE_FIELDS: Tuple[str, ...] = (
 )
 
 
+def _roster_names(season_id: int) -> Set[str]:
+    """Return the set of rostered player names for ``season_id``."""
+
+    query = (
+        db.session.query(Roster.player_name)
+        .filter(Roster.season_id == season_id)
+        .filter(Roster.player_name.isnot(None))
+    )
+    names: Set[str] = set()
+    for (name,) in query.all():
+        if not name:
+            continue
+        text = str(name).strip()
+        if text:
+            names.add(text)
+    return names
+
+
 def _safe_pct(numer: Optional[float], denom: Optional[float]) -> Optional[float]:
     try:
         if not numer or not denom:
@@ -107,13 +125,21 @@ def _parse_shot_details(blob: Optional[str]) -> List[Dict[str, Any]]:
     return shots
 
 
-def _aggregate_rows(rows: Iterable[PlayerStats]) -> Dict[str, Dict[str, Any]]:
+def _aggregate_rows(
+    rows: Iterable[PlayerStats],
+    roster_names: Optional[Set[str]] = None,
+) -> Dict[str, Dict[str, Any]]:
     players: Dict[str, Dict[str, Any]] = {}
     shot_events: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
     for row in rows:
-        player = row.player_name
+        raw_player = row.player_name
+        if not raw_player:
+            continue
+        player = str(raw_player).strip()
         if not player:
+            continue
+        if roster_names is not None and player not in roster_names:
             continue
 
         entry = players.setdefault(
@@ -121,11 +147,9 @@ def _aggregate_rows(rows: Iterable[PlayerStats]) -> Dict[str, Dict[str, Any]]:
             {
                 "player": player,
                 "jersey": row.jersey_number,
-                "games": set(),
             },
         )
         entry.setdefault("jersey", row.jersey_number or entry.get("jersey"))
-        entry["games"].add(row.game_id)
 
         for field in _AGGREGATE_FIELDS:
             entry[field] = (entry.get(field) or 0) + (getattr(row, field) or 0)
@@ -181,7 +205,7 @@ def _season_rows(
     end_date: Optional[date],
 ) -> Dict[str, Dict[str, Any]]:
     query = _apply_date_window(_base_game_query(season_id), start_date, end_date)
-    return _aggregate_rows(query.all())
+    return _aggregate_rows(query.all(), _roster_names(season_id))
 
 
 def _last_game_rows(
@@ -211,7 +235,8 @@ def _last_game_rows(
         .all()
     )
 
-    players = _aggregate_rows(rows)
+    roster = _roster_names(season_id)
+    players = _aggregate_rows(rows, roster)
     latest_date = None
     if rows:
         latest_date = max(getattr(r.game, "game_date", None) for r in rows if getattr(r, "game", None))
@@ -235,12 +260,10 @@ def get_season_window(
 
 
 def _build_common(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
-    row = {
+    return {
         "player": player,
         "jersey": data.get("jersey"),
-        "games": len(data.get("games") or []),
     }
-    return row
 
 
 def _build_shrink_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -443,13 +466,12 @@ def fetch_offense_shrinks(season_id: int, start_date: Optional[date] = None, end
         players,
         _build_shrink_row,
         (
-            ('games', 'games'),
-            ("fg3_att", "fg3_att"),
             ("fg3_make", "fg3_make"),
-            ("fg3_shrink_att", "fg3_shrink_att"),
+            ("fg3_att", "fg3_att"),
             ("fg3_shrink_make", "fg3_shrink_make"),
-            ("fg3_nonshrink_att", "fg3_nonshrink_att"),
+            ("fg3_shrink_att", "fg3_shrink_att"),
             ("fg3_nonshrink_make", "fg3_nonshrink_make"),
+            ("fg3_nonshrink_att", "fg3_nonshrink_att"),
         ),
     )
 
@@ -462,13 +484,12 @@ def fetch_offense_shrinks_last_game(
         players,
         _build_shrink_row,
         (
-            ('games', 'games'),
-            ("fg3_att", "fg3_att"),
             ("fg3_make", "fg3_make"),
-            ("fg3_shrink_att", "fg3_shrink_att"),
+            ("fg3_att", "fg3_att"),
             ("fg3_shrink_make", "fg3_shrink_make"),
-            ("fg3_nonshrink_att", "fg3_nonshrink_att"),
+            ("fg3_shrink_att", "fg3_shrink_att"),
             ("fg3_nonshrink_make", "fg3_nonshrink_make"),
+            ("fg3_nonshrink_att", "fg3_nonshrink_att"),
         ),
         note_date=note_date,
     )
@@ -480,9 +501,8 @@ def fetch_atr_finishing(season_id: int, start_date: Optional[date] = None, end_d
         players,
         _build_atr_row,
         (
-            ('games', 'games'),
-            ("atr_att", "atr_att"),
             ("atr_make", "atr_make"),
+            ("atr_att", "atr_att"),
             ("atr_and1", "atr_and1"),
         ),
     )
@@ -496,9 +516,8 @@ def fetch_atr_finishing_last_game(
         players,
         _build_atr_row,
         (
-            ('games', 'games'),
-            ("atr_att", "atr_att"),
             ("atr_make", "atr_make"),
+            ("atr_att", "atr_att"),
             ("atr_and1", "atr_and1"),
         ),
         note_date=note_date,
@@ -511,7 +530,6 @@ def fetch_oreb(season_id: int, start_date: Optional[date] = None, end_date: Opti
         players,
         _build_off_reb_row,
         (
-            ('games', 'games'),
             ("crash_plus", "crash_plus"),
             ("crash_opps", "crash_opps"),
             ("back_plus", "back_plus"),
@@ -528,7 +546,6 @@ def fetch_oreb_last_game(
         players,
         _build_off_reb_row,
         (
-            ('games', 'games'),
             ("crash_plus", "crash_plus"),
             ("crash_opps", "crash_opps"),
             ("back_plus", "back_plus"),
@@ -544,7 +561,6 @@ def fetch_dreb(season_id: int, start_date: Optional[date] = None, end_date: Opti
         players,
         _build_def_reb_row,
         (
-            ('games', 'games'),
             ("box_plus", "box_plus"),
             ("box_opps", "box_opps"),
             ("off_reb_given_up", "off_reb_given_up"),
@@ -560,7 +576,6 @@ def fetch_dreb_last_game(
         players,
         _build_def_reb_row,
         (
-            ('games', 'games'),
             ("box_plus", "box_plus"),
             ("box_opps", "box_opps"),
             ("off_reb_given_up", "off_reb_given_up"),
@@ -575,7 +590,6 @@ def fetch_collisions(season_id: int, start_date: Optional[date] = None, end_date
         players,
         _build_collision_row,
         (
-            ('games', 'games'),
             ("gap_plus", "gap_plus"),
             ("gap_opps", "gap_opps"),
         ),
@@ -590,7 +604,6 @@ def fetch_collisions_last_game(
         players,
         _build_collision_row,
         (
-            ('games', 'games'),
             ("gap_plus", "gap_plus"),
             ("gap_opps", "gap_opps"),
         ),
@@ -604,7 +617,6 @@ def fetch_pass_contest(season_id: int, start_date: Optional[date] = None, end_da
         players,
         _build_pass_contest_row,
         (
-            ('games', 'games'),
             ("contest_plus", "contest_plus"),
             ("contest_opps", "contest_opps"),
         ),
@@ -619,7 +631,6 @@ def fetch_pass_contest_last_game(
         players,
         _build_pass_contest_row,
         (
-            ('games', 'games'),
             ("contest_plus", "contest_plus"),
             ("contest_opps", "contest_opps"),
         ),
@@ -633,7 +644,6 @@ def fetch_gap_help(season_id: int, start_date: Optional[date] = None, end_date: 
         players,
         _build_gap_help_row,
         (
-            ('games', 'games'),
             ("gap_plus", "gap_plus"),
             ("gap_opps", "gap_opps"),
         ),
@@ -648,7 +658,6 @@ def fetch_gap_help_last_game(
         players,
         _build_gap_help_row,
         (
-            ('games', 'games'),
             ("gap_plus", "gap_plus"),
             ("gap_opps", "gap_opps"),
         ),
@@ -662,7 +671,6 @@ def fetch_low_man(season_id: int, start_date: Optional[date] = None, end_date: O
         players,
         _build_low_man_row,
         (
-            ('games', 'games'),
             ("low_plus", "low_plus"),
             ("low_opps", "low_opps"),
         ),
@@ -677,7 +685,6 @@ def fetch_low_man_last_game(
         players,
         _build_low_man_row,
         (
-            ('games', 'games'),
             ("low_plus", "low_plus"),
             ("low_opps", "low_opps"),
         ),
@@ -691,7 +698,6 @@ def fetch_pnr_grade(season_id: int, start_date: Optional[date] = None, end_date:
         players,
         _build_pnr_grade_row,
         (
-            ('games', 'games'),
             ("close_plus", "close_plus"),
             ("close_opps", "close_opps"),
             ("shut_plus", "shut_plus"),
@@ -708,7 +714,6 @@ def fetch_pnr_grade_last_game(
         players,
         _build_pnr_grade_row,
         (
-            ('games', 'games'),
             ("close_plus", "close_plus"),
             ("close_opps", "close_opps"),
             ("shut_plus", "shut_plus"),

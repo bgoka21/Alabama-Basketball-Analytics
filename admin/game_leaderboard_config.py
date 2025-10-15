@@ -24,30 +24,28 @@ def _clone_sequence(value: Optional[Iterable[str]]) -> Optional[List[str]]:
 _GAME_CONFIG: Dict[str, ConfigMap] = {
     "shrinks_offense": {
         "columns": [
-            "GP",
-            "3FG Att",
             "3FG Makes",
+            "3FG Att",
             "3FG %",
-            "Shrink 3FG Att",
             "Shrink 3FG Makes",
+            "Shrink 3FG Att",
             "Shrink 3FG %",
             "Shrink 3FG Freq",
-            "Non-Shrink 3FG Att",
             "Non-Shrink 3FG Makes",
+            "Non-Shrink 3FG Att",
             "Non-Shrink 3FG %",
             "Non-Shrink 3FG Freq",
         ],
         "column_map": {
-            "GP": ("games",),
-            "3FG Att": ("fg3_att",),
             "3FG Makes": ("fg3_make",),
+            "3FG Att": ("fg3_att",),
             "3FG %": ("fg3_pct",),
-            "Shrink 3FG Att": ("fg3_shrink_att",),
             "Shrink 3FG Makes": ("fg3_shrink_make",),
+            "Shrink 3FG Att": ("fg3_shrink_att",),
             "Shrink 3FG %": ("fg3_shrink_pct",),
             "Shrink 3FG Freq": ("fg3_shrink_freq_pct",),
-            "Non-Shrink 3FG Att": ("fg3_nonshrink_att",),
             "Non-Shrink 3FG Makes": ("fg3_nonshrink_make",),
+            "Non-Shrink 3FG Att": ("fg3_nonshrink_att",),
             "Non-Shrink 3FG %": ("fg3_nonshrink_pct",),
             "Non-Shrink 3FG Freq": ("fg3_nonshrink_freq_pct",),
         },
@@ -60,8 +58,8 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
         "default_sort": [
             "fg3_shrink_pct",
-            "fg3_shrink_att",
             "fg3_shrink_make",
+            "fg3_shrink_att",
             "player",
         ],
         "table_id": "game-leaderboard-offense-3fg-shrinks",
@@ -122,16 +120,15 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "atr_finishing": {
-        "columns": ["GP", "ATR Att", "ATR Makes", "ATR %", "And-1"],
+        "columns": ["ATR Makes", "ATR Att", "ATR %", "And-1"],
         "column_map": {
-            "GP": ("games",),
-            "ATR Att": ("atr_att",),
             "ATR Makes": ("atr_make",),
+            "ATR Att": ("atr_att",),
             "ATR %": ("atr_pct",),
             "And-1": ("atr_and1",),
         },
         "pct_columns": ["ATR %"],
-        "default_sort": ["atr_pct", "atr_att", "atr_make", "player"],
+        "default_sort": ["atr_pct", "atr_make", "atr_att", "player"],
         "table_id": "game-leaderboard-offense-atr-finishing",
         "percent_specs": [
             {
@@ -148,7 +145,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
     },
     "rebounding_offense": {
         "columns": [
-            "GP",
             "Crash +",
             "Crash Opps",
             "Crash %",
@@ -157,7 +153,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
             "Back Man %",
         ],
         "column_map": {
-            "GP": ("games",),
             "Crash +": ("crash_plus",),
             "Crash Opps": ("crash_opps",),
             "Crash %": ("crash_pct",),
@@ -207,14 +202,12 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
     },
     "rebounding_defense": {
         "columns": [
-            "GP",
             "Box Out +",
             "Box Out Opps",
             "Box Out %",
             "Off Reb's Given Up",
         ],
         "column_map": {
-            "GP": ("games",),
             "Box Out +": ("box_plus",),
             "Box Out Opps": ("box_opps",),
             "Box Out %": ("box_pct",),
@@ -244,9 +237,8 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "collisions": {
-        "columns": ["GP", "Gap +", "Gap Opps", "Gap %"],
+        "columns": ["Gap +", "Gap Opps", "Gap %"],
         "column_map": {
-            "GP": ("games",),
             "Gap +": ("gap_plus",),
             "Gap Opps": ("gap_opps",),
             "Gap %": ("gap_pct",),
@@ -270,9 +262,8 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "pass_contest": {
-        "columns": ["GP", "Contest +", "Contest Opps", "Contest %"],
+        "columns": ["Contest +", "Contest Opps", "Contest %"],
         "column_map": {
-            "GP": ("games",),
             "Contest +": ("contest_plus",),
             "Contest Opps": ("contest_opps",),
             "Contest %": ("contest_pct",),
@@ -301,9 +292,8 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "overall_gap_help": {
-        "columns": ["GP", "Gap +", "Gap Opps", "Gap %"],
+        "columns": ["Gap +", "Gap Opps", "Gap %"],
         "column_map": {
-            "GP": ("games",),
             "Gap +": ("gap_plus",),
             "Gap Opps": ("gap_opps",),
             "Gap %": ("gap_pct",),
@@ -327,9 +317,8 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "overall_low_man": {
-        "columns": ["GP", "Low Man +", "Low Man Opps", "Low Man %"],
+        "columns": ["Low Man +", "Low Man Opps", "Low Man %"],
         "column_map": {
-            "GP": ("games",),
             "Low Man +": ("low_plus",),
             "Low Man Opps": ("low_opps",),
             "Low Man %": ("low_pct",),
@@ -354,7 +343,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
     },
     "pnr_grade": {
         "columns": [
-            "GP",
             "Close Window +",
             "Close Window Opps",
             "Close Window %",
@@ -363,7 +351,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
             "Shut Door %",
         ],
         "column_map": {
-            "GP": ("games",),
             "Close Window +": ("close_plus",),
             "Close Window Opps": ("close_opps",),
             "Close Window %": ("close_pct",),
