@@ -4110,6 +4110,83 @@ def parse_file(file_id):
         return redirect(url_for('admin.files_view_unique'))
 
 
+def _reparse_uploaded_game(uploaded_file, upload_path):
+    """Helper to re-parse a game file and refresh derived data."""
+    season_id = (
+        uploaded_file.season_id
+        or Season.query.order_by(Season.start_date.desc()).first().id
+    )
+
+    filename = uploaded_file.filename
+    game = Game.query.filter_by(csv_filename=filename).first()
+    if not game:
+        game = Game(
+            season_id=season_id,
+            game_date=uploaded_file.file_date or date.today(),
+            opponent_name="Unknown",
+            home_or_away="Home",
+            result="N/A",
+            csv_filename=filename,
+        )
+        db.session.add(game)
+        db.session.commit()
+    else:
+        if game.season_id != season_id:
+            game.season_id = season_id
+        db.session.flush()
+
+    # BEGIN Advanced Possession
+    invalidate_adv_poss_game(game.id)
+    # END Advanced Possession
+    # BEGIN Playcall Report
+    invalidate_playcall_report(game.id)
+    # END Playcall Report
+
+    TeamStats.query.filter_by(game_id=game.id).delete()
+    PlayerStats.query.filter_by(game_id=game.id).delete()
+    BlueCollarStats.query.filter_by(game_id=game.id).delete()
+    OpponentBlueCollarStats.query.filter_by(game_id=game.id).delete()
+
+    poss_ids = [p.id for p in Possession.query.filter_by(game_id=game.id).all()]
+    if poss_ids:
+        PlayerPossession.query.filter(
+            PlayerPossession.possession_id.in_(poss_ids)
+        ).delete(synchronize_session=False)
+        ShotDetail.query.filter(
+            ShotDetail.possession_id.in_(poss_ids)
+        ).delete(synchronize_session=False)
+    Possession.query.filter_by(game_id=game.id).delete()
+
+    # Commit the deletions so the parser sees a clean slate
+    db.session.commit()
+
+    results = parse_csv(upload_path, None, season_id)
+
+    raw_lineups = results.get("lineup_efficiencies", {})
+    json_lineups = {
+        size: {
+            side: {",".join(combo): ppp for combo, ppp in sides.items()}
+            for side, sides in raw_lineups[size].items()
+        }
+        for size in raw_lineups
+    }
+
+    uploaded_file.parse_status = "Parsed Successfully"
+    uploaded_file.last_parsed = datetime.utcnow()
+    uploaded_file.parse_error = None
+    uploaded_file.parse_log = None
+    uploaded_file.offensive_breakdown = json.dumps(
+        results.get("offensive_breakdown", {})
+    )
+    uploaded_file.defensive_breakdown = json.dumps(
+        results.get("defensive_breakdown", {})
+    )
+    uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
+    db.session.commit()
+
+    return game.id, season_id
+
+
 def _reparse_uploaded_practice(uploaded_file, upload_path):
     """Helper to re-parse a practice file for bulk operations."""
     season_id = (
@@ -4214,6 +4291,10 @@ def reparse_file(file_id):
             rid = _reparse_uploaded_recruit(uploaded_file, upload_path)
             flash('Recruit file re-parsed successfully!', 'success')
             return redirect(url_for('recruits.detail_recruit', id=rid))
+
+        game_id, _season_id = _reparse_uploaded_game(uploaded_file, upload_path)
+        flash('Game re-parsed successfully!', 'success')
+        return redirect(url_for('admin.edit_game', game_id=game_id))
 
         flash('Reparse not supported for this file type.', 'error')
         return redirect(url_for('admin.files_view_unique'))
