@@ -49,6 +49,22 @@
             {% set _ = href_params.update({'end_date': end_date}) %}
           {% endif %}
         {% endif %}
+        {% if selected_session %}
+          {% set _ = href_params.update({'session': selected_session}) %}
+        {% endif %}
+        {% if selected_labels %}
+          {% if 'label' in href_params %}
+            {% set existing_label_value = href_params['label'] %}
+            {% if existing_label_value is string %}
+              {% set combined_labels = (selected_labels + [existing_label_value]) | unique %}
+            {% else %}
+              {% set combined_labels = (selected_labels + (existing_label_value | list)) | unique %}
+            {% endif %}
+            {% set _ = href_params.update({'label': combined_labels}) %}
+          {% else %}
+            {% set _ = href_params.update({'label': selected_labels}) %}
+          {% endif %}
+        {% endif %}
         {% set is_active = request.endpoint == endpoint %}
         {% if is_active and params %}
           {% for key, value in params.items() %}

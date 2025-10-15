@@ -8,6 +8,7 @@ from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 from pathlib import Path
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse, parse_qs
 
 import admin.routes as admin_routes
 from models.database import db, Season, Session, Practice, PlayerStats, Roster
@@ -157,3 +158,40 @@ def test_dual_leaderboard_defaults_official_session(app, monkeypatch):
 
     assert captured['selected_session'] == 'Official Practice'
     assert 'Official Practice' in captured['sessions']
+
+
+def test_leaderboard_quick_links_preserve_session_and_label(client, app):
+    base_query = {
+        'season_id': 1,
+        'stat': 'points',
+        'session': 'All',
+        'label': '4V4 DRILLS',
+    }
+
+    with captured_templates(app) as templates:
+        resp = client.get('/admin/leaderboard', query_string=base_query)
+        assert resp.status_code == 200
+        soup = BeautifulSoup(resp.data, 'html.parser')
+        quick_link = None
+        for anchor in soup.select('section.mb-6 a'):
+            if anchor.get_text(strip=True) == 'ATR Shot Contests':
+                quick_link = anchor
+                break
+        assert quick_link is not None
+        href = quick_link['href']
+        parsed = urlparse(href)
+        params = parse_qs(parsed.query)
+        assert params.get('session') == ['All']
+        assert params.get('label') == ['4V4 DRILLS']
+
+        follow_resp = client.get(href)
+        assert follow_resp.status_code == 200
+
+    contexts = [
+        context for template, context in templates
+        if template.name == 'admin/leaderboard.html'
+    ]
+    assert len(contexts) >= 2
+    followup_context = contexts[-1]
+    assert followup_context['selected_session'] == 'All'
+    assert followup_context['selected_labels'] == ['4V4 DRILLS']
