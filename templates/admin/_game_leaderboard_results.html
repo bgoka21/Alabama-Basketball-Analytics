@@ -10,11 +10,11 @@
     {% for group in leaderboard_groups %}
       <details class="bg-white rounded shadow group" open>
         <summary class="flex items-center justify-between px-6 py-4 cursor-pointer select-none">
-          <span class="text-lg font-semibold text-gray-900">{{ group.title }}</span>
+          <span class="text-lg font-semibold text-gray-900">{{ group["title"] }}</span>
           <span class="text-sm text-gray-500 transition-transform group-open:-rotate-180">&#9662;</span>
         </summary>
         <div class="border-t border-gray-200 px-6 py-6 space-y-6">
-          {% for item in group.items %}
+          {% for item in group["items"] %}
             <div id="{{ item.slug }}" class="space-y-4">
               {% set table = build_dual_table(
                 base_columns=columns_for(item.key),
