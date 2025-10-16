@@ -60,7 +60,7 @@ def _build_sample_series_payload():
                         "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
                     },
                     {
-                        "playcall": "FLOW",
+                        "playcall": "Angle",
                         "ran_in_flow": 2,
                         "in_flow": {"pts": 5, "chances": 2, "ppc": 2.5},
                     },
@@ -91,6 +91,13 @@ def test_compute_from_dataframe_normalizes_playcall_tokens():
                 "TEAM": "Alabama",
                 "#1": "3FG+",
             },
+            {
+                "Row": "Offense",
+                "SERIES": "FLOW",
+                "PLAYCALL": "Flow - Angle",
+                "TEAM": "Alabama",
+                "#1": "3FG+",
+            },
         ]
     )
 
@@ -109,12 +116,18 @@ def test_compute_from_dataframe_normalizes_playcall_tokens():
     assert base_play["in_flow"]["chances"] == 1
 
     flow_entries = payload["series"]["FLOW"]["plays"]
-    assert len(flow_entries) == 1
+    assert len(flow_entries) == 2
     flow_entry = flow_entries[0]
     assert flow_entry["playcall"] == "2 Keep M Rip"
     assert flow_entry["ran_in_flow"] == 1
     assert flow_entry["in_flow"]["pts"] == 3
     assert flow_entry["in_flow"]["chances"] == 1
+
+    flow_angle_entry = flow_entries[1]
+    assert flow_angle_entry["playcall"] == "Angle"
+    assert flow_angle_entry["ran_in_flow"] == 1
+    assert flow_angle_entry["in_flow"]["pts"] == 3
+    assert flow_angle_entry["in_flow"]["chances"] == 1
 
 
 def test_compute_from_dataframe_prefers_non_flow_series_label():
@@ -173,7 +186,7 @@ def sample_game_payloads():
                         "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
                     },
                     {
-                        "playcall": "FLOW",
+                        "playcall": "Angle",
                         "ran_in_flow": 1,
                         "in_flow": {"pts": 2, "chances": 1, "ppc": 2.0},
                     },
@@ -217,7 +230,7 @@ def sample_game_payloads():
                         "in_flow": {"pts": 3, "chances": 1, "ppc": 3.0},
                     },
                     {
-                        "playcall": "FLOW",
+                        "playcall": "Angle",
                         "ran_in_flow": 1,
                         "in_flow": {"pts": 1, "chances": 1, "ppc": 1.0},
                     },
@@ -427,7 +440,7 @@ def test_playcall_report_all_card_includes_flow_only(app, monkeypatch):
     rows = all_section["rows"]
     assert len(rows) == 3
     combos = {(row["series"], row["playcall"]) for row in rows}
-    assert combos == {("HORNS", "Horns Flex"), ("ZONE", "Zone 23"), ("FLOW", "FLOW")}
+    assert combos == {("HORNS", "Horns Flex"), ("ZONE", "Zone 23"), ("FLOW", "Angle")}
 
     flow_row = next(row for row in rows if row["series"] == "FLOW")
     assert flow_row["ran"] == 2
@@ -497,7 +510,7 @@ def test_api_playcall_all_csv_and_json(app, monkeypatch):
     rows = flat["rows"]
     assert len(rows) == 3
     pairs = {(row["series"], row["playcall"]) for row in rows}
-    assert pairs == {("HORNS", "Horns Flex"), ("ZONE", "Zone 23"), ("FLOW", "FLOW")}
+    assert pairs == {("HORNS", "Horns Flex"), ("ZONE", "Zone 23"), ("FLOW", "Angle")}
 
     flow_entry = next(row for row in rows if row["series"] == "FLOW")
     assert flow_entry["off_set"]["pts"] == 0

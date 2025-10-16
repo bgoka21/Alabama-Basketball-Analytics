@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import re
 from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Dict, Iterable, Mapping, MutableMapping, Optional, Tuple
@@ -17,6 +18,21 @@ from models.database import Game
 _LOGGER = logging.getLogger(__name__)
 _CACHE_TTL_SECONDS = 60 * 60  # 1 hour
 _IN_MEMORY_CACHE: Dict[int, Dict[str, object]] = {}
+
+
+_FLOW_PREFIX_PATTERN = re.compile(r"^\s*flow\s*[–-]\s*", flags=re.IGNORECASE)
+
+
+def _normalize_flow_playcall_label(label: object) -> str:
+    """Normalize a FLOW playcall label for consistent aggregation."""
+
+    if not isinstance(label, str):
+        if label is None:
+            return ""
+        label = str(label)
+    trimmed = label.strip()
+    normalized = _FLOW_PREFIX_PATTERN.sub("", trimmed)
+    return normalized.strip()
 
 
 def _utc_now_iso() -> str:
@@ -213,13 +229,16 @@ def _compute_from_dataframe(df: pd.DataFrame) -> Dict[str, object]:
                 family_totals["chances"] += chance_increment
         # Flow aggregation (includes pure FLOW and X, FLOW entries)
         if in_flow:
-            if playcall_label not in flow_map:
-                flow_map[playcall_label] = {
-                    "playcall": playcall_label,
+            flow_playcall_label = _normalize_flow_playcall_label(playcall_label) or (
+                playcall_label or "UNKNOWN"
+            )
+            if flow_playcall_label not in flow_map:
+                flow_map[flow_playcall_label] = {
+                    "playcall": flow_playcall_label,
                     "ran_in_flow": 0,
                     "in_flow": {"pts": 0, "chances": 0},
                 }
-            flow_entry = flow_map[playcall_label]
+            flow_entry = flow_map[flow_playcall_label]
             flow_entry["ran_in_flow"] += 1
             if not is_neutral:
                 flow_entry["in_flow"]["pts"] += points
@@ -411,7 +430,10 @@ def aggregate_playcall_reports(game_ids: Iterable[int]):
                     for entry in plays_payload:
                         if not isinstance(entry, Mapping):
                             continue
-                        playcall = str(entry.get("playcall", "")) or "UNKNOWN"
+                        raw_playcall = entry.get("playcall", "")
+                        playcall = _normalize_flow_playcall_label(raw_playcall)
+                        if not playcall:
+                            playcall = _normalize_string(raw_playcall) or "UNKNOWN"
                         if playcall not in flow_map:
                             flow_map[playcall] = {
                                 "playcall": playcall,
