@@ -120,12 +120,11 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "atr_finishing": {
-        "columns": ["ATR Makes", "ATR Att", "ATR %", "And-1"],
+        "columns": ["ATR Makes", "ATR Att", "ATR %"],
         "column_map": {
             "ATR Makes": ("atr_make",),
             "ATR Att": ("atr_att",),
             "ATR %": ("atr_pct",),
-            "And-1": ("atr_and1",),
         },
         "pct_columns": ["ATR %"],
         "default_sort": ["atr_pct", "atr_make", "atr_att", "player"],
