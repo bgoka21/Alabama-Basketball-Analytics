@@ -18,6 +18,25 @@
       <label for="result" class="block font-semibold mb-1">Result</label>
       <input type="text" id="result" name="result" value="{{ game.result }}" class="w-full p-2 border rounded">
     </div>
+    <!-- Game Types -->
+    <div class="mb-6">
+      <span class="block font-semibold mb-1">Game Types</span>
+      <div class="flex flex-wrap gap-3">
+        {% for option in game_type_options %}
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="game_type"
+              value="{{ option }}"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              {% if option in game.game_types %}checked{% endif %}
+            >
+            <span>{{ option }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      <p class="text-sm text-gray-500 mt-1">Select every tag that applies to this matchup.</p>
+    </div>
     <!-- Submit Button -->
     <div>
       <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
