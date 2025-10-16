@@ -45,6 +45,7 @@ from werkzeug.utils import secure_filename
 from models.database import (
     db,
     Game,
+    GameTypeTag,
     TeamStats,
     PlayerStats,
     BlueCollarStats,
@@ -68,7 +69,7 @@ from models.recruit import Recruit, RecruitShotTypeStat
 from models.user import User
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, selectinload
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from utils.shottype import (
@@ -118,6 +119,14 @@ from admin.game_leaderboard_config import (
     guards_for as game_guards_for,
 )
 from utils.session_helpers import get_player_stats_for_date_range
+
+
+GAME_TYPE_OPTIONS = [
+    "Exhibition",
+    "Non-Conference",
+    "Conference",
+    "Postseason",
+]
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
     get_on_court_metrics,
@@ -4467,18 +4476,45 @@ def download_file(file_id):
 @admin_bp.route('/game-reports')
 @login_required
 def game_reports():
-    # filter to the currently selected season
-    sid   = request.args.get('season_id', type=int)
-    if not sid:
-        # fallback to most recent season
-        sid = Season.query.order_by(Season.start_date.desc()).first().id
-    games = Game.query \
-                 .filter_by(season_id=sid) \
-                 .order_by(Game.game_date.desc()) \
-                 .all()
-    return render_template('admin/game_reports.html',
-                           games=games,
-                            active_page='game_reports')
+    all_seasons = Season.query.order_by(Season.start_date.desc()).all()
+    selected_season = request.args.get('season_id', type=int)
+    if selected_season is None and all_seasons:
+        selected_season = all_seasons[0].id
+
+    raw_types = request.args.getlist('game_type')
+    if not raw_types:
+        single = (request.args.get('game_type') or '').strip()
+        if single:
+            raw_types = [single]
+
+    selected_game_types: list[str] = []
+    for value in raw_types:
+        match = next(
+            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
+            None,
+        )
+        if match and match not in selected_game_types:
+            selected_game_types.append(match)
+
+    games: list[Game] = []
+    if selected_season:
+        query = (
+            Game.query.options(selectinload(Game.type_tags))
+            .filter_by(season_id=selected_season)
+        )
+        if selected_game_types:
+            query = query.filter(Game.type_tags.any(GameTypeTag.tag.in_(selected_game_types)))
+        games = query.order_by(Game.game_date.desc()).all()
+
+    return render_template(
+        'admin/game_reports.html',
+        games=games,
+        active_page='game_reports',
+        game_type_options=GAME_TYPE_OPTIONS,
+        selected_game_types=selected_game_types,
+        all_seasons=all_seasons,
+        selected_season=selected_season,
+    )
 
 
 
@@ -4948,6 +4984,26 @@ def edit_game(game_id):
             game.opponent_name = request.form.get('opponent_name')
             game.result = request.form.get('result')
 
+            raw_types = request.form.getlist('game_type')
+            if not raw_types:
+                single = (request.form.get('game_type') or '').strip()
+                if single:
+                    raw_types = [single]
+
+            selected_types: list[str] = []
+            for value in raw_types:
+                match = next(
+                    (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
+                    None,
+                )
+                if not match:
+                    raise ValueError("Invalid game type selection.")
+                if match not in selected_types:
+                    selected_types.append(match)
+
+            ordered_types = [option for option in GAME_TYPE_OPTIONS if option in selected_types]
+            game.game_types = ordered_types
+
             db.session.commit()
             flash("Game updated successfully!", "success")
             return redirect(url_for('admin.game_reports'))
@@ -4956,7 +5012,11 @@ def edit_game(game_id):
             db.session.rollback()
             flash(f"Error updating game: {e}", "error")
 
-    return render_template('admin/edit_game.html', game=game)
+    return render_template(
+        'admin/edit_game.html',
+        game=game,
+        game_type_options=GAME_TYPE_OPTIONS,
+    )
 
 
 

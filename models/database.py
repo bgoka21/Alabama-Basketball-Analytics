@@ -45,6 +45,49 @@ class Game(db.Model):
     opponent_blue_coll_stats = db.relationship('OpponentBlueCollarStats', backref='game', lazy=True)
     possessions              = db.relationship('Possession',             backref='game', lazy=True)
 
+    type_tags                = db.relationship(
+        'GameTypeTag',
+        back_populates='game',
+        cascade='all, delete-orphan',
+        order_by='GameTypeTag.tag',
+        lazy='selectin',
+    )
+
+    @property
+    def game_types(self):
+        return [tag.tag for tag in self.type_tags]
+
+    @game_types.setter
+    def game_types(self, tags):
+        unique_tags = []
+        for tag in tags or []:
+            if tag and tag not in unique_tags:
+                unique_tags.append(tag)
+
+        existing = {tag.tag: tag for tag in self.type_tags}
+
+        for tag_obj in list(self.type_tags):
+            if tag_obj.tag not in unique_tags:
+                self.type_tags.remove(tag_obj)
+
+        for tag in unique_tags:
+            if tag not in existing:
+                self.type_tags.append(GameTypeTag(tag=tag))
+
+
+class GameTypeTag(db.Model):
+    __tablename__ = 'game_type_tag'
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id', ondelete='CASCADE'), nullable=False, index=True)
+    tag = db.Column(db.String(32), nullable=False)
+
+    game = db.relationship('Game', back_populates='type_tags')
+
+    __table_args__ = (
+        UniqueConstraint('game_id', 'tag', name='uq_game_type_tag_game_id_tag'),
+    )
+
 
 class Practice(db.Model):
     __tablename__   = 'practice'
