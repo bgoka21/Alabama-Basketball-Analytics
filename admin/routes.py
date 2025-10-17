@@ -8077,7 +8077,6 @@ def leaderboard_game():
                     '3FG (Shrinks)',
                     shrinks_season,
                     shrinks_last,
-                    split_dual=True,
                 ),
                 _group_item('atr_finishing', 'ATR Finishing', atr_season, atr_last),
             ],
