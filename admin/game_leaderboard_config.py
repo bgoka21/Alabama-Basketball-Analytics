@@ -239,13 +239,13 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         ],
     },
     "collisions": {
-        "columns": ["Gap +", "Gap Opps", "Gap %"],
+        "columns": ["Collision +", "Collision Opps", "Collision %"],
         "column_map": {
-            "Gap +": ("gap_plus",),
-            "Gap Opps": ("gap_opps",),
-            "Gap %": ("gap_pct",),
+            "Collision +": ("gap_plus",),
+            "Collision Opps": ("gap_opps",),
+            "Collision %": ("gap_pct",),
         },
-        "pct_columns": ["Gap %"],
+        "pct_columns": ["Collision %"],
         "default_sort": ["gap_pct", "gap_opps", "gap_plus", "player"],
         "table_id": "game-leaderboard-defense-collisions",
         "percent_specs": [

@@ -172,13 +172,13 @@
   {{ render_grade_scales_for_specs(percent_specs) }}
 
 {% elif selected.key == 'collision_gap_help' %}
-  {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+  {% set columns = ["Collision +", "Collision Opp", "Collision %"] %}
   {% set column_map = {
-    "Gap +": ("plus", "gap_plus"),
-    "Gap Opp": ("opps", "gap_opp", "gap_opps"),
-    "Gap %": ("pct", "gap_pct"),
+    "Collision +": ("plus", "gap_plus"),
+    "Collision Opp": ("opps", "gap_opp", "gap_opps"),
+    "Collision %": ("pct", "gap_pct"),
   } %}
-  {% set pct_columns = ["Gap %"] %}
+  {% set pct_columns = ["Collision %"] %}
   {% set table = build_dual_table(
     base_columns=columns,
     season_rows=collision_rows,
