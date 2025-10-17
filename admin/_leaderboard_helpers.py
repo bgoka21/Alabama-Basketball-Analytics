@@ -940,10 +940,14 @@ def _resolve_column_value(row: Any, keys: Tuple[str, ...]) -> Any:
     return None
 
 
-def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optional[str], Any, Optional[str]]:
+def _parse_column_spec(
+    column: str, spec: Any
+) -> Tuple[Tuple[str, ...], Optional[str], Any, Optional[str], Optional[str], Optional[str]]:
     formatter: Optional[str] = None
     default_value: Any = None
     grade_metric: Optional[str] = None
+    label_override: Optional[str] = None
+    subgroup: Optional[str] = None
 
     if spec is None:
         keys: Tuple[str, ...] = (column,)
@@ -955,6 +959,10 @@ def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optiona
             keys = tuple(raw_keys)
         formatter = spec.get("format")
         default_value = spec.get("default")
+        label_override = spec.get("label") or spec.get("display")
+        subgroup_value = spec.get("subgroup")
+        if subgroup_value is not None:
+            subgroup = str(subgroup_value)
         metric_override = (
             spec.get("metric")
             or spec.get("grade_metric")
@@ -971,7 +979,7 @@ def _parse_column_spec(column: str, spec: Any) -> Tuple[Tuple[str, ...], Optiona
     if not keys:
         keys = (column,)
 
-    return keys, formatter, default_value, grade_metric
+    return keys, formatter, default_value, grade_metric, label_override, subgroup
 
 
 def _format_columns_for_source(
@@ -988,7 +996,7 @@ def _format_columns_for_source(
 
     for column in columns:
         spec = mapping.get(column)
-        keys, formatter, default_value, _ = _parse_column_spec(column, spec)
+        keys, formatter, default_value, _, _, _ = _parse_column_spec(column, spec)
         value = _resolve_column_value(source, keys)
         if value is None and default_value is not None:
             value = default_value
@@ -1176,7 +1184,7 @@ def _extract_numeric_for_column(
         return None
 
     spec = mapping.get(column)
-    keys, formatter, default_value, _ = _parse_column_spec(column, spec)
+    keys, formatter, default_value, _, _, _ = _parse_column_spec(column, spec)
     value = _resolve_column_value(source, keys)
     if value is None and default_value is not None:
         value = default_value
@@ -1326,15 +1334,24 @@ def build_dual_table(
 
     for column in base_columns:
         slug = _slugify_label(column)
-        spec_keys, formatter, _, grade_metric = _parse_column_spec(column, mapping.get(column))
+        (
+            spec_keys,
+            formatter,
+            _,
+            grade_metric,
+            label_override,
+            subgroup,
+        ) = _parse_column_spec(column, mapping.get(column))
         canonical_keys = [
             str(key).lower()
             for key in spec_keys
             if isinstance(key, str)
         ]
         is_pct = column in pct_set or formatter == "pct"
+        display_label = label_override or column
         column_info = {
-            "label": column,
+            "label": display_label,
+            "source_label": column,
             "slug": slug,
             "keys": canonical_keys,
             "formatter": formatter,
@@ -1342,6 +1359,8 @@ def build_dual_table(
         }
         if grade_metric:
             column_info["grade_metric"] = str(grade_metric)
+        if subgroup:
+            column_info["subgroup"] = subgroup
         column_specs.append(column_info)
         for key in canonical_keys:
             canonical_map.setdefault(key, column_info)
@@ -1414,6 +1433,8 @@ def build_dual_table(
         }
         if cell_class:
             column_entry["cell_class"] = cell_class
+        if spec.get("subgroup"):
+            column_entry["subgroup"] = spec["subgroup"]
         columns.append(column_entry)
 
     for spec in column_specs:
@@ -1428,7 +1449,89 @@ def build_dual_table(
         }
         if cell_class:
             column_entry["cell_class"] = cell_class
+        if spec.get("subgroup"):
+            column_entry["subgroup"] = spec["subgroup"]
         columns.append(column_entry)
+
+    def _build_header_rows(table_columns: list[Dict[str, Any]]) -> list[list[Dict[str, Any]]]:
+        has_groups = any(col.get("group") for col in table_columns)
+        if not has_groups:
+            return []
+        has_subgroups = any(col.get("subgroup") for col in table_columns)
+        total_depth = 2 + (1 if has_subgroups else 0)
+        header_rows: list[list[Dict[str, Any]]] = []
+        group_row: list[Dict[str, Any]] = []
+        group_segments: list[Dict[str, Any]] = []
+        index = 0
+        while index < len(table_columns):
+            column_entry = table_columns[index]
+            group_label = column_entry.get("group")
+            if not group_label:
+                column_entry["render_header"] = False
+                group_row.append(
+                    {
+                        "type": "column",
+                        "column": column_entry,
+                        "rowspan": total_depth,
+                        "colspan": 1,
+                    }
+                )
+                index += 1
+                continue
+            span = 1
+            while (
+                index + span < len(table_columns)
+                and table_columns[index + span].get("group") == group_label
+            ):
+                span += 1
+            group_row.append(
+                {
+                    "type": "group",
+                    "label": group_label,
+                    "colspan": span,
+                    "rowspan": 1,
+                }
+            )
+            group_segments.append(
+                {
+                    "label": group_label,
+                    "columns": table_columns[index : index + span],
+                }
+            )
+            index += span
+
+        header_rows.append(group_row)
+
+        if has_subgroups:
+            subgroup_row: list[Dict[str, Any]] = []
+            for segment in group_segments:
+                segment_columns = segment.get("columns") or []
+                sub_index = 0
+                while sub_index < len(segment_columns):
+                    seg_column = segment_columns[sub_index]
+                    subgroup_label = seg_column.get("subgroup")
+                    span = 1
+                    while (
+                        sub_index + span < len(segment_columns)
+                        and segment_columns[sub_index + span].get("subgroup")
+                        == subgroup_label
+                    ):
+                        span += 1
+                    label_text = str(subgroup_label) if subgroup_label else "\u00A0"
+                    subgroup_row.append(
+                        {
+                            "type": "group",
+                            "label": label_text,
+                            "colspan": span,
+                            "rowspan": 1,
+                        }
+                    )
+                    sub_index += span
+            header_rows.append(subgroup_row)
+
+        return header_rows
+
+    header_rows = _build_header_rows(columns)
 
     rows: list[Dict[str, Any]] = []
     for index, display in enumerate(display_rows):
@@ -1455,12 +1558,14 @@ def build_dual_table(
         }
 
         for spec in column_specs:
-            label = spec["label"]
+            source_label = spec.get("source_label") or spec["label"]
             slug = spec["slug"]
-            total_value = totals_display.get(label, default_placeholder)
-            last_value = last_display.get(label, default_placeholder)
+            total_value = totals_display.get(source_label, default_placeholder)
+            last_value = last_display.get(source_label, default_placeholder)
             row_entry[f"totals_{slug}"] = total_value
-            value_numeric = totals_numeric.get(label) if totals_numeric else None
+            value_numeric = (
+                totals_numeric.get(source_label) if totals_numeric else None
+            )
             if value_numeric is not None:
                 row_entry[f"totals_{slug}_value"] = value_numeric
             else:
@@ -1471,7 +1576,9 @@ def build_dual_table(
                 row_entry.get(f"totals_{slug}_value") or value_numeric,
             )
             row_entry[f"last_{slug}"] = last_value
-            value_numeric = last_numeric.get(label) if last_numeric else None
+            value_numeric = (
+                last_numeric.get(source_label) if last_numeric else None
+            )
             if value_numeric is not None:
                 row_entry[f"last_{slug}_value"] = value_numeric
             else:
@@ -1497,12 +1604,16 @@ def build_dual_table(
         }
 
         for spec in column_specs:
-            label = spec["label"]
+            source_label = spec.get("source_label") or spec["label"]
             slug = spec["slug"]
-            totals_row[f"totals_{slug}"] = totals_display_data.get(label, default_placeholder)
-            totals_row[f"last_{slug}"] = last_totals_display.get(label, default_placeholder)
-            totals_numeric_value = totals_numeric_data.get(label)
-            last_numeric_value = last_numeric_data.get(label)
+            totals_row[f"totals_{slug}"] = totals_display_data.get(
+                source_label, default_placeholder
+            )
+            totals_row[f"last_{slug}"] = last_totals_display.get(
+                source_label, default_placeholder
+            )
+            totals_numeric_value = totals_numeric_data.get(source_label)
+            last_numeric_value = last_numeric_data.get(source_label)
             if totals_numeric_value is not None:
                 totals_row[f"totals_{slug}_value"] = totals_numeric_value
             if last_numeric_value is not None:
@@ -1584,6 +1695,7 @@ def build_dual_table(
         "totals": totals_row,
         "default_sort": default_sort_value,
         "has_data": bool(rows) or bool(totals_row),
+        "header_rows": header_rows,
     }
 
 
