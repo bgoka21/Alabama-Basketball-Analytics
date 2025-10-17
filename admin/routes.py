@@ -2282,6 +2282,29 @@ def _flatten_practice_field_catalog():
     return catalog
 
 
+def _build_leaderboard_catalog():
+    """Return sorted list of game leaderboard metrics."""
+
+    catalog = []
+    seen = set()
+    for entry in LEADERBOARD_STATS:
+        key = entry.get('key')
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        catalog.append(
+            {
+                'key': key,
+                'label': entry.get('label') or key.replace('_', ' ').title(),
+                'format': entry.get('format'),
+                'hidden': bool(entry.get('hidden')),
+            }
+        )
+
+    catalog.sort(key=lambda item: item['label'])
+    return catalog
+
+
 _JERSEY_RE = re.compile(r"^\s*#?(\d+)")
 
 
@@ -2925,6 +2948,82 @@ def _prepare_custom_stats_columns(dataset_columns):
         ordered.append(player_col)
     ordered.extend(stat_columns)
     return ordered
+
+
+@admin_bp.route('/correlation-workbench', methods=['GET'])
+@admin_required
+def correlation_workbench():
+    """Render the correlation analytics workspace."""
+
+    seasons = (
+        Season.query.order_by(Season.start_date.desc(), Season.id.desc()).all()
+    )
+    season_options = [
+        {
+            'id': season.id,
+            'label': season.season_name or f"Season {season.id}",
+        }
+        for season in seasons
+    ]
+
+    selected_season_id = season_options[0]['id'] if season_options else None
+
+    roster_entries = (
+        Roster.query.order_by(Roster.season_id.desc(), Roster.player_name.asc()).all()
+        if season_options
+        else []
+    )
+
+    roster_payload = []
+    for entry in roster_entries:
+        roster_payload.append(
+            {
+                'id': entry.id,
+                'season_id': entry.season_id,
+                'name': entry.player_name,
+                'label': entry.player_name,
+                'jersey': _extract_jersey_number(entry.player_name),
+            }
+        )
+
+    practice_catalog = _flatten_practice_field_catalog()
+    leaderboard_catalog = _build_leaderboard_catalog()
+
+    return render_template(
+        'admin/correlation_workbench.html',
+        season_options=season_options,
+        selected_season_id=selected_season_id,
+        roster_payload=roster_payload,
+        practice_catalog=practice_catalog,
+        leaderboard_catalog=leaderboard_catalog,
+    )
+
+
+@admin_bp.route('/api/correlation/workbench', methods=['POST'])
+@admin_required
+def correlation_workbench_api():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, Mapping):
+        return jsonify({'error': 'Request payload must be a JSON object'}), 400
+
+    studies = payload.get('studies')
+    scope = payload.get('scope')
+
+    if not isinstance(studies, Sequence) or isinstance(studies, (bytes, str)):
+        return jsonify({'error': 'studies must be a non-empty list'}), 400
+    if not studies:
+        return jsonify({'error': 'studies must be a non-empty list'}), 400
+    if not isinstance(scope, Mapping):
+        return jsonify({'error': 'scope must be a JSON object'}), 400
+
+    try:
+        from services.correlation import run_studies
+
+        result = run_studies(studies=studies, scope=scope)
+    except (ValueError, TypeError) as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    return jsonify(result)
 
 
 @admin_bp.route('/custom-stats', methods=['GET'])

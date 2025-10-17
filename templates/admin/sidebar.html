@@ -121,6 +121,7 @@
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.users_list' %} active{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.usage_report' %} active{% endif %}" href="{{ usage_url }}">Usage</a>
+        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.correlation_workbench' %} active{% endif %}" href="{{ url_for('admin.correlation_workbench') }}">Correlation Workbench</a>
         {% if view_exists('admin.draft_upload') %}
         <a class="nav-link" href="{{ url_for('admin.draft_upload') }}">Draft Upload</a>
         {% endif %}

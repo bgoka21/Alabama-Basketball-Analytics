@@ -13,12 +13,12 @@
 
 ## Phase 2: Front-End Workspace Surface
 3. **Template & bootstrap**
-   - [ ] Create `templates/admin/correlation_workbench.html` patterned after the custom practice stats layout with left-side filter controls and a main chart canvas.
-   - [ ] Inject roster, practice, and leaderboard catalogs via the Flask context for client initialization.
-   - [ ] Wire the page into the admin navigation with permission checks consistent with other analytics pages.
+   - [x] Create `templates/admin/correlation_workbench.html` patterned after the custom practice stats layout with left-side filter controls and a main chart canvas.
+   - [x] Inject roster, practice, and leaderboard catalogs via the Flask context for client initialization.
+   - [x] Wire the page into the admin navigation with permission checks consistent with other analytics pages.
 
 4. **Client controller & visualization**
-   - [ ] Build `static/js/correlation_workbench.js` to manage state, fetch studies from the new endpoint, and render Chart.js scatter/heatmap components.
+   - [x] Build `static/js/correlation_workbench.js` to manage state, fetch studies from the new endpoint, and render Chart.js scatter/heatmap components.
    - [ ] Support multi-study panels, study presets (CRUD via existing presets API), and exports (CSV + PNG via html2canvas).
    - [ ] Add automated front-end tests (Jest) for state reducers/helpers and lint updates if required.
 
