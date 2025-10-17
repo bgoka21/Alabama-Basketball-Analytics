@@ -8054,6 +8054,7 @@ def leaderboard_game():
         *,
         split_dual: bool = False,
         split_titles: Optional[Sequence[str]] = None,
+        split_stacked: bool = False,
     ) -> Dict[str, Any]:
         return {
             'key': key,
@@ -8066,6 +8067,7 @@ def leaderboard_game():
             'slug': key.replace('_', '-'),
             'split_dual': split_dual,
             'split_titles': list(split_titles) if split_titles else None,
+            'split_stacked': split_stacked,
         }
 
     leaderboard_groups = [
@@ -8077,6 +8079,9 @@ def leaderboard_game():
                     '3FG (Shrinks)',
                     shrinks_season,
                     shrinks_last,
+                    split_dual=True,
+                    split_titles=("Season Shrink 3's", "Last Game Shrink 3's"),
+                    split_stacked=True,
                 ),
                 _group_item('atr_finishing', 'ATR Finishing', atr_season, atr_last),
             ],
