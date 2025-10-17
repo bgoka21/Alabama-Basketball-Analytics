@@ -826,12 +826,26 @@ def parse_csv(file_path, game_id, season_id):
         "reb_tip": 0
     }
 
+    offense_reb_rows = {
+        "rebound opportunities",
+        "offense rebounding opportunities",
+        "offense rebound opportunities",
+        "offensive rebounding opportunities",
+        "offensive rebound opportunities",
+    }
+    defense_reb_rows = {
+        "defense rebounding opportunities",
+        "defense rebound opportunities",
+        "defensive rebounding opportunities",
+        "defensive rebound opportunities",
+    }
+
     # --- Process Each Row ---
     for index, row in df.iterrows():
         row_type = str(row.get("Row", "")).strip()
         row_type_lower = row_type.lower()
 
-        if row_type_lower == "rebound opportunities":
+        if row_type_lower in offense_reb_rows:
             for col in df.columns:
                 if not col.startswith("#"):
                     continue
@@ -850,7 +864,27 @@ def parse_csv(file_path, game_id, season_id):
                         inc_stat(slot, "back_man_positive")
                     elif token == "BM -":
                         inc_stat(slot, "back_man_missed")
-                    elif token == "Def +":
+                    elif row_type_lower == "rebound opportunities":
+                        if token == "Def +":
+                            inc_stat(slot, "box_out_positive")
+                        elif token == "Def -":
+                            inc_stat(slot, "box_out_missed")
+                        elif token == "Given Up":
+                            inc_stat(slot, "off_reb_given_up")
+            continue
+
+        if row_type_lower in defense_reb_rows:
+            for col in df.columns:
+                if not col.startswith("#"):
+                    continue
+                tokens = extract_tokens(row.get(col, ""))
+                if not tokens:
+                    continue
+                if col not in player_stats_dict:
+                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+                slot = player_stats_dict[col]
+                for token in tokens:
+                    if token == "Def +":
                         inc_stat(slot, "box_out_positive")
                     elif token == "Def -":
                         inc_stat(slot, "box_out_missed")
