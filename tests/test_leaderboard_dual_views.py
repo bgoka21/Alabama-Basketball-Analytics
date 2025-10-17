@@ -295,6 +295,25 @@ class TestDualViews:
         fake = _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals)
         monkeypatch.setattr(rmod, "compute_collisions_gap_help", fake)
 
+        import app.grades as grades_mod
+
+        grade_token_calls: list[str] = []
+        grade_scale_calls: list[str] = []
+
+        def fake_grade_token(metric_key, value):
+            grade_token_calls.append(metric_key)
+            return f"grade-token grade-token--{metric_key}"
+
+        real_grade_scale = grades_mod.grade_scale
+
+        def capture_grade_scale(metric_key):
+            grade_scale_calls.append(metric_key)
+            return real_grade_scale(metric_key)
+
+        monkeypatch.setattr(grades_mod, "grade_token", fake_grade_token)
+        monkeypatch.setattr(grades_mod, "grade_scale", capture_grade_scale)
+        app_client.application.jinja_env.globals["grade_scale"] = capture_grade_scale
+
         resp = app_client.get("/admin/leaderboard/collisions/gap-help")
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
@@ -304,6 +323,10 @@ class TestDualViews:
             section_title="Collisions — Gap Help",
             expected_texts=["4", "5", "2", "2", "80.0%", "100.0%"],
         )
+
+        assert "gap_pct" in grade_token_calls
+        assert "collision_pct" not in grade_token_calls
+        assert "gap_pct" in grade_scale_calls
 
     def test_atr_fg_pct_dual_view(self, monkeypatch, app_client):
         import admin.routes as rmod

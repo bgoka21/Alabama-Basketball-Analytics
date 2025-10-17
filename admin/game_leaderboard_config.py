@@ -275,7 +275,10 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         "column_map": {
             "Collision +": ("gap_plus",),
             "Collision Opps": ("gap_opps",),
-            "Collision %": ("gap_pct",),
+            "Collision %": {
+                "keys": ("gap_pct",),
+                "grade_metric": "gap_pct",
+            },
         },
         "pct_columns": ["Collision %"],
         "default_sort": ["gap_pct", "gap_opps", "gap_plus", "player"],
@@ -439,10 +442,13 @@ def columns_for(key: str) -> List[str]:
     return list(_config_for(key).get("columns", []))
 
 
-def column_map_for(key: str) -> Dict[str, Tuple[str, ...]]:
-    mapping = {}
+def column_map_for(key: str) -> Dict[str, Any]:
+    mapping: Dict[str, Any] = {}
     for label, value in _config_for(key).get("column_map", {}).items():
-        mapping[label] = _ensure_tuple(value)
+        if isinstance(value, Mapping):
+            mapping[label] = dict(value)
+        else:
+            mapping[label] = _ensure_tuple(value)
     return mapping
 
 
