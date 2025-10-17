@@ -1,6 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'macros/dual_tables.html' import render_dual_section %}
 {% from '_macros/percent_box.html' import apply_percent_wrappers %}
+{% from '_macros/grade_scale.html' import render_grade_scales_for_specs %}
 
 {% block page_controls %}
   <form method="get" class="mb-4 flex flex-wrap items-end gap-4">
@@ -58,7 +59,10 @@
       {% set column_map = {
         "Collision +": ("plus", "gap_plus"),
         "Collision Opp": ("opps", "gap_opp", "gap_opps"),
-        "Collision %": ("pct", "gap_pct"),
+        "Collision %": {
+          "keys": ("pct", "gap_pct"),
+          "grade_metric": "gap_pct",
+        },
       } %}
       {% set pct_columns = ["Collision %"] %}
       {% set table = build_dual_table(
@@ -94,6 +98,8 @@
         table,
         practice_note
       ) }}
+
+      {{ render_grade_scales_for_specs(percent_specs) }}
     </div>
   </div>
 {% endblock %}
