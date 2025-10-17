@@ -122,3 +122,34 @@ def test_game_collision_low_man(tmp_path):
         assert row.low_help_missed == 1
         assert row.collision_gap_positive == 1
         assert row.collision_gap_missed == 1
+
+
+def test_gap_low_tokens_outside_pnr(tmp_path):
+    csv_path = tmp_path / "game_gap_low.csv"
+    csv_content = (
+        "Row,PLAYER POSSESSIONS,OPP STATS,POSSESSION START,POSSESSION TYPE,PAINT TOUCHES,SHOT CLOCK,SHOT CLOCK PT,TEAM,#1 A\n"
+        "Defense,,,start,Half Court,,24,,Man,\"Gap +, Low +\"\n"
+        "Defense,,,start2,Half Court,,24,,Man,\"Gap -, Low -\"\n"
+    )
+    csv_path.write_text(csv_content)
+
+    os.makedirs("instance", exist_ok=True)
+    db_path = os.path.join("instance", "database.db")
+    if os.path.exists(db_path):
+        os.remove(db_path)
+
+    app = create_app()
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+        db.session.add(Season(id=1, season_name="2024"))
+        db.session.commit()
+
+        parse_csv(str(csv_path), game_id=None, season_id=1)
+
+        row = PlayerStats.query.filter_by(player_name="#1 A").first()
+        assert row is not None
+        assert row.pnr_gap_positive == 1
+        assert row.pnr_gap_missed == 1
+        assert row.low_help_positive == 1
+        assert row.low_help_missed == 1

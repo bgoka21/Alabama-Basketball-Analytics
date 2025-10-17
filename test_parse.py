@@ -846,15 +846,29 @@ def parse_csv(file_path, game_id, season_id):
         row_type = str(row.get("Row", "")).strip()
         row_type_lower = row_type.lower()
 
+        row_tokens_by_col = {}
+        for col in df.columns:
+            if not col.startswith("#"):
+                continue
+            tokens = extract_tokens(row.get(col, ""))
+            if not tokens:
+                continue
+            if col not in player_stats_dict:
+                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            slot = player_stats_dict[col]
+            row_tokens_by_col[col] = tokens
+            for token in tokens:
+                if token == "Gap +":
+                    inc_stat(slot, "pnr_gap_positive")
+                elif token == "Gap -":
+                    inc_stat(slot, "pnr_gap_missed")
+                elif token == "Low +":
+                    inc_stat(slot, "low_help_positive")
+                elif token == "Low -":
+                    inc_stat(slot, "low_help_missed")
+
         if row_type_lower in offense_reb_rows:
-            for col in df.columns:
-                if not col.startswith("#"):
-                    continue
-                tokens = extract_tokens(row.get(col, ""))
-                if not tokens:
-                    continue
-                if col not in player_stats_dict:
-                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            for col, tokens in row_tokens_by_col.items():
                 slot = player_stats_dict[col]
                 for token in tokens:
                     if token == "Off +":
@@ -875,14 +889,7 @@ def parse_csv(file_path, game_id, season_id):
             continue
 
         if row_type_lower in defense_reb_rows:
-            for col in df.columns:
-                if not col.startswith("#"):
-                    continue
-                tokens = extract_tokens(row.get(col, ""))
-                if not tokens:
-                    continue
-                if col not in player_stats_dict:
-                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            for col, tokens in row_tokens_by_col.items():
                 slot = player_stats_dict[col]
                 for token in tokens:
                     if token == "Def +":
@@ -894,25 +901,10 @@ def parse_csv(file_path, game_id, season_id):
             continue
 
         if row_type_lower in ("pnr", "pnr file"):
-            for col in df.columns:
-                if not col.startswith("#"):
-                    continue
-                tokens = extract_tokens(row.get(col, ""))
-                if not tokens:
-                    continue
-                if col not in player_stats_dict:
-                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            for col, tokens in row_tokens_by_col.items():
                 slot = player_stats_dict[col]
                 for token in tokens:
-                    if token == "Gap +":
-                        inc_stat(slot, "pnr_gap_positive")
-                    elif token == "Gap -":
-                        inc_stat(slot, "pnr_gap_missed")
-                    elif token == "Low +":
-                        inc_stat(slot, "low_help_positive")
-                    elif token == "Low -":
-                        inc_stat(slot, "low_help_missed")
-                    elif token == "CW +":
+                    if token == "CW +":
                         inc_stat(slot, "close_window_positive")
                     elif token == "CW -":
                         inc_stat(slot, "close_window_missed")
