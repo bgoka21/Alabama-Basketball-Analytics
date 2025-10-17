@@ -465,11 +465,9 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         for token in tokens:
             if token == "Bump +":
                 inc_stat(slot, "bump_positive")
-                inc_stat(slot, "collision_gap_positive")
                 continue
             if token == "Bump -":
                 inc_stat(slot, "bump_missed")
-                inc_stat(slot, "collision_gap_missed")
                 continue
 
             if token in defense_mapping:
