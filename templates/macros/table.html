@@ -6,7 +6,8 @@
   dense=True,
   sticky_header=False,
   caption=None,
-  default_sort=None
+  default_sort=None,
+  header_rows=None
 ) -%}
   {%- set container_classes = 'rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden' -%}
   {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
@@ -23,7 +24,105 @@
         {%- endif %}
         {%- set thead_classes = 'bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700' -%}
         {%- set sticky_header_class = ' sticky top-0 z-10 bg-gray-50 dark:bg-gray-800/60' if sticky_header else '' -%}
+        {%- set header_rows_data = header_rows or [] -%}
+        {%- set has_custom_header = header_rows_data | length > 0 -%}
         <thead class="{{ thead_classes }}{% if sticky_header %} sticky top-0 z-10{% endif %}">
+          {%- if has_custom_header -%}
+            {%- for row in header_rows_data -%}
+              <tr>
+                {%- for cell in row -%}
+                  {%- set cell_type = cell.type if cell.type is defined else 'group' -%}
+                  {%- set cell_colspan = cell.colspan if cell.colspan is defined else 1 -%}
+                  {%- set cell_rowspan = cell.rowspan if cell.rowspan is defined else 1 -%}
+                  {%- if cell_type == 'column' -%}
+                    {%- set col = cell.column -%}
+                    {%- set align = col.align | default('left') -%}
+                    {%- set align_class = {
+                      'left': 'text-left',
+                      'right': 'text-right',
+                      'center': 'text-center'
+                    }[align] -%}
+                    {%- set justify_class = {
+                      'left': 'justify-start',
+                      'right': 'justify-end',
+                      'center': 'justify-center'
+                    }[align] -%}
+                    {%- set width_class = col.width if col.width is defined and col.width else '' -%}
+                    {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                    {%- if col.sortable -%}
+                      {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
+                    {%- endif -%}
+                    <th scope="col"
+                        class="{{ th_base_classes }} {{ width_class }}"
+                        data-sortable="{{ 'true' if col.sortable else 'false' }}"
+                        data-key="{{ col.key }}"
+                        aria-sort="none"
+                        {%- if cell_rowspan | int > 1 %} rowspan="{{ cell_rowspan }}"{%- endif -%}
+                        {%- if cell_colspan | int > 1 %} colspan="{{ cell_colspan }}"{%- endif -%}>
+                      {%- if col.sortable -%}
+                        <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                                aria-label="Sort by {{ col.label }}">
+                          <span>{{ col.label | safe }}</span>
+                          <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                        </button>
+                      {%- else -%}
+                        <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                          <span>{{ col.label | safe }}</span>
+                          <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
+                        </div>
+                      {%- endif -%}
+                    </th>
+                  {%- else -%}
+                    {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
+                    <th scope="col"
+                        class="{{ group_th_classes }}"
+                        {%- if cell_colspan | int > 1 %} colspan="{{ cell_colspan }}"{%- endif -%}
+                        {%- if cell_rowspan | int > 1 %} rowspan="{{ cell_rowspan }}"{%- endif -%}>
+                      {{ cell.label | safe }}
+                    </th>
+                  {%- endif -%}
+                {%- endfor -%}
+              </tr>
+            {%- endfor -%}
+            <tr>
+              {%- for col in columns if col.render_header is not defined or col.render_header -%}
+                {%- set align = col.align | default('left') -%}
+                {%- set align_class = {
+                  'left': 'text-left',
+                  'right': 'text-right',
+                  'center': 'text-center'
+                }[align] -%}
+                {%- set justify_class = {
+                  'left': 'justify-start',
+                  'right': 'justify-end',
+                  'center': 'justify-center'
+                }[align] -%}
+                {%- set width_class = col.width if col.width is defined and col.width else '' -%}
+                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                {%- if col.sortable -%}
+                  {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
+                {%- endif -%}
+                <th scope="col"
+                    class="{{ th_base_classes }} {{ width_class }}"
+                    data-sortable="{{ 'true' if col.sortable else 'false' }}"
+                    data-key="{{ col.key }}"
+                    aria-sort="none">
+                  {%- if col.sortable -%}
+                    <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                            aria-label="Sort by {{ col.label }}">
+                      <span>{{ col.label | safe }}</span>
+                      <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                    </button>
+                  {%- else -%}
+                    <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                      <span>{{ col.label | safe }}</span>
+                      <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
+                    </div>
+                  {%- endif -%}
+                </th>
+              {%- endfor %}
+            </tr>
+          {%- else -%}
           {%- set grouped_columns = columns | selectattr('group', 'defined') | selectattr('group') | list -%}
           {%- set has_groups = grouped_columns | length > 0 -%}
           {%- if has_groups -%}
@@ -177,6 +276,7 @@
                 </th>
               {%- endfor %}
             </tr>
+          {%- endif -%}
           {%- endif -%}
         </thead>
         <tbody>

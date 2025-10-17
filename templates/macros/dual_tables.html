@@ -39,7 +39,8 @@
         dense=True,
         sticky_header=True,
         caption=title,
-        default_sort=default_sort
+        default_sort=default_sort,
+        header_rows=table.header_rows if table.header_rows is defined else None
       ) }}
     {% else %}
       <div class="text-sm opacity-70">{{ empty_message }}</div>
@@ -76,7 +77,8 @@
               dense=True,
               sticky_header=True,
               caption=title ~ ' — ' ~ season_label,
-              default_sort=season.default_sort if season.default_sort is defined else None
+              default_sort=season.default_sort if season.default_sort is defined else None,
+              header_rows=season.header_rows if season.header_rows is defined else None
             ) }}
           </div>
           <div class="space-y-2">
@@ -89,7 +91,8 @@
               dense=True,
               sticky_header=True,
               caption=title ~ ' — ' ~ last_label,
-              default_sort=last.default_sort if last.default_sort is defined else None
+              default_sort=last.default_sort if last.default_sort is defined else None,
+              header_rows=last.header_rows if last.header_rows is defined else None
             ) }}
           </div>
         </div>
@@ -105,7 +108,8 @@
               dense=True,
               sticky_header=True,
               caption=title ~ ' — ' ~ season_label,
-              default_sort=season.default_sort if season.default_sort is defined else None
+              default_sort=season.default_sort if season.default_sort is defined else None,
+              header_rows=season.header_rows if season.header_rows is defined else None
             ) }}
           </div>
           <div class="space-y-2">
@@ -118,7 +122,8 @@
               dense=True,
               sticky_header=True,
               caption=title ~ ' — ' ~ last_label,
-              default_sort=last.default_sort if last.default_sort is defined else None
+              default_sort=last.default_sort if last.default_sort is defined else None,
+              header_rows=last.header_rows if last.header_rows is defined else None
             ) }}
           </div>
         </div>
