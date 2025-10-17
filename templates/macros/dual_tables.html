@@ -48,7 +48,7 @@
 {% endmacro %}
 
 
-{% macro render_split_dual_section(title, season_table, last_table, note_date=None, empty_message='No stats for the most recent practice.', split_titles=None) %}
+{% macro render_split_dual_section(title, season_table, last_table, note_date=None, empty_message='No stats for the most recent practice.', split_titles=None, stacked=False) %}
   {% set season = season_table or {} %}
   {% set last = last_table or {} %}
   {% set season_label = (split_titles[0] if split_titles and split_titles|length > 0 else 'Season Totals') %}
@@ -64,34 +64,65 @@
     <span class="sr-only">{{ title }} — {{ season_label }}</span>
     <span class="sr-only">{{ title }} — {{ last_label }}</span>
     {% if has_content %}
-      <div class="grid gap-4 lg:grid-cols-2">
-        <div class="space-y-2">
-          <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ season_label }}</h4>
-          {{ render_table(
-            id=season.id,
-            columns=season.columns or [],
-            rows=season.rows or [],
-            totals=season.totals if season.totals is defined else None,
-            dense=True,
-            sticky_header=True,
-            caption=title ~ ' — ' ~ season_label,
-            default_sort=season.default_sort if season.default_sort is defined else None
-          ) }}
+      {% if stacked %}
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ season_label }}</h4>
+            {{ render_table(
+              id=season.id,
+              columns=season.columns or [],
+              rows=season.rows or [],
+              totals=season.totals if season.totals is defined else None,
+              dense=True,
+              sticky_header=True,
+              caption=title ~ ' — ' ~ season_label,
+              default_sort=season.default_sort if season.default_sort is defined else None
+            ) }}
+          </div>
+          <div class="space-y-2">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ last_label }}</h4>
+            {{ render_table(
+              id=last.id,
+              columns=last.columns or [],
+              rows=last.rows or [],
+              totals=last.totals if last.totals is defined else None,
+              dense=True,
+              sticky_header=True,
+              caption=title ~ ' — ' ~ last_label,
+              default_sort=last.default_sort if last.default_sort is defined else None
+            ) }}
+          </div>
         </div>
-        <div class="space-y-2">
-          <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ last_label }}</h4>
-          {{ render_table(
-            id=last.id,
-            columns=last.columns or [],
-            rows=last.rows or [],
-            totals=last.totals if last.totals is defined else None,
-            dense=True,
-            sticky_header=True,
-            caption=title ~ ' — ' ~ last_label,
-            default_sort=last.default_sort if last.default_sort is defined else None
-          ) }}
+      {% else %}
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-2">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ season_label }}</h4>
+            {{ render_table(
+              id=season.id,
+              columns=season.columns or [],
+              rows=season.rows or [],
+              totals=season.totals if season.totals is defined else None,
+              dense=True,
+              sticky_header=True,
+              caption=title ~ ' — ' ~ season_label,
+              default_sort=season.default_sort if season.default_sort is defined else None
+            ) }}
+          </div>
+          <div class="space-y-2">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ last_label }}</h4>
+            {{ render_table(
+              id=last.id,
+              columns=last.columns or [],
+              rows=last.rows or [],
+              totals=last.totals if last.totals is defined else None,
+              dense=True,
+              sticky_header=True,
+              caption=title ~ ' — ' ~ last_label,
+              default_sort=last.default_sort if last.default_sort is defined else None
+            ) }}
+          </div>
         </div>
-      </div>
+      {% endif %}
     {% else %}
       <div class="text-sm opacity-70">{{ empty_message }}</div>
     {% endif %}

@@ -43,7 +43,8 @@
                   last_table,
                   note_date=item.note_date,
                   empty_message=no_data_message,
-                  split_titles=item.split_titles
+                  split_titles=item.split_titles,
+                  stacked=item.split_stacked
                 ) }}
               {% else %}
                 {{ render_dual_section(item.label, table, note_date=item.note_date, empty_message=no_data_message) }}
