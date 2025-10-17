@@ -96,9 +96,7 @@ def test_game_collision_low_man(tmp_path):
         "Row,PLAYER POSSESSIONS,OPP STATS,POSSESSION START,POSSESSION TYPE,PAINT TOUCHES,SHOT CLOCK,SHOT CLOCK PT,TEAM,#1 A\n"
         "Defense,,,start,Half Court,,24,,Man,\"Bump +, Low Man +\"\n"
         "Defense,,,start2,Half Court,,24,,Man,\"Bump -, Low Man -\"\n"
-        "Defense,,,start3,Half Court,,24,,Man,\"Gap +\"\n"
-        "Defense,,,start4,Half Court,,24,,Man,\"Gap -\"\n"
-        "Offense,\"#1 A\",,start5,Half Court,,24,,Man,2FG+\n"
+        "Offense,\"#1 A\",,start3,Half Court,,24,,Man,2FG+\n"
     )
     csv_path.write_text(csv_content)
 

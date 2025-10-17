@@ -437,12 +437,8 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         "Contest": "contest_early",
         "No Contest": "contest_no",
         "None": "contest_no",
-        "Bump +": "bump_positive",
-        "Bump -": "bump_missed",
         "Low Man +": "low_help_positive",
         "Low Man -": "low_help_missed",
-        "Gap +": "collision_gap_positive",
-        "Gap -": "collision_gap_missed",
         "Contest Pass +": "pass_contest_positive",
         "Contest Pass -": "pass_contest_missed",
         "Blowby": "blowby_total",
@@ -465,9 +461,16 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         for token in tokens:
             if token == "Bump +":
                 inc_stat(slot, "bump_positive")
+                inc_stat(slot, "collision_gap_positive")
                 continue
             if token == "Bump -":
                 inc_stat(slot, "bump_missed")
+                inc_stat(slot, "collision_gap_missed")
+                continue
+
+            if token in ("Gap +", "Gap -"):
+                # Gap tokens still appear in legacy data but should not affect
+                # collision counters now that we source them from Bump labels.
                 continue
 
             if token in defense_mapping:
