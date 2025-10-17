@@ -1,0 +1,218 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+<div
+  class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8"
+  data-correlation-root
+  data-selected-season="{{ selected_season_id or '' }}"
+>
+  <div class="space-y-8 py-4">
+    <header class="space-y-3">
+      <h1 class="text-3xl font-bold text-gray-900">Correlation Analytics Workspace</h1>
+      <p class="text-base text-gray-600">
+        Explore how practice and game metrics relate to one another. Configure a study on the left,
+        then generate scatter plots and coefficient summaries to validate trends, surface outliers,
+        and guide follow-up questions with the coaching staff.
+      </p>
+    </header>
+
+    {% if not season_options %}
+    <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-600">
+      Add a season with roster data to get started. Once players are available, you can launch
+      the correlation workbench from here.
+    </div>
+    {% else %}
+    <div class="grid gap-6 lg:grid-cols-[minmax(280px,320px)_1fr]">
+      <aside class="space-y-6">
+        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Study Scope</h2>
+            <span class="text-xs font-medium uppercase tracking-wide text-gray-500">Filters</span>
+          </div>
+
+          <div class="space-y-2">
+            <label for="correlation-season" class="text-sm font-medium text-gray-700">Season</label>
+            <select
+              id="correlation-season"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+            >
+              {% for option in season_options %}
+              <option value="{{ option.id }}" {% if option.id == selected_season_id %}selected{% endif %}>
+                {{ option.label }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <label for="correlation-date-from" class="text-sm font-medium text-gray-700">From</label>
+              <input
+                type="date"
+                id="correlation-date-from"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+              />
+            </div>
+            <div class="space-y-2">
+              <label for="correlation-date-to" class="text-sm font-medium text-gray-700">To</label>
+              <input
+                type="date"
+                id="correlation-date-to"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+              />
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label for="correlation-roster" class="text-sm font-medium text-gray-700">Players</label>
+            <select
+              id="correlation-roster"
+              class="h-48 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+              multiple
+            ></select>
+            <p class="text-xs text-gray-500">Hold Ctrl (Windows) or Command (Mac) to select multiple players.</p>
+          </div>
+        </section>
+
+        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Study Metrics</h2>
+            <span class="text-xs font-medium uppercase tracking-wide text-gray-500">Axes</span>
+          </div>
+
+          <div class="space-y-2">
+            <label for="correlation-x-metric" class="text-sm font-medium text-gray-700">X-Axis Metric</label>
+            <select
+              id="correlation-x-metric"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+            ></select>
+          </div>
+
+          <div class="space-y-2">
+            <label for="correlation-y-metric" class="text-sm font-medium text-gray-700">Y-Axis Metric</label>
+            <select
+              id="correlation-y-metric"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+            ></select>
+          </div>
+
+          <div class="space-y-2">
+            <label for="correlation-study-label" class="text-sm font-medium text-gray-700">Study Label</label>
+            <input
+              type="text"
+              id="correlation-study-label"
+              placeholder="e.g., Shooting vs Efficiency"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
+            />
+            <p class="text-xs text-gray-500">Optional. Appears above the chart and in exports.</p>
+          </div>
+
+          <button
+            type="button"
+            id="correlation-run"
+            class="inline-flex w-full items-center justify-center rounded-lg bg-[#9E1B32] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#7b1427] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/60 focus:ring-offset-2"
+          >
+            Run Study
+          </button>
+          <div id="correlation-error" class="hidden rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"></div>
+        </section>
+      </aside>
+
+      <main class="space-y-6">
+        <section class="space-y-5 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="space-y-1">
+              <h2 class="text-xl font-semibold text-gray-900" id="correlation-study-title">Correlation Study</h2>
+              <p class="text-sm text-gray-500" id="correlation-study-subtitle">Configure a study and run it to view results.</p>
+            </div>
+            <div class="text-sm font-medium text-gray-500" id="correlation-sample-count"></div>
+          </div>
+
+          <div id="correlation-summary" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Pearson</dt>
+              <dd class="mt-1 text-2xl font-bold text-gray-900" id="correlation-pearson">—</dd>
+              <p class="text-xs text-gray-500">Measures linear relationship strength.</p>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Spearman</dt>
+              <dd class="mt-1 text-2xl font-bold text-gray-900" id="correlation-spearman">—</dd>
+              <p class="text-xs text-gray-500">Accounts for monotonic relationships using ranks.</p>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Samples</dt>
+              <dd class="mt-1 text-2xl font-bold text-gray-900" id="correlation-samples">0</dd>
+              <p class="text-xs text-gray-500">Players included after filters.</p>
+            </div>
+          </div>
+
+          <div
+            id="correlation-empty-state"
+            class="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600"
+          >
+            Pick metrics and run your first study to populate the chart.
+          </div>
+
+          <canvas id="correlation-chart" class="hidden h-[420px] w-full"></canvas>
+        </section>
+
+        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Data Points</h3>
+            <span class="text-xs font-medium uppercase tracking-wide text-gray-500">Players</span>
+          </div>
+          <div id="correlation-points-empty" class="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+            Run a study to list player-level values.
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm" id="correlation-points-table">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700">Player</th>
+                  <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700" id="correlation-x-header">X</th>
+                  <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700" id="correlation-y-header">Y</th>
+                </tr>
+              </thead>
+              <tbody id="correlation-points-body" class="divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    {% endif %}
+  </div>
+
+  <script type="application/json" id="correlation-roster-data">
+    {{ roster_payload | tojson }}
+  </script>
+  <script type="application/json" id="correlation-practice-catalog">
+    {{ practice_catalog | tojson }}
+  </script>
+  <script type="application/json" id="correlation-leaderboard-catalog">
+    {{ leaderboard_catalog | tojson }}
+  </script>
+  <script type="application/json" id="correlation-season-options">
+    {{ season_options | tojson }}
+  </script>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+    window.__CSRF__ = "{% if csrf_token is defined %}{{ csrf_token()|e }}{% else %}{% endif %}";
+  </script>
+  <script src="{{ url_for('static', filename='js/chart.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/correlation_workbench.js') }}" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.initCorrelationWorkbench) {
+        window.initCorrelationWorkbench({
+          apiUrl: "{{ url_for('admin.correlation_workbench_api') }}"
+        });
+      } else {
+        console.warn('initCorrelationWorkbench is not defined. Make sure correlation_workbench.js is loaded.');
+      }
+    });
+  </script>
+{% endblock %}
