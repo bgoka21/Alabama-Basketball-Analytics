@@ -142,26 +142,16 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
             }
         ],
     },
-    "rebounding_offense": {
-        "columns": [
-            "Crash +",
-            "Crash Opps",
-            "Crash %",
-            "Back Man +",
-            "Back Man Opps",
-            "Back Man %",
-        ],
+    "rebounding_offense_crash": {
+        "columns": ["Crash +", "Crash Opps", "Crash %"],
         "column_map": {
             "Crash +": ("crash_plus",),
             "Crash Opps": ("crash_opps",),
             "Crash %": ("crash_pct",),
-            "Back Man +": ("back_plus",),
-            "Back Man Opps": ("back_opps",),
-            "Back Man %": ("back_pct",),
         },
-        "pct_columns": ["Crash %", "Back Man %"],
+        "pct_columns": ["Crash %"],
         "default_sort": ["crash_pct", "crash_opps", "crash_plus", "player"],
-        "table_id": "game-leaderboard-rebounding-offensive",
+        "table_id": "game-leaderboard-rebounding-offensive-crash",
         "percent_specs": [
             {
                 "slug": "crash_pct",
@@ -179,7 +169,20 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                     "crash_att_min",
                     "min_crash_att",
                 ],
-            },
+            }
+        ],
+    },
+    "rebounding_offense_back": {
+        "columns": ["Back Man +", "Back Man Opps", "Back Man %"],
+        "column_map": {
+            "Back Man +": ("back_plus",),
+            "Back Man Opps": ("back_opps",),
+            "Back Man %": ("back_pct",),
+        },
+        "pct_columns": ["Back Man %"],
+        "default_sort": ["back_pct", "back_opps", "back_plus", "player"],
+        "table_id": "game-leaderboard-rebounding-offensive-back",
+        "percent_specs": [
             {
                 "slug": "back_man_pct",
                 "metric": "back_man_pct",
@@ -196,7 +199,7 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                     "back_att_min",
                     "min_back_att",
                 ],
-            },
+            }
         ],
     },
     "rebounding_defense": {
@@ -340,26 +343,16 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
             }
         ],
     },
-    "pnr_grade": {
-        "columns": [
-            "Close Window +",
-            "Close Window Opps",
-            "Close Window %",
-            "Shut Door +",
-            "Shut Door Opps",
-            "Shut Door %",
-        ],
+    "pnr_grade_close_window": {
+        "columns": ["Close Window +", "Close Window Opps", "Close Window %"],
         "column_map": {
             "Close Window +": ("close_plus",),
             "Close Window Opps": ("close_opps",),
             "Close Window %": ("close_pct",),
-            "Shut Door +": ("shut_plus",),
-            "Shut Door Opps": ("shut_opps",),
-            "Shut Door %": ("shut_pct",),
         },
-        "pct_columns": ["Close Window %", "Shut Door %"],
+        "pct_columns": ["Close Window %"],
         "default_sort": ["close_pct", "close_opps", "close_plus", "player"],
-        "table_id": "game-leaderboard-pnr-grade",
+        "table_id": "game-leaderboard-pnr-grade-close-window",
         "percent_specs": [
             {
                 "slug": "close_window_pct",
@@ -372,7 +365,20 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                     "close_opp_min",
                     "close_opps_min",
                 ],
-            },
+            }
+        ],
+    },
+    "pnr_grade_shut_door": {
+        "columns": ["Shut Door +", "Shut Door Opps", "Shut Door %"],
+        "column_map": {
+            "Shut Door +": ("shut_plus",),
+            "Shut Door Opps": ("shut_opps",),
+            "Shut Door %": ("shut_pct",),
+        },
+        "pct_columns": ["Shut Door %"],
+        "default_sort": ["shut_pct", "shut_opps", "shut_plus", "player"],
+        "table_id": "game-leaderboard-pnr-grade-shut-door",
+        "percent_specs": [
             {
                 "slug": "shut_door_pct",
                 "metric": "shut_door_pct",
@@ -384,7 +390,7 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                     "shut_opp_min",
                     "shut_opps_min",
                 ],
-            },
+            }
         ],
     },
 }

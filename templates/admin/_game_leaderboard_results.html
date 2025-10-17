@@ -34,7 +34,20 @@
               {% if percent_specs %}
                 {% set _ = apply_percent_wrappers(table, percent_specs) %}
               {% endif %}
-              {{ render_dual_section(item.label, table, note_date=item.note_date, empty_message=no_data_message) }}
+              {% if item.split_dual %}
+                {% set season_table = split_dual_table(table, prefix='totals_', table_id_suffix='season') %}
+                {% set last_table = split_dual_table(table, prefix='last_', table_id_suffix='last') %}
+                {{ render_split_dual_section(
+                  item.label,
+                  season_table,
+                  last_table,
+                  note_date=item.note_date,
+                  empty_message=no_data_message,
+                  split_titles=item.split_titles
+                ) }}
+              {% else %}
+                {{ render_dual_section(item.label, table, note_date=item.note_date, empty_message=no_data_message) }}
+              {% endif %}
               {% if percent_specs %}
                 {{ render_grade_scales_for_specs(percent_specs) }}
               {% endif %}
