@@ -99,6 +99,7 @@ from admin._leaderboard_helpers import (
     build_dual_context,
     build_dual_table,
     build_leaderboard_table,
+    split_dual_table,
     prepare_dual_context,
     _normalize_compute_result,
     combine_dual_rows,
@@ -2001,6 +2002,7 @@ admin_bp.add_app_template_filter(combine_dual_rows, name="combine_dual_rows")
 admin_bp.add_app_template_filter(combine_dual_totals, name="combine_dual_totals")
 admin_bp.add_app_template_global(build_dual_table, name="build_dual_table")
 admin_bp.add_app_template_global(build_leaderboard_table, name="build_leaderboard_table")
+admin_bp.add_app_template_global(split_dual_table, name="split_dual_table")
 admin_bp.add_app_template_global(game_columns_for, name="columns_for")
 admin_bp.add_app_template_global(game_column_map_for, name="column_map_for")
 admin_bp.add_app_template_global(game_pct_columns_for, name="pct_columns_for")
@@ -8049,6 +8051,9 @@ def leaderboard_game():
         label: str,
         season_slice: LeaderboardSlice,
         last_slice: LeaderboardSlice,
+        *,
+        split_dual: bool = False,
+        split_titles: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
         return {
             'key': key,
@@ -8059,20 +8064,39 @@ def leaderboard_game():
             'last_totals': last_slice.totals,
             'note_date': _format_note(last_slice.note_date),
             'slug': key.replace('_', '-'),
+            'split_dual': split_dual,
+            'split_titles': list(split_titles) if split_titles else None,
         }
 
     leaderboard_groups = [
         {
             'title': 'Offense',
             'items': [
-                _group_item('shrinks_offense', '3FG (Shrinks)', shrinks_season, shrinks_last),
+                _group_item(
+                    'shrinks_offense',
+                    '3FG (Shrinks)',
+                    shrinks_season,
+                    shrinks_last,
+                    split_dual=True,
+                ),
                 _group_item('atr_finishing', 'ATR Finishing', atr_season, atr_last),
             ],
         },
         {
             'title': 'Rebounding',
             'items': [
-                _group_item('rebounding_offense', 'Offensive Rebounding', oreb_season, oreb_last),
+                _group_item(
+                    'rebounding_offense_crash',
+                    'Crash Rates',
+                    oreb_season,
+                    oreb_last,
+                ),
+                _group_item(
+                    'rebounding_offense_back',
+                    'Back Man',
+                    oreb_season,
+                    oreb_last,
+                ),
                 _group_item('rebounding_defense', 'Defensive Rebounding', dreb_season, dreb_last),
             ],
         },
@@ -8088,7 +8112,18 @@ def leaderboard_game():
         {
             'title': 'PnR Grade',
             'items': [
-                _group_item('pnr_grade', 'PnR Grade', pnr_season, pnr_last),
+                _group_item(
+                    'pnr_grade_close_window',
+                    'Close Window',
+                    pnr_season,
+                    pnr_last,
+                ),
+                _group_item(
+                    'pnr_grade_shut_door',
+                    'Shut Door',
+                    pnr_season,
+                    pnr_last,
+                ),
             ],
         },
     ]

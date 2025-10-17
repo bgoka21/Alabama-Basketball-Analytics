@@ -1587,6 +1587,93 @@ def build_dual_table(
     }
 
 
+def split_dual_table(
+    table_data: Optional[Mapping[str, Any]],
+    *,
+    prefix: str,
+    table_id_suffix: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return a single-group table derived from a dual leaderboard table."""
+
+    if not table_data:
+        return {
+            "id": None,
+            "columns": [],
+            "rows": [],
+            "totals": None,
+            "default_sort": "",
+            "has_data": False,
+        }
+
+    normalized_prefix = str(prefix or "").strip()
+    if normalized_prefix not in {"totals_", "last_"}:
+        raise ValueError("prefix must be 'totals_' or 'last_'")
+
+    columns = list(table_data.get("columns") or [])
+    shared_columns: list[Dict[str, Any]] = []
+    prefixed_columns: list[Dict[str, Any]] = []
+
+    for column in columns:
+        key = str(column.get("key") or "")
+        column_copy = dict(column)
+        if key.startswith(normalized_prefix):
+            column_copy.pop("group", None)
+            prefixed_columns.append(column_copy)
+        elif key.startswith("totals_") or key.startswith("last_"):
+            continue
+        else:
+            shared_columns.append(column_copy)
+
+    selected_columns = shared_columns + prefixed_columns
+
+    allowed_keys: set[str] = {"rank", "rank_value", "player"}
+    for column in selected_columns:
+        key = column.get("key")
+        if key:
+            allowed_keys.add(str(key))
+            allowed_keys.add(f"{key}_token")
+        value_key = column.get("value_key")
+        if value_key:
+            allowed_keys.add(str(value_key))
+
+    rows: list[Dict[str, Any]] = []
+    for row in table_data.get("rows") or []:
+        new_row: Dict[str, Any] = {}
+        for key in allowed_keys:
+            if key in row:
+                new_row[key] = row[key]
+        rows.append(new_row)
+
+    totals: Optional[Dict[str, Any]] = None
+    base_totals = table_data.get("totals")
+    if base_totals:
+        totals = {}
+        for key in allowed_keys:
+            if key in base_totals:
+                totals[key] = base_totals[key]
+        if not totals:
+            totals = None
+
+    default_sort = str(table_data.get("default_sort") or "")
+    if normalized_prefix == "last_" and default_sort:
+        default_sort = default_sort.replace("totals_", "last_")
+
+    base_id = table_data.get("id")
+    resolved_id = None
+    if base_id:
+        suffix = table_id_suffix or normalized_prefix.rstrip("_")
+        resolved_id = f"{base_id}-{suffix}"
+
+    return {
+        "id": resolved_id,
+        "columns": selected_columns,
+        "rows": rows,
+        "totals": totals,
+        "default_sort": default_sort,
+        "has_data": bool(rows) or bool(totals),
+    }
+
+
 def build_leaderboard_table(
     *,
     config: Optional[Mapping[str, Any]],
