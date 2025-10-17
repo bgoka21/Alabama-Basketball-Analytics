@@ -468,9 +468,17 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
                 inc_stat(slot, "collision_gap_missed")
                 continue
 
-            if token in ("Gap +", "Gap -"):
-                # Gap tokens still appear in legacy data but should not affect
-                # collision counters now that we source them from Bump labels.
+            if token == "Gap +":
+                inc_stat(slot, "pnr_gap_positive")
+                continue
+            if token == "Gap -":
+                inc_stat(slot, "pnr_gap_missed")
+                continue
+            if token == "Low +":
+                inc_stat(slot, "low_help_positive")
+                continue
+            if token == "Low -":
+                inc_stat(slot, "low_help_missed")
                 continue
 
             if token in defense_mapping:
@@ -855,17 +863,20 @@ def parse_csv(file_path, game_id, season_id):
                 continue
             if col not in player_stats_dict:
                 player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            slot = player_stats_dict[col]
             row_tokens_by_col[col] = tokens
-            for token in tokens:
-                if token == "Gap +":
-                    inc_stat(slot, "pnr_gap_positive")
-                elif token == "Gap -":
-                    inc_stat(slot, "pnr_gap_missed")
-                elif token == "Low +":
-                    inc_stat(slot, "low_help_positive")
-                elif token == "Low -":
-                    inc_stat(slot, "low_help_missed")
+
+        if row_tokens_by_col and row_type_lower == "pnr":
+            for col, tokens in row_tokens_by_col.items():
+                slot = player_stats_dict[col]
+                for token in tokens:
+                    if token == "Gap +":
+                        inc_stat(slot, "pnr_gap_positive")
+                    elif token == "Gap -":
+                        inc_stat(slot, "pnr_gap_missed")
+                    elif token == "Low +":
+                        inc_stat(slot, "low_help_positive")
+                    elif token == "Low -":
+                        inc_stat(slot, "low_help_missed")
 
         if row_type_lower in offense_reb_rows:
             for col, tokens in row_tokens_by_col.items():
