@@ -118,9 +118,10 @@ def test_game_collision_low_man(tmp_path):
 
         row = PlayerStats.query.filter_by(player_name="#1 A").first()
         assert row is not None
+        # Game collisions only credit "Bump" labels; low-man and gap tags are ignored.
         assert row.bump_positive == 1
         assert row.bump_missed == 1
-        assert row.low_help_positive == 1
-        assert row.low_help_missed == 1
-        assert row.collision_gap_positive == 1
-        assert row.collision_gap_missed == 1
+        assert row.low_help_positive == 0
+        assert row.low_help_missed == 0
+        assert row.collision_gap_positive == 0
+        assert row.collision_gap_missed == 0
