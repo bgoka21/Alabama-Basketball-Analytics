@@ -439,10 +439,6 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         "None": "contest_no",
         "Bump +": "bump_positive",
         "Bump -": "bump_missed",
-        "Low Man +": "low_help_positive",
-        "Low Man -": "low_help_missed",
-        "Gap +": "collision_gap_positive",
-        "Gap -": "collision_gap_missed",
         "Contest Pass +": "pass_contest_positive",
         "Contest Pass -": "pass_contest_missed",
         "Blowby": "blowby_total",
@@ -462,6 +458,7 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
             player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, defense_mapping, {"dummy": 0})
 
         slot = player_stats_dict[col]
+        # Only treat explicit "Bump ±" labels as collision events for games.
         for token in tokens:
             if token == "Bump +":
                 inc_stat(slot, "bump_positive")
