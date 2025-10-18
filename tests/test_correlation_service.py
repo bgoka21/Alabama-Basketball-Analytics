@@ -418,6 +418,76 @@ def test_empty_dataset_returns_zero_samples(app, season):
         assert result["scatter"] == []
 
 
+def test_game_blue_collar_stats_filtered_by_season(app, season):
+    with app.app_context():
+        roster_lookup = _create_roster(season, ["Alice"])
+        current_game = _add_game(
+            season,
+            date(2024, 11, 1),
+            "Current Opponent",
+            {
+                "Alice": {
+                    "points": 10,
+                    "assists": 4,
+                    "turnovers": 2,
+                }
+            },
+        )
+
+        db.session.add(
+            BlueCollarStats(
+                season_id=season.id,
+                game_id=current_game.id,
+                player_id=roster_lookup["Alice"].id,
+                deflection=2,
+                total_blue_collar=2,
+            )
+        )
+
+        previous_season = Season(season_name="2023-24")
+        db.session.add(previous_season)
+        db.session.commit()
+
+        previous_game = _add_game(
+            previous_season,
+            date(2023, 12, 1),
+            "Previous Opponent",
+            {"Alice": {"points": 20, "assists": 8, "turnovers": 3}},
+        )
+
+        # Simulate legacy blue-collar stats that still point at the current-season
+        # roster entry even though they belong to a prior season.
+        db.session.add(
+            BlueCollarStats(
+                season_id=previous_season.id,
+                game_id=previous_game.id,
+                player_id=roster_lookup["Alice"].id,
+                deflection=7,
+                total_blue_collar=7,
+            )
+        )
+        db.session.commit()
+
+        scope = StudyScope(season_id=season.id)
+        studies = [
+            StudyDefinition(
+                identifier="deflections", 
+                x=MetricDefinition(MetricSource.GAME, "deflections"),
+                y=MetricDefinition(MetricSource.GAME, "deflections"),
+            )
+        ]
+
+        payload = run_studies(studies, scope)
+        result = payload["studies"][0]
+
+        assert result["samples"] == 1
+        assert len(result["scatter"]) == 1
+        point = result["scatter"][0]
+        assert point["player"] == "Alice"
+        assert point["x"] == pytest.approx(2.0)
+        assert point["y"] == pytest.approx(2.0)
+
+
 def test_unknown_metric_raises_value_error(app, season):
     with app.app_context():
         scope = StudyScope(season_id=season.id)
