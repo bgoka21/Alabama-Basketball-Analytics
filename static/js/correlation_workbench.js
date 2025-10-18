@@ -71,34 +71,23 @@
     return entries;
   }
 
-  function normalizeLeaderboardCatalog(catalog) {
-    if (!catalog) {
+  function normalizeGameCatalog(catalog) {
+    if (!Array.isArray(catalog)) {
       return [];
     }
-    if (Array.isArray(catalog)) {
-      return catalog
-        .filter((entry) => entry && entry.key)
-        .map((entry) => ({
-          key: entry.key,
-          label: entry.label || entry.key,
-          source: 'game',
-          hidden: Boolean(entry.hidden)
-        }));
-    }
-    if (typeof catalog === 'object') {
-      return Object.values(catalog)
-        .filter((entry) => entry && entry.key)
-        .map((entry) => ({
-          key: entry.key,
-          label: entry.label || entry.key,
-          source: 'game',
-          hidden: Boolean(entry.hidden)
-        }));
-    }
-    return [];
+    return catalog
+      .filter((entry) => entry && entry.key)
+      .map((entry) => ({
+        key: entry.key,
+        label: entry.label || entry.key,
+        source: 'game',
+        group: entry.group || null,
+        catalog: entry.catalog || 'leaderboard',
+        hidden: Boolean(entry.hidden)
+      }));
   }
 
-  function populateMetricSelect(select, practiceMetrics, leaderboardMetrics) {
+  function populateMetricSelect(select, practiceMetrics, gameMetrics) {
     if (!select) {
       return;
     }
@@ -122,19 +111,27 @@
       practiceGroups.get(groupLabel).appendChild(option);
     });
 
-    if (leaderboardMetrics.length) {
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = 'Game Metrics';
-      leaderboardMetrics.forEach((metric) => {
+    if (gameMetrics.length) {
+      const gameGroups = new Map();
+      gameMetrics.forEach((metric) => {
+        const groupLabelBase = metric.catalog === 'practice'
+          ? metric.group || 'Practice Metrics'
+          : metric.group || 'Game Metrics';
+        const groupLabel = `Game · ${groupLabelBase}`;
+        if (!gameGroups.has(groupLabel)) {
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = groupLabel;
+          gameGroups.set(groupLabel, optgroup);
+          select.appendChild(optgroup);
+        }
         const option = document.createElement('option');
         option.value = `game${VALUE_DELIMITER}${metric.key}`;
         option.textContent = metric.label;
         option.dataset.source = 'game';
         option.dataset.key = metric.key;
         option.dataset.label = metric.label;
-        optgroup.appendChild(option);
+        gameGroups.get(groupLabel).appendChild(option);
       });
-      select.appendChild(optgroup);
     }
 
     if (select.options.length) {
@@ -205,7 +202,44 @@
     }
   }
 
-  function renderChart(canvas, studyLabel, scatter, xLabel, yLabel) {
+  function computeTrendline(points) {
+    const validPoints = points.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+    if (validPoints.length < 2) {
+      return null;
+    }
+
+    const n = validPoints.length;
+    let sumX = 0;
+    let sumY = 0;
+    let sumXY = 0;
+    let sumX2 = 0;
+
+    validPoints.forEach((point) => {
+      sumX += point.x;
+      sumY += point.y;
+      sumXY += point.x * point.y;
+      sumX2 += point.x * point.x;
+    });
+
+    const denominator = n * sumX2 - sumX * sumX;
+    if (Math.abs(denominator) <= Number.EPSILON) {
+      return null;
+    }
+
+    const slope = (n * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / n;
+
+    const sorted = validPoints.slice().sort((a, b) => a.x - b.x);
+    const minX = sorted[0].x;
+    const maxX = sorted[sorted.length - 1].x;
+
+    return [
+      { x: minX, y: intercept + slope * minX },
+      { x: maxX, y: intercept + slope * maxX }
+    ];
+  }
+
+  function renderChart(canvas, studyLabel, scatter, xLabel, yLabel, showTrendline) {
     if (!canvas || typeof Chart === 'undefined') {
       return;
     }
@@ -222,19 +256,41 @@
       chartInstance.destroy();
     }
 
+    const datasets = [
+      {
+        label: studyLabel,
+        data,
+        backgroundColor: '#9E1B32',
+        borderColor: '#9E1B32',
+        pointRadius: 5,
+        hoverRadius: 7
+      }
+    ];
+
+    if (showTrendline) {
+      const trendlinePoints = computeTrendline(data);
+      if (trendlinePoints) {
+        datasets.push({
+          label: `${studyLabel} Trendline`,
+          data: trendlinePoints,
+          type: 'line',
+          fill: false,
+          borderColor: '#2563eb',
+          backgroundColor: '#2563eb',
+          borderWidth: 2,
+          pointRadius: 0,
+          hitRadius: 0,
+          hoverRadius: 0,
+          tension: 0,
+          borderDash: [6, 4]
+        });
+      }
+    }
+
     chartInstance = new Chart(context, {
       type: 'scatter',
       data: {
-        datasets: [
-          {
-            label: studyLabel,
-            data,
-            backgroundColor: '#9E1B32',
-            borderColor: '#9E1B32',
-            pointRadius: 5,
-            hoverRadius: 7
-          }
-        ]
+        datasets
       },
       options: {
         responsive: true,
@@ -394,7 +450,7 @@
     const apiUrl = config && config.apiUrl;
     const rosterData = readJsonScript('correlation-roster-data') || [];
     const practiceCatalog = readJsonScript('correlation-practice-catalog') || {};
-    const leaderboardCatalog = readJsonScript('correlation-leaderboard-catalog') || [];
+    const gameCatalog = readJsonScript('correlation-game-catalog') || [];
     const seasons = readJsonScript('correlation-season-options') || [];
 
     const seasonSelect = document.getElementById('correlation-season');
@@ -418,7 +474,9 @@
     const pointsEmpty = document.getElementById('correlation-points-empty');
     const dateFromInput = document.getElementById('correlation-date-from');
     const dateToInput = document.getElementById('correlation-date-to');
+    const trendlineToggle = document.getElementById('correlation-trendline');
     let resizeFrame = null;
+    let lastRender = null;
 
     if (!seasonSelect || !rosterSelect || !xMetricSelect || !yMetricSelect || !runButton || !chartCanvas) {
       return;
@@ -431,9 +489,9 @@
     }
 
     const practiceMetrics = flattenPracticeCatalog(practiceCatalog);
-    const leaderboardMetrics = normalizeLeaderboardCatalog(leaderboardCatalog);
-    populateMetricSelect(xMetricSelect, practiceMetrics, leaderboardMetrics);
-    populateMetricSelect(yMetricSelect, practiceMetrics, leaderboardMetrics);
+    const gameMetrics = normalizeGameCatalog(gameCatalog);
+    populateMetricSelect(xMetricSelect, practiceMetrics, gameMetrics);
+    populateMetricSelect(yMetricSelect, practiceMetrics, gameMetrics);
 
     if (!xMetricSelect.options.length || !yMetricSelect.options.length) {
       runButton.disabled = true;
@@ -602,6 +660,7 @@
             emptyState.classList.remove('hidden');
           }
           clearChart(chartCanvas);
+          lastRender = null;
           renderPointsTable(pointsBody, pointsEmpty, [], xMetric.label, yMetric.label);
           updateHeaders(xHeader, yHeader, xMetric, yMetric);
           return;
@@ -615,13 +674,21 @@
           if (emptyState) {
             emptyState.classList.add('hidden');
           }
-          renderChart(chartCanvas, studyLabel, scatter, xMetric.label, yMetric.label);
+          const showTrendline = trendlineToggle ? trendlineToggle.checked : false;
+          renderChart(chartCanvas, studyLabel, scatter, xMetric.label, yMetric.label, showTrendline);
+          lastRender = {
+            studyLabel,
+            scatter,
+            xLabel: xMetric.label,
+            yLabel: yMetric.label
+          };
           renderPointsTable(pointsBody, pointsEmpty, scatter, xMetric.label, yMetric.label);
         } else {
           if (emptyState) {
             emptyState.classList.remove('hidden');
           }
           clearChart(chartCanvas);
+          lastRender = null;
           renderPointsTable(pointsBody, pointsEmpty, [], xMetric.label, yMetric.label);
         }
       } catch (error) {
@@ -630,5 +697,26 @@
         setLoading(false);
       }
     });
+
+    if (trendlineToggle) {
+      trendlineToggle.addEventListener('change', () => {
+        if (!lastRender || !chartCanvas) {
+          return;
+        }
+        if (!lastRender.scatter || !lastRender.scatter.length) {
+          clearChart(chartCanvas);
+          lastRender = null;
+          return;
+        }
+        renderChart(
+          chartCanvas,
+          lastRender.studyLabel,
+          lastRender.scatter,
+          lastRender.xLabel,
+          lastRender.yLabel,
+          trendlineToggle.checked
+        );
+      });
+    }
   };
 })();
