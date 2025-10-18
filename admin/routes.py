@@ -2955,6 +2955,8 @@ def _prepare_custom_stats_columns(dataset_columns):
 def correlation_workbench():
     """Render the correlation analytics workspace."""
 
+    from services.correlation import SUPPORTED_GAME_METRICS, SUPPORTED_PRACTICE_METRICS
+
     seasons = (
         Season.query.order_by(Season.start_date.desc(), Season.id.desc()).all()
     )
@@ -2986,8 +2988,16 @@ def correlation_workbench():
             }
         )
 
-    practice_catalog = _flatten_practice_field_catalog()
-    leaderboard_catalog = _build_leaderboard_catalog()
+    practice_catalog = {
+        key: entry
+        for key, entry in _flatten_practice_field_catalog().items()
+        if key in SUPPORTED_PRACTICE_METRICS
+    }
+    leaderboard_catalog = [
+        entry
+        for entry in _build_leaderboard_catalog()
+        if entry.get('key') in SUPPORTED_GAME_METRICS
+    ]
 
     return render_template(
         'admin/correlation_workbench.html',

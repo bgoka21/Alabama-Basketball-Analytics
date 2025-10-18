@@ -13,7 +13,7 @@ import math
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Sequence
 
 import pandas as pd
 from sqlalchemy import and_, func
@@ -331,6 +331,7 @@ def _practice_metric_specs() -> Dict[str, _MetricSpec]:
 
 
 _PRACTICE_METRICS = _practice_metric_specs()
+SUPPORTED_PRACTICE_METRICS: FrozenSet[str] = frozenset(_PRACTICE_METRICS)
 
 
 def _load_practice_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
@@ -473,6 +474,7 @@ def _game_metric_specs() -> Dict[str, _MetricSpec]:
 
 
 _GAME_METRICS = _game_metric_specs()
+SUPPORTED_GAME_METRICS: FrozenSet[str] = frozenset(_GAME_METRICS)
 
 
 def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
