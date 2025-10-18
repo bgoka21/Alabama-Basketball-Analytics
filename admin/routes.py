@@ -1818,7 +1818,7 @@ def compute_overall_gap_help(
     label_set=None,
     **kwargs,
 ):
-    """Return combined Collision + PnR Gap Help results."""
+    """Return overall Gap Help results using PnR data only."""
 
     if season_id is None:
         return None, []
@@ -1826,16 +1826,6 @@ def compute_overall_gap_help(
     shared_kwargs = dict(kwargs)
     shared_kwargs.pop("role", None)
     shared_kwargs.pop("stat_key", None)
-
-    collision_result = compute_collisions_gap_help(
-        session=session,
-        season_id=season_id,
-        start_dt=start_dt,
-        end_dt=end_dt,
-        label_set=label_set,
-        **shared_kwargs,
-    )
-    collision_totals, collision_rows = _normalize_compute_result(collision_result)
 
     pnr_result = compute_pnr_gap_help(
         session=session,
@@ -1847,39 +1837,16 @@ def compute_overall_gap_help(
     )
     pnr_totals, pnr_rows = _normalize_compute_result(pnr_result)
 
-    stats = {}
-    for source_rows, plus_index, opp_index in (
-        (collision_rows, 1, 2),
-        (pnr_rows, 1, 2),
-    ):
-        player_totals = _collect_player_totals(
-            source_rows,
-            plus_aliases=_GAP_PLUS_ALIASES,
-            opp_aliases=_GAP_OPP_ALIASES,
-            plus_index=plus_index,
-            opp_index=opp_index,
-        )
-        for player, entry in player_totals.items():
-            combined = stats.setdefault(
-                player,
-                {
-                    "player_name": player,
-                    "plus": 0,
-                    "opps": 0,
-                },
-            )
-            combined["plus"] += entry["plus"]
-            combined["opps"] += entry["opps"]
-
-    rows = _finalize_rows(stats)
-
-    collision_plus, collision_opps = _extract_totals(
-        collision_totals,
+    player_totals = _collect_player_totals(
+        pnr_rows,
         plus_aliases=_GAP_PLUS_ALIASES,
         opp_aliases=_GAP_OPP_ALIASES,
-        plus_index=0,
-        opp_index=1,
+        plus_index=1,
+        opp_index=2,
     )
+
+    rows = _finalize_rows(player_totals)
+
     pnr_plus, pnr_opps = _extract_totals(
         pnr_totals,
         plus_aliases=_GAP_PLUS_ALIASES,
@@ -1888,12 +1855,10 @@ def compute_overall_gap_help(
         opp_index=1,
     )
 
-    total_plus = collision_plus + pnr_plus
-    total_opps = collision_opps + pnr_opps
     totals = {
-        "plus": total_plus,
-        "opps": total_opps,
-        "pct": _safe_pct(total_plus, total_opps),
+        "plus": pnr_plus,
+        "opps": pnr_opps,
+        "pct": _safe_pct(pnr_plus, pnr_opps),
     }
 
     return totals, rows

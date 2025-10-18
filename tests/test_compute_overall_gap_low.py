@@ -3,14 +3,9 @@ import pytest
 import admin.routes as routes
 
 
-def test_compute_overall_gap_help_combines_sources(monkeypatch):
+def test_compute_overall_gap_help_uses_pnr_only(monkeypatch):
     def fake_collisions(**kwargs):
-        rows = [
-            ("Player A", 4, 6, 0.0),
-            ("Player B", 2, 3, 0.0),
-        ]
-        totals = (6, 9, 0.0)
-        return totals, rows
+        raise AssertionError("compute_collisions_gap_help should not be called")
 
     def fake_pnr(**kwargs):
         rows = [
@@ -25,20 +20,21 @@ def test_compute_overall_gap_help_combines_sources(monkeypatch):
 
     totals, rows = routes.compute_overall_gap_help(season_id=1)
 
-    assert totals["plus"] == 10
-    assert totals["opps"] == 16
-    assert totals["pct"] == pytest.approx(62.5)
+    assert totals["plus"] == 4
+    assert totals["opps"] == 7
+    assert totals["pct"] == pytest.approx((4 / 7) * 100)
 
-    assert [row["player_name"] for row in rows] == ["Player A", "Player B", "Player C"]
-    assert rows[0]["plus"] == 7
-    assert rows[0]["opps"] == 11
-    expected_pct = (7 / 11) * 100
-    assert rows[0]["pct"] == pytest.approx(expected_pct)
+    assert [row["player_name"] for row in rows] == ["Player A", "Player C"]
+
+    player_a = rows[0]
+    assert player_a["plus"] == 3
+    assert player_a["opps"] == 5
+    assert player_a["pct"] == pytest.approx((3 / 5) * 100)
 
 
 def test_compute_overall_gap_help_single_source(monkeypatch):
     def fake_collisions(**kwargs):
-        return None, []
+        raise AssertionError("compute_collisions_gap_help should not be called")
 
     def fake_pnr(**kwargs):
         rows = [{"player_name": "Only", "plus": 5, "opps": 10, "pct": 50.0}]
@@ -122,22 +118,11 @@ def test_compute_overall_low_man_handles_missing_collisions(monkeypatch):
     assert rows == [{"player_name": "Player A", "plus": 1, "opps": 2, "pct": 50.0}]
 
 
-def test_overall_gap_help_stat_key_includes_all_sources(monkeypatch):
+def test_overall_gap_help_stat_key_stripped(monkeypatch):
     captured = {}
 
     def fake_collisions(**kwargs):
-        captured["collisions_kwargs"] = kwargs
-        rows = [
-            ("Crimson", 3, 5, 0.0),
-            ("White", 2, 4, 0.0),
-        ]
-        totals = {
-            "Crimson": {"gap_plus": 3, "gap_opp": 5},
-            "White": {"gap_plus": 2, "gap_opp": 4},
-            "gap_plus": 5,
-            "gap_opp": 9,
-        }
-        return totals, rows
+        raise AssertionError("compute_collisions_gap_help should not be called")
 
     def fake_pnr(**kwargs):
         captured["pnr_kwargs"] = kwargs
@@ -155,15 +140,18 @@ def test_overall_gap_help_stat_key_includes_all_sources(monkeypatch):
         stat_key="overall_gap_help",
     )
 
-    assert "stat_key" not in captured["collisions_kwargs"]
     assert "stat_key" not in captured["pnr_kwargs"]
 
-    assert totals["plus"] == 9
-    assert totals["opps"] == 15
-    assert totals["pct"] == pytest.approx((9 / 15) * 100)
+    assert totals["plus"] == 4
+    assert totals["opps"] == 6
+    assert totals["pct"] == pytest.approx((4 / 6) * 100)
 
-    names = {row["player_name"] for row in rows}
-    assert names == {"Crimson", "White", "PnR Helper"}
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["player_name"] == "PnR Helper"
+    assert row["plus"] == 4
+    assert row["opps"] == 6
+    assert row["pct"] == pytest.approx((4 / 6) * 100)
 
 
 def test_overall_low_man_stat_key_includes_all_sources(monkeypatch):
