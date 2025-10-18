@@ -2958,10 +2958,31 @@ def correlation_workbench():
         for key, entry in _flatten_practice_field_catalog().items()
         if key in SUPPORTED_PRACTICE_METRICS
     }
-    leaderboard_catalog = [
+
+    leaderboard_entries = [
         entry
         for entry in _build_leaderboard_catalog()
         if entry.get('key') in SUPPORTED_GAME_METRICS
+    ]
+
+    practice_game_entries = [
+        {
+            'key': key,
+            'label': entry.get('label') or key,
+            'group': entry.get('group'),
+            'format': entry.get('format'),
+            'catalog': 'practice',
+        }
+        for key, entry in practice_catalog.items()
+        if key in SUPPORTED_GAME_METRICS
+    ]
+
+    game_catalog = practice_game_entries + [
+        {
+            **entry,
+            'catalog': 'leaderboard',
+        }
+        for entry in leaderboard_entries
     ]
 
     return render_template(
@@ -2970,7 +2991,7 @@ def correlation_workbench():
         selected_season_id=selected_season_id,
         roster_payload=roster_payload,
         practice_catalog=practice_catalog,
-        leaderboard_catalog=leaderboard_catalog,
+        game_catalog=game_catalog,
     )
 
 

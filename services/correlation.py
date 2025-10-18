@@ -433,19 +433,7 @@ def _load_practice_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
 # -- Game metric computation -------------------------------------------------
 
 
-_GAME_PLAYER_FIELDS: Sequence[str] = (
-    "points",
-    "assists",
-    "turnovers",
-    "atr_makes",
-    "atr_attempts",
-    "fg2_makes",
-    "fg2_attempts",
-    "fg3_makes",
-    "fg3_attempts",
-    "ftm",
-    "fta",
-)
+_GAME_PLAYER_FIELDS: Sequence[str] = _PRACTICE_PLAYER_FIELDS
 
 
 def _game_metric_specs() -> Dict[str, _MetricSpec]:
@@ -455,7 +443,9 @@ def _game_metric_specs() -> Dict[str, _MetricSpec]:
     def pct(numer: str, denom: str) -> _MetricSpec:
         return _MetricSpec((numer, denom), lambda row: _pct(_safe_div(row.get(numer), row.get(denom))))
 
-    specs: Dict[str, _MetricSpec] = {
+    specs: Dict[str, _MetricSpec] = dict(_practice_metric_specs())
+
+    leaderboard_specs: Dict[str, _MetricSpec] = {
         "points": direct("points"),
         "assists": direct("assists"),
         "turnovers": direct("turnovers"),
@@ -469,6 +459,9 @@ def _game_metric_specs() -> Dict[str, _MetricSpec]:
             lambda row: _safe_div(row.get("assists"), row.get("turnovers")),
         ),
     }
+
+    for key, spec in leaderboard_specs.items():
+        specs.setdefault(key, spec)
 
     return specs
 
@@ -530,10 +523,43 @@ def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         for field in _GAME_PLAYER_FIELDS:
             row[field] = _as_float(getattr(result, field))
 
+    blue_query = (
+        db.session.query(
+            Roster.id.label("roster_id"),
+            *[
+                func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
+                for field in _PRACTICE_BLUE_FIELDS
+            ],
+        )
+        .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
+        .filter(Roster.season_id == scope.season_id)
+        .filter(BlueCollarStats.game_id.isnot(None))
+    )
+
+    if scope.roster_ids:
+        blue_query = blue_query.filter(Roster.id.in_(scope.roster_ids))
+
+    if scope.start_date or scope.end_date:
+        blue_query = blue_query.join(Game, BlueCollarStats.game_id == Game.id)
+        if scope.start_date:
+            blue_query = blue_query.filter(Game.game_date >= scope.start_date)
+        if scope.end_date:
+            blue_query = blue_query.filter(Game.game_date <= scope.end_date)
+
+    blue_query = blue_query.group_by(Roster.id)
+
+    for result in blue_query.all():
+        row = rows.get(result.roster_id)
+        if not row:
+            continue
+        for field in _PRACTICE_BLUE_FIELDS:
+            row[field] = _as_float(getattr(result, field))
+
     final: Dict[str, Dict[str, Any]] = {}
     for row in rows.values():
         numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
-        if not any(value not in (0.0, None) for value in numeric_values):
+        blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+        if not any(value not in (0.0, None) for value in numeric_values + blue_values):
             continue
         final[row["player"]] = row
     return final
@@ -597,8 +623,11 @@ def _coerce_metric(defn: Mapping[str, Any] | MetricDefinition) -> MetricDefiniti
 
     if metric_source is MetricSource.PRACTICE and key in _PRACTICE_CATALOG:
         label = label or _PRACTICE_CATALOG[key].get("label")
-    elif metric_source is MetricSource.GAME and key in _LEADERBOARD_CATALOG:
-        label = label or _LEADERBOARD_CATALOG[key].get("label")
+    elif metric_source is MetricSource.GAME:
+        if key in _PRACTICE_CATALOG:
+            label = label or _PRACTICE_CATALOG[key].get("label")
+        elif key in _LEADERBOARD_CATALOG:
+            label = label or _LEADERBOARD_CATALOG[key].get("label")
 
     return MetricDefinition(source=metric_source, key=key, label=label)
 

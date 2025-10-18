@@ -107,6 +107,15 @@
             <p class="text-xs text-gray-500">Optional. Appears above the chart and in exports.</p>
           </div>
 
+          <div class="flex items-center justify-between gap-3">
+            <label for="correlation-trendline" class="text-sm font-medium text-gray-700">Show Trendline</label>
+            <input
+              type="checkbox"
+              id="correlation-trendline"
+              class="h-4 w-4 rounded border-gray-300 text-[#9E1B32] focus:ring-[#9E1B32]"
+            />
+          </div>
+
           <button
             type="button"
             id="correlation-run"
@@ -192,8 +201,8 @@
   <script type="application/json" id="correlation-practice-catalog">
     {{ practice_catalog | tojson }}
   </script>
-  <script type="application/json" id="correlation-leaderboard-catalog">
-    {{ leaderboard_catalog | tojson }}
+  <script type="application/json" id="correlation-game-catalog">
+    {{ game_catalog | tojson }}
   </script>
   <script type="application/json" id="correlation-season-options">
     {{ season_options | tojson }}
