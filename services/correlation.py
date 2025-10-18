@@ -399,6 +399,7 @@ def _load_practice_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
         .filter(Roster.season_id == scope.season_id)
         .filter(BlueCollarStats.practice_id.isnot(None))
+        .filter(BlueCollarStats.season_id == scope.season_id)
     )
 
     if scope.roster_ids:
@@ -503,6 +504,7 @@ def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         .join(Game, PlayerStats.game_id == Game.id)
         .filter(PlayerStats.game_id.isnot(None))
         .filter(PlayerStats.season_id == scope.season_id)
+        .filter(Game.season_id == scope.season_id)
     )
 
     if scope.roster_ids:
@@ -534,6 +536,7 @@ def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
         .filter(Roster.season_id == scope.season_id)
         .filter(BlueCollarStats.game_id.isnot(None))
+        .filter(BlueCollarStats.season_id == scope.season_id)
     )
 
     if scope.roster_ids:
