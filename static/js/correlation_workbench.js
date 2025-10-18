@@ -191,10 +191,26 @@
     }
   }
 
+  function syncCanvasDimensions(canvas) {
+    if (!canvas) {
+      return;
+    }
+    const viewportHeight = window.innerHeight || 0;
+    const targetHeight = Math.max(280, Math.min(520, Math.floor((viewportHeight || 0) * 0.6)));
+    canvas.style.height = `${targetHeight}px`;
+    canvas.height = targetHeight;
+    const width = Math.floor(canvas.getBoundingClientRect().width);
+    if (width > 0) {
+      canvas.width = width;
+    }
+  }
+
   function renderChart(canvas, studyLabel, scatter, xLabel, yLabel) {
     if (!canvas || typeof Chart === 'undefined') {
       return;
     }
+    canvas.classList.remove('hidden');
+    syncCanvasDimensions(canvas);
     const context = canvas.getContext('2d');
     const data = scatter.map((point) => ({
       x: point.x,
@@ -260,7 +276,6 @@
         }
       }
     });
-    canvas.classList.remove('hidden');
   }
 
   function renderPointsTable(pointsBody, emptyStateNode, points, xLabel, yLabel) {
@@ -403,8 +418,9 @@
     const pointsEmpty = document.getElementById('correlation-points-empty');
     const dateFromInput = document.getElementById('correlation-date-from');
     const dateToInput = document.getElementById('correlation-date-to');
+    let resizeFrame = null;
 
-    if (!seasonSelect || !rosterSelect || !xMetricSelect || !yMetricSelect || !runButton) {
+    if (!seasonSelect || !rosterSelect || !xMetricSelect || !yMetricSelect || !runButton || !chartCanvas) {
       return;
     }
 
@@ -432,6 +448,9 @@
 
     renderRosterOptions(rosterSelect, rosterData, seasonSelect.value);
 
+    scheduleResize();
+    window.addEventListener('resize', scheduleResize);
+
     seasonSelect.addEventListener('change', () => {
       renderRosterOptions(rosterSelect, rosterData, seasonSelect.value);
     });
@@ -448,6 +467,21 @@
         errorBox.textContent = message;
         errorBox.classList.remove('hidden');
       }
+    }
+
+    function scheduleResize() {
+      if (!chartCanvas) {
+        return;
+      }
+      if (resizeFrame) {
+        cancelAnimationFrame(resizeFrame);
+      }
+      resizeFrame = requestAnimationFrame(() => {
+        syncCanvasDimensions(chartCanvas);
+        if (chartInstance && typeof chartInstance.resize === 'function') {
+          chartInstance.resize();
+        }
+      });
     }
 
     function setLoading(isLoading) {
