@@ -43,21 +43,30 @@
     if (!catalog || typeof catalog !== 'object') {
       return entries;
     }
-    Object.entries(catalog).forEach(([group, fields]) => {
-      if (!Array.isArray(fields)) {
+    Object.entries(catalog).forEach(([groupOrKey, fields]) => {
+      if (Array.isArray(fields)) {
+        fields.forEach((field) => {
+          if (!field || !field.key) {
+            return;
+          }
+          entries.push({
+            key: field.key,
+            label: field.label || field.key,
+            group: groupOrKey,
+            source: 'practice'
+          });
+        });
         return;
       }
-      fields.forEach((field) => {
-        if (!field || !field.key) {
-          return;
-        }
+
+      if (fields && typeof fields === 'object' && fields.key) {
         entries.push({
-          key: field.key,
-          label: field.label || field.key,
-          group,
+          key: fields.key,
+          label: fields.label || fields.key,
+          group: fields.group || null,
           source: 'practice'
         });
-      });
+      }
     });
     return entries;
   }

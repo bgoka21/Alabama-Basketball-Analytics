@@ -77,7 +77,7 @@ PRACTICE_FIELD_GROUPS = {
         {"key": "on_floor_dreb_pct", "label": "On-Floor DREB%", "format": "percent"},
     ],
     "Blue Collar": [
-        {"key": "bcp_total", "label": "BCP Total", "format": "count"},
+        {"key": "bcp_total", "label": "Total Blue Collar Points", "format": "count"},
         {"key": "deflections", "label": "Deflections", "format": "count"},
         {"key": "charges", "label": "Charges Taken", "format": "count"},
         {"key": "floor_dives", "label": "Floor Dives", "format": "count"},
