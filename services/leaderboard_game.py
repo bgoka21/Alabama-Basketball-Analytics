@@ -39,6 +39,7 @@ class LeaderboardSlice:
 _AGGREGATE_FIELDS: Tuple[str, ...] = (
     "fg3_makes",
     "fg3_attempts",
+    "fg2_attempts",
     "atr_makes",
     "atr_attempts",
     "atr_fouled",
@@ -269,12 +270,15 @@ def _build_common(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
 def _build_shrink_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
     row = _build_common(player, data)
     att = data.get("fg3_attempts", 0)
+    fg2_att = data.get("fg2_attempts", 0)
     makes = data.get("fg3_makes", 0)
+    total_fga = (fg2_att or 0) + (att or 0)
     row.update(
         {
             "fg3_att": att,
             "fg3_make": makes,
             "fg3_pct": _safe_pct(makes, att),
+            "fg3_freq_pct": _safe_pct(att, total_fga),
             "fg3_shrink_att": data.get("fg3_shrink_att", 0),
             "fg3_shrink_make": data.get("fg3_shrink_makes", 0),
             "fg3_shrink_pct": data.get("fg3_shrink_pct"),
@@ -283,6 +287,7 @@ def _build_shrink_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
             "fg3_nonshrink_make": data.get("fg3_nonshrink_makes", 0),
             "fg3_nonshrink_pct": data.get("fg3_nonshrink_pct"),
             "fg3_nonshrink_freq_pct": data.get("fg3_nonshrink_freq_pct"),
+            "fg2_att": fg2_att,
         }
     )
     return row
@@ -443,6 +448,9 @@ def _build_totals(rows: Sequence[Dict[str, Any]], mappings: Sequence[Tuple[str, 
         totals["fg3_shrink_freq_pct"] = _safe_pct(totals["fg3_shrink_att"], totals["fg3_att"])
     if "fg3_nonshrink_att" in totals and "fg3_att" in totals:
         totals["fg3_nonshrink_freq_pct"] = _safe_pct(totals["fg3_nonshrink_att"], totals["fg3_att"])
+    if "fg3_att" in totals:
+        fg2_total = totals.get("fg2_att") or 0
+        totals["fg3_freq_pct"] = _safe_pct(totals["fg3_att"], fg2_total + (totals["fg3_att"] or 0))
     return totals
 
 
@@ -468,6 +476,7 @@ def fetch_offense_shrinks(season_id: int, start_date: Optional[date] = None, end
         (
             ("fg3_make", "fg3_make"),
             ("fg3_att", "fg3_att"),
+            ("fg2_att", "fg2_att"),
             ("fg3_shrink_make", "fg3_shrink_make"),
             ("fg3_shrink_att", "fg3_shrink_att"),
             ("fg3_nonshrink_make", "fg3_nonshrink_make"),
@@ -486,6 +495,7 @@ def fetch_offense_shrinks_last_game(
         (
             ("fg3_make", "fg3_make"),
             ("fg3_att", "fg3_att"),
+            ("fg2_att", "fg2_att"),
             ("fg3_shrink_make", "fg3_shrink_make"),
             ("fg3_shrink_att", "fg3_shrink_att"),
             ("fg3_nonshrink_make", "fg3_nonshrink_make"),

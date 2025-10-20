@@ -24,65 +24,73 @@ def _clone_sequence(value: Optional[Iterable[str]]) -> Optional[List[str]]:
 _GAME_CONFIG: Dict[str, ConfigMap] = {
     "shrinks_offense": {
         "columns": [
-            "3FG Makes",
-            "3FG Att",
-            "3FG %",
-            "Shrink 3FG Makes",
-            "Shrink 3FG Att",
+            "FG",
+            "FG%",
+            "Freq",
+            "Shrink 3FG",
             "Shrink 3FG %",
             "Shrink 3FG Freq",
-            "Non-Shrink 3FG Makes",
-            "Non-Shrink 3FG Att",
+            "Non-Shrink 3FG",
             "Non-Shrink 3FG %",
             "Non-Shrink 3FG Freq",
         ],
         "column_map": {
-            "3FG Makes": ("fg3_make",),
-            "3FG Att": ("fg3_att",),
-            "3FG %": ("fg3_pct",),
-            "Shrink 3FG Makes": {
-                "keys": ("fg3_shrink_make",),
-                "label": "3FG Makes",
-                "subgroup": "Shrink 3's",
+            "FG": {
+                "keys": ("fg3_make", "fg3_att"),
+                "numeric_keys": ("fg3_make",),
+                "compose": "makes_attempts",
+                "make_keys": ("fg3_make", "fg3_makes"),
+                "attempt_keys": ("fg3_att", "fg3_attempts"),
             },
-            "Shrink 3FG Att": {
-                "keys": ("fg3_shrink_att",),
-                "label": "3FG Att",
+            "FG%": ("fg3_pct",),
+            "Freq": {
+                "keys": ("fg3_freq_pct",),
+                "format": "pct",
+            },
+            "Shrink 3FG": {
+                "keys": ("fg3_shrink_make", "fg3_shrink_att"),
+                "numeric_keys": ("fg3_shrink_make",),
+                "compose": "makes_attempts",
+                "make_keys": ("fg3_shrink_make",),
+                "attempt_keys": ("fg3_shrink_att",),
+                "label": "3FG",
                 "subgroup": "Shrink 3's",
             },
             "Shrink 3FG %": {
                 "keys": ("fg3_shrink_pct",),
-                "label": "3FG %",
+                "label": "3FG%",
                 "subgroup": "Shrink 3's",
             },
             "Shrink 3FG Freq": {
                 "keys": ("fg3_shrink_freq_pct",),
                 "label": "3FG Freq",
                 "subgroup": "Shrink 3's",
+                "format": "pct",
             },
-            "Non-Shrink 3FG Makes": {
-                "keys": ("fg3_nonshrink_make",),
-                "label": "3FG Makes",
-                "subgroup": "Non-Shrink 3's",
-            },
-            "Non-Shrink 3FG Att": {
-                "keys": ("fg3_nonshrink_att",),
-                "label": "3FG Att",
+            "Non-Shrink 3FG": {
+                "keys": ("fg3_nonshrink_make", "fg3_nonshrink_att"),
+                "numeric_keys": ("fg3_nonshrink_make",),
+                "compose": "makes_attempts",
+                "make_keys": ("fg3_nonshrink_make",),
+                "attempt_keys": ("fg3_nonshrink_att",),
+                "label": "3FG",
                 "subgroup": "Non-Shrink 3's",
             },
             "Non-Shrink 3FG %": {
                 "keys": ("fg3_nonshrink_pct",),
-                "label": "3FG %",
+                "label": "3FG%",
                 "subgroup": "Non-Shrink 3's",
             },
             "Non-Shrink 3FG Freq": {
                 "keys": ("fg3_nonshrink_freq_pct",),
                 "label": "3FG Freq",
                 "subgroup": "Non-Shrink 3's",
+                "format": "pct",
             },
         },
         "pct_columns": [
-            "3FG %",
+            "FG%",
+            "Freq",
             "Shrink 3FG %",
             "Shrink 3FG Freq",
             "Non-Shrink 3FG %",
@@ -97,7 +105,7 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         "table_id": "game-leaderboard-offense-3fg-shrinks",
         "percent_specs": [
             {
-                "slug": "3fg_pct",
+                "slug": "fg_pct",
                 "metric": "fg3_pct",
                 "attempt_slugs": [
                     "fg3_att",

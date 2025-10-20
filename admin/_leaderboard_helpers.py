@@ -994,10 +994,49 @@ def _format_columns_for_source(
 ) -> Dict[str, Any]:
     entry: Dict[str, Any] = {"jersey": jersey, "player": player}
 
+    def _normalize_keys(value: Any) -> Tuple[str, ...]:
+        if not value:
+            return tuple()
+        if isinstance(value, (str, bytes)):
+            return (str(value),)
+        try:
+            return tuple(str(part) for part in value if part not in {None, ""})
+        except TypeError:
+            return (str(value),)
+
     for column in columns:
         spec = mapping.get(column)
         keys, formatter, default_value, _, _, _ = _parse_column_spec(column, spec)
-        value = _resolve_column_value(source, keys)
+        compose_mode: Optional[str] = None
+        make_keys: Tuple[str, ...] = tuple()
+        attempt_keys: Tuple[str, ...] = tuple()
+        make_index: Optional[int] = None
+        attempt_index: Optional[int] = None
+        if isinstance(spec, Mapping):
+            raw_compose = spec.get("compose")
+            if raw_compose is not None:
+                compose_mode = str(raw_compose)
+            if compose_mode:
+                make_keys = _normalize_keys(spec.get("make_keys")) or _normalize_keys(
+                    spec.get("make_key")
+                )
+                attempt_keys = _normalize_keys(spec.get("attempt_keys")) or _normalize_keys(
+                    spec.get("attempt_key")
+                )
+                make_index = spec.get("make_index")
+                attempt_index = spec.get("attempt_index")
+
+        if compose_mode == "makes_attempts":
+            make_value = _resolve_value(source, make_keys or keys, index=make_index)
+            attempt_value = _resolve_value(
+                source, attempt_keys or keys, index=attempt_index
+            )
+            if make_value is None and attempt_value is None:
+                value = default_value if default_value is not None else default_placeholder
+            else:
+                value = f"{_to_int(make_value)}-{_to_int(attempt_value)}"
+        else:
+            value = _resolve_column_value(source, keys)
         if value is None and default_value is not None:
             value = default_value
 
