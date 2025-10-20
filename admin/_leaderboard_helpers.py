@@ -1474,6 +1474,8 @@ def build_dual_table(
             column_entry["cell_class"] = cell_class
         if spec.get("subgroup"):
             column_entry["subgroup"] = spec["subgroup"]
+        if spec.get("subgroup_header"):
+            column_entry["subgroup_header"] = spec["subgroup_header"]
         columns.append(column_entry)
 
     for spec in column_specs:
@@ -1490,6 +1492,8 @@ def build_dual_table(
             column_entry["cell_class"] = cell_class
         if spec.get("subgroup"):
             column_entry["subgroup"] = spec["subgroup"]
+        if spec.get("subgroup_header"):
+            column_entry["subgroup_header"] = spec["subgroup_header"]
         columns.append(column_entry)
 
     def _build_header_rows(table_columns: list[Dict[str, Any]]) -> list[list[Dict[str, Any]]]:
@@ -1549,6 +1553,7 @@ def build_dual_table(
                 while sub_index < len(segment_columns):
                     seg_column = segment_columns[sub_index]
                     subgroup_label = seg_column.get("subgroup")
+                    subgroup_header = seg_column.get("subgroup_header")
                     span = 1
                     while (
                         sub_index + span < len(segment_columns)
@@ -1556,7 +1561,8 @@ def build_dual_table(
                         == subgroup_label
                     ):
                         span += 1
-                    label_text = str(subgroup_label) if subgroup_label else "\u00A0"
+                    label_source = subgroup_header or subgroup_label
+                    label_text = str(label_source) if label_source else "\u00A0"
                     subgroup_row.append(
                         {
                             "type": "group",
