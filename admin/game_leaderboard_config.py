@@ -55,17 +55,20 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                 "attempt_keys": ("fg3_shrink_att",),
                 "label": "3FG",
                 "subgroup": "Shrink 3's",
+                "subgroup_header": "Shrink",
             },
             "Shrink 3FG %": {
                 "keys": ("fg3_shrink_pct",),
                 "label": "3FG%",
                 "subgroup": "Shrink 3's",
+                "subgroup_header": "Shrink",
             },
             "Shrink 3FG Freq": {
                 "keys": ("fg3_shrink_freq_pct",),
                 "label": "3FG Freq",
                 "subgroup": "Shrink 3's",
                 "format": "pct",
+                "subgroup_header": "Shrink",
             },
             "Non-Shrink 3FG": {
                 "keys": ("fg3_nonshrink_make", "fg3_nonshrink_att"),
@@ -75,17 +78,20 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                 "attempt_keys": ("fg3_nonshrink_att",),
                 "label": "3FG",
                 "subgroup": "Non-Shrink 3's",
+                "subgroup_header": "Non-Shrink",
             },
             "Non-Shrink 3FG %": {
                 "keys": ("fg3_nonshrink_pct",),
                 "label": "3FG%",
                 "subgroup": "Non-Shrink 3's",
+                "subgroup_header": "Non-Shrink",
             },
             "Non-Shrink 3FG Freq": {
                 "keys": ("fg3_nonshrink_freq_pct",),
                 "label": "3FG Freq",
                 "subgroup": "Non-Shrink 3's",
                 "format": "pct",
+                "subgroup_header": "Non-Shrink",
             },
         },
         "pct_columns": [
