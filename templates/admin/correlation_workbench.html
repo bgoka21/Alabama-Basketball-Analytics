@@ -70,8 +70,48 @@
               class="h-48 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40"
               multiple
             ></select>
-            <p class="text-xs text-gray-500">Hold Ctrl (Windows) or Command (Mac) to select multiple players.</p>
+            <p class="text-xs text-gray-500" id="correlation-roster-help">
+              Hold Ctrl (Windows) or Command (Mac) to select multiple players.
+            </p>
           </div>
+
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Group Points By</legend>
+            <div class="space-y-2">
+              <label class="flex items-center gap-2 text-sm text-gray-700" for="correlation-group-player">
+                <input
+                  type="radio"
+                  name="correlation-group"
+                  value="player"
+                  id="correlation-group-player"
+                  class="h-4 w-4 border-gray-300 text-[#9E1B32] focus:ring-[#9E1B32]"
+                  checked
+                />
+                <span>Player</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-700" for="correlation-group-practice">
+                <input
+                  type="radio"
+                  name="correlation-group"
+                  value="practice"
+                  id="correlation-group-practice"
+                  class="h-4 w-4 border-gray-300 text-[#9E1B32] focus:ring-[#9E1B32]"
+                />
+                <span>Practice Session</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-700" for="correlation-group-game">
+                <input
+                  type="radio"
+                  name="correlation-group"
+                  value="game"
+                  id="correlation-group-game"
+                  class="h-4 w-4 border-gray-300 text-[#9E1B32] focus:ring-[#9E1B32]"
+                />
+                <span>Game</span>
+              </label>
+            </div>
+            <p class="text-xs text-gray-500" id="correlation-group-help">Each point represents a player.</p>
+          </fieldset>
         </section>
 
         <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -151,7 +191,7 @@
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
               <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Samples</dt>
               <dd class="mt-1 text-2xl font-bold text-gray-900" id="correlation-samples">0</dd>
-              <p class="text-xs text-gray-500">Players included after filters.</p>
+              <p class="text-xs text-gray-500" id="correlation-samples-help">Players included after filters.</p>
             </div>
           </div>
 
@@ -172,16 +212,16 @@
         <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-gray-900">Data Points</h3>
-            <span class="text-xs font-medium uppercase tracking-wide text-gray-500">Players</span>
+            <span class="text-xs font-medium uppercase tracking-wide text-gray-500" id="correlation-points-label">Players</span>
           </div>
           <div id="correlation-points-empty" class="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
-            Run a study to list player-level values.
+            Run a study to list point-level values.
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 text-sm" id="correlation-points-table">
               <thead class="bg-gray-50">
                 <tr>
-                  <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700">Player</th>
+                  <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700" id="correlation-point-header">Player</th>
                   <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700" id="correlation-x-header">X</th>
                   <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700" id="correlation-y-header">Y</th>
                 </tr>

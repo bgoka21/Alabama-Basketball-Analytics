@@ -3,6 +3,7 @@
 
   const VALUE_DELIMITER = '::';
   const DEFAULT_DECIMALS = 3;
+  const SESSION_PLAYER_LIMIT = 5;
   let chartInstance = null;
 
   function readJsonScript(id) {
@@ -178,6 +179,14 @@
     return num.toFixed(DEFAULT_DECIMALS);
   }
 
+  function getSelectedGrouping(radios) {
+    if (!radios || !radios.length) {
+      return 'player';
+    }
+    const selected = Array.from(radios).find((radio) => radio.checked);
+    return selected ? selected.value : 'player';
+  }
+
   function clearChart(canvas) {
     if (chartInstance) {
       chartInstance.destroy();
@@ -249,7 +258,9 @@
     const data = scatter.map((point) => ({
       x: point.x,
       y: point.y,
-      player: point.player
+      label: point.label || point.player,
+      player: point.player_name || point.player,
+      groupLabel: point.group_label || null
     }));
 
     if (chartInstance) {
@@ -302,10 +313,18 @@
           tooltip: {
             callbacks: {
               label(context) {
-                const player = context.raw.player || 'Unknown';
-                const xVal = formatPoint(context.raw.x);
-                const yVal = formatPoint(context.raw.y);
-                return `${player}: (${xVal}, ${yVal})`;
+                const raw = context.raw || {};
+                const title = raw.label || raw.player || 'Point';
+                const xVal = formatPoint(raw.x);
+                const yVal = formatPoint(raw.y);
+                const lines = [`${title}: (${xVal}, ${yVal})`];
+                if (raw.player && raw.player !== title) {
+                  lines.push(`Player: ${raw.player}`);
+                }
+                if (raw.groupLabel && raw.groupLabel !== title) {
+                  lines.push(raw.groupLabel);
+                }
+                return lines.join('\n');
               }
             }
           }
@@ -334,7 +353,7 @@
     });
   }
 
-  function renderPointsTable(pointsBody, emptyStateNode, points, xLabel, yLabel) {
+  function renderPointsTable(pointsBody, emptyStateNode, points, xLabel, yLabel, grouping) {
     if (!pointsBody) {
       return;
     }
@@ -352,10 +371,20 @@
     }
 
     const fragment = document.createDocumentFragment();
+    const mode = grouping || 'player';
+
     points
       .slice()
       .sort((a, b) => {
-        return (a.player || '').localeCompare(b.player || '');
+        const labelA = (a.label || a.player || '').toLowerCase();
+        const labelB = (b.label || b.player || '').toLowerCase();
+        if (labelA < labelB) {
+          return -1;
+        }
+        if (labelA > labelB) {
+          return 1;
+        }
+        return 0;
       })
       .forEach((point) => {
         const row = document.createElement('tr');
@@ -363,7 +392,40 @@
 
         const playerCell = document.createElement('td');
         playerCell.className = 'px-4 py-2 text-left text-gray-900';
-        playerCell.textContent = point.player || '—';
+        const label = point.label || point.player || '—';
+        const playerName = point.player_name || point.player;
+        const details = [];
+        if (mode === 'practice' || mode === 'game') {
+          if (playerName && playerName !== label) {
+            details.push(playerName);
+          }
+          if (point.group_label && point.group_label !== label) {
+            details.push(point.group_label);
+          }
+          if (point.session_date) {
+            const parsed = new Date(point.session_date);
+            if (!Number.isNaN(parsed.getTime())) {
+              details.push(parsed.toLocaleDateString());
+            }
+          }
+        } else if (playerName && playerName !== label) {
+          details.push(playerName);
+        }
+
+        const container = document.createElement('div');
+        const primary = document.createElement('div');
+        primary.className = 'font-medium text-gray-900';
+        primary.textContent = label;
+        container.appendChild(primary);
+
+        if (details.length) {
+          const secondary = document.createElement('div');
+          secondary.className = 'text-xs text-gray-500';
+          secondary.textContent = details.join(' • ');
+          container.appendChild(secondary);
+        }
+
+        playerCell.appendChild(container);
 
         const xCell = document.createElement('td');
         xCell.className = 'px-4 py-2 text-left text-gray-700';
@@ -472,9 +534,15 @@
     const yHeader = document.getElementById('correlation-y-header');
     const pointsBody = document.getElementById('correlation-points-body');
     const pointsEmpty = document.getElementById('correlation-points-empty');
+    const pointsLabel = document.getElementById('correlation-points-label');
+    const pointHeader = document.getElementById('correlation-point-header');
     const dateFromInput = document.getElementById('correlation-date-from');
     const dateToInput = document.getElementById('correlation-date-to');
     const trendlineToggle = document.getElementById('correlation-trendline');
+    const groupingRadios = document.querySelectorAll('input[name="correlation-group"]');
+    const groupHelp = document.getElementById('correlation-group-help');
+    const rosterHelp = document.getElementById('correlation-roster-help');
+    const samplesHelp = document.getElementById('correlation-samples-help');
     let resizeFrame = null;
     let lastRender = null;
 
@@ -512,6 +580,66 @@
     seasonSelect.addEventListener('change', () => {
       renderRosterOptions(rosterSelect, rosterData, seasonSelect.value);
     });
+
+    function updateGroupingUI(grouping) {
+      const copy = {
+        player: {
+          group: 'Each point represents a player.',
+          roster: 'Hold Ctrl (Windows) or Command (Mac) to select multiple players.',
+          label: 'Players',
+          column: 'Player',
+          empty: 'Run a study to list player-level values.',
+          samples: 'Players included after filters.'
+        },
+        practice: {
+          group: 'Each point represents an individual practice for the selected players.',
+          roster: `Select up to ${SESSION_PLAYER_LIMIT} players when grouping by practice.`,
+          label: 'Practices',
+          column: 'Practice',
+          empty: 'Run a study to list practice-level values.',
+          samples: 'Practices included after filters.'
+        },
+        game: {
+          group: 'Each point represents an individual game for the selected players.',
+          roster: `Select up to ${SESSION_PLAYER_LIMIT} players when grouping by game.`,
+          label: 'Games',
+          column: 'Game',
+          empty: 'Run a study to list game-level values.',
+          samples: 'Games included after filters.'
+        }
+      };
+
+      const messages = copy[grouping] || copy.player;
+      if (groupHelp) {
+        groupHelp.textContent = messages.group;
+      }
+      if (rosterHelp) {
+        rosterHelp.textContent = messages.roster;
+      }
+      if (samplesHelp) {
+        samplesHelp.textContent = messages.samples;
+      }
+      if (pointsLabel) {
+        pointsLabel.textContent = messages.label;
+      }
+      if (pointHeader) {
+        pointHeader.textContent = messages.column;
+      }
+      if (pointsEmpty) {
+        pointsEmpty.textContent = messages.empty;
+      }
+    }
+
+    const initialGrouping = getSelectedGrouping(groupingRadios);
+    updateGroupingUI(initialGrouping);
+
+    if (groupingRadios && groupingRadios.length) {
+      groupingRadios.forEach((radio) => {
+        radio.addEventListener('change', () => {
+          updateGroupingUI(getSelectedGrouping(groupingRadios));
+        });
+      });
+    }
 
     function clearError() {
       if (errorBox) {
@@ -562,7 +690,7 @@
       }
     }
 
-    function updateSummary(studyLabel, xMetric, yMetric, study) {
+    function updateSummary(studyLabel, xMetric, yMetric, study, grouping) {
       if (summaryTitle) {
         summaryTitle.textContent = studyLabel;
       }
@@ -571,7 +699,7 @@
       }
       if (sampleBadge) {
         const samples = study.samples || 0;
-        sampleBadge.textContent = samples === 1 ? '1 sample' : `${samples} samples`;
+        sampleBadge.textContent = samples === 1 ? '1 point' : `${samples} points`;
       }
       if (pearsonCell) {
         pearsonCell.textContent = formatCoefficient(study.pearson);
@@ -603,11 +731,37 @@
         return;
       }
 
+      const grouping = getSelectedGrouping(groupingRadios);
+
+      if (grouping === 'practice') {
+        if (xMetric.source !== 'practice' || yMetric.source !== 'practice') {
+          showError('Practice grouping requires both metrics to use practice data.');
+          return;
+        }
+      }
+
+      if (grouping === 'game') {
+        if (xMetric.source !== 'game' || yMetric.source !== 'game') {
+          showError('Game grouping requires both metrics to use game data.');
+          return;
+        }
+      }
+
       const rosterIds = Array.from(rosterSelect.selectedOptions)
         .map((option) => Number(option.value))
         .filter((value) => !Number.isNaN(value));
 
-      const scope = { season_id: seasonId };
+      if ((grouping === 'practice' || grouping === 'game') && !rosterIds.length) {
+        showError('Select at least one player before running a per-session study.');
+        return;
+      }
+
+      if ((grouping === 'practice' || grouping === 'game') && rosterIds.length > SESSION_PLAYER_LIMIT) {
+        showError(`Per-session grouping supports up to ${SESSION_PLAYER_LIMIT} players at a time.`);
+        return;
+      }
+
+      const scope = { season_id: seasonId, group_by: grouping };
       if (rosterIds.length) {
         scope.roster_ids = rosterIds;
       }
@@ -655,18 +809,18 @@
         const studies = data && Array.isArray(data.studies) ? data.studies : [];
         const study = studies[0];
         if (!study) {
-          updateSummary(studyLabel, xMetric, yMetric, { pearson: null, spearman: null, samples: 0 });
+          updateSummary(studyLabel, xMetric, yMetric, { pearson: null, spearman: null, samples: 0 }, grouping);
           if (emptyState) {
             emptyState.classList.remove('hidden');
           }
           clearChart(chartCanvas);
           lastRender = null;
-          renderPointsTable(pointsBody, pointsEmpty, [], xMetric.label, yMetric.label);
+          renderPointsTable(pointsBody, pointsEmpty, [], xMetric.label, yMetric.label, grouping);
           updateHeaders(xHeader, yHeader, xMetric, yMetric);
           return;
         }
 
-        updateSummary(studyLabel, xMetric, yMetric, study);
+        updateSummary(studyLabel, xMetric, yMetric, study, grouping);
         updateHeaders(xHeader, yHeader, xMetric, yMetric);
 
         const scatter = Array.isArray(study.scatter) ? study.scatter : [];
@@ -682,14 +836,14 @@
             xLabel: xMetric.label,
             yLabel: yMetric.label
           };
-          renderPointsTable(pointsBody, pointsEmpty, scatter, xMetric.label, yMetric.label);
+          renderPointsTable(pointsBody, pointsEmpty, scatter, xMetric.label, yMetric.label, grouping);
         } else {
           if (emptyState) {
             emptyState.classList.remove('hidden');
           }
           clearChart(chartCanvas);
           lastRender = null;
-          renderPointsTable(pointsBody, pointsEmpty, [], xMetric.label, yMetric.label);
+          renderPointsTable(pointsBody, pointsEmpty, [], xMetric.label, yMetric.label, grouping);
         }
       } catch (error) {
         showError(error && error.message ? error.message : 'Failed to run correlation study.');

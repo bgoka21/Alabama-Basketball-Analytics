@@ -4,7 +4,7 @@ import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -3012,9 +3012,37 @@ def correlation_workbench_api():
     if not isinstance(scope, Mapping):
         return jsonify({'error': 'scope must be a JSON object'}), 400
 
-    try:
-        from services.correlation import run_studies
+    group_by_value = scope.get('group_by', 'player')
 
+    from services.correlation import Grouping, run_studies
+
+    try:
+        grouping = Grouping(str(group_by_value).lower())
+    except ValueError:
+        return jsonify({'error': f"Unsupported group_by value '{group_by_value}'"}), 400
+
+    if grouping in {Grouping.PRACTICE, Grouping.GAME}:
+        roster_ids = scope.get('roster_ids')
+        if not isinstance(roster_ids, Sequence) or isinstance(roster_ids, (str, bytes)) or not roster_ids:
+            return (
+                jsonify({'error': 'Select at least one player before running a per-session study.'}),
+                400,
+            )
+        max_points = 5
+        if len(roster_ids) > max_points:
+            return (
+                jsonify(
+                    {
+                        'error': f'Per-session mode supports up to {max_points} players at a time. Reduce the selection.',
+                    }
+                ),
+                400,
+            )
+
+    scope = dict(scope)
+    scope['group_by'] = grouping.value
+
+    try:
         result = run_studies(studies=studies, scope=scope)
     except (ValueError, TypeError) as exc:
         return jsonify({'error': str(exc)}), 400
