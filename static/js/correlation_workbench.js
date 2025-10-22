@@ -3,7 +3,6 @@
 
   const VALUE_DELIMITER = '::';
   const DEFAULT_DECIMALS = 3;
-  const SESSION_PLAYER_LIMIT = 5;
   let chartInstance = null;
 
   function readJsonScript(id) {
@@ -593,7 +592,7 @@
         },
         practice: {
           group: 'Each point represents an individual practice for the selected players.',
-          roster: `Select up to ${SESSION_PLAYER_LIMIT} players when grouping by practice.`,
+          roster: 'Select players to include when viewing practice-level points.',
           label: 'Practices',
           column: 'Practice',
           empty: 'Run a study to list practice-level values.',
@@ -601,7 +600,7 @@
         },
         game: {
           group: 'Each point represents an individual game for the selected players.',
-          roster: `Select up to ${SESSION_PLAYER_LIMIT} players when grouping by game.`,
+          roster: 'Select players to include when viewing game-level points.',
           label: 'Games',
           column: 'Game',
           empty: 'Run a study to list game-level values.',
@@ -753,11 +752,6 @@
 
       if ((grouping === 'practice' || grouping === 'game') && !rosterIds.length) {
         showError('Select at least one player before running a per-session study.');
-        return;
-      }
-
-      if ((grouping === 'practice' || grouping === 'game') && rosterIds.length > SESSION_PLAYER_LIMIT) {
-        showError(`Per-session grouping supports up to ${SESSION_PLAYER_LIMIT} players at a time.`);
         return;
       }
 
