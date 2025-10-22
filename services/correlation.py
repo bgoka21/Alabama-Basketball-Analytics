@@ -1089,6 +1089,7 @@ def run_studies(
 
         combined = pd.concat([x_series.rename("x"), y_series.rename("y")], axis=1, join="inner")
         combined = combined.dropna()
+        combined = combined[(combined["x"] > 0) | (combined["y"] > 0)]
 
         samples = int(len(combined.index))
         pearson: Optional[float] = None

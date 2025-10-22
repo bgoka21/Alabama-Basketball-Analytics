@@ -106,7 +106,7 @@ def season(app):
 @pytest.fixture
 def practice_and_game_data(app, season):
     with app.app_context():
-        roster_lookup = _create_roster(season, ["Alice", "Bob"])
+        roster_lookup = _create_roster(season, ["Alice", "Bob", "Charlie"])
 
         base_stats_1 = {
             "Alice": {
@@ -153,6 +153,28 @@ def practice_and_game_data(app, season):
                 "box_out_missed": 2,
                 "off_reb_given_up": 2,
             },
+            "Charlie": {
+                "fg3_makes": 0,
+                "fg3_attempts": 4,
+                "fg2_makes": 0,
+                "fg2_attempts": 3,
+                "atr_makes": 0,
+                "atr_attempts": 0,
+                "points": 0,
+                "assists": 0,
+                "turnovers": 0,
+                "second_assists": 0,
+                "pot_assists": 0,
+                "ftm": 0,
+                "fta": 0,
+                "crash_positive": 0,
+                "crash_missed": 0,
+                "back_man_positive": 0,
+                "back_man_missed": 0,
+                "box_out_positive": 0,
+                "box_out_missed": 0,
+                "off_reb_given_up": 0,
+            },
         }
 
         blue_stats_1 = {
@@ -179,6 +201,18 @@ def practice_and_game_data(app, season):
                 "block": 0,
                 "off_reb": 2,
                 "def_reb": 3,
+            },
+            "Charlie": {
+                "total_blue_collar": 0,
+                "deflection": 0,
+                "charge_taken": 0,
+                "floor_dive": 0,
+                "reb_tip": 0,
+                "misc": 0,
+                "steal": 0,
+                "block": 0,
+                "off_reb": 0,
+                "def_reb": 0,
             },
         }
 
@@ -236,6 +270,28 @@ def practice_and_game_data(app, season):
                 "box_out_missed": 1,
                 "off_reb_given_up": 1,
             },
+            "Charlie": {
+                "fg3_makes": 0,
+                "fg3_attempts": 5,
+                "fg2_makes": 0,
+                "fg2_attempts": 4,
+                "atr_makes": 0,
+                "atr_attempts": 0,
+                "points": 0,
+                "assists": 0,
+                "turnovers": 0,
+                "second_assists": 0,
+                "pot_assists": 0,
+                "ftm": 0,
+                "fta": 0,
+                "crash_positive": 0,
+                "crash_missed": 0,
+                "back_man_positive": 0,
+                "back_man_missed": 0,
+                "box_out_positive": 0,
+                "box_out_missed": 0,
+                "off_reb_given_up": 0,
+            },
         }
 
         blue_stats_2 = {
@@ -262,6 +318,18 @@ def practice_and_game_data(app, season):
                 "block": 0,
                 "off_reb": 1,
                 "def_reb": 2,
+            },
+            "Charlie": {
+                "total_blue_collar": 0,
+                "deflection": 0,
+                "charge_taken": 0,
+                "floor_dive": 0,
+                "reb_tip": 0,
+                "misc": 0,
+                "steal": 0,
+                "block": 0,
+                "off_reb": 0,
+                "def_reb": 0,
             },
         }
 
@@ -305,6 +373,19 @@ def practice_and_game_data(app, season):
                     "ftm": 1,
                     "fta": 2,
                 },
+                "Charlie": {
+                    "fg3_makes": 0,
+                    "fg3_attempts": 2,
+                    "fg2_makes": 0,
+                    "fg2_attempts": 3,
+                    "atr_makes": 0,
+                    "atr_attempts": 0,
+                    "points": 0,
+                    "assists": 0,
+                    "turnovers": 0,
+                    "ftm": 0,
+                    "fta": 0,
+                },
             },
         )
 
@@ -339,12 +420,26 @@ def practice_and_game_data(app, season):
                     "ftm": 2,
                     "fta": 2,
                 },
+                "Charlie": {
+                    "fg3_makes": 0,
+                    "fg3_attempts": 1,
+                    "fg2_makes": 0,
+                    "fg2_attempts": 2,
+                    "atr_makes": 0,
+                    "atr_attempts": 0,
+                    "points": 0,
+                    "assists": 0,
+                    "turnovers": 0,
+                    "ftm": 0,
+                    "fta": 0,
+                },
             },
         )
 
         return {
             "alice_id": roster_lookup["Alice"].id,
             "bob_id": roster_lookup["Bob"].id,
+            "charlie_id": roster_lookup["Charlie"].id,
         }
 
 
@@ -369,6 +464,7 @@ def test_run_studies_mixed_sources(app, season, practice_and_game_data):
 
         scatter = {point["player"]: point for point in result["scatter"]}
         assert set(scatter.keys()) == {"Alice", "Bob"}
+        assert "Charlie" not in scatter
         assert scatter["Alice"]["x"] == pytest.approx(40.0)
         assert scatter["Alice"]["y"] == pytest.approx(30.0)
         assert scatter["Bob"]["x"] == pytest.approx(10.0)
