@@ -3028,17 +3028,6 @@ def correlation_workbench_api():
                 jsonify({'error': 'Select at least one player before running a per-session study.'}),
                 400,
             )
-        max_points = 5
-        if len(roster_ids) > max_points:
-            return (
-                jsonify(
-                    {
-                        'error': f'Per-session mode supports up to {max_points} players at a time. Reduce the selection.',
-                    }
-                ),
-                400,
-            )
-
     scope = dict(scope)
     scope['group_by'] = grouping.value
 
