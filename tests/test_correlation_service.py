@@ -418,6 +418,74 @@ def test_empty_dataset_returns_zero_samples(app, season):
         assert result["scatter"] == []
 
 
+def test_run_studies_group_by_practice_sessions(app, season, practice_and_game_data):
+    with app.app_context():
+        alice_id = practice_and_game_data["alice_id"]
+
+        scope = {"season_id": season.id, "roster_ids": [alice_id], "group_by": "practice"}
+        studies = [
+            {
+                "identifier": "practice-volume",
+                "x": {"source": "practice", "key": "play_ast"},
+                "y": {"source": "practice", "key": "play_to"},
+            }
+        ]
+
+        payload = run_studies(studies, scope)
+        study = payload["studies"][0]
+
+        assert study["samples"] == 2
+        scatter = study["scatter"]
+        assert len(scatter) == 2
+        for point in scatter:
+            assert point["grouping"] == "practice"
+            assert point["player_name"] == "Alice"
+            assert point["label"].startswith("Alice")
+            assert point.get("session_id") is not None
+
+
+def test_run_studies_group_by_game_sessions(app, season, practice_and_game_data):
+    with app.app_context():
+        bob_id = practice_and_game_data["bob_id"]
+
+        scope = {"season_id": season.id, "roster_ids": [bob_id], "group_by": "game"}
+        studies = [
+            {
+                "identifier": "game-output",
+                "x": {"source": "game", "key": "points"},
+                "y": {"source": "game", "key": "assists"},
+            }
+        ]
+
+        payload = run_studies(studies, scope)
+        study = payload["studies"][0]
+
+        assert study["samples"] == 2
+        scatter = study["scatter"]
+        assert len(scatter) == 2
+        for point in scatter:
+            assert point["grouping"] == "game"
+            assert point["player_name"] == "Bob"
+            assert point.get("session_id") is not None
+
+
+def test_group_by_practice_rejects_game_metrics(app, season, practice_and_game_data):
+    with app.app_context():
+        alice_id = practice_and_game_data["alice_id"]
+
+        scope = {"season_id": season.id, "roster_ids": [alice_id], "group_by": "practice"}
+        studies = [
+            {
+                "identifier": "invalid",
+                "x": {"source": "practice", "key": "play_ast"},
+                "y": {"source": "game", "key": "points"},
+            }
+        ]
+
+        with pytest.raises(ValueError):
+            run_studies(studies, scope)
+
+
 def test_game_blue_collar_stats_filtered_by_season(app, season):
     with app.app_context():
         roster_lookup = _create_roster(season, ["Alice"])

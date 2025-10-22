@@ -57,6 +57,15 @@ class StudyDefinition:
 
 
 @dataclass(frozen=True)
+class Grouping(str, Enum):
+    """Supported scatter point grouping modes."""
+
+    PLAYER = "player"
+    PRACTICE = "practice"
+    GAME = "game"
+
+
+@dataclass(frozen=True)
 class StudyScope:
     """Filters shared by every study in a request."""
 
@@ -64,6 +73,7 @@ class StudyScope:
     roster_ids: Optional[Sequence[int]] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    group_by: Grouping = Grouping.PLAYER
 
 
 # -- Metric catalog helpers --------------------------------------------------
@@ -334,7 +344,32 @@ _PRACTICE_METRICS = _practice_metric_specs()
 SUPPORTED_PRACTICE_METRICS: FrozenSet[str] = frozenset(_PRACTICE_METRICS)
 
 
+def _format_practice_session_label(session_date: Optional[date], category: Optional[str]) -> str:
+    base = "Practice"
+    if category:
+        base = f"{category} Practice"
+    if session_date:
+        return f"{base} – {session_date.strftime('%b %d, %Y')}"
+    return base
+
+
+def _format_game_session_label(session_date: Optional[date], opponent: Optional[str]) -> str:
+    if opponent and session_date:
+        return f"{opponent} – {session_date.strftime('%b %d, %Y')}"
+    if opponent:
+        return opponent
+    if session_date:
+        return f"Game – {session_date.strftime('%b %d, %Y')}"
+    return "Game"
+
+
 def _load_practice_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
+    if scope.group_by is Grouping.PRACTICE:
+        return _load_practice_session_rows(scope)
+    return _load_practice_player_rows(scope)
+
+
+def _load_practice_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     roster_query = Roster.query.filter(Roster.season_id == scope.season_id)
     if scope.roster_ids:
         roster_query = roster_query.filter(Roster.id.in_(scope.roster_ids))
@@ -427,7 +462,151 @@ def _load_practice_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
         if not any(value not in (0.0, None) for value in numeric_values + blue_values):
             continue
-        final[row["player"]] = row
+        key = row["player"]
+        row["player_name"] = row["player"]
+        row["label"] = row["player"]
+        row["group_label"] = None
+        row["grouping"] = Grouping.PLAYER.value
+        row["row_key"] = key
+        final[key] = row
+    return final
+
+
+def _load_practice_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
+    roster_query = Roster.query.filter(Roster.season_id == scope.season_id)
+    if scope.roster_ids:
+        roster_query = roster_query.filter(Roster.id.in_(scope.roster_ids))
+
+    roster_entries = roster_query.all()
+    if not roster_entries:
+        return {}
+
+    roster_lookup: Dict[int, Roster] = {entry.id: entry for entry in roster_entries}
+
+    base_query = (
+        db.session.query(
+            PlayerStats.practice_id.label("practice_id"),
+            Roster.id.label("roster_id"),
+            Roster.player_name.label("player_name"),
+            Practice.date.label("practice_date"),
+            Practice.category.label("practice_category"),
+            *[
+                func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
+                for field in _PRACTICE_PLAYER_FIELDS
+            ],
+        )
+        .join(
+            Roster,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        )
+        .join(Practice, PlayerStats.practice_id == Practice.id)
+        .filter(PlayerStats.practice_id.isnot(None))
+        .filter(PlayerStats.season_id == scope.season_id)
+    )
+
+    if scope.roster_ids:
+        base_query = base_query.filter(Roster.id.in_(scope.roster_ids))
+
+    if scope.start_date:
+        base_query = base_query.filter(Practice.date >= scope.start_date)
+    if scope.end_date:
+        base_query = base_query.filter(Practice.date <= scope.end_date)
+
+    base_query = base_query.group_by(
+        PlayerStats.practice_id,
+        Roster.id,
+        Roster.player_name,
+        Practice.date,
+        Practice.category,
+    )
+
+    rows: Dict[tuple[int, int], Dict[str, Any]] = {}
+
+    for result in base_query.all():
+        practice_id = int(result.practice_id)
+        roster_id = int(result.roster_id)
+        key = (practice_id, roster_id)
+        row = rows.setdefault(
+            key,
+            {
+                "practice_id": practice_id,
+                "roster_id": roster_id,
+                "player": result.player_name,
+                "player_name": result.player_name,
+                "practice_date": result.practice_date,
+                "practice_category": result.practice_category,
+                "practice_count": 1,
+            },
+        )
+        for field in _PRACTICE_PLAYER_FIELDS:
+            row[field] = _as_float(getattr(result, field))
+
+    blue_query = (
+        db.session.query(
+            BlueCollarStats.practice_id.label("practice_id"),
+            BlueCollarStats.player_id.label("roster_id"),
+            *[
+                func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
+                for field in _PRACTICE_BLUE_FIELDS
+            ],
+        )
+        .join(Roster, Roster.id == BlueCollarStats.player_id)
+        .join(Practice, BlueCollarStats.practice_id == Practice.id)
+        .filter(BlueCollarStats.practice_id.isnot(None))
+        .filter(BlueCollarStats.season_id == scope.season_id)
+    )
+
+    if scope.roster_ids:
+        blue_query = blue_query.filter(BlueCollarStats.player_id.in_(scope.roster_ids))
+
+    if scope.start_date:
+        blue_query = blue_query.filter(Practice.date >= scope.start_date)
+    if scope.end_date:
+        blue_query = blue_query.filter(Practice.date <= scope.end_date)
+
+    blue_query = blue_query.group_by(BlueCollarStats.practice_id, BlueCollarStats.player_id)
+
+    for result in blue_query.all():
+        practice_id = int(result.practice_id)
+        roster_id = int(result.roster_id)
+        key = (practice_id, roster_id)
+        row = rows.get(key)
+        if not row:
+            roster_entry = roster_lookup.get(roster_id)
+            if not roster_entry:
+                continue
+            row = rows.setdefault(
+                key,
+                {
+                    "practice_id": practice_id,
+                    "roster_id": roster_id,
+                    "player": roster_entry.player_name,
+                    "player_name": roster_entry.player_name,
+                    "practice_date": None,
+                    "practice_category": None,
+                    "practice_count": 1,
+                },
+            )
+        for field in _PRACTICE_BLUE_FIELDS:
+            row[field] = _as_float(getattr(result, field))
+
+    final: Dict[str, Dict[str, Any]] = {}
+    for key, row in rows.items():
+        numeric_values = [row.get(field, 0.0) for field in _PRACTICE_PLAYER_FIELDS]
+        blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+        if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+            continue
+        practice_label = _format_practice_session_label(row.get("practice_date"), row.get("practice_category"))
+        display_label = f"{row['player_name']} – {practice_label}"
+        point_key = f"practice:{row['practice_id']}:{row['roster_id']}"
+        row["label"] = display_label
+        row["group_label"] = practice_label
+        row["grouping"] = Grouping.PRACTICE.value
+        row["row_key"] = point_key
+        final[point_key] = row
     return final
 
 
@@ -472,6 +651,12 @@ SUPPORTED_GAME_METRICS: FrozenSet[str] = frozenset(_GAME_METRICS)
 
 
 def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
+    if scope.group_by is Grouping.GAME:
+        return _load_game_session_rows(scope)
+    return _load_game_player_rows(scope)
+
+
+def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     roster_query = Roster.query.filter(Roster.season_id == scope.season_id)
     if scope.roster_ids:
         roster_query = roster_query.filter(Roster.id.in_(scope.roster_ids))
@@ -564,7 +749,153 @@ def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
         if not any(value not in (0.0, None) for value in numeric_values + blue_values):
             continue
-        final[row["player"]] = row
+        key = row["player"]
+        row["player_name"] = row["player"]
+        row["label"] = row["player"]
+        row["group_label"] = None
+        row["grouping"] = Grouping.PLAYER.value
+        row["row_key"] = key
+        final[key] = row
+    return final
+
+
+def _load_game_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
+    roster_query = Roster.query.filter(Roster.season_id == scope.season_id)
+    if scope.roster_ids:
+        roster_query = roster_query.filter(Roster.id.in_(scope.roster_ids))
+
+    roster_entries = roster_query.all()
+    if not roster_entries:
+        return {}
+
+    roster_lookup: Dict[int, Roster] = {entry.id: entry for entry in roster_entries}
+
+    game_query = (
+        db.session.query(
+            PlayerStats.game_id.label("game_id"),
+            Roster.id.label("roster_id"),
+            Roster.player_name.label("player_name"),
+            Game.game_date.label("game_date"),
+            Game.opponent_name.label("opponent"),
+            *[
+                func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
+                for field in _GAME_PLAYER_FIELDS
+            ],
+        )
+        .join(
+            Roster,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        )
+        .join(Game, PlayerStats.game_id == Game.id)
+        .filter(PlayerStats.game_id.isnot(None))
+        .filter(PlayerStats.season_id == scope.season_id)
+        .filter(Game.season_id == scope.season_id)
+    )
+
+    if scope.roster_ids:
+        game_query = game_query.filter(Roster.id.in_(scope.roster_ids))
+
+    if scope.start_date:
+        game_query = game_query.filter(Game.game_date >= scope.start_date)
+    if scope.end_date:
+        game_query = game_query.filter(Game.game_date <= scope.end_date)
+
+    game_query = game_query.group_by(
+        PlayerStats.game_id,
+        Roster.id,
+        Roster.player_name,
+        Game.game_date,
+        Game.opponent_name,
+    )
+
+    rows: Dict[tuple[int, int], Dict[str, Any]] = {}
+
+    for result in game_query.all():
+        game_id = int(result.game_id)
+        roster_id = int(result.roster_id)
+        key = (game_id, roster_id)
+        row = rows.setdefault(
+            key,
+            {
+                "game_id": game_id,
+                "roster_id": roster_id,
+                "player": result.player_name,
+                "player_name": result.player_name,
+                "game_date": result.game_date,
+                "opponent": result.opponent,
+                "game_count": 1,
+            },
+        )
+        for field in _GAME_PLAYER_FIELDS:
+            row[field] = _as_float(getattr(result, field))
+
+    blue_query = (
+        db.session.query(
+            BlueCollarStats.game_id.label("game_id"),
+            BlueCollarStats.player_id.label("roster_id"),
+            *[
+                func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
+                for field in _PRACTICE_BLUE_FIELDS
+            ],
+        )
+        .join(Roster, Roster.id == BlueCollarStats.player_id)
+        .join(Game, BlueCollarStats.game_id == Game.id)
+        .filter(BlueCollarStats.game_id.isnot(None))
+        .filter(BlueCollarStats.season_id == scope.season_id)
+        .filter(Game.season_id == scope.season_id)
+    )
+
+    if scope.roster_ids:
+        blue_query = blue_query.filter(BlueCollarStats.player_id.in_(scope.roster_ids))
+
+    if scope.start_date:
+        blue_query = blue_query.filter(Game.game_date >= scope.start_date)
+    if scope.end_date:
+        blue_query = blue_query.filter(Game.game_date <= scope.end_date)
+
+    blue_query = blue_query.group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
+
+    for result in blue_query.all():
+        game_id = int(result.game_id)
+        roster_id = int(result.roster_id)
+        key = (game_id, roster_id)
+        row = rows.get(key)
+        if not row:
+            roster_entry = roster_lookup.get(roster_id)
+            if not roster_entry:
+                continue
+            row = rows.setdefault(
+                key,
+                {
+                    "game_id": game_id,
+                    "roster_id": roster_id,
+                    "player": roster_entry.player_name,
+                    "player_name": roster_entry.player_name,
+                    "game_date": None,
+                    "opponent": None,
+                    "game_count": 1,
+                },
+            )
+        for field in _PRACTICE_BLUE_FIELDS:
+            row[field] = _as_float(getattr(result, field))
+
+    final: Dict[str, Dict[str, Any]] = {}
+    for key, row in rows.items():
+        numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
+        blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+        if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+            continue
+        game_label = _format_game_session_label(row.get("game_date"), row.get("opponent"))
+        display_label = f"{row['player_name']} – {game_label}"
+        point_key = f"game:{row['game_id']}:{row['roster_id']}"
+        row["label"] = display_label
+        row["group_label"] = game_label
+        row["grouping"] = Grouping.GAME.value
+        row["row_key"] = point_key
+        final[point_key] = row
     return final
 
 
@@ -666,12 +997,21 @@ def _coerce_scope(scope: StudyScope | Mapping[str, Any]) -> StudyScope:
 
     start_date = scope.get("start_date")
     end_date = scope.get("end_date")
+    raw_group = scope.get("group_by") or Grouping.PLAYER.value
+    if isinstance(raw_group, Grouping):
+        group_by = raw_group
+    else:
+        try:
+            group_by = Grouping(str(raw_group).lower())
+        except ValueError as exc:
+            raise ValueError(f"Unsupported group_by value '{raw_group}'") from exc
 
     return StudyScope(
         season_id=int(season_id),
         roster_ids=roster_ids,
         start_date=start_date,
         end_date=end_date,
+        group_by=group_by,
     )
 
 
@@ -688,18 +1028,62 @@ def run_studies(
     practice_rows = _load_practice_rows(normalized_scope)
     game_rows = _load_game_rows(normalized_scope)
 
-    player_meta: Dict[str, Dict[str, Any]] = {}
-    for data in practice_rows.values():
-        player_meta[data["player"]] = {"roster_id": data.get("roster_id")}
-    for data in game_rows.values():
-        meta = player_meta.setdefault(data["player"], {})
-        if meta.get("roster_id") is None and data.get("roster_id") is not None:
-            meta["roster_id"] = data.get("roster_id")
+    # Build metadata for every scatter point key (player or session).
+    point_meta: Dict[str, Dict[str, Any]] = {}
+
+    def register_rows(rows: Mapping[str, Mapping[str, Any]]) -> None:
+        for key, data in rows.items():
+            meta = point_meta.setdefault(key, {})
+            player_name = data.get("player_name") or data.get("player")
+            if player_name and not meta.get("player_name"):
+                meta["player_name"] = player_name
+            label = data.get("label") or data.get("player_name") or data.get("player")
+            if label and not meta.get("label"):
+                meta["label"] = label
+            group_label = data.get("group_label")
+            if group_label and not meta.get("group_label"):
+                meta["group_label"] = group_label
+            grouping = data.get("grouping")
+            if grouping and not meta.get("grouping"):
+                meta["grouping"] = grouping
+            roster_id = data.get("roster_id")
+            if roster_id is not None and meta.get("roster_id") is None:
+                meta["roster_id"] = roster_id
+            if data.get("practice_id") is not None:
+                meta["session_id"] = data.get("practice_id")
+                meta["session_type"] = "practice"
+                if data.get("practice_category") and not meta.get("session_category"):
+                    meta["session_category"] = data.get("practice_category")
+                if data.get("practice_date") is not None and not meta.get("session_date"):
+                    meta["session_date"] = data.get("practice_date")
+            if data.get("game_id") is not None:
+                meta["session_id"] = data.get("game_id")
+                meta["session_type"] = "game"
+                if data.get("opponent") and not meta.get("opponent"):
+                    meta["opponent"] = data.get("opponent")
+                if data.get("game_date") is not None and not meta.get("session_date"):
+                    meta["session_date"] = data.get("game_date")
+
+    register_rows(practice_rows)
+    register_rows(game_rows)
 
     results = []
 
     for index, study in enumerate(studies):
         study_def = _coerce_study(study)
+
+        if (
+            normalized_scope.group_by is Grouping.PRACTICE
+            and (study_def.x.source is not MetricSource.PRACTICE or study_def.y.source is not MetricSource.PRACTICE)
+        ):
+            raise ValueError("Practice grouping can only be used with practice metrics")
+
+        if (
+            normalized_scope.group_by is Grouping.GAME
+            and (study_def.x.source is not MetricSource.GAME or study_def.y.source is not MetricSource.GAME)
+        ):
+            raise ValueError("Game grouping can only be used with game metrics")
+
         x_series = _metric_series(study_def.x, practice_rows, game_rows)
         y_series = _metric_series(study_def.y, practice_rows, game_rows)
 
@@ -718,16 +1102,40 @@ def run_studies(
         scatter: Iterable[Dict[str, Any]] = []
         if samples:
             scatter = []
-            for player, row in combined.iterrows():
-                meta = player_meta.get(player, {})
+            for point_key, row in combined.iterrows():
+                meta = point_meta.get(point_key, {})
+                label = meta.get("label") or point_key
+                player_name = meta.get("player_name") or label
                 point = {
-                    "player": player,
+                    "player": label,
                     "x": float(row["x"]),
                     "y": float(row["y"]),
                 }
+                if meta.get("player_name"):
+                    point["player_name"] = player_name
+                if meta.get("group_label"):
+                    point["group_label"] = meta.get("group_label")
+                if meta.get("grouping"):
+                    point["grouping"] = meta.get("grouping")
                 roster_id = meta.get("roster_id")
                 if roster_id is not None:
                     point["roster_id"] = roster_id
+                if meta.get("session_type"):
+                    point["session_type"] = meta.get("session_type")
+                if meta.get("session_id") is not None:
+                    point["session_id"] = meta.get("session_id")
+                if meta.get("session_category"):
+                    point["session_category"] = meta.get("session_category")
+                if meta.get("opponent"):
+                    point["opponent"] = meta.get("opponent")
+                session_date = meta.get("session_date")
+                if session_date is not None:
+                    if isinstance(session_date, date):
+                        point["session_date"] = session_date.isoformat()
+                    else:
+                        point["session_date"] = session_date
+                if label:
+                    point["label"] = label
                 scatter.append(point)
 
         results.append(
@@ -759,5 +1167,6 @@ __all__ = [
     "MetricSource",
     "StudyDefinition",
     "StudyScope",
+    "Grouping",
     "run_studies",
 ]
