@@ -1,0 +1,63 @@
+{% extends 'admin/base.html' %}
+{% from 'macros/dual_tables.html' import render_dual_section, render_split_dual_section %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
+{% from '_macros/grade_scale.html' import render_grade_scales_for_specs %}
+
+{% block page_controls %}
+<form
+  method="get"
+  id="practice-leaderboard-form"
+  class="mb-4 flex flex-wrap items-end gap-4"
+  hx-get="{{ url_for('admin.leaderboard_practice_new') }}"
+  hx-trigger="change delay:250ms, submit"
+  hx-target="#practice-leaderboard-results"
+  hx-include="#practice-leaderboard-form"
+  hx-select="#practice-leaderboard-results"
+  hx-swap="outerHTML"
+  hx-push-url="true"
+>
+  <div>
+    <label class="font-semibold mr-2">Season:</label>
+    <select name="season_id" class="border p-2 rounded">
+      {% for s in all_seasons %}
+        <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>
+          {{ s.season_name }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-2">
+    <label class="text-sm font-medium">Date:</label>
+    <input
+      type="date"
+      name="start_date"
+      value="{{ start_date or '' }}"
+      class="border px-2 py-1 text-sm"
+    >
+    <span class="text-sm">–</span>
+    <input
+      type="date"
+      name="end_date"
+      value="{{ end_date or '' }}"
+      class="border px-2 py-1 text-sm"
+    >
+  </div>
+  {% if selected_session %}
+    <input type="hidden" name="session" value="{{ selected_session }}">
+  {% endif %}
+  {% for lbl in selected_labels %}
+    <input type="hidden" name="label" value="{{ lbl }}">
+  {% endfor %}
+  <div>
+    <button type="submit" class="bg-[#9E1B32] hover:bg-[#7f1524] text-white px-5 py-2 rounded">Apply</button>
+  </div>
+  <div>
+    <a href="{{ url_for('admin.leaderboard_practice_new') }}" class="text-gray-600 hover:underline text-sm">Clear</a>
+  </div>
+</form>
+{% include "_filters_session.html" %}
+{% endblock %}
+
+{% block content %}
+  {% include 'admin/_new_practice_leaderboard_results.html' %}
+{% endblock %}

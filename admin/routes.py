@@ -8268,6 +8268,191 @@ def leaderboard_game():
     return render_template('admin/game_leaderboard.html', **context)
 
 
+@admin_bp.route('/leaderboard/practice/new')
+@login_required
+def leaderboard_practice_new():
+    sid = request.args.get('season_id', type=int)
+    if not sid:
+        latest = Season.query.order_by(Season.start_date.desc()).first()
+        sid = latest.id if latest else None
+
+    start_date_arg = request.args.get('start_date')
+    end_date_arg = request.args.get('end_date')
+    start_dt = end_dt = None
+    if start_date_arg:
+        try:
+            start_dt = date.fromisoformat(start_date_arg)
+        except ValueError:
+            start_date_arg = ''
+    if end_date_arg:
+        try:
+            end_dt = date.fromisoformat(end_date_arg)
+        except ValueError:
+            end_date_arg = ''
+
+    session_names = _get_session_names_for_season(sid)
+    sessions, selected_session = _build_session_selection(
+        session_names, request.args.get('session')
+    )
+
+    if sid and selected_session != 'All':
+        session_start, session_end = _get_session_window_from_db(
+            sid, selected_session
+        )
+        if session_start is None and session_end is None:
+            current_app.logger.warning(
+                "No DB Session window for %s in season_id=%s; skipping date filter.",
+                selected_session,
+                sid,
+            )
+            start_dt = end_dt = None
+            start_date_arg = ''
+            end_date_arg = ''
+        else:
+            start_dt = session_start
+            end_dt = session_end
+
+    start_date = start_dt.isoformat() if start_dt else (start_date_arg or '')
+    end_date = end_dt.isoformat() if end_dt else (end_date_arg or '')
+
+    label_options: list[str] = []
+    selected_labels: list[str] = []
+    label_set: Optional[set[str]] = None
+
+    if sid:
+        stats_query = PlayerStats.query.filter(PlayerStats.season_id == sid)
+        if start_dt or end_dt:
+            stats_query = (
+                stats_query
+                .outerjoin(Game, PlayerStats.game_id == Game.id)
+                .outerjoin(Practice, PlayerStats.practice_id == Practice.id)
+            )
+            if start_dt:
+                stats_query = stats_query.filter(
+                    or_(
+                        and_(PlayerStats.game_id != None, Game.game_date >= start_dt),
+                        and_(
+                            PlayerStats.practice_id != None,
+                            Practice.date >= start_dt,
+                        ),
+                    )
+                )
+            if end_dt:
+                stats_query = stats_query.filter(
+                    or_(
+                        and_(PlayerStats.game_id != None, Game.game_date <= end_dt),
+                        and_(
+                            PlayerStats.practice_id != None,
+                            Practice.date <= end_dt,
+                        ),
+                    )
+                )
+        stats_list = stats_query.all()
+        label_options = collect_practice_labels(stats_list)
+        selected_labels = [
+            lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
+        ]
+        if selected_labels:
+            label_set = {lbl.upper() for lbl in selected_labels}
+
+    def _build_stat_payload(stat_key: str) -> Dict[str, Any]:
+        cfg = next((c for c in LEADERBOARD_STATS if c['key'] == stat_key), None)
+        if not sid or not cfg:
+            return {
+                'config': cfg,
+                'rows': [],
+                'team_totals': {},
+                'split': {},
+            }
+
+        _, rows, team_totals = compute_leaderboard(
+            stat_key,
+            sid,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            label_set=label_set if label_set else None,
+        )
+
+        practice_dual_ctx = get_practice_dual_context(
+            stat_key,
+            sid,
+            label_set=label_set if label_set else None,
+        )
+
+        season_rows_for_split = (
+            practice_dual_ctx.get('season_rows') if practice_dual_ctx else rows
+        )
+        season_totals_for_split = (
+            practice_dual_ctx.get('season_team_totals') if practice_dual_ctx else team_totals
+        )
+
+        split_context = {}
+        if cfg:
+            split_context = _split_leaderboard_rows_for_template(
+                stat_key,
+                season_rows_for_split,
+                season_totals_for_split,
+                last_rows=(practice_dual_ctx.get('last_rows') if practice_dual_ctx else None),
+                last_team_totals=(
+                    practice_dual_ctx.get('last_team_totals') if practice_dual_ctx else None
+                ),
+                last_practice_date=(
+                    practice_dual_ctx.get('last_practice_date') if practice_dual_ctx else None
+                ),
+            )
+
+        return {
+            'config': cfg,
+            'rows': rows,
+            'team_totals': team_totals,
+            'split': split_context or {},
+        }
+
+    tab_definitions = [
+        ('defense', 'Defense – Bumps'),
+        ('off_rebounding', 'Offensive Rebounding'),
+        ('def_rebounding', 'Defensive Rebounding'),
+        ('collision_gap_help', 'Collisions – Gap Help'),
+        ('pass_contest', 'Pass Contests'),
+        ('overall_gap_help', 'Overall Gap Help'),
+        ('overall_low_man', 'Overall Low Man'),
+        ('pnr_gap_help', 'PnR Gap Help'),
+        ('pnr_grade', 'PnR Grade'),
+        ('atr_contest_breakdown', 'ATR Shot Contests'),
+        ('fg2_contest_breakdown', '2FG Shot Contests'),
+        ('fg3_contest_breakdown', '3FG Shot Contests'),
+    ]
+
+    practice_payloads = {
+        key: {
+            'label': label,
+            **_build_stat_payload(key),
+        }
+        for key, label in tab_definitions
+    }
+
+    all_seasons = Season.query.order_by(Season.start_date.desc()).all()
+
+    context = {
+        'all_seasons': all_seasons,
+        'selected_season': sid,
+        'start_date': start_date or '',
+        'end_date': end_date or '',
+        'sessions': sessions,
+        'selected_session': selected_session,
+        'label_options': label_options,
+        'selected_labels': selected_labels,
+        'practice_payloads': practice_payloads,
+        'tab_definitions': tab_definitions,
+        'active_page': 'leaderboard',
+    }
+
+    if request.headers.get('HX-Request') == 'true':
+        return render_template('admin/_new_practice_leaderboard_results.html', **context)
+
+    return render_template('admin/new_practice_leaderboard.html', **context)
+
+
 @admin_bp.route('/leaderboard')
 @login_required
 def leaderboard():
