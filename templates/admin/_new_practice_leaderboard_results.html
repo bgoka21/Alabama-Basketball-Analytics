@@ -1,0 +1,585 @@
+{% from 'macros/dual_tables.html' import render_dual_section %}
+{% from '_macros/percent_box.html' import apply_percent_wrappers %}
+{% from '_macros/grade_scale.html' import render_grade_scales_for_specs %}
+
+<div id="practice-leaderboard-results" class="space-y-6">
+  <section>
+    <h1 class="text-3xl font-bold mb-2">Practice Leaderboard</h1>
+    <p class="text-sm text-gray-600">
+      Season totals paired with last practice results for every practice focus area.
+    </p>
+  </section>
+
+  <div class="bg-white rounded shadow">
+    <div class="border-b border-gray-200 overflow-x-auto">
+      <nav class="flex gap-2 px-6 py-4 min-w-max">
+        {% for key, label in tab_definitions %}
+          <button
+            type="button"
+            class="tab-button px-3 py-1 text-sm rounded-full border transition {{ 'bg-[#9E1B32] text-white border-[#9E1B32]' if loop.first else 'border-gray-300 text-gray-700 hover:bg-[#9E1B32]/10' }}"
+            data-tab-target="practice-tab-{{ key }}"
+          >
+            {{ label }}
+          </button>
+        {% endfor %}
+      </nav>
+    </div>
+
+    <div class="px-6 py-6 space-y-10">
+      {% for key, label in tab_definitions %}
+        {% set payload = practice_payloads.get(key, {}) %}
+        {% set split = payload.get('split', {}) %}
+        {% set last_note = split.get('last_practice_date') %}
+        {% if last_note %}
+          {% set practice_note = last_note.strftime('%b %d, %Y') %}
+        {% else %}
+          {% set practice_note = None %}
+        {% endif %}
+        <div
+          id="practice-tab-{{ key }}"
+          class="tab-panel space-y-8 {% if not loop.first %}hidden{% endif %}"
+        >
+          {% if key == 'defense' %}
+            {% set columns = ["Bump +", "Bump Opps", "Bump %"] %}
+            {% set column_map = {
+              "Bump +": ("plus", "bump_positive"),
+              "Bump Opps": ("opps", "total_opps"),
+              "Bump %": ("pct",),
+            } %}
+            {% set pct_columns = ["Bump %"] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('bump_rows'),
+              last_rows=split.get('bump_last_rows'),
+              season_totals=split.get('bump_totals'),
+              last_totals=split.get('bump_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-defense-bumps',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'bump_pct',
+                'metric': 'bump_pct',
+                'attempt_slugs': ['bump_opps', 'bump_opp'],
+                'minimum_slugs': [
+                  'bump_min', 'bump_min_opps', 'bump_min_opp',
+                  'bump_opps_min', 'bump_opp_min', 'min_bump_opps', 'min_bump_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(label, table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% elif key == 'off_rebounding' %}
+            {% set crash_columns = ["Crash +", "Crash Att", "Crash %"] %}
+            {% set crash_map = {
+              "Crash +": ("plus", "crash_plus"),
+              "Crash Att": ("opps", "crash_opp", "crash_opps"),
+              "Crash %": ("pct", "crash_pct"),
+            } %}
+            {% set crash_table = build_dual_table(
+              base_columns=crash_columns,
+              season_rows=split.get('crash_rows'),
+              last_rows=split.get('crash_last_rows'),
+              season_totals=split.get('crash_totals'),
+              last_totals=split.get('crash_last_totals'),
+              column_map=crash_map,
+              pct_columns=['Crash %'],
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-offense-crash',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set crash_percent_specs = [
+              {
+                'slug': 'crash_pct',
+                'metric': 'crash_pct',
+                'attempt_slugs': ['crash_att', 'crash_opp', 'crash_opps'],
+                'minimum_slugs': [
+                  'crash_min', 'crash_min_att', 'crash_min_attempts',
+                  'crash_att_min', 'min_crash_att', 'crash_opp_min', 'min_crash_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(crash_table, crash_percent_specs) }}
+            {{ render_dual_section('Offensive Crash', crash_table, practice_note) }}
+            {{ render_grade_scales_for_specs(crash_percent_specs) }}
+
+            {% set back_columns = ["Back Man +", "Back Man Att", "Back Man %"] %}
+            {% set back_map = {
+              "Back Man +": ("plus", "back_plus"),
+              "Back Man Att": ("opps", "back_opp", "back_opps"),
+              "Back Man %": ("pct", "back_pct"),
+            } %}
+            {% set back_table = build_dual_table(
+              base_columns=back_columns,
+              season_rows=split.get('backman_rows'),
+              last_rows=split.get('backman_last_rows'),
+              season_totals=split.get('backman_totals'),
+              last_totals=split.get('backman_last_totals'),
+              column_map=back_map,
+              pct_columns=['Back Man %'],
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-offense-back',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set back_percent_specs = [
+              {
+                'slug': 'back_man_pct',
+                'metric': 'back_man_pct',
+                'attempt_slugs': ['back_man_att', 'back_man_opp', 'back_man_opps'],
+                'minimum_slugs': [
+                  'back_man_min', 'back_man_min_att', 'back_man_min_attempts',
+                  'back_man_att_min', 'min_back_man_att', 'back_man_opp_min', 'min_back_man_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(back_table, back_percent_specs) }}
+            {{ render_dual_section('Offensive Back Man', back_table, practice_note) }}
+            {{ render_grade_scales_for_specs(back_percent_specs) }}
+
+          {% elif key == 'def_rebounding' %}
+            {% set columns = ["Box Out +", "Box Out Att", "Box Out %", "Off Reb's Given Up"] %}
+            {% set column_map = {
+              "Box Out +": ("plus", "box_plus"),
+              "Box Out Att": ("opps", "box_opp", "box_opps"),
+              "Box Out %": ("pct", "box_pct"),
+              "Off Reb's Given Up": ("off_reb_given_up", "given_up"),
+            } %}
+            {% set pct_columns = ["Box Out %"] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('box_rows'),
+              last_rows=split.get('box_last_rows'),
+              season_totals=split.get('box_totals'),
+              last_totals=split.get('box_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-def-reb',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'box_out_pct',
+                'metric': 'box_out_pct',
+                'attempt_slugs': ['box_out_att', 'box_out_opp', 'box_out_opps'],
+                'minimum_slugs': [
+                  'box_out_min', 'box_out_min_att', 'box_out_min_attempts',
+                  'box_out_att_min', 'min_box_out_att', 'box_out_opp_min', 'min_box_out_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(label, table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% elif key == 'collision_gap_help' %}
+            {% set columns = ["Collision +", "Collision Opp", "Collision %"] %}
+            {% set column_map = {
+              "Collision +": ("plus", "gap_plus"),
+              "Collision Opp": ("opps", "gap_opp", "gap_opps"),
+              "Collision %": ("pct", "gap_pct"),
+            } %}
+            {% set pct_columns = ["Collision %"] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('collision_rows'),
+              last_rows=split.get('collision_last_rows'),
+              season_totals=split.get('collision_totals'),
+              last_totals=split.get('collision_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-collision-gap',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'gap_pct',
+                'metric': 'gap_pct',
+                'attempt_slugs': ['gap_opp', 'gap_opps'],
+                'minimum_slugs': [
+                  'gap_min', 'gap_min_opp', 'gap_min_opps',
+                  'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(label, table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% elif key == 'pass_contest' %}
+            {% set columns = ["Contest +", "Contest Att", "Contest %"] %}
+            {% set column_map = {
+              "Contest +": ("plus", "contest_plus", "pass_contest_plus"),
+              "Contest Att": ("opps", "contest_opp", "contest_opps", "pass_contest_opp", "pass_contest_opps"),
+              "Contest %": ("pct", "contest_pct", "pass_contest_pct"),
+            } %}
+            {% set pct_columns = ["Contest %"] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('pass_contest_rows'),
+              last_rows=split.get('pass_contest_last_rows'),
+              season_totals=split.get('pass_contest_totals'),
+              last_totals=split.get('pass_contest_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-pass-contest',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'contest_pct',
+                'metric': 'contest_pct',
+                'attempt_slugs': ['contest_att', 'contest_opp', 'contest_opps'],
+                'minimum_slugs': [
+                  'contest_min', 'contest_min_att', 'contest_min_attempts',
+                  'contest_att_min', 'min_contest_att', 'contest_opp_min', 'min_contest_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(label, table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% elif key == 'overall_gap_help' %}
+            {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+            {% set column_map = {
+              "Gap +": ("plus", "gap_plus"),
+              "Gap Opp": ("opps", "gap_opp", "gap_opps"),
+              "Gap %": ("pct", "gap_pct"),
+            } %}
+            {% set pct_columns = ["Gap %"] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('overall_gap_rows'),
+              last_rows=split.get('overall_gap_last_rows'),
+              season_totals=split.get('overall_gap_totals'),
+              last_totals=split.get('overall_gap_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-overall-gap',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'overall_gap_pct',
+                'metric': 'gap_pct',
+                'attempt_slugs': ['gap_opp', 'gap_opps'],
+                'minimum_slugs': [
+                  'gap_min', 'gap_min_opp', 'gap_min_opps',
+                  'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(label, table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% elif key == 'overall_low_man' %}
+            {% set columns = ["Low Man +", "Low Man Opp", "Low Man %"] %}
+            {% set column_map = {
+              "Low Man +": ("plus", "low_plus"),
+              "Low Man Opp": ("opps", "low_opp", "low_opps"),
+              "Low Man %": ("pct", "low_pct"),
+            } %}
+            {% set pct_columns = ["Low Man %"] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('overall_low_rows'),
+              last_rows=split.get('overall_low_last_rows'),
+              season_totals=split.get('overall_low_totals'),
+              last_totals=split.get('overall_low_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-overall-low',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'overall_low_pct',
+                'metric': 'low_pct',
+                'attempt_slugs': ['low_opp', 'low_opps'],
+                'minimum_slugs': [
+                  'low_min', 'low_min_opp', 'low_min_opps',
+                  'low_opp_min', 'low_opps_min', 'min_low_opp', 'min_low_opps'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(label, table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% elif key == 'pnr_gap_help' %}
+            {% set columns = ["Gap +", "Gap Opp", "Gap %"] %}
+            {% set column_map = {
+              "Gap +": ("plus", "gap_plus", "low_plus"),
+              "Gap Opp": ("opps", "gap_opp", "gap_opps", "low_opp", "low_opps"),
+              "Gap %": ("pct", "gap_pct", "low_pct"),
+            } %}
+            {% set pct_columns = ["Gap %"] %}
+            {% set gap_table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('gap_rows'),
+              last_rows=split.get('gap_last_rows'),
+              season_totals=split.get('gap_totals'),
+              last_totals=split.get('gap_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-pnr-gap',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'gap_pct',
+                'metric': 'gap_pct',
+                'attempt_slugs': ['gap_opp', 'gap_opps'],
+                'minimum_slugs': [
+                  'gap_min', 'gap_min_opp', 'gap_min_opps',
+                  'gap_opp_min', 'gap_opps_min', 'min_gap_opp', 'min_gap_opps'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(gap_table, percent_specs) }}
+            {{ render_dual_section('PnR Gap Help', gap_table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+            {% set low_table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('low_rows'),
+              last_rows=split.get('low_last_rows'),
+              season_totals=split.get('low_totals'),
+              last_totals=split.get('low_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-pnr-low',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set low_percent_specs = [
+              {
+                'slug': 'low_pct',
+                'metric': 'low_pct',
+                'attempt_slugs': ['low_opp', 'low_opps'],
+                'minimum_slugs': [
+                  'low_min', 'low_min_opp', 'low_min_opps',
+                  'low_opp_min', 'low_opps_min', 'min_low_opp', 'min_low_opps'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(low_table, low_percent_specs) }}
+            {{ render_dual_section('PnR Low Man', low_table, practice_note) }}
+            {{ render_grade_scales_for_specs(low_percent_specs) }}
+
+          {% elif key == 'pnr_grade' %}
+            {% set close_columns = ["Close Window +", "Close Window Opp", "Close Window %"] %}
+            {% set close_map = {
+              "Close Window +": ("plus", "cw_plus", "close_window_plus"),
+              "Close Window Opp": ("opps", "cw_opp", "close_window_opp"),
+              "Close Window %": ("pct", "cw_pct", "close_window_pct"),
+            } %}
+            {% set close_table = build_dual_table(
+              base_columns=close_columns,
+              season_rows=split.get('close_rows'),
+              last_rows=split.get('close_last_rows'),
+              season_totals=split.get('close_totals'),
+              last_totals=split.get('close_last_totals'),
+              column_map=close_map,
+              pct_columns=['Close Window %'],
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-pnr-close-window',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set close_percent_specs = [
+              {
+                'slug': 'close_window_pct',
+                'metric': 'close_window_pct',
+                'attempt_slugs': ['close_window_opp', 'close_window_opps', 'cw_opp'],
+                'minimum_slugs': [
+                  'close_window_min', 'close_window_min_opp', 'close_window_min_opps',
+                  'close_window_opp_min', 'close_window_opps_min', 'min_close_window_opp', 'min_close_window_opps',
+                  'cw_min', 'cw_opp_min', 'min_cw_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(close_table, close_percent_specs) }}
+            {{ render_dual_section('Close Window', close_table, practice_note) }}
+            {{ render_grade_scales_for_specs(close_percent_specs) }}
+
+            {% set shut_columns = ["Shut Door +", "Shut Door Opp", "Shut Door %"] %}
+            {% set shut_map = {
+              "Shut Door +": ("plus", "sd_plus", "shut_door_plus"),
+              "Shut Door Opp": ("opps", "sd_opp", "shut_door_opp"),
+              "Shut Door %": ("pct", "sd_pct", "shut_door_pct"),
+            } %}
+            {% set shut_table = build_dual_table(
+              base_columns=shut_columns,
+              season_rows=split.get('shut_rows'),
+              last_rows=split.get('shut_last_rows'),
+              season_totals=split.get('shut_totals'),
+              last_totals=split.get('shut_last_totals'),
+              column_map=shut_map,
+              pct_columns=['Shut Door %'],
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-pnr-shut-door',
+              default_sort=['pct', 'opps', 'plus']
+            ) %}
+            {% set shut_percent_specs = [
+              {
+                'slug': 'shut_door_pct',
+                'metric': 'shut_door_pct',
+                'attempt_slugs': ['shut_door_opp', 'shut_door_opps', 'sd_opp'],
+                'minimum_slugs': [
+                  'shut_door_min', 'shut_door_min_opp', 'shut_door_min_opps',
+                  'shut_door_opp_min', 'shut_door_opps_min', 'min_shut_door_opp', 'min_shut_door_opps',
+                  'sd_min', 'sd_opp_min', 'min_sd_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(shut_table, shut_percent_specs) }}
+            {{ render_dual_section('Shut Door', shut_table, practice_note) }}
+            {{ render_grade_scales_for_specs(shut_percent_specs) }}
+
+          {% elif key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
+            {% set label_map = {
+              'atr_contest_breakdown': 'ATR',
+              'fg2_contest_breakdown': '2FG',
+              'fg3_contest_breakdown': '3FG'
+            } %}
+            {% set shot_label = label_map.get(key, 'Shot') %}
+            {% set columns = [
+              'Contest Att', 'Contest Makes', 'Contest FG%',
+              'Late Att', 'Late Makes', 'Late FG%',
+              'No Contest Att', 'No Contest Makes', 'No Contest FG%'
+            ] %}
+            {% set column_map = {
+              'Contest Att': ('opps', 'contest_attempts'),
+              'Contest Makes': ('plus', 'contest_makes'),
+              'Contest FG%': ('pct', 'contest_pct'),
+              'Late Att': ('opps', 'late_attempts'),
+              'Late Makes': ('plus', 'late_makes'),
+              'Late FG%': ('pct', 'late_pct'),
+              'No Contest Att': ('opps', 'no_contest_attempts'),
+              'No Contest Makes': ('plus', 'no_contest_makes'),
+              'No Contest FG%': ('pct', 'no_contest_pct'),
+            } %}
+            {% set pct_columns = ['Contest FG%', 'Late FG%', 'No Contest FG%'] %}
+            {% set table = build_dual_table(
+              base_columns=columns,
+              season_rows=split.get('shot_contest_rows'),
+              last_rows=split.get('shot_contest_last_rows'),
+              season_totals=split.get('shot_contest_totals'),
+              last_totals=split.get('shot_contest_last_totals'),
+              column_map=column_map,
+              pct_columns=pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-shot-contest-' ~ key.split('_')[0]
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'contest_fg_pct',
+                'metric': 'contest_pct',
+                'attempt_slugs': ['contest_att', 'contest_attempts', 'contest_opp', 'contest_opps'],
+                'minimum_slugs': [
+                  'contest_min', 'contest_min_att', 'contest_min_attempts',
+                  'contest_att_min', 'min_contest_att', 'contest_opp_min', 'min_contest_opp'
+                ]
+              },
+              {
+                'slug': 'late_fg_pct',
+                'metric': 'late_pct',
+                'attempt_slugs': ['late_att', 'late_attempts', 'late_opp', 'late_opps'],
+                'minimum_slugs': [
+                  'late_min', 'late_min_att', 'late_min_attempts',
+                  'late_att_min', 'min_late_att', 'late_opp_min', 'min_late_opp'
+                ]
+              },
+              {
+                'slug': 'no_contest_fg_pct',
+                'metric': 'no_contest_pct',
+                'attempt_slugs': ['no_contest_att', 'no_contest_attempts', 'no_contest_opp', 'no_contest_opps'],
+                'minimum_slugs': [
+                  'no_contest_min', 'no_contest_min_att', 'no_contest_min_attempts',
+                  'no_contest_att_min', 'min_no_contest_att', 'no_contest_opp_min', 'min_no_contest_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(table, percent_specs) }}
+            {{ render_dual_section(shot_label ~ ' Shot Contests', table, practice_note) }}
+            {{ render_grade_scales_for_specs(percent_specs) }}
+
+          {% else %}
+            <p class="text-sm text-gray-500">No data available for {{ label }}.</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    const container = document.getElementById('practice-leaderboard-results');
+    if(!container){ return; }
+    const buttons = Array.from(container.querySelectorAll('.tab-button'));
+    const panels = Array.from(container.querySelectorAll('.tab-panel'));
+    if(buttons.length === 0 || panels.length === 0){ return; }
+    function activate(targetId){
+      panels.forEach(panel => {
+        if(panel.id === targetId){
+          panel.classList.remove('hidden');
+        } else {
+          panel.classList.add('hidden');
+        }
+      });
+      buttons.forEach(btn => {
+        if(btn.dataset.tabTarget === targetId){
+          btn.classList.add('bg-[#9E1B32]', 'text-white', 'border-[#9E1B32]');
+          btn.classList.remove('border-gray-300', 'text-gray-700');
+        } else {
+          btn.classList.remove('bg-[#9E1B32]', 'text-white', 'border-[#9E1B32]');
+          btn.classList.add('border-gray-300', 'text-gray-700');
+        }
+      });
+    }
+    buttons.forEach(btn => {
+      btn.addEventListener('click', function(){
+        activate(this.dataset.tabTarget);
+      });
+    });
+  })();
+</script>
