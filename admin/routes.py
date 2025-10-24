@@ -1323,7 +1323,14 @@ _PRACTICE_DUAL_KEY_OVERRIDES = {
 }
 
 
-def get_practice_dual_context(stat_key, season_id, *, label_set=None):
+def get_practice_dual_context(
+    stat_key,
+    season_id,
+    *,
+    start_dt=None,
+    end_dt=None,
+    label_set=None,
+):
     """Return prepared season/last-practice context for practice leaderboards."""
 
     if season_id is None:
@@ -1335,6 +1342,8 @@ def get_practice_dual_context(stat_key, season_id, *, label_set=None):
             season_id,
             compute_fn=compute_pnr_gap_help,
             stat_key=stat_key,
+            start_dt=start_dt,
+            end_dt=end_dt,
             label_set=label_set,
         )
         return {
@@ -1368,6 +1377,8 @@ def get_practice_dual_context(stat_key, season_id, *, label_set=None):
         season_id,
         compute_fn,
         stat_key=compute_stat_key,
+        start_dt=start_dt,
+        end_dt=end_dt,
         label_set=label_set,
     )
     return prepare_dual_context(ctx, stat_key)
@@ -8460,6 +8471,8 @@ def leaderboard_practice_new():
         practice_dual_ctx = get_practice_dual_context(
             stat_key,
             sid,
+            start_dt=start_dt,
+            end_dt=end_dt,
             label_set=label_set if label_set else None,
         )
 
@@ -8613,7 +8626,13 @@ def leaderboard():
 
     cfg, rows, team_totals = compute_leaderboard(stat_key, sid, start_dt, end_dt, label_set if label_set else None)
     practice_dual_ctx = (
-        get_practice_dual_context(cfg['key'], sid, label_set=label_set if label_set else None)
+        get_practice_dual_context(
+            cfg['key'],
+            sid,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            label_set=label_set if label_set else None,
+        )
         if cfg
         else None
     )
