@@ -52,6 +52,17 @@ def ensure_saved_stat_profile_table(app):
         insp = inspect(db.engine)
         if 'saved_stat_profile' not in insp.get_table_names():
             SavedStatProfile.__table__.create(bind=db.engine, checkfirst=True)
+        ensure_columns(
+            db.engine,
+            "saved_stat_profile",
+            [
+                ("preset_type", "TEXT"),
+                ("date_from", "TEXT"),
+                ("date_to", "TEXT"),
+                ("mode_default", "TEXT"),
+                ("source_default", "TEXT"),
+            ],
+        )
 
 
 # Optional: Import auth blueprint if it exists
