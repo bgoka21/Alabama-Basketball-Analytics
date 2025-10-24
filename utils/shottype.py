@@ -79,11 +79,40 @@ def gather_labels_for_shot(shot: Mapping) -> set[str]:
 
 
 def compute_3fg_breakdown_from_shots(shot_list: Iterable[Mapping]) -> MutableMapping[str, float]:
-    """Return shrink/non-shrink totals for a list of shot detail dicts."""
+    """Return shrink/non-shrink and contest totals for 3FG shot detail dicts."""
 
     total_att = total_makes = 0
     shrink_att = shrink_makes = 0
     non_att = non_makes = 0
+
+    contest_totals: dict[str, dict[str, int]] = {
+        "contest": {"attempts": 0, "makes": 0},
+        "late": {"attempts": 0, "makes": 0},
+        "no_contest": {"attempts": 0, "makes": 0},
+    }
+
+    def _normalized_contest(value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        text = text.replace("-", " ").replace("_", " ")
+        normalized = re.sub(r"[^a-z]", "", text)
+        if not normalized:
+            return None
+        mapping = {
+            "contest": "contest",
+            "contested": "contest",
+            "late": "late",
+            "latecontest": "late",
+            "latecontested": "late",
+            "latecloseout": "late",
+            "nocontest": "no_contest",
+            "uncontested": "no_contest",
+            "none": "no_contest",
+        }
+        return mapping.get(normalized)
 
     for shot in shot_list:
         if (shot.get("shot_class") or "").lower() != "3fg":
@@ -114,6 +143,17 @@ def compute_3fg_breakdown_from_shots(shot_list: Iterable[Mapping]) -> MutableMap
             if made:
                 non_makes += 1
 
+        contest_value = (
+            shot.get("contest_level")
+            or shot.get("3fg_contest")
+            or shot.get("contest")
+        )
+        contest_key = _normalized_contest(contest_value)
+        if contest_key and contest_key in contest_totals:
+            contest_totals[contest_key]["attempts"] += 1
+            if made:
+                contest_totals[contest_key]["makes"] += 1
+
     def pct(makes: int, attempts: int) -> float:
         return (makes / attempts * 100.0) if attempts else 0.0
 
@@ -132,6 +172,29 @@ def compute_3fg_breakdown_from_shots(shot_list: Iterable[Mapping]) -> MutableMap
         "fg3_nonshrink_att": non_att,
         "fg3_nonshrink_pct": pct(non_makes, non_att),
         "fg3_nonshrink_freq_pct": freq(non_att, total_att),
+        "fg3_contest_makes": contest_totals["contest"]["makes"],
+        "fg3_contest_attempts": contest_totals["contest"]["attempts"],
+        "fg3_contest_pct": pct(
+            contest_totals["contest"]["makes"], contest_totals["contest"]["attempts"]
+        ),
+        "fg3_contest_freq_pct": freq(
+            contest_totals["contest"]["attempts"], total_att
+        ),
+        "fg3_late_makes": contest_totals["late"]["makes"],
+        "fg3_late_attempts": contest_totals["late"]["attempts"],
+        "fg3_late_pct": pct(
+            contest_totals["late"]["makes"], contest_totals["late"]["attempts"]
+        ),
+        "fg3_late_freq_pct": freq(contest_totals["late"]["attempts"], total_att),
+        "fg3_no_contest_makes": contest_totals["no_contest"]["makes"],
+        "fg3_no_contest_attempts": contest_totals["no_contest"]["attempts"],
+        "fg3_no_contest_pct": pct(
+            contest_totals["no_contest"]["makes"],
+            contest_totals["no_contest"]["attempts"],
+        ),
+        "fg3_no_contest_freq_pct": freq(
+            contest_totals["no_contest"]["attempts"], total_att
+        ),
     }
 
 

@@ -514,14 +514,21 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
 
         for player in players:
             row = core_rows.get(player, {})
+            details = shot_details.get(player, {})
             p = row.get('player', player)
             entry = {'player': p}
             for suffix_key, subtype in suffixes:
                 makes_key = f'{sc}_{suffix_key}_makes'
                 attempts_key = f'{sc}_{suffix_key}_attempts'
-                makes = safe_int(row.get(makes_key))
-                attempts = safe_int(row.get(attempts_key))
-                pct = make_pct(makes, attempts)
+                pct_key = f'{sc}_{suffix_key}_pct'
+                detail_makes = details.get(makes_key)
+                detail_attempts = details.get(attempts_key)
+                makes_source = detail_makes if detail_makes is not None else row.get(makes_key)
+                attempts_source = detail_attempts if detail_attempts is not None else row.get(attempts_key)
+                makes = safe_int(makes_source)
+                attempts = safe_int(attempts_source)
+                pct_value = details.get(pct_key)
+                pct = pct_value if pct_value is not None else make_pct(makes, attempts)
                 entry[f'{subtype}_makes'] = makes
                 entry[f'{subtype}_attempts'] = attempts
                 entry[f'{subtype}_pct'] = pct
@@ -1215,6 +1222,18 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             "fg3_nonshrink_makes": breakdown["fg3_nonshrink_makes"],
             "fg3_nonshrink_pct": breakdown["fg3_nonshrink_pct"],
             "fg3_nonshrink_freq_pct": breakdown["fg3_nonshrink_freq_pct"],
+            "fg3_contest_attempts": breakdown["fg3_contest_attempts"],
+            "fg3_contest_makes": breakdown["fg3_contest_makes"],
+            "fg3_contest_pct": breakdown["fg3_contest_pct"],
+            "fg3_contest_freq_pct": breakdown["fg3_contest_freq_pct"],
+            "fg3_late_attempts": breakdown["fg3_late_attempts"],
+            "fg3_late_makes": breakdown["fg3_late_makes"],
+            "fg3_late_pct": breakdown["fg3_late_pct"],
+            "fg3_late_freq_pct": breakdown["fg3_late_freq_pct"],
+            "fg3_no_contest_attempts": breakdown["fg3_no_contest_attempts"],
+            "fg3_no_contest_makes": breakdown["fg3_no_contest_makes"],
+            "fg3_no_contest_pct": breakdown["fg3_no_contest_pct"],
+            "fg3_no_contest_freq_pct": breakdown["fg3_no_contest_freq_pct"],
         })
 
         shot_details[player] = flat
