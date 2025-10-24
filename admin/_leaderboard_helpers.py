@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import inspect
 import functools
 import re
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Mapping
@@ -28,7 +29,30 @@ def _default_context() -> DualContextResult:
     }
 
 
-def get_last_practice(session: Session, season_id: Optional[int]):
+def _supports_date_window(fn: Callable[..., Any]) -> bool:
+    """Return ``True`` if ``fn`` accepts date window keyword arguments."""
+
+    try:
+        sig = inspect.signature(fn)
+    except (TypeError, ValueError):  # pragma: no cover - builtins without signatures
+        return True
+
+    has_var_kw = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in sig.parameters.values()
+    )
+    if has_var_kw:
+        return True
+
+    return all(name in sig.parameters for name in ("start_dt", "end_dt"))
+
+
+def get_last_practice(
+    session: Session,
+    season_id: Optional[int],
+    *,
+    start_dt: Optional[date] = None,
+    end_dt: Optional[date] = None,
+):
     """Return the latest :class:`Practice` for ``season_id``."""
 
     if season_id is None:
@@ -39,8 +63,22 @@ def get_last_practice(session: Session, season_id: Optional[int]):
     date_column = getattr(Practice, "date", None)
     created_at_column = getattr(Practice, "created_at", None)
 
+    normalized_date_expr = None
+    if date_column is not None and created_at_column is not None:
+        normalized_date_expr = func.coalesce(date_column, func.date(created_at_column))
+    elif date_column is not None:
+        normalized_date_expr = date_column
+    elif created_at_column is not None:
+        normalized_date_expr = func.date(created_at_column)
+
     if date_column is not None:
         query = query.filter(date_column.isnot(None))
+
+    if normalized_date_expr is not None:
+        if start_dt is not None:
+            query = query.filter(normalized_date_expr >= start_dt)
+        if end_dt is not None:
+            query = query.filter(normalized_date_expr <= end_dt)
 
     order_clauses = []
 
@@ -74,14 +112,14 @@ def with_last_practice(
         return context
 
     compute_kwargs = dict(kwargs)
-    compute_kwargs.pop("start_dt", None)
-    compute_kwargs.pop("end_dt", None)
+    start_dt: Optional[date] = compute_kwargs.pop("start_dt", None)
+    end_dt: Optional[date] = compute_kwargs.pop("end_dt", None)
 
     season_result = compute_fn(
         session=session,
         season_id=season_id,
-        start_dt=None,
-        end_dt=None,
+        start_dt=start_dt,
+        end_dt=end_dt,
         **compute_kwargs,
     )
     season_team_totals, season_rows = _normalize_compute_result(season_result)
@@ -92,7 +130,18 @@ def with_last_practice(
         }
     )
 
-    last_practice = get_last_practice(session, season_id)
+    last_practice_kwargs = {}
+    if _supports_date_window(get_last_practice):
+        if start_dt is not None:
+            last_practice_kwargs["start_dt"] = start_dt
+        if end_dt is not None:
+            last_practice_kwargs["end_dt"] = end_dt
+
+    last_practice = get_last_practice(
+        session,
+        season_id,
+        **last_practice_kwargs,
+    )
     if not last_practice:
         return context
 
