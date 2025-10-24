@@ -1,9 +1,21 @@
 import os
+import json
+
 import pytest
 from datetime import date
 from flask import Flask
 
-from models.database import db, Season, Practice, Roster, Possession, PlayerPossession, ShotDetail, Game
+from models.database import (
+    db,
+    Season,
+    Practice,
+    Roster,
+    Possession,
+    PlayerPossession,
+    PlayerStats,
+    ShotDetail,
+    Game,
+)
 from parse_practice_csv import parse_practice_csv
 from test_parse import parse_csv
 from app import create_app
@@ -47,6 +59,33 @@ def test_practice_shot_details(practice_app, tmp_path):
         def_events = [d.event_type for d in ShotDetail.query.filter_by(possession_id=def_poss.id)]
         assert '2FG+' in off_events
         assert 'Turnover' in def_events
+
+
+def test_practice_shot_details_include_balance_column(practice_app, tmp_path):
+    csv_path = tmp_path / "practice.csv"
+    practice_date = date(2024, 1, 10)
+
+    with practice_app.app_context():
+        season = Season(id=1, season_name='2024', start_date=practice_date)
+        db.session.add(season)
+        roster = Roster(season_id=1, player_name='#1 A')
+        db.session.add(roster)
+        practice = Practice(id=1, season_id=1, date=practice_date, category='Official Practice')
+        db.session.add(practice)
+        db.session.commit()
+
+    csv_content = (
+        "Row,CRIMSON PLAYER POSSESSIONS,WHITE PLAYER POSSESSIONS,POSSESSION TYPE,Shot Location,#1 A,#2 B,3FG (Balance)\n"
+        "Crimson,\"#1 A\",,Halfcourt,Arc,3FG+, ,On Balance\n"
+    )
+    csv_path.write_text(csv_content)
+
+    with practice_app.app_context():
+        parse_practice_csv(str(csv_path), season_id=1, category='Official Practice', file_date=practice_date)
+        stats = PlayerStats.query.filter_by(player_name='#1 A').first()
+        assert stats is not None
+        details = json.loads(stats.shot_type_details)
+        assert details[0]['3fg_balance'] == 'On Balance'
 
 
 def test_game_shot_details(tmp_path):
