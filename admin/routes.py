@@ -838,10 +838,16 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     if game_ids:
         personal_offreb_q = personal_offreb_q.filter(BlueCollarStats.game_id.in_(game_ids))
     personal_offreb_q = personal_offreb_q.group_by(BlueCollarStats.player_id).all()
-    person_off_rebs = {
-        db.session.get(Roster, pid).player_name: count
-        for pid, count in personal_offreb_q
-    }
+    person_off_rebs = {}
+    for row in personal_offreb_q:
+        roster_entry = db.session.get(Roster, row.player_id)
+        if roster_entry is None:
+            current_app.logger.warning(
+                'Skipping personal off reb stats for missing roster entry',
+                extra={'player_id': row.player_id, 'season_id': season_id},
+            )
+            continue
+        person_off_rebs[roster_entry.player_name] = row.personal_off_rebs
 
     personal_fouls_q = (
         db.session.query(
