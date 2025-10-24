@@ -1,3 +1,5 @@
+{% from 'macros/dual_tables.html' import render_split_dual_section %}
+
 {% set contest_columns = [
   '3FG', '3FG%', '3FG Freq',
   'Contest 3FG', 'Contest 3FG %', 'Contest 3FG Freq',
@@ -157,5 +159,14 @@
   }
 ] %}
 {{ apply_percent_wrappers(contest_summary_table, contest_summary_specs) }}
-{{ render_dual_section('3FG Contest Types', contest_summary_table, practice_note) }}
+{% set season_table = split_dual_table(contest_summary_table, prefix='totals_', table_id_suffix='season') %}
+{% set last_table = split_dual_table(contest_summary_table, prefix='last_', table_id_suffix='last') %}
+{{ render_split_dual_section(
+  '3FG Contest Types',
+  season_table,
+  last_table,
+  practice_note,
+  split_titles=['Season Totals', 'Last Practice'],
+  stacked=True
+) }}
 {{ render_grade_scales_for_specs(contest_summary_specs, 'View grading scales (3FG contests)') }}
