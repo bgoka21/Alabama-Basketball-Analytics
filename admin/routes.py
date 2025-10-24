@@ -1288,6 +1288,7 @@ _PRACTICE_DUAL_MAP = {
     "atr_fg_pct": lambda: _build_stat_compute("atr_fg_pct"),
     "atr_contest_breakdown": lambda: _build_stat_compute("atr_contest_breakdown"),
     "fg2_contest_breakdown": lambda: _build_stat_compute("fg2_contest_breakdown"),
+    "fg3_fg_pct": lambda: _build_stat_compute("fg3_contest_breakdown"),
     "fg3_contest_breakdown": lambda: _build_stat_compute("fg3_contest_breakdown"),
 }
 
@@ -1429,12 +1430,18 @@ def _split_leaderboard_rows_for_template(
         "overall_gap_help",
         "overall_low_man",
         "atr_fg_pct",
+        "fg3_fg_pct",
         "atr_contest_breakdown",
         "fg2_contest_breakdown",
         "fg3_contest_breakdown",
     }
     if stat_key not in practice_keys | {"pnr_grade"}:
         return {}
+
+    stat_key_aliases = {
+        "fg3_fg_pct": "fg3_contest_breakdown",
+    }
+    normalized_stat_key = stat_key_aliases.get(stat_key, stat_key)
 
     normalized = prepare_dual_context(
         {
@@ -1444,7 +1451,7 @@ def _split_leaderboard_rows_for_template(
             "last_team_totals": last_team_totals,
             "last_practice_date": last_practice_date,
         },
-        stat_key,
+        normalized_stat_key,
     )
 
     if stat_key == "atr_fg_pct":
@@ -1514,7 +1521,7 @@ def _split_leaderboard_rows_for_template(
         "fg3_contest_breakdown": "3FG",
     }
 
-    if stat_key in contest_keys:
+    if normalized_stat_key in contest_keys:
         season_by = normalized.get("season_rows_by_subtype") or {}
         last_by = normalized.get("last_rows_by_subtype") or {}
         totals_by = normalized.get("season_team_totals") or {}

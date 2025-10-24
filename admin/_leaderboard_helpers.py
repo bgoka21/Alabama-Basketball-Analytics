@@ -700,8 +700,13 @@ def prepare_dual_context(context: DualContextResult, stat_key: Optional[str]) ->
         "fg3_contest_breakdown": "fg3",
     }
 
-    if stat_key in contest_keys:
-        sc = contest_keys[stat_key]
+    contest_aliases = {
+        "fg3_fg_pct": "fg3_contest_breakdown",
+    }
+    contest_stat_key = contest_aliases.get(stat_key, stat_key)
+
+    if contest_stat_key in contest_keys:
+        sc = contest_keys[contest_stat_key]
         specs = (
             {
                 "subtype": "contest",
