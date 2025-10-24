@@ -1255,6 +1255,118 @@ def _extract_numeric_for_column(
     return _to_float(numeric_value)
 
 
+def _build_header_rows_for_columns(
+    table_columns: list[Dict[str, Any]],
+) -> list[list[Dict[str, Any]]]:
+    if not table_columns:
+        return []
+
+    has_groups = any(col.get("group") for col in table_columns)
+    has_subgroups = any(col.get("subgroup") for col in table_columns)
+    header_rows: list[list[Dict[str, Any]]] = []
+
+    if has_groups:
+        group_row: list[Dict[str, Any]] = []
+        group_segments: list[Dict[str, Any]] = []
+        index = 0
+        while index < len(table_columns):
+            column_entry = table_columns[index]
+            group_label = column_entry.get("group")
+            if not group_label:
+                column_entry["render_header"] = False
+                group_row.append(
+                    {
+                        "type": "column",
+                        "column": column_entry,
+                        "rowspan": 2 + (1 if has_subgroups else 0),
+                        "colspan": 1,
+                    }
+                )
+                index += 1
+                continue
+            span = 1
+            while (
+                index + span < len(table_columns)
+                and table_columns[index + span].get("group") == group_label
+            ):
+                span += 1
+            group_row.append(
+                {
+                    "type": "group",
+                    "label": group_label,
+                    "colspan": span,
+                    "rowspan": 1,
+                }
+            )
+            group_segments.append(
+                {
+                    "label": group_label,
+                    "columns": table_columns[index : index + span],
+                }
+            )
+            index += span
+
+        header_rows.append(group_row)
+
+        if has_subgroups:
+            subgroup_row: list[Dict[str, Any]] = []
+            for segment in group_segments:
+                segment_columns = segment.get("columns") or []
+                sub_index = 0
+                while sub_index < len(segment_columns):
+                    seg_column = segment_columns[sub_index]
+                    subgroup_label = seg_column.get("subgroup")
+                    subgroup_header = seg_column.get("subgroup_header")
+                    span = 1
+                    while (
+                        sub_index + span < len(segment_columns)
+                        and segment_columns[sub_index + span].get("subgroup")
+                        == subgroup_label
+                    ):
+                        span += 1
+                    label_source = subgroup_header or subgroup_label
+                    label_text = str(label_source) if label_source else "\u00A0"
+                    subgroup_row.append(
+                        {
+                            "type": "group",
+                            "label": label_text,
+                            "colspan": span,
+                            "rowspan": 1,
+                        }
+                    )
+                    sub_index += span
+            header_rows.append(subgroup_row)
+        return header_rows
+
+    if has_subgroups:
+        subgroup_row: list[Dict[str, Any]] = []
+        index = 0
+        while index < len(table_columns):
+            column_entry = table_columns[index]
+            subgroup_label = column_entry.get("subgroup")
+            subgroup_header = column_entry.get("subgroup_header")
+            span = 1
+            while (
+                index + span < len(table_columns)
+                and table_columns[index + span].get("subgroup") == subgroup_label
+            ):
+                span += 1
+            label_source = subgroup_header or subgroup_label
+            label_text = str(label_source) if label_source else "\u00A0"
+            subgroup_row.append(
+                {
+                    "type": "group",
+                    "label": label_text,
+                    "colspan": span,
+                    "rowspan": 1,
+                }
+            )
+            index += span
+        header_rows.append(subgroup_row)
+
+    return header_rows
+
+
 def build_dual_table(
     *,
     base_columns: Sequence[str],
@@ -1501,87 +1613,7 @@ def build_dual_table(
             column_entry["subgroup_header"] = spec["subgroup_header"]
         columns.append(column_entry)
 
-    def _build_header_rows(table_columns: list[Dict[str, Any]]) -> list[list[Dict[str, Any]]]:
-        has_groups = any(col.get("group") for col in table_columns)
-        if not has_groups:
-            return []
-        has_subgroups = any(col.get("subgroup") for col in table_columns)
-        total_depth = 2 + (1 if has_subgroups else 0)
-        header_rows: list[list[Dict[str, Any]]] = []
-        group_row: list[Dict[str, Any]] = []
-        group_segments: list[Dict[str, Any]] = []
-        index = 0
-        while index < len(table_columns):
-            column_entry = table_columns[index]
-            group_label = column_entry.get("group")
-            if not group_label:
-                column_entry["render_header"] = False
-                group_row.append(
-                    {
-                        "type": "column",
-                        "column": column_entry,
-                        "rowspan": total_depth,
-                        "colspan": 1,
-                    }
-                )
-                index += 1
-                continue
-            span = 1
-            while (
-                index + span < len(table_columns)
-                and table_columns[index + span].get("group") == group_label
-            ):
-                span += 1
-            group_row.append(
-                {
-                    "type": "group",
-                    "label": group_label,
-                    "colspan": span,
-                    "rowspan": 1,
-                }
-            )
-            group_segments.append(
-                {
-                    "label": group_label,
-                    "columns": table_columns[index : index + span],
-                }
-            )
-            index += span
-
-        header_rows.append(group_row)
-
-        if has_subgroups:
-            subgroup_row: list[Dict[str, Any]] = []
-            for segment in group_segments:
-                segment_columns = segment.get("columns") or []
-                sub_index = 0
-                while sub_index < len(segment_columns):
-                    seg_column = segment_columns[sub_index]
-                    subgroup_label = seg_column.get("subgroup")
-                    subgroup_header = seg_column.get("subgroup_header")
-                    span = 1
-                    while (
-                        sub_index + span < len(segment_columns)
-                        and segment_columns[sub_index + span].get("subgroup")
-                        == subgroup_label
-                    ):
-                        span += 1
-                    label_source = subgroup_header or subgroup_label
-                    label_text = str(label_source) if label_source else "\u00A0"
-                    subgroup_row.append(
-                        {
-                            "type": "group",
-                            "label": label_text,
-                            "colspan": span,
-                            "rowspan": 1,
-                        }
-                    )
-                    sub_index += span
-            header_rows.append(subgroup_row)
-
-        return header_rows
-
-    header_rows = _build_header_rows(columns)
+    header_rows = _build_header_rows_for_columns(columns)
 
     rows: list[Dict[str, Any]] = []
     for index, display in enumerate(display_rows):
@@ -1787,6 +1819,7 @@ def split_dual_table(
             shared_columns.append(column_copy)
 
     selected_columns = shared_columns + prefixed_columns
+    header_rows = _build_header_rows_for_columns(selected_columns)
 
     allowed_keys: set[str] = {"rank", "rank_value", "player"}
     for column in selected_columns:
@@ -1833,6 +1866,7 @@ def split_dual_table(
         "totals": totals,
         "default_sort": default_sort,
         "has_data": bool(rows) or bool(totals),
+        "header_rows": header_rows,
     }
 
 
