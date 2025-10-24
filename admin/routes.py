@@ -1536,7 +1536,7 @@ def _split_leaderboard_rows_for_template(
         def _combine(rows):
             combined = {}
             for entry in rows or []:
-                player = entry.get("player")
+                player = _resolve_stat_value(entry, _PLAYER_KEY_ALIASES)
                 if not player:
                     continue
                 subtype = entry.get("subtype")
