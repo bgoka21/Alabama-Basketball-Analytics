@@ -1536,15 +1536,52 @@ def _split_leaderboard_rows_for_template(
                         "jersey": entry.get("jersey"),
                     },
                 )
+                if record.get("jersey") in (None, "") and entry.get("jersey"):
+                    record["jersey"] = entry.get("jersey")
                 record[f"{subtype}_makes"] = entry.get("plus")
                 record[f"{subtype}_attempts"] = entry.get("opps")
                 record[f"{subtype}_pct"] = entry.get("pct")
-            return list(combined.values())
+
+            results: list[dict[str, Any]] = []
+            for record in combined.values():
+                contest_makes = safe_int(record.get("contest_makes"))
+                contest_attempts = safe_int(record.get("contest_attempts"))
+                late_makes = safe_int(record.get("late_makes"))
+                late_attempts = safe_int(record.get("late_attempts"))
+                no_makes = safe_int(record.get("no_contest_makes"))
+                no_attempts = safe_int(record.get("no_contest_attempts"))
+
+                total_attempts = contest_attempts + late_attempts + no_attempts
+                total_makes = contest_makes + late_makes + no_makes
+
+                record["fg3_make"] = total_makes
+                record["fg3_makes"] = total_makes
+                record["fg3_att"] = total_attempts
+                record["fg3_attempts"] = total_attempts
+                record["fg3_pct"] = _safe_pct(total_makes, total_attempts)
+                record["fg3_freq_pct"] = 100.0 if total_attempts else None
+                record["contest_freq_pct"] = _safe_pct(contest_attempts, total_attempts)
+                record["late_freq_pct"] = _safe_pct(late_attempts, total_attempts)
+                record["no_contest_freq_pct"] = _safe_pct(no_attempts, total_attempts)
+
+                results.append(record)
+
+            return results
 
         def _totals_map(container):
             contest = container.get("contest") or {}
             late = container.get("late") or {}
             no_contest = container.get("no_contest") or {}
+            contest_makes = safe_int(contest.get("plus"))
+            contest_attempts = safe_int(contest.get("opps"))
+            late_makes = safe_int(late.get("plus"))
+            late_attempts = safe_int(late.get("opps"))
+            no_makes = safe_int(no_contest.get("plus"))
+            no_attempts = safe_int(no_contest.get("opps"))
+
+            total_attempts = contest_attempts + late_attempts + no_attempts
+            total_makes = contest_makes + late_makes + no_makes
+
             return {
                 "contest_makes": contest.get("plus"),
                 "contest_attempts": contest.get("opps"),
@@ -1555,6 +1592,15 @@ def _split_leaderboard_rows_for_template(
                 "no_contest_makes": no_contest.get("plus"),
                 "no_contest_attempts": no_contest.get("opps"),
                 "no_contest_pct": no_contest.get("pct"),
+                "fg3_make": total_makes,
+                "fg3_makes": total_makes,
+                "fg3_att": total_attempts,
+                "fg3_attempts": total_attempts,
+                "fg3_pct": _safe_pct(total_makes, total_attempts),
+                "fg3_freq_pct": 100.0 if total_attempts else None,
+                "contest_freq_pct": _safe_pct(contest_attempts, total_attempts),
+                "late_freq_pct": _safe_pct(late_attempts, total_attempts),
+                "no_contest_freq_pct": _safe_pct(no_attempts, total_attempts),
             }
 
         return {
