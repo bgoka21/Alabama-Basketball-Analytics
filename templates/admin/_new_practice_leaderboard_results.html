@@ -1,4 +1,4 @@
-{% from 'macros/dual_tables.html' import render_dual_section %}
+{% from 'macros/dual_tables.html' import render_dual_section, render_split_dual_section %}
 {% from '_macros/percent_box.html' import apply_percent_wrappers %}
 {% from '_macros/grade_scale.html' import render_grade_scales_for_specs %}
 
@@ -472,11 +472,182 @@
             {{ render_dual_section('Shut Door', shut_table, practice_note) }}
             {{ render_grade_scales_for_specs(shut_percent_specs) }}
 
-          {% elif key in ['atr_contest_breakdown', 'fg2_contest_breakdown', 'fg3_contest_breakdown'] %}
+          {% elif key == 'fg3_contest_breakdown' %}
+            {% set contest_columns = [
+              '3FG', '3FG%', '3FG Freq',
+              'Contest 3FG', 'Contest 3FG %', 'Contest 3FG Freq',
+              'Late Contest 3FG', 'Late Contest 3FG %', 'Late Contest 3FG Freq',
+              'Uncontested 3FG', 'Uncontested 3FG %', 'Uncontested 3FG Freq'
+            ] %}
+            {% set contest_map = {
+              '3FG': {
+                'keys': ('fg3_make', 'fg3_makes', 'fg3_att', 'fg3_attempts'),
+                'numeric_keys': ('fg3_make', 'fg3_makes'),
+                'compose': 'makes_attempts',
+                'make_keys': ('fg3_make', 'fg3_makes'),
+                'attempt_keys': ('fg3_att', 'fg3_attempts'),
+                'label': '3FG',
+                'subgroup': 'Total 3FGs',
+                'subgroup_header': 'All 3FGs'
+              },
+              '3FG%': {
+                'keys': ('fg3_pct',),
+                'label': '3FG%',
+                'subgroup': 'Total 3FGs',
+                'subgroup_header': 'All 3FGs'
+              },
+              '3FG Freq': {
+                'keys': ('fg3_freq_pct',),
+                'label': '3FG Freq',
+                'format': 'pct',
+                'subgroup': 'Total 3FGs',
+                'subgroup_header': 'All 3FGs'
+              },
+              'Contest 3FG': {
+                'keys': ('contest_make', 'contest_makes', 'contest_attempts'),
+                'numeric_keys': ('contest_make', 'contest_makes'),
+                'compose': 'makes_attempts',
+                'make_keys': ('contest_make', 'contest_makes'),
+                'attempt_keys': ('contest_att', 'contest_attempts'),
+                'label': '3FG',
+                'subgroup': "Contest 3's",
+                'subgroup_header': 'Contest 3s'
+              },
+              'Contest 3FG %': {
+                'keys': ('contest_pct',),
+                'label': '3FG%',
+                'subgroup': "Contest 3's",
+                'subgroup_header': 'Contest 3s'
+              },
+              'Contest 3FG Freq': {
+                'keys': ('contest_freq_pct',),
+                'label': '3FG Freq',
+                'format': 'pct',
+                'subgroup': "Contest 3's",
+                'subgroup_header': 'Contest 3s'
+              },
+              'Late Contest 3FG': {
+                'keys': ('late_make', 'late_makes', 'late_attempts'),
+                'numeric_keys': ('late_make', 'late_makes'),
+                'compose': 'makes_attempts',
+                'make_keys': ('late_make', 'late_makes'),
+                'attempt_keys': ('late_att', 'late_attempts'),
+                'label': '3FG',
+                'subgroup': "Late Contest 3's",
+                'subgroup_header': 'Late Contest'
+              },
+              'Late Contest 3FG %': {
+                'keys': ('late_pct',),
+                'label': '3FG%',
+                'subgroup': "Late Contest 3's",
+                'subgroup_header': 'Late Contest'
+              },
+              'Late Contest 3FG Freq': {
+                'keys': ('late_freq_pct',),
+                'label': '3FG Freq',
+                'format': 'pct',
+                'subgroup': "Late Contest 3's",
+                'subgroup_header': 'Late Contest'
+              },
+              'Uncontested 3FG': {
+                'keys': ('no_contest_make', 'no_contest_makes', 'no_contest_attempts'),
+                'numeric_keys': ('no_contest_make', 'no_contest_makes'),
+                'compose': 'makes_attempts',
+                'make_keys': ('no_contest_make', 'no_contest_makes'),
+                'attempt_keys': ('no_contest_att', 'no_contest_attempts'),
+                'label': '3FG',
+                'subgroup': "Uncontested 3's",
+                'subgroup_header': 'Uncontested'
+              },
+              'Uncontested 3FG %': {
+                'keys': ('no_contest_pct',),
+                'label': '3FG%',
+                'subgroup': "Uncontested 3's",
+                'subgroup_header': 'Uncontested'
+              },
+              'Uncontested 3FG Freq': {
+                'keys': ('no_contest_freq_pct',),
+                'label': '3FG Freq',
+                'format': 'pct',
+                'subgroup': "Uncontested 3's",
+                'subgroup_header': 'Uncontested'
+              }
+            } %}
+            {% set contest_pct_columns = [
+              '3FG%', '3FG Freq',
+              'Contest 3FG %', 'Contest 3FG Freq',
+              'Late Contest 3FG %', 'Late Contest 3FG Freq',
+              'Uncontested 3FG %', 'Uncontested 3FG Freq'
+            ] %}
+            {% set contest_table = build_dual_table(
+              base_columns=contest_columns,
+              season_rows=split.get('shot_contest_rows'),
+              last_rows=split.get('shot_contest_last_rows'),
+              season_totals=split.get('shot_contest_totals'),
+              last_totals=split.get('shot_contest_last_totals'),
+              column_map=contest_map,
+              pct_columns=contest_pct_columns,
+              left_label='Season Totals',
+              right_label='Last Practice',
+              totals_label='Team Totals',
+              table_id='practice-fg3-contest-summary',
+              default_sort=['fg3_pct', 'fg3_attempts', 'contest_pct', 'contest_attempts']
+            ) %}
+            {% set percent_specs = [
+              {
+                'slug': 'fg3_pct',
+                'metric': 'fg3_pct',
+                'attempt_slugs': ['fg3_att', 'fg3_attempts'],
+                'minimum_slugs': [
+                  'fg3_min', 'fg3_min_att', 'fg3_min_attempts',
+                  'three_min_att', 'three_min_attempts'
+                ]
+              },
+              {
+                'slug': 'contest_fg_pct',
+                'metric': 'contest_pct',
+                'attempt_slugs': ['contest_att', 'contest_attempts', 'contest_opp', 'contest_opps'],
+                'minimum_slugs': [
+                  'contest_min', 'contest_min_att', 'contest_min_attempts',
+                  'contest_att_min', 'min_contest_att', 'contest_opp_min', 'min_contest_opp'
+                ]
+              },
+              {
+                'slug': 'late_fg_pct',
+                'metric': 'late_pct',
+                'attempt_slugs': ['late_att', 'late_attempts', 'late_opp', 'late_opps'],
+                'minimum_slugs': [
+                  'late_min', 'late_min_att', 'late_min_attempts',
+                  'late_att_min', 'min_late_att', 'late_opp_min', 'min_late_opp'
+                ]
+              },
+              {
+                'slug': 'no_contest_fg_pct',
+                'metric': 'no_contest_pct',
+                'attempt_slugs': ['no_contest_att', 'no_contest_attempts', 'no_contest_opp', 'no_contest_opps'],
+                'minimum_slugs': [
+                  'no_contest_min', 'no_contest_min_att', 'no_contest_min_attempts',
+                  'no_contest_att_min', 'min_no_contest_att', 'no_contest_opp_min', 'min_no_contest_opp'
+                ]
+              }
+            ] %}
+            {{ apply_percent_wrappers(contest_table, percent_specs) }}
+            {% set season_table = split_dual_table(contest_table, prefix='totals_', table_id_suffix='season') %}
+            {% set last_table = split_dual_table(contest_table, prefix='last_', table_id_suffix='last') %}
+            {{ render_split_dual_section(
+              '3FG Contest Types',
+              season_table,
+              last_table,
+              practice_note,
+              split_titles=['Season Totals', 'Last Practice'],
+              stacked=True
+            ) }}
+            {{ render_grade_scales_for_specs(percent_specs, 'View grading scales (3FG contests)') }}
+
+          {% elif key in ['atr_contest_breakdown', 'fg2_contest_breakdown'] %}
             {% set label_map = {
               'atr_contest_breakdown': 'ATR',
-              'fg2_contest_breakdown': '2FG',
-              'fg3_contest_breakdown': '3FG'
+              'fg2_contest_breakdown': '2FG'
             } %}
             {% set shot_label = label_map.get(key, 'Shot') %}
             {% set columns = [
