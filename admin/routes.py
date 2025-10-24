@@ -1318,6 +1318,11 @@ _PRACTICE_DUAL_MAP = {
 }
 
 
+_PRACTICE_DUAL_KEY_OVERRIDES = {
+    "fg3_fg_pct": "fg3_contest_breakdown",
+}
+
+
 def get_practice_dual_context(stat_key, season_id, *, label_set=None):
     """Return prepared season/last-practice context for practice leaderboards."""
 
@@ -1357,11 +1362,12 @@ def get_practice_dual_context(stat_key, season_id, *, label_set=None):
         return None
 
     compute_fn = factory()
+    compute_stat_key = _PRACTICE_DUAL_KEY_OVERRIDES.get(stat_key, stat_key)
     ctx = with_last_practice(
         db.session,
         season_id,
         compute_fn,
-        stat_key=stat_key,
+        stat_key=compute_stat_key,
         label_set=label_set,
     )
     return prepare_dual_context(ctx, stat_key)
