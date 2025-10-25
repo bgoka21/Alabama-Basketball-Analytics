@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date
 import pytest
 from flask import Flask
@@ -6,7 +7,15 @@ from flask_login import LoginManager
 from pathlib import Path
 from werkzeug.security import generate_password_hash
 
-from models.database import db, Season, Practice, PlayerStats, Roster
+from models.database import (
+    db,
+    Season,
+    Practice,
+    PlayerStats,
+    Roster,
+    Possession,
+    PlayerPossession,
+)
 from models.user import User
 from public.routes import public_bp
 from admin.routes import admin_bp
@@ -47,8 +56,18 @@ def app():
             {"shot_class":"2fg","result":"made","2fg_type":"Dunk","drill_labels":["4V4 DRILLS"]},
         ]
         player_stat = PlayerStats(practice_id=1, season_id=1, player_name='#1 Test', shot_type_details=json.dumps(shots))
+        player_stat.stat_details = json.dumps([
+            {"event": "floor_dive", "drill_labels": ["4V4 DRILLS"]},
+        ])
         db.session.add(player_stat)
         persist_player_shot_details(player_stat, shots, replace=True)
+        possession1 = Possession(id=1, season_id=1, practice_id=1, drill_labels='4V4 DRILLS')
+        possession2 = Possession(id=2, season_id=1, practice_id=1, drill_labels='4V4 DRILLS')
+        db.session.add_all([possession1, possession2])
+        db.session.add_all([
+            PlayerPossession(possession_id=1, player_id=1),
+            PlayerPossession(possession_id=2, player_id=1),
+        ])
         db.session.commit()
     yield app
     with app.app_context():
@@ -75,6 +94,11 @@ def _dunk_count(html):
     return 0
 
 
+def _poss_per_bcp_values(html):
+    pattern = r'<td[^>]*data-key="poss_per_bcp"[^>]*>([^<]*)</td>'
+    return [match.strip() for match in re.findall(pattern, html)]
+
+
 def test_home_label_filter(client):
     resp = client.get('/practice_home')
     html = resp.data.decode('utf-8')
@@ -83,3 +107,14 @@ def test_home_label_filter(client):
     resp = client.get('/practice_home', query_string={'label':'4V4 DRILLS'})
     html = resp.data.decode('utf-8')
     assert _dunk_count(html) == 1
+
+
+def test_poss_per_bcp_column_visibility(client):
+    resp = client.get('/practice_home')
+    html = resp.data.decode('utf-8')
+    assert 'Poss / BCP' not in html
+
+    resp = client.get('/practice_home', query_string={'label': '4V4 DRILLS'})
+    html = resp.data.decode('utf-8')
+    assert 'Poss / BCP' in html
+    assert _poss_per_bcp_values(html) == ['1.00']
