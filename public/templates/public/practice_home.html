@@ -52,11 +52,20 @@
   ) }}
 </div>
 
-{% set bcp_cols = [
-  {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
-  {'key': 'bcp', 'label': 'BCP', 'sortable': True, 'align': 'right'},
-  {'key': 'wins', 'label': 'Wins', 'sortable': True, 'align': 'right'},
-] %}
+{% if show_poss_per_bcp %}
+  {% set bcp_cols = [
+    {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+    {'key': 'bcp', 'label': 'BCP', 'sortable': True, 'align': 'right'},
+    {'key': 'poss_per_bcp', 'label': 'Poss / BCP', 'sortable': True, 'align': 'right'},
+    {'key': 'wins', 'label': 'Wins', 'sortable': True, 'align': 'right'},
+  ] %}
+{% else %}
+  {% set bcp_cols = [
+    {'key': 'player', 'label': 'Player', 'sortable': True, 'align': 'left', 'value_key': 'player_sort'},
+    {'key': 'bcp', 'label': 'BCP', 'sortable': True, 'align': 'right'},
+    {'key': 'wins', 'label': 'Wins', 'sortable': True, 'align': 'right'},
+  ] %}
+{% endif %}
 <div class="space-y-4">
   <h2 class="text-xl font-semibold">Blue Collar Leaders</h2>
   {{ render_table(

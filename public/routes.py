@@ -3,7 +3,7 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
 from markupsafe import Markup
-from sqlalchemy import func, desc, and_, case
+from sqlalchemy import func, desc, and_, case, or_
 from utils.db_helpers import array_agg_or_group_concat
 from utils.skill_config import shot_map, label_map
 from datetime import date, timedelta
@@ -469,6 +469,7 @@ def practice_homepage(active_page="practice_home"):
             selected_labels=[],
             start_date=request.args.get("start_date", ""),
             end_date=request.args.get("end_date", ""),
+            show_poss_per_bcp=False,
         )
 
     start_date_param = request.args.get("start_date")
@@ -505,6 +506,7 @@ def practice_homepage(active_page="practice_home"):
             selected_labels=[],
             start_date=start_date_param or '',
             end_date=end_date_param or '',
+            show_poss_per_bcp=False,
         )
 
     stats = PlayerStats.query.filter(PlayerStats.practice_id.in_(practice_ids)).all()
@@ -514,6 +516,26 @@ def practice_homepage(active_page="practice_home"):
         lbl for lbl in request.args.getlist("label") if lbl.upper() in label_options
     ]
     label_set = {lbl.upper() for lbl in selected_labels}
+    target_drill_labels = {"4V4 DRILLS", "5V5 DRILLS"}
+    show_poss_per_bcp = False
+    possessions_by_player = defaultdict(int)
+    if label_set and (label_set & target_drill_labels):
+        show_poss_per_bcp = True
+        possession_query = (
+            db.session.query(
+                Roster.player_name,
+                func.count(PlayerPossession.id),
+            )
+            .join(Roster, PlayerPossession.player_id == Roster.id)
+            .join(Possession, Possession.id == PlayerPossession.possession_id)
+            .filter(Roster.season_id == season_id)
+            .filter(Possession.practice_id.in_(practice_ids))
+        )
+        clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
+        if clauses:
+            possession_query = possession_query.filter(or_(*clauses))
+        for name, count in possession_query.group_by(Roster.player_name).all():
+            possessions_by_player[name] = count
     fg3_total_makes = 0
     fg3_total_attempts = 0
 
@@ -566,11 +588,15 @@ def practice_homepage(active_page="practice_home"):
                 for p in winners:
                     win_counts[p] += 1
 
-        bcp_leaders = [
-            (p, bcp_totals[p], win_counts.get(p, 0)) for p in bcp_totals
-        ]
-        bcp_leaders.sort(key=lambda x: x[1], reverse=True)
-        bcp_leaders = bcp_leaders[:10]
+        bcp_entries = []
+        for player in bcp_totals:
+            total = bcp_totals[player]
+            wins = win_counts.get(player, 0)
+            possessions = possessions_by_player[player]
+            ratio_value = (possessions / total) if (show_poss_per_bcp and total) else None
+            bcp_entries.append((player, total, wins, possessions, ratio_value))
+        bcp_entries.sort(key=lambda x: x[1], reverse=True)
+        bcp_leaders = bcp_entries[:10]
 
         atr_rows = []
         fg3_rows = []
@@ -669,12 +695,15 @@ def practice_homepage(active_page="practice_home"):
                 if r.total_blue_collar == max_bcp:
                     win_counts[r.player_name] += 1
 
-        bcp_leaders = [
-            (name, bcp_totals.get(name, 0.0), win_counts.get(name, 0))
-            for name in bcp_totals.keys()
-        ]
-        bcp_leaders.sort(key=lambda x: x[1], reverse=True)
-        bcp_leaders = bcp_leaders[:10]
+        bcp_entries = []
+        for name in bcp_totals.keys():
+            total = bcp_totals.get(name, 0.0)
+            wins = win_counts.get(name, 0)
+            possessions = possessions_by_player[name]
+            ratio_value = (possessions / total) if (show_poss_per_bcp and total) else None
+            bcp_entries.append((name, total, wins, possessions, ratio_value))
+        bcp_entries.sort(key=lambda x: x[1], reverse=True)
+        bcp_leaders = bcp_entries[:10]
 
         # ─── ATR% Leaders ──────────────────────────────────────────────────
         qa = (
@@ -825,15 +854,17 @@ def practice_homepage(active_page="practice_home"):
         for player, count in dunks
     ]
 
-    bcp_rows = [
-        {
+    bcp_rows = []
+    for player, total, wins, _possessions, poss_per_bcp in bcp_leaders:
+        row = {
             "player": _player_cell(player, can_link),
             "player_sort": player,
             "bcp": decimal_cell(total, places=1),
             "wins": num(wins),
         }
-        for player, total, wins in bcp_leaders
-    ]
+        if show_poss_per_bcp:
+            row["poss_per_bcp"] = decimal_cell(poss_per_bcp, places=2)
+        bcp_rows.append(row)
 
     atr_rows = [
         {
@@ -908,6 +939,7 @@ def practice_homepage(active_page="practice_home"):
         selected_labels=selected_labels,
         start_date=start_date_param or '',
         end_date=end_date_param or '',
+        show_poss_per_bcp=show_poss_per_bcp,
     )
 
 
