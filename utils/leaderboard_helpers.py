@@ -522,7 +522,11 @@ def get_rebound_rates_onfloor(
 ) -> Dict[str, Optional[float]]:
     roster = db.session.get(Roster, player_id)
     if not roster:
-        return {"off_reb_rate_on": None, "def_reb_rate_on": None}
+        return {
+            "off_reb_rate_on": None,
+            "def_reb_rate_on": None,
+            "def_reb_opportunities_on": None,
+        }
 
     start_dt = _coerce_date(date_from)
     end_dt = _coerce_date(date_to)
@@ -577,6 +581,7 @@ def get_rebound_rates_onfloor(
     return {
         "off_reb_rate_on": off_reb_rate,
         "def_reb_rate_on": def_reb_rate,
+        "def_reb_opportunities_on": opp_misses,
     }
 
 
