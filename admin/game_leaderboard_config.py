@@ -299,7 +299,7 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         "table_id": "game-leaderboard-defense-collisions",
         "percent_specs": [
             {
-                "slug": "gap_pct",
+                "slug": "collision_pct",
                 "metric": "gap_pct",
                 "attempt_slugs": ["gap_opps", "gap_opp"],
                 "minimum_slugs": [
@@ -379,7 +379,7 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         "table_id": "game-leaderboard-defense-low-man",
         "percent_specs": [
             {
-                "slug": "low_pct",
+                "slug": "low_man_pct",
                 "metric": "low_pct",
                 "attempt_slugs": ["low_opps", "low_opp"],
                 "minimum_slugs": [
