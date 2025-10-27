@@ -324,6 +324,8 @@ class TestDualViews:
             expected_texts=["4", "5", "2", "2", "80.0%", "100.0%"],
         )
 
+        assert 'data-key="totals_collision_pct"' in html
+        assert 'data-key="last_collision_pct"' in html
         assert "gap_pct" in grade_token_calls
         assert "collision_pct" not in grade_token_calls
         assert "gap_pct" in grade_scale_calls
@@ -464,6 +466,8 @@ class TestDualViews:
         assert 'Overall Low Man' in html
         for text in ["Low +", "Low Opp", "Low %", "7", "10", "4", "6", "70.0%", "66.7%"]:
             assert text in html
+        assert 'data-key="totals_low_pct"' in html
+        assert 'data-key="last_low_pct"' in html
 
     def test_pnr_grade_split(self, monkeypatch, app_client):
         import admin.routes as rmod
@@ -525,6 +529,132 @@ def test_build_dual_table_includes_grade_tokens():
     totals = table["totals"]
     assert totals["totals_fg_pct_token"] == expected_token
     assert totals["last_fg_pct_token"] == expected_token
+
+
+def test_collision_percent_wrappers_include_tokens(app_client):
+    from admin._leaderboard_helpers import build_dual_table
+    from admin.game_leaderboard_config import (
+        columns_for,
+        column_map_for,
+        pct_columns_for,
+        percent_specs_for,
+        sort_default_for,
+        table_id_for,
+    )
+
+    table = build_dual_table(
+        base_columns=columns_for("collisions"),
+        season_rows=[
+            {
+                "player": "Alpha",
+                "jersey": 1,
+                "gap_plus": 4,
+                "gap_opps": 5,
+                "gap_pct": 80.0,
+            }
+        ],
+        last_rows=[
+            {
+                "player": "Alpha",
+                "jersey": 1,
+                "gap_plus": 2,
+                "gap_opps": 2,
+                "gap_pct": 100.0,
+            }
+        ],
+        season_totals={
+            "player": "Team Totals",
+            "gap_plus": 4,
+            "gap_opps": 5,
+            "gap_pct": 80.0,
+        },
+        last_totals={
+            "player": "Team Totals",
+            "gap_plus": 2,
+            "gap_opps": 2,
+            "gap_pct": 100.0,
+        },
+        column_map=column_map_for("collisions"),
+        pct_columns=pct_columns_for("collisions"),
+        table_id=table_id_for("collisions"),
+        default_sort=sort_default_for("collisions"),
+    )
+
+    macro = app_client.application.jinja_env.get_template("_macros/percent_box.html").module
+    macro.apply_percent_wrappers(table, percent_specs_for("collisions"))
+
+    row = table["rows"][0]
+    assert "percent-box" in row["totals_collision_pct"]
+    assert "percent-box" in row["last_collision_pct"]
+    assert "grade-token" in row["totals_collision_pct"]
+    assert "grade-token" in row["last_collision_pct"]
+    totals = table["totals"]
+    assert totals is not None
+    assert "percent-box" in totals["totals_collision_pct"]
+    assert "percent-box" in totals["last_collision_pct"]
+
+
+def test_low_man_percent_wrappers_include_tokens(app_client):
+    from admin._leaderboard_helpers import build_dual_table
+    from admin.game_leaderboard_config import (
+        columns_for,
+        column_map_for,
+        pct_columns_for,
+        percent_specs_for,
+        sort_default_for,
+        table_id_for,
+    )
+
+    table = build_dual_table(
+        base_columns=columns_for("overall_low_man"),
+        season_rows=[
+            {
+                "player": "Beta",
+                "jersey": 2,
+                "low_plus": 7,
+                "low_opps": 10,
+                "low_pct": 70.0,
+            }
+        ],
+        last_rows=[
+            {
+                "player": "Beta",
+                "jersey": 2,
+                "low_plus": 4,
+                "low_opps": 6,
+                "low_pct": 66.7,
+            }
+        ],
+        season_totals={
+            "player": "Team Totals",
+            "low_plus": 7,
+            "low_opps": 10,
+            "low_pct": 70.0,
+        },
+        last_totals={
+            "player": "Team Totals",
+            "low_plus": 4,
+            "low_opps": 6,
+            "low_pct": 66.7,
+        },
+        column_map=column_map_for("overall_low_man"),
+        pct_columns=pct_columns_for("overall_low_man"),
+        table_id=table_id_for("overall_low_man"),
+        default_sort=sort_default_for("overall_low_man"),
+    )
+
+    macro = app_client.application.jinja_env.get_template("_macros/percent_box.html").module
+    macro.apply_percent_wrappers(table, percent_specs_for("overall_low_man"))
+
+    row = table["rows"][0]
+    assert "percent-box" in row["totals_low_man_pct"]
+    assert "percent-box" in row["last_low_man_pct"]
+    assert "grade-token" in row["totals_low_man_pct"]
+    assert "grade-token" in row["last_low_man_pct"]
+    totals = table["totals"]
+    assert totals is not None
+    assert "percent-box" in totals["totals_low_man_pct"]
+    assert "percent-box" in totals["last_low_man_pct"]
 
 
 def test_split_dual_table_restores_rank_and_player_headers():
