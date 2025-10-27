@@ -1859,6 +1859,13 @@ def split_dual_table(
     for column in columns:
         key = str(column.get("key") or "")
         column_copy = dict(column)
+        # ``render_header`` is injected when building the combined dual table so
+        # that certain columns (like rank/player) can span multiple header
+        # rows. Once we split the table into a standalone view, those helper
+        # flags would suppress the header cells entirely, which causes the
+        # column groups to shift left. Reset the flag so the headers render as
+        # normal in the split table.
+        column_copy.pop("render_header", None)
         if key.startswith(normalized_prefix):
             column_copy.pop("group", None)
             prefixed_columns.append(column_copy)
