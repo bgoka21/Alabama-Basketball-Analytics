@@ -245,6 +245,8 @@ def compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details):
                     base.get('turnover_rate', 0.0),
                     base.get('individual_off_reb_rate', 0.0),
                     off_reb_rate,
+                    base.get('individual_def_reb_rate', 0.0),
+                    base.get('def_reb_rate', 0.0),
                     base.get('individual_foul_rate', 0.0),
                     base.get('fouls_drawn_rate', 0.0),
                 )
@@ -856,6 +858,29 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             continue
         person_off_rebs[roster_entry.player_name] = row.personal_off_rebs
 
+    personal_defreb_q = (
+        db.session.query(
+            BlueCollarStats.player_id.label('player_id'),
+            func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('personal_def_rebs')
+        )
+        .filter(BlueCollarStats.season_id == season_id)
+    )
+    if practice_ids:
+        personal_defreb_q = personal_defreb_q.filter(BlueCollarStats.practice_id.in_(practice_ids))
+    if game_ids:
+        personal_defreb_q = personal_defreb_q.filter(BlueCollarStats.game_id.in_(game_ids))
+    personal_defreb_q = personal_defreb_q.group_by(BlueCollarStats.player_id).all()
+    person_def_rebs = {}
+    for row in personal_defreb_q:
+        roster_entry = db.session.get(Roster, row.player_id)
+        if roster_entry is None:
+            current_app.logger.warning(
+                'Skipping personal def reb stats for missing roster entry',
+                extra={'player_id': row.player_id, 'season_id': season_id},
+            )
+            continue
+        person_def_rebs[roster_entry.player_name] = row.personal_def_rebs
+
     personal_fouls_q = (
         db.session.query(
             PlayerStats.player_name.label('player'),
@@ -943,6 +968,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         | set(bc_rows)
         | set(person_off_rebs)
         | set(personal_fouls)
+        | set(person_def_rebs)
     )
 
     extra_rows = {}
@@ -1003,6 +1029,13 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             else 0
         )
         off_reb_rate = rebound_rates.get('off_reb_rate_on') or 0.0
+        def_reb_opp = rebound_rates.get('def_reb_opportunities_on') or 0
+        individual_def_reb_rate = (
+            person_def_rebs.get(player, 0) / def_reb_opp
+            if def_reb_opp
+            else 0
+        )
+        def_reb_rate = rebound_rates.get('def_reb_rate_on') or 0.0
         fouls_rate = events.get('fouls_on', 0) / on_poss if on_poss else 0
         foul_rate_ind = personal_fouls.get(player, 0) / on_poss if on_poss else 0
 
@@ -1019,6 +1052,8 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
             'bamalytics_turnover_rate': round(bama_to_rate, 1),
             'individual_team_turnover_pct': round(individual_team_turnover_pct, 1),
             'individual_off_reb_rate': round(individual_off_reb_rate * 100, 1),
+            'individual_def_reb_rate': round(individual_def_reb_rate * 100, 1),
+            'def_reb_rate': round(def_reb_rate, 1),
             'fouls_drawn_rate': round(fouls_rate * 100, 1),
             'individual_foul_rate': round(foul_rate_ind * 100, 1),
         }

@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash
 
 from models.database import (
     db, Season, Practice, PlayerStats, Roster,
-    Possession, PlayerPossession, ShotDetail
+    Possession, PlayerPossession, ShotDetail, BlueCollarStats
 )
 from utils.shottype import persist_player_shot_details
 from models.user import User
@@ -119,6 +119,31 @@ def app():
         db.session.add(ShotDetail(possession_id=3, event_type='2FG+'))
         db.session.add(ShotDetail(possession_id=3, event_type='Turnover'))
 
+        poss4 = Possession(
+            id=4,
+            practice_id=1,
+            season_id=1,
+            game_id=None,
+            possession_side='Crimson',
+            time_segment='Defense',
+            points_scored=0,
+            drill_labels='4V4 DRILLS',
+        )
+        db.session.add(poss4)
+        db.session.add(PlayerPossession(possession_id=4, player_id=1))
+        db.session.add(ShotDetail(possession_id=4, event_type='ATR-'))
+        db.session.add(ShotDetail(possession_id=4, event_type='TEAM Def Reb'))
+
+        db.session.add(
+            BlueCollarStats(
+                practice_id=1,
+                season_id=1,
+                player_id=1,
+                off_reb=1,
+                def_reb=1,
+            )
+        )
+
         db.session.commit()
     yield app
     with app.app_context():
@@ -195,9 +220,23 @@ def test_offense_summary_table(client):
     assert 'Team TO Rate' in html
     assert 'TO % (Bamalytics)' in html
     assert "% of TO's (NBA.com)" in html
+    assert 'Ind Def Reb%' in html
+    assert 'Def Reb Rate' in html
     # turnovers=1, total_fga=5, pot_assists=2, assists=3 => 1/11*100=9.1
     assert '9.1' in html
     assert '100.0' in html
+
+    soup = BeautifulSoup(html, 'html.parser')
+    table = soup.find('table')
+    headers = [th.get_text(strip=True) for th in table.find('thead').find_all('th')]
+    body_row = table.find('tbody').find('tr')
+    cells = [cell.get_text(strip=True) for cell in body_row.find_all(['th', 'td'])]
+    ind_def_idx = headers.index('Ind Def Reb%')
+    def_rate_idx = headers.index('Def Reb Rate')
+    # headers include leading Player column, ensure we align with row cells
+    expected_values = {'100.0', '100.0%', '100', '100%'}
+    assert cells[ind_def_idx] in expected_values
+    assert cells[def_rate_idx] in expected_values
 
 
 def test_offensive_metrics_filter(client):
