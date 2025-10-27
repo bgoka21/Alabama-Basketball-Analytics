@@ -96,3 +96,29 @@ def test_leaderboard_new_keys_sanity(key, rows):
         r1 = next(r for r in out["rows"] if r[0] == BOB)
         assert r1[1] == 0 and r1[2] == 1 and r1[3] == 0.0
         assert r1[4] == 1 and r1[5] == 1 and r1[6] == 100.0
+
+
+def test_fetch_gap_help_ignores_collision_fields(monkeypatch):
+    from services import leaderboard_game as lg
+
+    def fake_season_rows(season_id, start_date, end_date):
+        return {
+            "Player": {
+                "player": "Player",
+                "jersey": 11,
+                "collision_gap_positive": 9,
+                "collision_gap_missed": 7,
+                "pnr_gap_positive": 2,
+                "pnr_gap_missed": 3,
+            }
+        }
+
+    monkeypatch.setattr(lg, "_season_rows", fake_season_rows)
+
+    result = lg.fetch_gap_help(season_id=1)
+
+    assert result.rows[0]["gap_plus"] == 2
+    assert result.rows[0]["gap_opps"] == 5
+    assert result.rows[0]["gap_pct"] == pytest.approx(40.0)
+    assert result.totals["gap_plus"] == 2
+    assert result.totals["gap_opps"] == 5

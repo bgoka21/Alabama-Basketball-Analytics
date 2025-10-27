@@ -372,12 +372,8 @@ def _build_pass_contest_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]
 
 def _build_gap_help_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
     row = _build_common(player, data)
-    plus = data.get("collision_gap_positive", 0) + data.get("pnr_gap_positive", 0)
-    opps = (
-        plus
-        + data.get("collision_gap_missed", 0)
-        + data.get("pnr_gap_missed", 0)
-    )
+    plus = data.get("pnr_gap_positive") or 0
+    opps = plus + (data.get("pnr_gap_missed") or 0)
     row.update(
         {
             "gap_plus": plus,
