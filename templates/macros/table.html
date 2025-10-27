@@ -59,18 +59,17 @@
                         aria-sort="none"
                         {%- if cell_rowspan | int > 1 %} rowspan="{{ cell_rowspan }}"{%- endif -%}
                         {%- if cell_colspan | int > 1 %} colspan="{{ cell_colspan }}"{%- endif -%}>
-                      {%- if col.sortable -%}
-                        <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
-                                aria-label="Sort by {{ col.label }}">
-                          <span>{{ col.label | safe }}</span>
-                          <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
-                        </button>
-                      {%- else -%}
-                        <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
-                          <span>{{ col.label | safe }}</span>
-                          <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
-                        </div>
-                      {%- endif -%}
+                    {%- if col.sortable -%}
+                      <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                              aria-label="Sort by {{ col.label }}">
+                        <span>{{ col.label | safe }}</span>
+                        <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                      </button>
+                    {%- else -%}
+                      <div class="inline-flex items-center w-full {{ justify_class }}">
+                        <span>{{ col.label | safe }}</span>
+                      </div>
+                    {%- endif -%}
                     </th>
                   {%- else -%}
                     {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
@@ -107,18 +106,17 @@
                     data-sortable="{{ 'true' if col.sortable else 'false' }}"
                     data-key="{{ col.key }}"
                     aria-sort="none">
-                  {%- if col.sortable -%}
-                    <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
-                            aria-label="Sort by {{ col.label }}">
-                      <span>{{ col.label | safe }}</span>
-                      <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
-                    </button>
-                  {%- else -%}
-                    <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
-                      <span>{{ col.label | safe }}</span>
-                      <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
-                    </div>
-                  {%- endif -%}
+                    {%- if col.sortable -%}
+                      <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                              aria-label="Sort by {{ col.label }}">
+                        <span>{{ col.label | safe }}</span>
+                        <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                      </button>
+                    {%- else -%}
+                      <div class="inline-flex items-center w-full {{ justify_class }}">
+                        <span>{{ col.label | safe }}</span>
+                      </div>
+                    {%- endif -%}
                 </th>
               {%- endfor %}
             </tr>
@@ -190,9 +188,8 @@
                         <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                       </button>
                     {%- else -%}
-                      <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                      <div class="inline-flex items-center w-full {{ justify_class }}">
                         <span>{{ col.label | safe }}</span>
-                        <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
                       </div>
                     {%- endif -%}
                   </th>
@@ -229,9 +226,8 @@
                       <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                     </button>
                   {%- else -%}
-                    <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                    <div class="inline-flex items-center w-full {{ justify_class }}">
                       <span>{{ col.label | safe }}</span>
-                      <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
                     </div>
                   {%- endif -%}
                 </th>
@@ -268,9 +264,8 @@
                       <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                     </button>
                   {%- else -%}
-                    <div class="inline-flex items-center gap-1 w-full {{ justify_class }}">
+                    <div class="inline-flex items-center w-full {{ justify_class }}">
                       <span>{{ col.label | safe }}</span>
-                      <span class="sort-caret opacity-0 transition" aria-hidden="true"></span>
                     </div>
                   {%- endif -%}
                 </th>
