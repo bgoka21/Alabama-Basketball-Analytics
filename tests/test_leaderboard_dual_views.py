@@ -527,6 +527,73 @@ def test_build_dual_table_includes_grade_tokens():
     assert totals["last_fg_pct_token"] == expected_token
 
 
+def test_split_dual_table_restores_rank_and_player_headers():
+    from admin._leaderboard_helpers import build_dual_table, split_dual_table
+    from admin.game_leaderboard_config import (
+        columns_for,
+        column_map_for,
+        pct_columns_for,
+    )
+
+    table = build_dual_table(
+        base_columns=columns_for("shrinks_offense"),
+        season_rows=[
+            {
+                "player": "Alpha",
+                "jersey": 1,
+                "FG": "1-3",
+                "FG%": "33.3%",
+                "Freq": "25.0%",
+                "Shrink 3FG": "1-2",
+                "Shrink 3FG %": "50.0%",
+                "Shrink 3FG Freq": "40.0%",
+                "Non-Shrink 3FG": "0-1",
+                "Non-Shrink 3FG %": "0.0%",
+                "Non-Shrink 3FG Freq": "60.0%",
+            }
+        ],
+        last_rows=[
+            {
+                "player": "Alpha",
+                "jersey": 1,
+                "FG": "0-1",
+                "FG%": "0.0%",
+                "Freq": "10.0%",
+                "Shrink 3FG": "0-1",
+                "Shrink 3FG %": "0.0%",
+                "Shrink 3FG Freq": "50.0%",
+                "Non-Shrink 3FG": "0-0",
+                "Non-Shrink 3FG %": "0.0%",
+                "Non-Shrink 3FG Freq": "50.0%",
+            }
+        ],
+        season_totals={"player": "Team"},
+        last_totals={"player": "Team"},
+        column_map=column_map_for("shrinks_offense"),
+        pct_columns=pct_columns_for("shrinks_offense"),
+        left_label="Season Shrink 3's",
+        right_label="Last Game Shrink 3's",
+        totals_label="Team Totals",
+        table_id="shrink-test",
+    )
+
+    season_table = split_dual_table(table, prefix="totals_", table_id_suffix="season")
+    last_table = split_dual_table(table, prefix="last_", table_id_suffix="last")
+
+    def _header_flags(split_table):
+        rank_col = next(col for col in split_table["columns"] if col["key"] == "rank")
+        player_col = next(col for col in split_table["columns"] if col["key"] == "player")
+        return rank_col.get("render_header", True), player_col.get("render_header", True)
+
+    rank_flag, player_flag = _header_flags(season_table)
+    assert rank_flag is not False
+    assert player_flag is not False
+
+    rank_flag, player_flag = _header_flags(last_table)
+    assert rank_flag is not False
+    assert player_flag is not False
+
+
 def test_percent_box_prefers_cached_token():
     test_app = app_module.create_app()
     with test_app.app_context():
