@@ -268,16 +268,24 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
         if not col.startswith("#"):
             continue
         tokens = extract_tokens(row.get(col, ""))
-        if "FT+" in tokens:
-            if col not in player_stats_dict:
-                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            player_stats_dict[col]["ftm"] += 1
-            player_stats_dict[col]["fta"] += 1
-            player_stats_dict[col]["points"] += 1
-        elif "FT-" in tokens:
-            if col not in player_stats_dict:
-                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            player_stats_dict[col]["fta"] += 1
+        if not tokens:
+            continue
+
+        ft_makes = tokens.count("FT+")
+        ft_misses = tokens.count("FT-")
+        if not ft_makes and not ft_misses:
+            continue
+
+        if col not in player_stats_dict:
+            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+
+        if ft_makes:
+            player_stats_dict[col]["ftm"] += ft_makes
+            player_stats_dict[col]["points"] += ft_makes
+
+        attempts = ft_makes + ft_misses
+        if attempts:
+            player_stats_dict[col]["fta"] += attempts
 
     # 4) Miscellaneous mapped stats (Turnover, 2nd Assist, Fouled), excluding "Assist"/"Pot. Assist"
     for col in df_columns:
@@ -399,6 +407,7 @@ def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id,
                     if token in blue_collar_mapping:
                         key = blue_collar_mapping[token]
                         player_stats_dict[col]["blue_collar_accum"][key] += 1
+                        team_totals[key] = team_totals.get(key, 0) + 1
                         team_totals["total_blue_collar"] += blue_collar_values[key]
                 blue_total = sum(
                     player_stats_dict[col]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
@@ -419,6 +428,7 @@ def process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping,
         if token in blue_collar_mapping:
             key = blue_collar_mapping[token]
             player_stats_dict[player_name]["blue_collar_accum"][key] += 1
+            team_totals[key] = team_totals.get(key, 0) + 1
             team_totals["total_blue_collar"] += blue_collar_values[key]
     blue_total = sum(
         player_stats_dict[player_name]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
@@ -803,7 +813,16 @@ def parse_csv(file_path, game_id, season_id):
         "total_ftm": 0,
         "total_fta": 0,
         "total_blue_collar": 0,
-        "foul_by": 0
+        "foul_by": 0,
+        "def_reb": 0,
+        "off_reb": 0,
+        "misc": 0,
+        "deflection": 0,
+        "steal": 0,
+        "block": 0,
+        "floor_dive": 0,
+        "charge_taken": 0,
+        "reb_tip": 0
     }
     opponent_totals = {
         "atr_makes": 0,
