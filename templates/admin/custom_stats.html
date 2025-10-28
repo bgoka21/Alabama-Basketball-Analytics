@@ -4,8 +4,8 @@
 <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
   <div class="space-y-8">
     <div class="flex flex-col gap-4">
-      <h1 class="text-2xl font-bold text-gray-900">Custom Stats Table (Practice)</h1>
-      <p class="text-sm text-gray-600">Build a practice stats view on the fly. Pick players, dates, and fields, then let the table refresh automatically as you tweak the configuration.</p>
+      <h1 class="text-2xl font-bold text-gray-900">Custom Stats Table (<span id="custom-source-heading">Practice</span>)</h1>
+      <p class="text-sm text-gray-600">Build a <span id="custom-source-description">practice</span> stats view on the fly. Pick players, dates, and fields, then let the table refresh automatically as you tweak the configuration.</p>
     </div>
 
     <div class="grid gap-6 xl:grid-cols-3">
@@ -43,6 +43,14 @@
             <p class="mt-2 text-xs text-gray-500">Search roster names to add multiple players. The table combines everyone you pick.</p>
           </div>
 
+          <div>
+            <span class="block text-sm font-medium">Data Source</span>
+            <div id="custom-source-toggle" class="mt-2 inline-flex overflow-hidden rounded-md border border-gray-300 bg-gray-50 text-sm">
+              <button type="button" data-source="practice" class="source-pill active px-4 py-2 font-medium text-white bg-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Practice</button>
+              <button type="button" data-source="game" class="source-pill px-4 py-2 font-medium text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Game</button>
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label for="custom-date-from" class="block text-sm font-medium">From</label>
@@ -53,12 +61,11 @@
               <input id="custom-date-to" type="date" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 focus:border-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-[#9E1B32]/40" />
             </div>
           </div>
-
           <div>
-            <span class="block text-sm font-medium">Totals vs. Per Practice</span>
+            <span class="block text-sm font-medium" id="mode-toggle-label">Totals vs. Per Practice</span>
             <div id="custom-mode-toggle" class="mt-2 inline-flex overflow-hidden rounded-md border border-gray-300 bg-gray-50 text-sm">
-              <button type="button" data-mode="totals" class="mode-pill active px-4 py-2 font-medium text-white bg-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Totals</button>
-              <button type="button" data-mode="per_practice" class="mode-pill px-4 py-2 font-medium text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Per Practice</button>
+              <button type="button" data-mode="totals" data-role="totals" class="mode-pill active px-4 py-2 font-medium text-white bg-[#9E1B32] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Totals</button>
+              <button type="button" data-mode="per_practice" data-role="per" class="mode-pill px-4 py-2 font-medium text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9E1B32]">Per Practice</button>
             </div>
           </div>
         </section>
@@ -143,7 +150,8 @@
     document.addEventListener('DOMContentLoaded', function () {
       if (typeof initCustomStatsPage === 'function') {
         initCustomStatsPage({
-          fieldsUrl: "{{ url_for('admin.get_practice_field_catalog') }}",
+          fieldsUrlPractice: "{{ url_for('admin.get_practice_field_catalog') }}",
+          fieldsUrlGame: "{{ url_for('admin.get_game_field_catalog') }}",
           dataUrl: '/admin/custom-stats/table-partial',
           presetsUrl: "{{ url_for('admin.list_presets_api') }}",
           exportCsvUrl: '/admin/custom-stats/export/csv'
