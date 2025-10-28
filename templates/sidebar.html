@@ -2,28 +2,32 @@
 {% set recruiting_active = request.endpoint and request.endpoint.startswith('recruits.') %}
 {% set recruit_list_url = url_for('recruits.list_recruits') if view_exists('recruits.list_recruits') else '#' %}
 {% set money_board_url = url_for('recruits.money_board') if view_exists('recruits.money_board') else '#' %}
+{% set base_classes = "nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" %}
+{% set active_classes = "bg-white/20 text-white font-semibold border-l-4 border-white shadow-inner" %}
+{% set summary_base_classes = base_classes ~ " cursor-pointer flex items-center justify-between gap-2" %}
+{% set summary_active_classes = "group-open:bg-white/20 group-open:text-white group-open:font-semibold group-open:border-l-4 group-open:border-white group-open:shadow-inner" %}
 <ul class="flex flex-col gap-2">
 {% if current_user.is_player %}
-  <li class="nav-item{% if request.endpoint == 'admin.player_detail' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.player_detail' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}">
       My Page
     </a>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.logout' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.logout') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.logout' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.logout') }}">
       Logout
     </a>
   </li>
   {% else %}
   {% set home_url = url_for('public.homepage') if view_exists('public.homepage') else '#' %}
-  <li class="nav-item{% if request.endpoint == 'public.homepage' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ home_url }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'public.homepage' %} {{ active_classes }}{% endif %}" href="{{ home_url }}">
       Home
     </a>
   </li>
   {% if current_user.is_player %}
-  <li class="nav-item{% if request.endpoint == 'public.skill_dev' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('public.skill_dev') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'public.skill_dev' %} {{ active_classes }}{% endif %}" href="{{ url_for('public.skill_dev') }}">
       Skill Development
     </a>
   </li>
@@ -31,90 +35,90 @@
   {% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports', 'advanced_offense_report', 'playcall_report'] %}
   <li class="nav-item">
     <details class="group" {% if reports_active %}open{% endif %}>
-      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32] flex items-center justify-between gap-2">
+      <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
         <span>Reports</span>
         <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
         </svg>
       </summary>
       <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.game_reports' %} active{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
+        <a class="{{ base_classes }}{% if request.endpoint == 'admin.game_reports' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
+        <a class="{{ base_classes }}{% if request.endpoint == 'admin.practice_reports' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
         {% if ADVANCED_POSSESSION_ENABLED %}
         {# BEGIN Advanced Possession #}
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'advanced_offense_report' %} active{% endif %}" href="{{ url_for('advanced_offense_report') }}">Advanced Possession Report</a>
+        <a class="{{ base_classes }}{% if request.endpoint == 'advanced_offense_report' %} {{ active_classes }}{% endif %}" href="{{ url_for('advanced_offense_report') }}">Advanced Possession Report</a>
         {# END Advanced Possession #}
         {% endif %}
         {% if PLAYCALL_REPORT_ENABLED %}
         {# BEGIN Playcall Report #}
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'playcall_report' %} active{% endif %}" href="{{ url_for('playcall_report') }}">Playcall Report</a>
+        <a class="{{ base_classes }}{% if request.endpoint == 'playcall_report' %} {{ active_classes }}{% endif %}" href="{{ url_for('playcall_report') }}">Playcall Report</a>
         {# END Playcall Report #}
         {% endif %}
       </div>
     </details>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.players_list' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.players_list') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.players_list' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.players_list') }}">
       Players
     </a>
   </li>
   {% if not current_user.is_player %}
     <li class="nav-item">
     <details class="group" {% if recruiting_active %}open{% endif %}>
-      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32] flex items-center justify-between gap-2">
+      <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
         <span>Recruiting</span>
         <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
         </svg>
       </summary>
       <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint and request.endpoint.startswith('recruits.') and request.endpoint != 'recruits.money_board' and not request.endpoint.startswith('recruits.money_coach') %} active{% endif %}"
+        <a class="{{ base_classes }}{% if request.endpoint and request.endpoint.startswith('recruits.') and request.endpoint != 'recruits.money_board' and not request.endpoint.startswith('recruits.money_coach') %} {{ active_classes }}{% endif %}"
            href="{{ recruit_list_url }}">Recruits</a>
 
-        <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint in ['recruits.money_board','recruits.money_coach'] %} active{% endif %}"
+        <a class="{{ base_classes }}{% if request.endpoint in ['recruits.money_board','recruits.money_coach'] %} {{ active_classes }}{% endif %}"
            href="{{ money_board_url }}">Money Board</a>
       </div>
     </details>
   </li>
 {% endif %}
-  <li class="nav-item{% if request.endpoint == 'admin.skill_totals' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.skill_totals') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.skill_totals' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.skill_totals') }}">
       Skill Totals
     </a>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.ft_daily' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.ft_daily') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.ft_daily' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.ft_daily') }}">
       Daily Free Throws
     </a>
   </li>
   {% set team_totals_ep = 'admin.team_totals' %}
   {% set has_team_totals = (view_exists(team_totals_ep) if view_exists is defined else True) %}
   {% set team_totals_url = url_for(team_totals_ep) if has_team_totals else '#' %}
-  <li class="nav-item{% if request.endpoint == team_totals_ep %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ team_totals_url }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == team_totals_ep %} {{ active_classes }}{% endif %}" href="{{ team_totals_url }}">
       Team Totals
     </a>
   </li>
-  <li class="nav-item{% if request.endpoint == 'admin.leaderboard' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.leaderboard') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.leaderboard' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.leaderboard') }}">
       Leaderboard
     </a>
   </li>
   {% set summer_url = url_for('public.summer_stats') if view_exists('public.summer_stats') else '#' %}
-  <li class="nav-item{% if request.endpoint == 'public.summer_stats' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ summer_url }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'public.summer_stats' %} {{ active_classes }}{% endif %}" href="{{ summer_url }}">
       Summer Stats
     </a>
   </li>
   {% if current_user.is_authenticated %}
-  <li class="nav-item{% if request.endpoint == 'admin.logout' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.logout') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.logout' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.logout') }}">
       Logout
     </a>
   </li>
   {% else %}
-  <li class="nav-item{% if request.endpoint == 'admin.login' %} active{% endif %}">
-    <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" href="{{ url_for('admin.login') }}">
+  <li class="nav-item">
+    <a class="{{ base_classes }}{% if request.endpoint == 'admin.login' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.login') }}">
       Login
     </a>
   </li>
