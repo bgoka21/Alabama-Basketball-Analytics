@@ -884,6 +884,15 @@ def parse_csv(file_path, game_id, season_id):
                 player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
             row_tokens_by_col[col] = tokens
 
+        if row_type == "TEAM":
+            tokens = extract_tokens(row.get("TEAM", ""))
+            for token in tokens:
+                if token in blue_collar_mapping:
+                    key = blue_collar_mapping[token]
+                    team_totals[key] = team_totals.get(key, 0) + 1
+                    team_totals["total_blue_collar"] += blue_collar_values[key]
+            continue
+
         if row_tokens_by_col and row_type_lower == "pnr":
             for col, tokens in row_tokens_by_col.items():
                 slot = player_stats_dict[col]
@@ -1029,6 +1038,13 @@ def parse_csv(file_path, game_id, season_id):
             team_totals["total_ftm"]           += safe_value(player_stats.get("ftm", 0))
             team_totals["total_fta"]           += safe_value(player_stats.get("fta", 0))
             team_totals["foul_by"]             += safe_value(player_stats.get("foul_by", 0))
+
+        team_totals["total_points"] = (
+            2 * team_totals.get("total_atr_makes", 0)
+            + 2 * team_totals.get("total_fg2_makes", 0)
+            + 3 * team_totals.get("total_fg3_makes", 0)
+            + team_totals.get("total_ftm", 0)
+        )
 
 
         # Process possessions for bucket 2 (Team vs Opponent) with subtract_off_reb=True
