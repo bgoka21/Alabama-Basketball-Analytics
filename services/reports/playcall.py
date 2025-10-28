@@ -197,8 +197,8 @@ def _compute_from_dataframe(df: pd.DataFrame) -> Dict[str, object]:
 
         family_label = series_value or "UNKNOWN"
         normalized_family_upper = family_label.upper() if isinstance(family_label, str) else ""
-        if normalized_family_upper == "UKNOWN":
-            if not playcall_label or playcall_label.upper() == "UNKNOWN":
+        if normalized_family_upper in {"UKNOWN", "UNKNOWN"}:
+            if not has_playcall or not playcall_label or playcall_label.upper() == "UNKNOWN":
                 continue
             family_label = "MISC"
 
@@ -458,8 +458,8 @@ def aggregate_playcall_reports(game_ids: Iterable[int]):
                 continue
 
             family_upper = family_name.upper()
-            treat_as_misc = family_upper in ("UKNOWN", "MISC")
-            target_family_name = "MISC" if family_upper == "UKNOWN" else ("MISC" if family_upper == "MISC" else family_name)
+            treat_as_misc = family_upper in ("UKNOWN", "UNKNOWN", "MISC")
+            target_family_name = "MISC" if treat_as_misc else family_name
 
             removed_totals = {
                 "off_set": {"pts": 0, "chances": 0},
