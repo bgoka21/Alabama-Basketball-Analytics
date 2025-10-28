@@ -1,92 +1,120 @@
 {# mark Recruiting menu open when we're in the recruits blueprint #}
+{% import '_macros/icons.html' as icons %}
 {% set recruiting_active = request.endpoint and request.endpoint.startswith('recruits.') %}
 {% set recruit_list_url = url_for('recruits.list_recruits') if view_exists('recruits.list_recruits') else '#' %}
 {% set money_board_url = url_for('recruits.money_board') if view_exists('recruits.money_board') else '#' %}
-{% set base_classes = "nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" %}
+{% set link_base_classes = "nav-link group flex w-full items-center gap-3 px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]" %}
 {% set active_classes = "bg-white/20 text-white font-semibold border-l-4 border-white shadow-inner" %}
-{% set summary_base_classes = base_classes ~ " cursor-pointer flex items-center justify-between gap-2" %}
+{% set summary_base_classes = "nav-link flex w-full items-center gap-3 px-3 py-2 rounded transition cursor-pointer hover:bg-white hover:text-[#9E1B32]" %}
 {% set summary_active_classes = "group-open:bg-white/20 group-open:text-white group-open:font-semibold group-open:border-l-4 group-open:border-white group-open:shadow-inner" %}
 <ul class="flex flex-col gap-2">
   {% if current_user.is_player %}
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.player_detail' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}">
-      My Page
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.player_detail' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.player_detail', player_name=current_user.player_name) }}">
+      {{ icons.render('profile') }}
+      <span class="flex-1 text-left">My Page</span>
     </a>
   </li>
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.logout' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.logout') }}">
-      Logout
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.logout' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.logout') }}">
+      {{ icons.render('logout') }}
+      <span class="flex-1 text-left">Logout</span>
     </a>
   </li>
   {% else %}
   {% set home_url = url_for('public.homepage') if view_exists('public.homepage') else '#' %}
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'public.homepage' %} {{ active_classes }}{% endif %}" href="{{ home_url }}">
-      Home
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'public.homepage' %} {{ active_classes }}{% endif %}" href="{{ home_url }}">
+      {{ icons.render('home') }}
+      <span class="flex-1 text-left">Home</span>
     </a>
   </li>
   {% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports', 'advanced_offense_report', 'playcall_report'] %}
   <li class="nav-item">
     <details class="group" {% if reports_active %}open{% endif %}>
       <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
-        <span>Reports</span>
-        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        {{ icons.render('reports') }}
+        <span class="flex-1 text-left">Reports</span>
+        <svg class="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
         </svg>
       </summary>
       <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.game_reports' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.practice_reports' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.game_reports' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.game_reports') }}">
+          {{ icons.render('reports') }}
+          <span class="flex-1 text-left">Game Reports</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.practice_reports' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.practice_reports') }}">
+          {{ icons.render('practice') }}
+          <span class="flex-1 text-left">Practice Reports</span>
+        </a>
         {% if ADVANCED_POSSESSION_ENABLED %}
         {# BEGIN Advanced Possession #}
-        <a class="{{ base_classes }}{% if request.endpoint == 'advanced_offense_report' %} {{ active_classes }}{% endif %}" href="{{ url_for('advanced_offense_report') }}">Advanced Possession Report</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'advanced_offense_report' %} {{ active_classes }}{% endif %}" href="{{ url_for('advanced_offense_report') }}">
+          {{ icons.render('analytics') }}
+          <span class="flex-1 text-left">Advanced Possession Report</span>
+        </a>
         {# END Advanced Possession #}
         {% endif %}
         {% if PLAYCALL_REPORT_ENABLED %}
         {# BEGIN Playcall Report #}
-        <a class="{{ base_classes }}{% if request.endpoint == 'playcall_report' %} {{ active_classes }}{% endif %}" href="{{ url_for('playcall_report') }}">Playcall Report</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'playcall_report' %} {{ active_classes }}{% endif %}" href="{{ url_for('playcall_report') }}">
+          {{ icons.render('clipboard') }}
+          <span class="flex-1 text-left">Playcall Report</span>
+        </a>
         {# END Playcall Report #}
         {% endif %}
       </div>
     </details>
   </li>
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.players_list' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.players_list') }}">
-      Players
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.players_list' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.players_list') }}">
+      {{ icons.render('players') }}
+      <span class="flex-1 text-left">Players</span>
     </a>
   </li>
   <li class="nav-item">
     <details class="group" {% if recruiting_active %}open{% endif %}>
       <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
-        <span>Recruiting</span>
-        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        {{ icons.render('recruiting') }}
+        <span class="flex-1 text-left">Recruiting</span>
+        <svg class="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
         </svg>
       </summary>
       <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
-        <a class="{{ base_classes }}{% if request.endpoint and request.endpoint.startswith('recruits.') and request.endpoint != 'recruits.money_board' and not request.endpoint.startswith('recruits.money_coach') %} {{ active_classes }}{% endif %}"
-           href="{{ recruit_list_url }}">Recruits</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint and request.endpoint.startswith('recruits.') and request.endpoint != 'recruits.money_board' and not request.endpoint.startswith('recruits.money_coach') %} {{ active_classes }}{% endif %}"
+           href="{{ recruit_list_url }}">
+          {{ icons.render('recruiting') }}
+          <span class="flex-1 text-left">Recruits</span>
+        </a>
 
-        <a class="{{ base_classes }}{% if request.endpoint in ['recruits.money_board','recruits.money_coach'] %} {{ active_classes }}{% endif %}"
-           href="{{ money_board_url }}">Money Board</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint in ['recruits.money_board','recruits.money_coach'] %} {{ active_classes }}{% endif %}"
+           href="{{ money_board_url }}">
+          {{ icons.render('currency') }}
+          <span class="flex-1 text-left">Money Board</span>
+        </a>
       </div>
     </details>
   </li>
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.skill_totals' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.skill_totals') }}">
-      Skill Totals
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.skill_totals' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.skill_totals') }}">
+      {{ icons.render('totals') }}
+      <span class="flex-1 text-left">Skill Totals</span>
     </a>
   </li>
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.ft_daily' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.ft_daily') }}">
-      Daily Free Throws
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.ft_daily' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.ft_daily') }}">
+      {{ icons.render('free-throws') }}
+      <span class="flex-1 text-left">Daily Free Throws</span>
     </a>
   </li>
   {% set has_team_totals = (view_exists('admin.team_totals') if view_exists is defined else True) %}
   {% set team_totals_url = url_for('admin.team_totals') if has_team_totals else '#' %}
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.team_totals' %} {{ active_classes }}{% endif %}" href="{{ team_totals_url }}">
-      Team Totals
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.team_totals' %} {{ active_classes }}{% endif %}" href="{{ team_totals_url }}">
+      {{ icons.render('totals') }}
+      <span class="flex-1 text-left">Team Totals</span>
     </a>
   </li>
   {% set leaderboard_endpoints = ['admin.leaderboard', 'admin.leaderboard_game', 'admin.leaderboard_practice_new'] %}
@@ -94,25 +122,36 @@
   <li class="nav-item">
     <details class="group" {% if leaderboards_active %}open{% endif %}>
       <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
-        <span>Leaderboards</span>
-        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        {{ icons.render('leaderboard') }}
+        <span class="flex-1 text-left">Leaderboards</span>
+        <svg class="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
         </svg>
       </summary>
       <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.leaderboard' %} {{ active_classes }}{% endif %}"
-           href="{{ url_for('admin.leaderboard') }}">Practice Leaderboard</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.leaderboard_practice_new' %} {{ active_classes }}{% endif %}"
-           href="{{ url_for('admin.leaderboard_practice_new') }}">New Practice Leaderboard Page</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.leaderboard_game' %} {{ active_classes }}{% endif %}"
-           href="{{ url_for('admin.leaderboard_game') }}">Game Leaderboard</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.leaderboard' %} {{ active_classes }}{% endif %}"
+           href="{{ url_for('admin.leaderboard') }}">
+          {{ icons.render('leaderboard') }}
+          <span class="flex-1 text-left">Practice Leaderboard</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.leaderboard_practice_new' %} {{ active_classes }}{% endif %}"
+           href="{{ url_for('admin.leaderboard_practice_new') }}">
+          {{ icons.render('leaderboard') }}
+          <span class="flex-1 text-left">New Practice Leaderboard Page</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.leaderboard_game' %} {{ active_classes }}{% endif %}"
+           href="{{ url_for('admin.leaderboard_game') }}">
+          {{ icons.render('leaderboard') }}
+          <span class="flex-1 text-left">Game Leaderboard</span>
+        </a>
       </div>
     </details>
   </li>
   {% set summer_url = url_for('public.summer_stats') if view_exists('public.summer_stats') else '#' %}
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'public.summer_stats' %} {{ active_classes }}{% endif %}" href="{{ summer_url }}">
-      Summer Stats
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'public.summer_stats' %} {{ active_classes }}{% endif %}" href="{{ summer_url }}">
+      {{ icons.render('summer') }}
+      <span class="flex-1 text-left">Summer Stats</span>
     </a>
   </li>
   {% if current_user.is_admin %}
@@ -123,43 +162,82 @@
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
       <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
-        <span>Management</span>
-        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        {{ icons.render('management') }}
+        <span class="flex-1 text-left">Management</span>
+        <svg class="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
         </svg>
       </summary>
       <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.dashboard' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.files_view_unique' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.files_view_unique') }}">Files</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.dashboard' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.dashboard') }}">
+          {{ icons.render('dashboard') }}
+          <span class="flex-1 text-left">Dashboard</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.files_view_unique' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.files_view_unique') }}">
+          {{ icons.render('files') }}
+          <span class="flex-1 text-left">Files</span>
+        </a>
         {% if view_exists('merge.merge_csv') %}
-        <a class="{{ base_classes }}{% if request.endpoint == 'merge.merge_csv' %} {{ active_classes }}{% endif %}" href="{{ url_for('merge.merge_csv') }}">Merge CSV</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'merge.merge_csv' %} {{ active_classes }}{% endif %}" href="{{ url_for('merge.merge_csv') }}">
+          {{ icons.render('merge') }}
+          <span class="flex-1 text-left">Merge CSV</span>
+        </a>
         {% endif %}
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.roster' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.roster') }}">Roster</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.sessions' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.sessions') }}">Sessions</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.users_list' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.users_list') }}">Users</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.roster' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.roster') }}">
+          {{ icons.render('roster') }}
+          <span class="flex-1 text-left">Roster</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.sessions' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.sessions') }}">
+          {{ icons.render('sessions') }}
+          <span class="flex-1 text-left">Sessions</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.users_list' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.users_list') }}">
+          {{ icons.render('users') }}
+          <span class="flex-1 text-left">Users</span>
+        </a>
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.usage_report' %} {{ active_classes }}{% endif %}" href="{{ usage_url }}">Usage</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.correlation_workbench' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.correlation_workbench') }}">Correlation Workbench</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.usage_report' %} {{ active_classes }}{% endif %}" href="{{ usage_url }}">
+          {{ icons.render('usage') }}
+          <span class="flex-1 text-left">Usage</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.correlation_workbench' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.correlation_workbench') }}">
+          {{ icons.render('correlation') }}
+          <span class="flex-1 text-left">Correlation Workbench</span>
+        </a>
         {% if view_exists('admin.draft_upload') %}
-        <a class="{{ base_classes }}" href="{{ url_for('admin.draft_upload') }}">Draft Upload</a>
+        <a class="{{ link_base_classes }}" href="{{ url_for('admin.draft_upload') }}">
+          {{ icons.render('upload') }}
+          <span class="flex-1 text-left">Draft Upload</span>
+        </a>
         {% endif %}
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.eybl_import' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_import') }}">EYBL / AAU Import</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.eybl_identity' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_identity', circuit='EYBL') }}">Identity Review</a>
-        <a class="{{ base_classes }}{% if request.endpoint == 'admin.eybl_synonyms' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_synonyms') }}">Synonyms</a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.eybl_import' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_import') }}">
+          {{ icons.render('import') }}
+          <span class="flex-1 text-left">EYBL / AAU Import</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.eybl_identity' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_identity', circuit='EYBL') }}">
+          {{ icons.render('identity') }}
+          <span class="flex-1 text-left">Identity Review</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.eybl_synonyms' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_synonyms') }}">
+          {{ icons.render('synonyms') }}
+          <span class="flex-1 text-left">Synonyms</span>
+        </a>
       </div>
     </details>
   </li>
   {% endif %}
   {% if current_user.is_authenticated %}
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.logout' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.logout') }}">
-      Logout
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.logout' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.logout') }}">
+      {{ icons.render('logout') }}
+      <span class="flex-1 text-left">Logout</span>
     </a>
   </li>
   {% else %}
   <li class="nav-item">
-    <a class="{{ base_classes }}{% if request.endpoint == 'admin.login' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.login') }}">
-      Login
+    <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.login' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.login') }}">
+      {{ icons.render('login') }}
+      <span class="flex-1 text-left">Login</span>
     </a>
   </li>
   {% endif %}
