@@ -88,7 +88,7 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
             continue
 
         family_upper = family_name.upper()
-        treat_as_misc = family_upper in ("UKNOWN", "MISC")
+        treat_as_misc = family_upper in ("UKNOWN", "UNKNOWN", "MISC")
         family_label = "MISC" if treat_as_misc else family_name
 
         plays_map = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
