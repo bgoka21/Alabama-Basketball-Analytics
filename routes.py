@@ -14,8 +14,8 @@ from admin.routes import (
     collect_practice_labels,
     compute_filtered_totals,
     compute_filtered_blue,
-    aggregate_stats,
     compute_team_shot_details,
+    compute_team_totals_payload,
 )
 from models.database import PlayerStats, Practice, BlueCollarStats, Game, Season
 from datetime import date
@@ -1170,70 +1170,47 @@ def practice_team_totals():
     ]
     label_set = {lbl.upper() for lbl in selected_labels}
 
-    if label_set:
-        totals = compute_filtered_totals(stats, label_set)
-        blue_totals = compute_filtered_blue(stats, label_set)
-    else:
-        totals = aggregate_stats(stats)
-        bc_query = db.session.query(
-            func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
-            func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
-            func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
-            func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
-            func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
-            func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
-            func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
-            func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
-            func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
-            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
-        ).filter(BlueCollarStats.practice_id != None)
-        if start_dt or end_dt:
-            bc_query = bc_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
-            if start_dt:
-                bc_query = bc_query.filter(Practice.date >= start_dt)
-            if end_dt:
-                bc_query = bc_query.filter(Practice.date <= end_dt)
-        bc = bc_query.one()
-        blue_totals = SimpleNamespace(
-            def_reb=bc.def_reb,
-            off_reb=bc.off_reb,
-            misc=bc.misc,
-            deflection=bc.deflection,
-            steal=bc.steal,
-            block=bc.block,
-            floor_dive=bc.floor_dive,
-            charge_taken=bc.charge_taken,
-            reb_tip=bc.reb_tip,
-            total_blue_collar=bc.total_blue_collar,
-        )
+    trend_selected_labels = [
+        lbl for lbl in request.args.getlist('trend_label') if lbl.upper() in label_options
+    ]
 
-    pt_query = db.session.query(
-        func.coalesce(Possession.paint_touches, '').label('pt'),
-        func.coalesce(func.sum(Possession.points_scored), 0).label('points'),
-        func.count(Possession.id).label('poss'),
-    ).filter(Possession.practice_id != None)
-    if start_dt or end_dt:
-        pt_query = pt_query.join(Practice, Possession.practice_id == Practice.id)
-        if start_dt:
-            pt_query = pt_query.filter(Practice.date >= start_dt)
-        if end_dt:
-            pt_query = pt_query.filter(Practice.date <= end_dt)
-    pt_rows = pt_query.group_by(Possession.paint_touches).all()
-    buckets = {0: {'pts': 0, 'poss': 0}, 1: {'pts': 0, 'poss': 0}, 2: {'pts': 0, 'poss': 0}, 3: {'pts': 0, 'poss': 0}}
-    for r in pt_rows:
+    trend_season_id = request.args.get('trend_season_id', type=int)
+    trend_start_date = request.args.get('trend_start_date', start_date)
+    trend_end_date = request.args.get('trend_end_date', end_date)
+    trend_window = request.args.get('trend_window', type=int)
+    trend_start_dt = trend_end_dt = None
+    if trend_start_date:
         try:
-            val = int(float(str(r.pt).strip() or '0'))
+            trend_start_dt = date.fromisoformat(trend_start_date)
         except ValueError:
-            continue
-        key = 3 if val >= 3 else val
-        buckets[key]['pts'] += r.points
-        buckets[key]['poss'] += r.poss
-    paint_ppp = SimpleNamespace(
-        zero=round(buckets[0]['pts'] / buckets[0]['poss'], 2) if buckets[0]['poss'] else 0.0,
-        one=round(buckets[1]['pts'] / buckets[1]['poss'], 2) if buckets[1]['poss'] else 0.0,
-        two=round(buckets[2]['pts'] / buckets[2]['poss'], 2) if buckets[2]['poss'] else 0.0,
-        three=round(buckets[3]['pts'] / buckets[3]['poss'], 2) if buckets[3]['poss'] else 0.0,
+            trend_start_date = ''
+    if trend_end_date:
+        try:
+            trend_end_dt = date.fromisoformat(trend_end_date)
+        except ValueError:
+            trend_end_date = ''
+
+    payload = compute_team_totals_payload(
+        stats_list=stats,
+        label_set=label_set,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        trend_selected_stats=request.args.getlist('trend_stat'),
+        trend_season_id=trend_season_id,
+        trend_start_dt=trend_start_dt,
+        trend_end_dt=trend_end_dt,
+        trend_selected_categories=[],
+        trend_window=trend_window,
     )
+
+    totals = payload['totals']
+    blue_totals = payload['blue_totals']
+    paint_ppp = payload['paint_ppp']
+    shot_type_totals = payload['shot_type_totals']
+    shot_summaries = payload['shot_summaries']
+    trend_rows = payload['trend_rows']
+    trend_selected_stats = payload['trend_selected_stats']
+    trend_stat_options = payload['trend_stat_options']
 
     return render_template(
         'admin/team_totals.html',
@@ -1242,10 +1219,22 @@ def practice_team_totals():
         paint_ppp=paint_ppp,
         label_options=label_options,
         selected_labels=selected_labels,
+        shot_type_totals=shot_type_totals,
+        shot_summaries=shot_summaries,
+        trend_rows=trend_rows,
+        trend_selected_stats=trend_selected_stats,
+        trend_stat_options=trend_stat_options,
         start_date=start_date or '',
         end_date=end_date or '',
         seasons=[],
         selected_season=None,
+        trend_selected_season=trend_season_id,
+        trend_start_date=trend_start_date or '',
+        trend_end_date=trend_end_date or '',
+        trend_window=trend_window,
+        trend_selected_labels=trend_selected_labels,
+        practice_categories=[],
+        trend_selected_categories=[],
         active_page='team_totals',
         # >>> TEMPLATE CONTEXT SESSION START
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',

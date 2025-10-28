@@ -128,6 +128,37 @@ GAME_TYPE_OPTIONS = [
     "Conference",
     "Postseason",
 ]
+
+TEAM_TOTAL_TREND_ALLOWED_STATS = {
+    "points",
+    "assists",
+    "turnovers",
+    "atr_makes",
+    "atr_attempts",
+    "fg2_makes",
+    "fg2_attempts",
+    "fg3_makes",
+    "fg3_attempts",
+    "ftm",
+    "fta",
+    "atr_pct",
+    "fg3_pct",
+    "atr_freq_pct",
+    "fg3_freq_pct",
+    "efg_pct",
+    "points_per_shot",
+    "assist_turnover_ratio",
+    "adj_assist_turnover_ratio",
+    "second_assists",
+    "pot_assists",
+    "ft_pct",
+    "fg_pct",
+    "fg2_pct",
+    "total_blue_collar",
+    "deflection",
+    "steal",
+    "block",
+}
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
     get_on_court_metrics,
@@ -7646,6 +7677,297 @@ def nba100_scores():
     )
 
 
+def compute_team_totals_payload(
+    *,
+    stats_list,
+    label_set,
+    season_id=None,
+    start_dt=None,
+    end_dt=None,
+    trend_selected_stats=None,
+    trend_season_id=None,
+    trend_start_dt=None,
+    trend_end_dt=None,
+    trend_selected_categories=None,
+    trend_window=None,
+):
+    """Build reusable aggregate data for practice team totals views."""
+
+    stats_list = stats_list or []
+    label_set = label_set or set()
+    trend_selected_categories = trend_selected_categories or []
+
+    if label_set:
+        totals = compute_filtered_totals(stats_list, label_set)
+        blue_totals = compute_filtered_blue(stats_list, label_set)
+    else:
+        totals = aggregate_stats(stats_list)
+
+        bc_query = db.session.query(
+            func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
+            func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
+            func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
+            func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
+            func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
+            func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
+            func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
+            func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
+            func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
+            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
+        ).filter(BlueCollarStats.practice_id != None)
+        if season_id:
+            bc_query = bc_query.filter(BlueCollarStats.season_id == season_id)
+        if start_dt or end_dt:
+            bc_query = bc_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
+            if start_dt:
+                bc_query = bc_query.filter(Practice.date >= start_dt)
+            if end_dt:
+                bc_query = bc_query.filter(Practice.date <= end_dt)
+        bc = bc_query.one()
+        blue_totals = SimpleNamespace(
+            def_reb=bc.def_reb,
+            off_reb=bc.off_reb,
+            misc=bc.misc,
+            deflection=bc.deflection,
+            steal=bc.steal,
+            block=bc.block,
+            floor_dive=bc.floor_dive,
+            charge_taken=bc.charge_taken,
+            reb_tip=bc.reb_tip,
+            total_blue_collar=bc.total_blue_collar,
+        )
+
+    pt_query = db.session.query(
+        func.coalesce(Possession.paint_touches, '').label('pt'),
+        func.coalesce(func.sum(Possession.points_scored), 0).label('points'),
+        func.count(Possession.id).label('poss'),
+    ).filter(Possession.practice_id != None)
+    if season_id:
+        pt_query = pt_query.filter(Possession.season_id == season_id)
+    if start_dt or end_dt:
+        pt_query = pt_query.join(Practice, Possession.practice_id == Practice.id)
+        if start_dt:
+            pt_query = pt_query.filter(Practice.date >= start_dt)
+        if end_dt:
+            pt_query = pt_query.filter(Practice.date <= end_dt)
+    pt_rows = pt_query.group_by(Possession.paint_touches).all()
+    buckets = {i: {'pts': 0, 'poss': 0} for i in range(4)}
+    for r in pt_rows:
+        try:
+            val = int(float(str(r.pt).strip() or '0'))
+        except ValueError:
+            continue
+        key = 3 if val >= 3 else val
+        buckets[key]['pts'] += r.points
+        buckets[key]['poss'] += r.poss
+    paint_ppp = SimpleNamespace(
+        zero=round(buckets[0]['pts'] / buckets[0]['poss'], 2) if buckets[0]['poss'] else 0.0,
+        one=round(buckets[1]['pts'] / buckets[1]['poss'], 2) if buckets[1]['poss'] else 0.0,
+        two=round(buckets[2]['pts'] / buckets[2]['poss'], 2) if buckets[2]['poss'] else 0.0,
+        three=round(buckets[3]['pts'] / buckets[3]['poss'], 2) if buckets[3]['poss'] else 0.0,
+    )
+
+    shot_type_totals, shot_summaries = compute_team_shot_details(stats_list, label_set)
+
+    trend_season_id = trend_season_id or season_id
+    selected_stats = [
+        s for s in (trend_selected_stats or []) if s in TEAM_TOTAL_TREND_ALLOWED_STATS
+    ]
+    if not selected_stats:
+        selected_stats = ['points']
+
+    selected_set = set(selected_stats)
+    query_stats = set(selected_stats)
+    if 'atr_pct' in query_stats:
+        query_stats.update({'atr_makes', 'atr_attempts'})
+    if 'fg3_pct' in query_stats:
+        query_stats.update({'fg3_makes', 'fg3_attempts'})
+    if query_stats & {'atr_freq_pct', 'fg3_freq_pct'}:
+        query_stats.update({'atr_attempts', 'fg2_attempts', 'fg3_attempts'})
+    if query_stats & {'efg_pct', 'points_per_shot', 'fg_pct', 'fg2_pct'}:
+        query_stats.update(
+            {
+                'atr_makes',
+                'atr_attempts',
+                'fg2_makes',
+                'fg2_attempts',
+                'fg3_makes',
+                'fg3_attempts',
+            }
+        )
+    if 'ft_pct' in query_stats:
+        query_stats.update({'ftm', 'fta'})
+    if query_stats & {'assist_turnover_ratio', 'adj_assist_turnover_ratio'}:
+        query_stats.update({'assists', 'turnovers', 'second_assists', 'pot_assists'})
+
+    bc_fields = {'total_blue_collar', 'deflection', 'steal', 'block'}
+    computed_fields = {
+        'atr_pct',
+        'fg3_pct',
+        'atr_freq_pct',
+        'fg3_freq_pct',
+        'efg_pct',
+        'points_per_shot',
+        'assist_turnover_ratio',
+        'adj_assist_turnover_ratio',
+        'fg_pct',
+        'fg2_pct',
+        'ft_pct',
+    }
+
+    sql_fields = [
+        func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s)
+        for s in query_stats
+        if s not in computed_fields and s not in bc_fields
+    ]
+
+    bc_alias = aliased(BlueCollarStats)
+    roster_alias = aliased(Roster)
+    bc_sql_fields = [
+        func.coalesce(func.sum(getattr(bc_alias, s)), 0).label(s)
+        for s in (query_stats & bc_fields)
+    ]
+
+    trend_query = (
+        db.session.query(
+            Practice.date.label('dt'),
+            *sql_fields,
+            *bc_sql_fields,
+        )
+        .select_from(PlayerStats)
+        .join(Practice, PlayerStats.practice_id == Practice.id)
+    )
+    if bc_sql_fields:
+        trend_query = trend_query.join(
+            roster_alias,
+            and_(
+                roster_alias.season_id == PlayerStats.season_id,
+                roster_alias.player_name == PlayerStats.player_name,
+            ),
+        ).outerjoin(
+            bc_alias,
+            and_(
+                bc_alias.practice_id == Practice.id,
+                bc_alias.player_id == roster_alias.id,
+                bc_alias.season_id == PlayerStats.season_id,
+            ),
+        )
+    trend_query = trend_query.filter(PlayerStats.practice_id != None)
+    if trend_season_id:
+        trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
+    if trend_start_dt:
+        trend_query = trend_query.filter(Practice.date >= trend_start_dt)
+    if trend_end_dt:
+        trend_query = trend_query.filter(Practice.date <= trend_end_dt)
+    if trend_selected_categories:
+        trend_query = trend_query.filter(Practice.category.in_(trend_selected_categories))
+
+    trend_rows = []
+    for r in trend_query.group_by(Practice.date).order_by(Practice.date):
+        base = {s: getattr(r, s) for s in query_stats if s not in computed_fields}
+        if 'atr_pct' in selected_stats:
+            att = base.get('atr_attempts', 0)
+            pct = round(base.get('atr_makes', 0) / att * 100, 1) if att else 0.0
+            base['atr_pct'] = pct
+        if 'fg3_pct' in selected_stats:
+            att = base.get('fg3_attempts', 0)
+            pct = round(base.get('fg3_makes', 0) / att * 100, 1) if att else 0.0
+            base['fg3_pct'] = pct
+        if 'ft_pct' in selected_stats:
+            att = base.get('fta', 0)
+            pct = round(base.get('ftm', 0) / att * 100, 1) if att else 0.0
+            base['ft_pct'] = pct
+        if selected_set & {'efg_pct', 'points_per_shot', 'fg_pct'}:
+            total_shots = (
+                base.get('atr_attempts', 0)
+                + base.get('fg2_attempts', 0)
+                + base.get('fg3_attempts', 0)
+            )
+            if total_shots:
+                efg = (
+                    base.get('atr_makes', 0)
+                    + base.get('fg2_makes', 0)
+                    + 1.5 * base.get('fg3_makes', 0)
+                ) / total_shots
+                if 'efg_pct' in selected_stats:
+                    base['efg_pct'] = round(efg * 100, 1)
+                if 'points_per_shot' in selected_stats:
+                    base['points_per_shot'] = round(efg * 2, 2)
+                if 'fg_pct' in selected_stats:
+                    fg = (
+                        base.get('atr_makes', 0)
+                        + base.get('fg2_makes', 0)
+                        + base.get('fg3_makes', 0)
+                    ) / total_shots
+                    base['fg_pct'] = round(fg * 100, 1)
+                if selected_set & {'atr_freq_pct', 'fg3_freq_pct'}:
+                    if 'atr_freq_pct' in selected_stats:
+                        base['atr_freq_pct'] = round(
+                            base.get('atr_attempts', 0) / total_shots * 100,
+                            1,
+                        )
+                    if 'fg3_freq_pct' in selected_stats:
+                        base['fg3_freq_pct'] = round(
+                            base.get('fg3_attempts', 0) / total_shots * 100,
+                            1,
+                        )
+            else:
+                if 'efg_pct' in selected_stats:
+                    base['efg_pct'] = 0.0
+                if 'points_per_shot' in selected_stats:
+                    base['points_per_shot'] = 0.0
+                if 'fg_pct' in selected_stats:
+                    base['fg_pct'] = 0.0
+                if 'atr_freq_pct' in selected_stats:
+                    base['atr_freq_pct'] = 0.0
+                if 'fg3_freq_pct' in selected_stats:
+                    base['fg3_freq_pct'] = 0.0
+        if 'fg2_pct' in selected_stats:
+            att = base.get('fg2_attempts', 0)
+            pct = round(base.get('fg2_makes', 0) / att * 100, 1) if att else 0.0
+            base['fg2_pct'] = pct
+        if 'assist_turnover_ratio' in selected_stats:
+            tos = base.get('turnovers', 0)
+            base['assist_turnover_ratio'] = (
+                round(base.get('assists', 0) / tos, 2) if tos else 0.0
+            )
+        if 'adj_assist_turnover_ratio' in selected_stats:
+            tos = base.get('turnovers', 0)
+            total_ast = (
+                base.get('assists', 0)
+                + base.get('second_assists', 0)
+                + base.get('pot_assists', 0)
+            )
+            base['adj_assist_turnover_ratio'] = (
+                round(total_ast / tos, 2) if tos else 0.0
+            )
+        trend_rows.append(
+            {'date': r.dt.isoformat(), **{s: base.get(s, 0) for s in selected_stats}}
+        )
+
+    if trend_window and trend_window > 1:
+        aggregated = []
+        for i in range(len(trend_rows)):
+            subset = trend_rows[max(0, i - trend_window + 1): i + 1]
+            row = {'date': trend_rows[i]['date']}
+            for stat in selected_stats:
+                vals = [d.get(stat, 0) for d in subset]
+                row[stat] = round(sum(vals) / len(subset), 2) if subset else 0
+            aggregated.append(row)
+        trend_rows = aggregated
+
+    return {
+        'totals': totals,
+        'blue_totals': blue_totals,
+        'paint_ppp': paint_ppp,
+        'shot_type_totals': shot_type_totals,
+        'shot_summaries': shot_summaries,
+        'trend_rows': trend_rows,
+        'trend_selected_stats': selected_stats,
+        'trend_stat_options': sorted(TEAM_TOTAL_TREND_ALLOWED_STATS),
+    }
+
+
 @admin_bp.route('/team_totals')
 @login_required
 def team_totals():
@@ -7743,227 +8065,28 @@ def team_totals():
     ]
     trend_label_set = {lbl.upper() for lbl in trend_selected_labels}
 
-    if label_set:
-        totals = compute_filtered_totals(stats_list, label_set)
-        blue_totals = compute_filtered_blue(stats_list, label_set)
-    else:
-        totals = aggregate_stats(stats_list)
-
-        bc_query = db.session.query(
-            func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label('def_reb'),
-            func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label('off_reb'),
-            func.coalesce(func.sum(BlueCollarStats.misc), 0).label('misc'),
-            func.coalesce(func.sum(BlueCollarStats.deflection), 0).label('deflection'),
-            func.coalesce(func.sum(BlueCollarStats.steal), 0).label('steal'),
-            func.coalesce(func.sum(BlueCollarStats.block), 0).label('block'),
-            func.coalesce(func.sum(BlueCollarStats.floor_dive), 0).label('floor_dive'),
-            func.coalesce(func.sum(BlueCollarStats.charge_taken), 0).label('charge_taken'),
-            func.coalesce(func.sum(BlueCollarStats.reb_tip), 0).label('reb_tip'),
-            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label('total_blue_collar'),
-        ).filter(BlueCollarStats.practice_id != None)
-        if season_id:
-            bc_query = bc_query.filter(BlueCollarStats.season_id == season_id)
-        if start_dt or end_dt:
-            bc_query = bc_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
-            if start_dt:
-                bc_query = bc_query.filter(Practice.date >= start_dt)
-            if end_dt:
-                bc_query = bc_query.filter(Practice.date <= end_dt)
-        bc = bc_query.one()
-        blue_totals = SimpleNamespace(
-            def_reb=bc.def_reb,
-            off_reb=bc.off_reb,
-            misc=bc.misc,
-            deflection=bc.deflection,
-            steal=bc.steal,
-            block=bc.block,
-            floor_dive=bc.floor_dive,
-            charge_taken=bc.charge_taken,
-            reb_tip=bc.reb_tip,
-            total_blue_collar=bc.total_blue_collar,
-        )
-
-    pt_query = db.session.query(
-        func.coalesce(Possession.paint_touches, '').label('pt'),
-        func.coalesce(func.sum(Possession.points_scored), 0).label('points'),
-        func.count(Possession.id).label('poss'),
-    ).filter(Possession.practice_id != None)
-    if season_id:
-        pt_query = pt_query.filter(Possession.season_id == season_id)
-    if start_dt or end_dt:
-        pt_query = pt_query.join(Practice, Possession.practice_id == Practice.id)
-        if start_dt:
-            pt_query = pt_query.filter(Practice.date >= start_dt)
-        if end_dt:
-            pt_query = pt_query.filter(Practice.date <= end_dt)
-    pt_rows = pt_query.group_by(Possession.paint_touches).all()
-    buckets = {0: {'pts': 0, 'poss': 0}, 1: {'pts': 0, 'poss': 0}, 2: {'pts': 0, 'poss': 0}, 3: {'pts': 0, 'poss': 0}}
-    for r in pt_rows:
-        try:
-            val = int(float(str(r.pt).strip() or '0'))
-        except ValueError:
-            continue
-        key = 3 if val >= 3 else val
-        buckets[key]['pts'] += r.points
-        buckets[key]['poss'] += r.poss
-    paint_ppp = SimpleNamespace(
-        zero=round(buckets[0]['pts'] / buckets[0]['poss'], 2) if buckets[0]['poss'] else 0.0,
-        one=round(buckets[1]['pts'] / buckets[1]['poss'], 2) if buckets[1]['poss'] else 0.0,
-        two=round(buckets[2]['pts'] / buckets[2]['poss'], 2) if buckets[2]['poss'] else 0.0,
-        three=round(buckets[3]['pts'] / buckets[3]['poss'], 2) if buckets[3]['poss'] else 0.0,
+    payload = compute_team_totals_payload(
+        stats_list=stats_list,
+        label_set=label_set,
+        season_id=season_id,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        trend_selected_stats=request.args.getlist('trend_stat'),
+        trend_season_id=trend_season_id,
+        trend_start_dt=trend_start_dt,
+        trend_end_dt=trend_end_dt,
+        trend_selected_categories=trend_selected_categories,
+        trend_window=trend_window,
     )
 
-    shot_type_totals, shot_summaries = compute_team_shot_details(stats_list, label_set)
-
-    # ─── Build trend data by date ───────────────────────────────────────────
-    # Trend graph aggregates all players; player filters removed
-
-    allowed_stats = {
-        'points','assists','turnovers','atr_makes','atr_attempts','fg2_makes',
-        'fg2_attempts','fg3_makes','fg3_attempts','ftm','fta','atr_pct','fg3_pct',
-        'atr_freq_pct','fg3_freq_pct',
-        'efg_pct','points_per_shot','assist_turnover_ratio','adj_assist_turnover_ratio',
-        'second_assists','pot_assists','ft_pct','fg_pct','fg2_pct',
-        'total_blue_collar','deflection','steal','block'
-    }
-    selected_stats = [s for s in request.args.getlist('trend_stat') if s in allowed_stats]
-    if not selected_stats:
-        selected_stats = ['points']
-
-    selected_set = set(selected_stats)
-    query_stats = set(selected_stats)
-    if 'atr_pct' in query_stats:
-        query_stats.update({'atr_makes','atr_attempts'})
-    if 'fg3_pct' in query_stats:
-        query_stats.update({'fg3_makes','fg3_attempts'})
-    if query_stats & {'atr_freq_pct','fg3_freq_pct'}:
-        query_stats.update({'atr_attempts','fg2_attempts','fg3_attempts'})
-    if query_stats & {'efg_pct','points_per_shot','fg_pct','fg2_pct'}:
-        query_stats.update({'atr_makes','atr_attempts','fg2_makes','fg2_attempts','fg3_makes','fg3_attempts'})
-    if 'ft_pct' in query_stats:
-        query_stats.update({'ftm','fta'})
-    if query_stats & {'assist_turnover_ratio','adj_assist_turnover_ratio'}:
-        query_stats.update({'assists','turnovers','second_assists','pot_assists'})
-
-    bc_fields = {'total_blue_collar','deflection','steal','block'}
-    computed_fields = {
-        'atr_pct','fg3_pct','atr_freq_pct','fg3_freq_pct',
-        'efg_pct','points_per_shot','assist_turnover_ratio',
-        'adj_assist_turnover_ratio','fg_pct','fg2_pct','ft_pct'
-    }
-
-    sql_fields = [
-        func.coalesce(func.sum(getattr(PlayerStats, s)), 0).label(s)
-        for s in query_stats
-        if s not in computed_fields and s not in bc_fields
-    ]
-
-    bc_alias = aliased(BlueCollarStats)
-    roster_alias = aliased(Roster)
-    bc_sql_fields = [
-        func.coalesce(func.sum(getattr(bc_alias, s)), 0).label(s)
-        for s in (query_stats & bc_fields)
-    ]
-
-    trend_query = (
-        db.session.query(
-            Practice.date.label('dt'),
-            *sql_fields,
-            *bc_sql_fields
-        )
-        .select_from(PlayerStats)
-        .join(Practice, PlayerStats.practice_id == Practice.id)
-    )
-    if bc_sql_fields:
-        trend_query = trend_query.join(
-            roster_alias,
-            and_(
-                roster_alias.season_id == PlayerStats.season_id,
-                roster_alias.player_name == PlayerStats.player_name,
-            ),
-        ).outerjoin(
-            bc_alias,
-            and_(
-                bc_alias.practice_id == Practice.id,
-                bc_alias.player_id == roster_alias.id,
-                bc_alias.season_id == PlayerStats.season_id,
-            ),
-        )
-    trend_query = trend_query.filter(PlayerStats.practice_id != None)
-    if trend_season_id:
-        trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
-    if trend_start_dt:
-        trend_query = trend_query.filter(Practice.date >= trend_start_dt)
-    if trend_end_dt:
-        trend_query = trend_query.filter(Practice.date <= trend_end_dt)
-    if trend_selected_categories:
-        trend_query = trend_query.filter(Practice.category.in_(trend_selected_categories))
-    # No player-level filtering
-    trend_rows = []
-    for r in trend_query.group_by(Practice.date).order_by(Practice.date):
-        base = {s: getattr(r, s) for s in query_stats if s not in computed_fields}
-        if 'atr_pct' in selected_stats:
-            att = base.get('atr_attempts', 0)
-            pct = round(base.get('atr_makes', 0) / att * 100, 1) if att else 0.0
-            base['atr_pct'] = pct
-        if 'fg3_pct' in selected_stats:
-            att = base.get('fg3_attempts', 0)
-            pct = round(base.get('fg3_makes', 0) / att * 100, 1) if att else 0.0
-            base['fg3_pct'] = pct
-        if 'ft_pct' in selected_stats:
-            att = base.get('fta', 0)
-            pct = round(base.get('ftm', 0) / att * 100, 1) if att else 0.0
-            base['ft_pct'] = pct
-        if selected_set & {'efg_pct','points_per_shot','fg_pct'}:
-            total_shots = base.get('atr_attempts',0)+base.get('fg2_attempts',0)+base.get('fg3_attempts',0)
-            if total_shots:
-                efg = (base.get('atr_makes',0)+base.get('fg2_makes',0)+1.5*base.get('fg3_makes',0))/total_shots
-                if 'efg_pct' in selected_stats:
-                    base['efg_pct'] = round(efg*100,1)
-                if 'points_per_shot' in selected_stats:
-                    base['points_per_shot'] = round(efg*2,2)
-                if 'fg_pct' in selected_stats:
-                    fg = (base.get('atr_makes',0)+base.get('fg2_makes',0)+base.get('fg3_makes',0))/total_shots
-                    base['fg_pct'] = round(fg*100,1)
-                if selected_set & {'atr_freq_pct','fg3_freq_pct'}:
-                    if 'atr_freq_pct' in selected_stats:
-                        base['atr_freq_pct'] = round(base.get('atr_attempts',0)/total_shots*100,1)
-                    if 'fg3_freq_pct' in selected_stats:
-                        base['fg3_freq_pct'] = round(base.get('fg3_attempts',0)/total_shots*100,1)
-            else:
-                if 'efg_pct' in selected_stats:
-                    base['efg_pct'] = 0.0
-                if 'points_per_shot' in selected_stats:
-                    base['points_per_shot'] = 0.0
-                if 'fg_pct' in selected_stats:
-                    base['fg_pct'] = 0.0
-                if 'atr_freq_pct' in selected_stats:
-                    base['atr_freq_pct'] = 0.0
-                if 'fg3_freq_pct' in selected_stats:
-                    base['fg3_freq_pct'] = 0.0
-        if 'fg2_pct' in selected_stats:
-            att = base.get('fg2_attempts',0)
-            pct = round(base.get('fg2_makes',0)/att*100,1) if att else 0.0
-            base['fg2_pct'] = pct
-        if 'assist_turnover_ratio' in selected_stats:
-            tos = base.get('turnovers',0)
-            base['assist_turnover_ratio'] = round(base.get('assists',0)/tos,2) if tos else 0.0
-        if 'adj_assist_turnover_ratio' in selected_stats:
-            tos = base.get('turnovers',0)
-            total_ast = base.get('assists',0)+base.get('second_assists',0)+base.get('pot_assists',0)
-            base['adj_assist_turnover_ratio'] = round(total_ast/tos,2) if tos else 0.0
-        trend_rows.append({'date': r.dt.isoformat(), **{s: base.get(s, 0) for s in selected_stats}})
-
-    if trend_window and trend_window > 1:
-        aggregated = []
-        for i in range(len(trend_rows)):
-            subset = trend_rows[max(0, i - trend_window + 1) : i + 1]
-            row = {'date': trend_rows[i]['date']}
-            for stat in selected_stats:
-                vals = [d.get(stat, 0) for d in subset]
-                row[stat] = round(sum(vals) / len(subset), 2)
-            aggregated.append(row)
-        trend_rows = aggregated
+    totals = payload['totals']
+    blue_totals = payload['blue_totals']
+    paint_ppp = payload['paint_ppp']
+    shot_type_totals = payload['shot_type_totals']
+    shot_summaries = payload['shot_summaries']
+    trend_rows = payload['trend_rows']
+    trend_selected_stats = payload['trend_selected_stats']
+    trend_stat_options = payload['trend_stat_options']
 
     return render_template(
         'admin/team_totals.html',
@@ -7979,8 +8102,8 @@ def team_totals():
         label_options=label_options,
         selected_labels=selected_labels,
         trend_rows=trend_rows,
-        trend_selected_stats=selected_stats,
-        trend_stat_options=sorted(allowed_stats),
+        trend_selected_stats=trend_selected_stats,
+        trend_stat_options=trend_stat_options,
         trend_selected_season=trend_season_id,
         trend_start_date=trend_start_date or '',
         trend_end_date=trend_end_date or '',
