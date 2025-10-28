@@ -186,7 +186,11 @@
       datesPresetsList: document.getElementById('dates-presets-list'),
       combinedWrapper: document.getElementById('combined-presets-wrapper'),
       combinedPresetsList: document.getElementById('combined-presets-list'),
-      combinedAccordion: document.getElementById('combined-presets-accordion')
+      combinedAccordion: document.getElementById('combined-presets-accordion'),
+      sourceToggle: document.getElementById('custom-source-toggle'),
+      modeLabel: document.getElementById('mode-toggle-label'),
+      sourceHeading: document.getElementById('custom-source-heading'),
+      sourceDescription: document.getElementById('custom-source-description')
     };
 
     if (!elements.playerRoot || !elements.tableContainer || !elements.statGroups) {
@@ -200,8 +204,10 @@
       selectedPlayerIds: new Set(),
       fieldOrder: new Map(),
       selectedFields: [],
+      selectedFieldsBySource: { practice: [], game: [] },
       mode: 'totals',
-      source: 'practice',
+      modeSelections: { practice: 'totals', game: 'totals' },
+      source: normalizeSource(config && config.defaultSource ? config.defaultSource : 'practice'),
       autoRefresh: Boolean(elements.autoRefresh ? elements.autoRefresh.checked : true),
       lastPayload: null,
       presets: { players: [], stats: [], dates: [], combined: [] },
@@ -215,13 +221,26 @@
 
     const playerUI = buildPlayerPicker(elements.playerRoot, state, queueRefresh);
 
-    fetchFields(config.fieldsUrl, elements.statGroups, elements.statSearch, state, queueRefresh);
+    state.selectedFieldsBySource.practice = state.selectedFields.slice();
+    state.modeSelections.practice = state.mode;
+
+    hydrateSourceToggle(elements, state, config, queueRefresh, playerUI, setSource);
 
     hydrateDates(elements, state, queueRefresh);
-    hydrateModeToggle(elements.modeToggle, state, queueRefresh);
+    hydrateModeToggle(elements.modeToggle, state, queueRefresh, elements);
     hydrateAutoRefresh(elements.autoRefresh, state);
-    hydratePresets(config, elements, state, queueRefresh, playerUI);
+    hydratePresets(config, elements, state, queueRefresh, playerUI, setSource);
     hydrateExports(config, elements, state);
+
+    updateSourceHeadline(state, elements);
+    updateSourceButtons(state, elements);
+    updateModeToggleLabels(state, elements);
+
+    setSource(state.source, { force: true, queueRefresh: false }).then(() => {
+      if (state.autoRefresh) {
+        queueRefresh('init');
+      }
+    });
 
     function queueRefresh(reason) {
       if (!state.autoRefresh) {
@@ -234,6 +253,91 @@
         state.refreshTimer = null;
         refreshTable(config, elements, state);
       }, REFRESH_DEBOUNCE_MS);
+    }
+
+    function resolveFieldsUrl(source) {
+      const normalized = normalizeSource(source);
+      if (normalized === 'game') {
+        return config.fieldsUrlGame || config.fieldsUrl;
+      }
+      return config.fieldsUrlPractice || config.fieldsUrl;
+    }
+
+    async function setSource(nextSource, options = {}) {
+      const normalized = normalizeSource(nextSource);
+      const force = Boolean(options.force);
+      const previousSource = state.source;
+
+      if (!force && normalized === previousSource) {
+        if (Array.isArray(options.presetFields)) {
+          state.selectedFields = options.presetFields.slice();
+        } else {
+          state.selectedFields = state.selectedFieldsBySource[normalized]
+            ? state.selectedFieldsBySource[normalized].slice()
+            : [];
+        }
+        const desiredMode = normalizeModeForSource(
+          options.modeOverride ?? state.modeSelections[normalized],
+          normalized
+        );
+        if (state.mode !== desiredMode) {
+          state.mode = desiredMode;
+        }
+        state.modeSelections[normalized] = state.mode;
+        updateModeButtons(state);
+        updateModeToggleLabels(state, elements);
+        updateSourceHeadline(state, elements);
+        updateSourceButtons(state, elements);
+        syncFieldCheckboxes(state);
+        if (options.queueRefresh !== false) {
+          queueRefresh('source');
+        }
+        return false;
+      }
+
+      state.selectedFieldsBySource[previousSource] = state.selectedFields.slice();
+      state.modeSelections[previousSource] = state.mode;
+
+      state.source = normalized;
+      if (Array.isArray(options.presetFields)) {
+        state.selectedFields = options.presetFields.slice();
+      } else {
+        state.selectedFields = state.selectedFieldsBySource[normalized]
+          ? state.selectedFieldsBySource[normalized].slice()
+          : [];
+      }
+
+      const nextMode = normalizeModeForSource(
+        options.modeOverride ?? state.modeSelections[normalized],
+        normalized
+      );
+      state.mode = nextMode;
+      state.modeSelections[normalized] = nextMode;
+
+      updateModeButtons(state);
+      updateModeToggleLabels(state, elements);
+      updateSourceHeadline(state, elements);
+      updateSourceButtons(state, elements);
+      state.lastPayload = null;
+
+      if (elements.statSearch) {
+        elements.statSearch.value = '';
+      }
+
+      const url = resolveFieldsUrl(normalized);
+      await fetchFields(url, elements.statGroups, elements.statSearch, state, queueRefresh, {
+        skipRefresh: true
+      });
+
+      state.selectedFields = dedupeAndSortFields(state.selectedFields, state.fieldOrder);
+      state.selectedFieldsBySource[normalized] = state.selectedFields.slice();
+      syncFieldCheckboxes(state);
+
+      if (options.queueRefresh !== false) {
+        queueRefresh('source');
+      }
+
+      return true;
     }
 
     playerUI.onChange = queueRefresh;
@@ -575,15 +679,38 @@
       .filter(Boolean);
   }
 
-  function fetchFields(url, container, searchInput, state, queueRefresh) {
+  function normalizeSource(value) {
+    if (value === null || value === undefined || value === '') {
+      return 'practice';
+    }
+    const text = String(value).trim().toLowerCase();
+    return text === 'game' ? 'game' : 'practice';
+  }
+
+  function normalizeModeForSource(mode, source) {
+    const normalizedSource = normalizeSource(source);
+    const raw = mode === null || mode === undefined ? '' : String(mode).trim().toLowerCase();
+    if (normalizedSource === 'game') {
+      if (raw === 'per_practice') {
+        return 'per_game';
+      }
+      return raw === 'per_game' || raw === 'totals' ? raw : 'totals';
+    }
+    if (raw === 'per_game') {
+      return 'per_practice';
+    }
+    return raw === 'per_practice' || raw === 'totals' ? raw : 'totals';
+  }
+
+  function fetchFields(url, container, searchInput, state, queueRefresh, options = {}) {
     if (!url) {
       container.innerHTML = '<p class="text-xs text-red-600">Missing stat field endpoint.</p>';
-      return;
+      return Promise.resolve(null);
     }
 
     container.innerHTML = '<p class="text-xs text-gray-500">Loading stat catalog…</p>';
 
-    fetch(url, { credentials: 'same-origin' })
+    return fetch(url, { credentials: 'same-origin' })
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to load fields (${response.status})`);
@@ -591,18 +718,21 @@
         return response.json();
       })
       .then((catalog) => {
-        buildFieldPicker(catalog, container, state, queueRefresh);
-        if (searchInput) {
+        buildFieldPicker(catalog, container, state, queueRefresh, options);
+        if (searchInput && !searchInput.dataset.customStatsBound) {
           searchInput.addEventListener('input', () => filterFields(searchInput.value, state));
+          searchInput.dataset.customStatsBound = '1';
         }
+        return catalog;
       })
       .catch((error) => {
         console.error('[custom-stats] Failed to load field catalog', error);
         container.innerHTML = '<p class="text-xs text-red-600">Unable to load stat catalog.</p>';
+        return null;
       });
   }
 
-  function buildFieldPicker(catalog, container, state, queueRefresh) {
+  function buildFieldPicker(catalog, container, state, queueRefresh, options = {}) {
     container.innerHTML = '';
     state.fieldCheckboxes = [];
     state.fieldOrder = new Map();
@@ -611,6 +741,18 @@
       container.innerHTML = '<p class="text-xs text-red-600">Stat catalog unavailable.</p>';
       return;
     }
+
+    const availableKeys = new Set();
+    Object.values(catalog).forEach((fields) => {
+      if (!Array.isArray(fields)) {
+        return;
+      }
+      fields.forEach((field) => {
+        if (field && field.key) {
+          availableKeys.add(String(field.key));
+        }
+      });
+    });
 
     let orderCounter = 0;
     Object.entries(catalog).forEach(([groupLabel, fields]) => {
@@ -647,6 +789,7 @@
               state.selectedFields = state.selectedFields.filter((k) => k !== key);
             }
             state.selectedFields = dedupeAndSortFields(state.selectedFields, state.fieldOrder);
+            state.selectedFieldsBySource[state.source] = state.selectedFields.slice();
             queueRefresh('fields');
           });
           const text = document.createElement('span');
@@ -660,6 +803,17 @@
       details.appendChild(list);
       container.appendChild(details);
     });
+
+    const previousSelection = state.selectedFields.slice();
+    const filteredSelection = previousSelection.filter((key) => availableKeys.has(key));
+    const selectionChanged = filteredSelection.length !== previousSelection.length;
+    state.selectedFields = dedupeAndSortFields(filteredSelection, state.fieldOrder);
+    state.selectedFieldsBySource[state.source] = state.selectedFields.slice();
+    syncFieldCheckboxes(state);
+
+    if (selectionChanged && options.skipRefresh !== true && state.autoRefresh) {
+      queueRefresh('fields');
+    }
   }
 
   function dedupeAndSortFields(fields, orderMap) {
@@ -740,7 +894,7 @@
     }
   }
 
-  function hydrateModeToggle(container, state, queueRefresh) {
+  function hydrateModeToggle(container, state, queueRefresh, elements) {
     if (!container) {
       return;
     }
@@ -748,11 +902,13 @@
     const buttons = Array.from(container.querySelectorAll('.mode-pill'));
     buttons.forEach((button) => {
       button.addEventListener('click', () => {
-        const mode = button.dataset.mode;
-        if (!mode || state.mode === mode) {
+        const rawMode = button.dataset.mode;
+        const nextMode = normalizeModeForSource(rawMode, state.source);
+        if (!nextMode || state.mode === nextMode) {
           return;
         }
-        state.mode = mode;
+        state.mode = nextMode;
+        state.modeSelections[state.source] = nextMode;
         buttons.forEach((btn) => {
           const isActive = btn === button;
           btn.classList.toggle('active', isActive);
@@ -760,9 +916,13 @@
           btn.classList.toggle('text-white', isActive);
           btn.classList.toggle('text-gray-700', !isActive);
         });
+        updateModeToggleLabels(state, elements);
         queueRefresh('mode');
       });
     });
+
+    updateModeButtons(state);
+    updateModeToggleLabels(state, elements);
   }
 
   function hydrateAutoRefresh(input, state) {
@@ -775,7 +935,65 @@
     });
   }
 
-  function hydratePresets(config, elements, state, queueRefresh, playerUI) {
+  function updateSourceHeadline(state, elements) {
+    if (elements.sourceHeading) {
+      elements.sourceHeading.textContent = state.source === 'game' ? 'Game' : 'Practice';
+    }
+    if (elements.sourceDescription) {
+      elements.sourceDescription.textContent = state.source === 'game' ? 'game' : 'practice';
+    }
+  }
+
+  function updateSourceButtons(state, elements) {
+    if (!elements.sourceToggle) {
+      return;
+    }
+    const buttons = Array.from(elements.sourceToggle.querySelectorAll('.source-pill'));
+    buttons.forEach((button) => {
+      const target = normalizeSource(button.dataset.source);
+      const isActive = target === state.source;
+      button.classList.toggle('active', isActive);
+      button.classList.toggle('bg-[#9E1B32]', isActive);
+      button.classList.toggle('text-white', isActive);
+      button.classList.toggle('text-gray-700', !isActive);
+    });
+  }
+
+  function updateModeToggleLabels(state, elements) {
+    if (elements.modeLabel) {
+      elements.modeLabel.textContent = state.source === 'game' ? 'Totals vs. Per Game' : 'Totals vs. Per Practice';
+    }
+    const container = document.getElementById('custom-mode-toggle');
+    if (!container) {
+      return;
+    }
+    const perButton = container.querySelector('.mode-pill[data-role="per"]');
+    if (perButton) {
+      const nextMode = state.source === 'game' ? 'per_game' : 'per_practice';
+      const label = state.source === 'game' ? 'Per Game' : 'Per Practice';
+      perButton.dataset.mode = nextMode;
+      perButton.textContent = label;
+    }
+  }
+
+  function hydrateSourceToggle(elements, state, config, queueRefresh, playerUI, setSource) {
+    if (!elements.sourceToggle || typeof setSource !== 'function') {
+      return;
+    }
+
+    const buttons = Array.from(elements.sourceToggle.querySelectorAll('.source-pill'));
+    buttons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const target = normalizeSource(button.dataset.source);
+        if (target === state.source) {
+          return;
+        }
+        await setSource(target, { force: true });
+      });
+    });
+  }
+
+  function hydratePresets(config, elements, state, queueRefresh, playerUI, setSource) {
     if (!elements.presetsPanel) {
       return;
     }
@@ -817,16 +1035,26 @@
 
         if (action === 'apply') {
           let changed = false;
+          let sourceChanged = false;
+
+          if (preset.source_default) {
+            const desiredSource = normalizeSource(preset.source_default);
+            if (desiredSource !== state.source && typeof setSource === 'function') {
+              await setSource(desiredSource, { force: true, queueRefresh: false });
+              sourceChanged = true;
+            }
+          }
+
           if (preset.preset_type === 'combined') {
             changed = applyCombinedPreset(preset, state, playerUI, elements);
           } else if (type === 'players') {
             changed = applyPlayersPreset(preset, state, playerUI);
           } else if (type === 'stats') {
-            changed = applyStatsPreset(preset, state);
+            changed = applyStatsPreset(preset, state, elements);
           } else if (type === 'dates') {
             changed = applyDatesPreset(preset, state, elements);
           }
-          if (changed) {
+          if (changed || sourceChanged) {
             state.lastPayload = null;
             queueRefresh(`preset-${type}`);
           }
@@ -1226,31 +1454,43 @@
     return Boolean(playerUI.setSelected(incoming));
   }
 
-  function applyStatsPreset(preset, state) {
+  function applyStatsPreset(preset, state, elements) {
     if (!preset) {
       return false;
     }
     const incoming = Array.isArray(preset.fields) ? preset.fields : [];
-    const seen = new Set();
-    const next = [];
-    incoming.forEach((rawKey) => {
-      const key = typeof rawKey === 'string' ? rawKey : String(rawKey || '').trim();
-      if (!key || seen.has(key)) {
-        return;
-      }
-      if (state.fieldOrder instanceof Map && state.fieldOrder.size && !state.fieldOrder.has(key)) {
-        return;
-      }
-      seen.add(key);
-      next.push(key);
-    });
+    const prepared = incoming
+      .map((rawKey) => (typeof rawKey === 'string' ? rawKey.trim() : String(rawKey || '').trim()))
+      .filter((key) => {
+        if (!key) {
+          return false;
+        }
+        if (state.fieldOrder instanceof Map && state.fieldOrder.size && !state.fieldOrder.has(key)) {
+          return false;
+        }
+        return true;
+      });
+
+    const next = dedupeAndSortFields(prepared, state.fieldOrder);
     const prev = state.selectedFields.slice();
     state.selectedFields = next;
+    state.selectedFieldsBySource[state.source] = next.slice();
     syncFieldCheckboxes(state);
-    if (prev.length !== next.length) {
-      return true;
+
+    let changed = prev.length !== next.length || prev.some((value, index) => value !== next[index]);
+
+    if (preset.mode_default) {
+      const desiredMode = normalizeModeForSource(preset.mode_default, state.source);
+      if (state.mode !== desiredMode) {
+        state.mode = desiredMode;
+        state.modeSelections[state.source] = desiredMode;
+        updateModeButtons(state);
+        updateModeToggleLabels(state, elements);
+        changed = true;
+      }
     }
-    return prev.some((value, index) => value !== next[index]);
+
+    return changed;
   }
 
   function applyDatesPreset(preset, state, elements) {
@@ -1313,17 +1553,21 @@
         }
       });
       if (fieldsChanged) {
-        state.selectedFields = mergedFields;
+        state.selectedFields = dedupeAndSortFields(mergedFields, state.fieldOrder);
+        state.selectedFieldsBySource[state.source] = state.selectedFields.slice();
         changed = true;
       }
     }
 
     syncFieldCheckboxes(state);
 
-    if (preset.mode_default && (preset.mode_default === 'totals' || preset.mode_default === 'per_practice')) {
-      if (state.mode !== preset.mode_default) {
-        state.mode = preset.mode_default;
+    if (preset.mode_default) {
+      const desiredMode = normalizeModeForSource(preset.mode_default, state.source);
+      if (state.mode !== desiredMode) {
+        state.mode = desiredMode;
+        state.modeSelections[state.source] = desiredMode;
         updateModeButtons(state);
+        updateModeToggleLabels(state, elements);
         changed = true;
       }
     }
@@ -1402,7 +1646,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'practice_custom_stats.png';
+            link.download = `custom_stats_${state.source || 'practice'}.png`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1482,7 +1726,8 @@
           throw new Error('Failed to export CSV');
         }
         const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
-        const filename = parseFilenameFromDisposition(disposition) || 'custom_stats.csv';
+        const fallback = `custom_stats_${payload && payload.source ? payload.source : 'practice'}.csv`;
+        const filename = parseFilenameFromDisposition(disposition) || fallback;
         return response.blob().then((blob) => ({ blob, filename }));
       })
       .then(({ blob, filename }) => {
@@ -1563,10 +1808,12 @@
   }
 
   function buildPayload(state, elements) {
+    const source = normalizeSource(state.source);
     const payload = {
       player_ids: state.selectedPlayers.slice(),
       fields: state.selectedFields.slice(),
-      mode: state.mode
+      mode: normalizeModeForSource(state.mode, source),
+      source
     };
     if (state.dateFrom) {
       payload.date_from = state.dateFrom;

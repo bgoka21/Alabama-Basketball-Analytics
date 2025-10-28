@@ -1,5 +1,8 @@
 {% from 'macros/table.html' import render_table %}
 
+{% set source_value = (source or 'practice') %}
+{% set source_title = 'Game' if source_value == 'game' else 'Practice' %}
+
 <div class="custom-stats-table space-y-3">
   {{ render_table(
     id='custom-stats-table',
@@ -8,12 +11,12 @@
     totals=None,
     dense=True,
     sticky_header=True,
-    caption='Custom practice stats',
+    caption='Custom ' ~ source_title|lower ~ ' stats',
     default_sort='player:asc'
   ) }}
 
   {% if rows | length == 0 %}
-    <div class="table-empty">No practice data found for the selected filters.</div>
+    <div class="table-empty">No {{ source_title|lower }} data found for the selected filters.</div>
   {% endif %}
 </div>
 
