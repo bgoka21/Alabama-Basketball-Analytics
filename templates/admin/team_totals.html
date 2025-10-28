@@ -2,8 +2,19 @@
 
 {% block page_controls %}
 <div id="mainControls">
+  <div class="flex flex-wrap items-center gap-4 mb-4 no-print">
+    <a href="{{ game_mode_url }}"
+       class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-200 text-black' }}">
+      Game
+    </a>
+    <a href="{{ practice_mode_url }}"
+       class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
+      Practice
+    </a>
+  </div>
   <div class="flex flex-wrap items-end gap-4 mb-4 no-print">
     <form id="mainFilterForm" method="get" class="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="mode" value="{{ mode }}">
       <div>
         <label class="font-semibold mr-2">Season:</label>
         <select name="season_id" class="border p-2 rounded">
@@ -13,22 +24,52 @@
         </select>
       </div>
       {% for key, values in request.args.lists() %}
-        {% if key != 'season_id' %}
+        {% if key not in ['season_id', 'mode'] %}
           {% for v in values %}
             <input type="hidden" name="{{ key }}" value="{{ v }}">
           {% endfor %}
         {% endif %}
       {% endfor %}
       <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
-      <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
+      <a href="{{ url_for(request.endpoint, mode=mode) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
     </form>
   </div>
-  {% include "_filters_session.html" %}
+  {% if mode == 'practice' %}
+    {% include "_filters_session.html" %}
+  {% elif mode == 'game' %}
+    <form id="gameTypeFilterForm" method="get" class="no-print border rounded p-3 bg-gray-50 flex flex-col gap-3">
+      <input type="hidden" name="mode" value="game">
+      {% for key, values in request.args.lists() %}
+        {% if key not in ['mode', 'game_type'] %}
+          {% for v in values %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="text-sm font-medium">Game Types</div>
+      <div class="flex flex-wrap gap-3">
+        {% for option in game_type_options %}
+          <label class="inline-flex items-center text-sm">
+            <input type="checkbox" name="game_type" value="{{ option }}" {% if option in selected_game_types %}checked{% endif %}>
+            <span class="ml-1">{{ option }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      <div>
+        <button type="submit" class="px-3 py-1 text-sm border rounded">Apply</button>
+        <a href="{{ url_for(request.endpoint, mode=mode) }}" class="text-gray-600 text-sm hover:underline ml-2">Clear</a>
+      </div>
+    </form>
+  {% endif %}
 </div>
 
 <div id="trendControls" class="hidden">
   <div class="flex flex-wrap items-end gap-4 mb-4 no-print">
     <form id="trendFilterForm" method="get" class="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="mode" value="{{ mode }}">
+      {% for gt in selected_game_types %}
+        <input type="hidden" name="game_type" value="{{ gt }}">
+      {% endfor %}
       <div>
         <label class="font-semibold mr-2">Season:</label>
         <select name="trend_season_id" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">
@@ -49,7 +90,7 @@
         <label class="block text-sm font-medium mb-1">Window</label>
         <input type="number" name="trend_window" min="1" value="{{ trend_window }}" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]" />
       </div>
-      {% if practice_categories %}
+      {% if mode == 'practice' and practice_categories %}
       <div>
         <label class="block text-sm font-medium mb-1">Category</label>
         <select name="trend_category" multiple class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">
@@ -59,9 +100,8 @@
         </select>
       </div>
       {% endif %}
-      {% if label_options %}
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-sm font-medium">Drills:</span>
+      {% if mode == 'practice' and label_options %}
+      <div class="flex flex-wrap items-center gap-2">
         {% for lbl in label_options %}
           <label class="text-sm mr-3">
             <input type="checkbox" name="trend_label" value="{{ lbl }}" {% if lbl in trend_selected_labels %}checked{% endif %}> {{ lbl }}
@@ -84,7 +124,7 @@
         </div>
       </div>
       <button type="submit" class="bg-[#9E1B32] text-white px-3 py-1 rounded text-sm">Apply</button>
-      <a href="{{ url_for(request.endpoint) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
+      <a href="{{ url_for(request.endpoint, mode=mode) }}" class="text-gray-600 text-sm hover:underline">Clear</a>
     </form>
   </div>
 </div>
@@ -739,10 +779,70 @@ document.addEventListener('DOMContentLoaded',()=>{
   }else{
     showTab('seasonTotals');
   }
-  const df=document.getElementById('trendFilterForm');
-  if(df){
-    df.addEventListener('submit',()=>{
-      df.action=df.action.split('#')[0]+window.location.hash;
+  ['mainFilterForm','trendFilterForm','gameTypeFilterForm'].forEach(formId=>{
+    const form=document.getElementById(formId);
+    if(form){
+      form.addEventListener('submit',()=>{
+        const base=(form.action||window.location.href).split('#')[0];
+        form.action=base+window.location.hash;
+      });
+    }
+  });
+  document.querySelectorAll('.mode-link').forEach(link=>{
+    const base=link.href.split('#')[0];
+    link.href=base+window.location.hash;
+  });
+  if(window.Chart && document.getElementById('trendChart')){
+    const labels = trendData.map(d => {
+      const [y,m,day] = d.date.split('-').map(Number);
+      const dt = new Date(y, m-1, day);
+      return dt.toLocaleDateString('en-US',{month:'long', day:'numeric'});
+    });
+    const generateColor = (idx, total) => {
+      const hue = Math.round((360 / total) * idx);
+      return `hsl(${hue}, 70%, 50%)`;
+    };
+    const datasets = trendStats.map((s, i) => ({
+      label: s,
+      data: trendData.map(d => d[s] || 0),
+      borderColor: generateColor(i, trendStats.length),
+      backgroundColor: generateColor(i, trendStats.length),
+      fill: false
+    }));
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: 'nearest', intersect: false },
+        scales: {
+          x: {
+            title: { display: true, text: 'Date' },
+            grid: { color: '#e5e7eb' }
+          },
+          y: {
+            title: { display: true, text: 'Value' },
+            grid: { color: '#e5e7eb' }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+            }
+          },
+          legend: {
+            display: true,
+            onClick: (e, legendItem, legend) => {
+              const index = legendItem.datasetIndex;
+              const ci = legend.chart;
+              const meta = ci.getDatasetMeta(index);
+              meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+              ci.update();
+            }
+          }
+        }
+      }
     });
   }
 });
