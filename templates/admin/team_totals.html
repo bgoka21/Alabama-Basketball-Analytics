@@ -103,9 +103,8 @@
       {% if mode == 'practice' and label_options %}
       <div class="flex flex-wrap items-center gap-2">
         {% for lbl in label_options %}
-          <label class="inline-flex items-center text-sm mr-2">
-            <input type="checkbox" name="trend_label" value="{{ lbl }}" {% if lbl in trend_selected_labels %}checked{% endif %}>
-            <span class="ml-1">{{ lbl }}</span>
+          <label class="text-sm mr-3">
+            <input type="checkbox" name="trend_label" value="{{ lbl }}" {% if lbl in trend_selected_labels %}checked{% endif %}> {{ lbl }}
           </label>
         {% endfor %}
       </div>
@@ -651,6 +650,65 @@
 <script>
 const trendData = {{ trend_rows|tojson }};
 const trendStats = {{ trend_selected_stats|tojson }};
+let trendChartInstance = null;
+
+function buildTrendChart(){
+  if(!window.Chart) return;
+  const canvas = document.getElementById('trendChart');
+  if(!canvas) return;
+  const labels = trendData.map(d => {
+    const [y,m,day] = d.date.split('-').map(Number);
+    const dt = new Date(y, m-1, day);
+    return dt.toLocaleDateString('en-US',{month:'long', day:'numeric'});
+  });
+  const generateColor = (idx, total) => {
+    const segments = total || 1;
+    const hue = Math.round((360 / segments) * idx);
+    return `hsl(${hue}, 70%, 50%)`;
+  };
+  const datasets = trendStats.map((s, i) => ({
+    label: s,
+    data: trendData.map(d => d[s] || 0),
+    borderColor: generateColor(i, trendStats.length),
+    backgroundColor: generateColor(i, trendStats.length),
+    fill: false
+  }));
+  trendChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'nearest', intersect: false },
+      scales: {
+        x: {
+          title: { display: true, text: 'Date' },
+          grid: { color: '#e5e7eb' }
+        },
+        y: {
+          title: { display: true, text: 'Value' },
+          grid: { color: '#e5e7eb' }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+          }
+        },
+        legend: {
+          display: true,
+          onClick: (e, legendItem, legend) => {
+            const index = legendItem.datasetIndex;
+            const ci = legend.chart;
+            const meta = ci.getDatasetMeta(index);
+            meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+            ci.update();
+          }
+        }
+      }
+    }
+  });
+}
 </script>
 <script>
 function capitalize(str){return str.charAt(0).toUpperCase()+str.slice(1);}
@@ -678,6 +736,14 @@ function showTab(tabName){
   });
   window.location.hash = tabName;
   if(tabName==='shotType'){showShotTypeDetail('atr');}
+  if(tabName==='trends'){
+    if(!trendChartInstance){
+      buildTrendChart();
+    }else{
+      trendChartInstance.resize();
+      trendChartInstance.update();
+    }
+  }
 }
 function showShotTypeDetail(detail){
   ['atr','fg2','fg3'].forEach(id=>{

@@ -8,6 +8,7 @@ shape so it can be fed directly into ``build_dual_table``.
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections import defaultdict
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Query
 
-from models.database import Game, PlayerStats, Season, Roster, db
+from models.database import Game, GameTypeTag, PlayerStats, Season, Roster, db
 from utils.shottype import compute_3fg_breakdown_from_shots
 
 
@@ -92,12 +93,15 @@ def _safe_pct(numer: Optional[float], denom: Optional[float]) -> Optional[float]
         return None
 
 
-def _base_game_query(season_id: int) -> Query:
-    return (
+def _base_game_query(season_id: int, game_types: Optional[Sequence[str]] = None) -> Query:
+    query = (
         PlayerStats.query.join(Game, PlayerStats.game_id == Game.id)
         .filter(PlayerStats.season_id == season_id)
         .filter(PlayerStats.game_id.isnot(None))
     )
+    if game_types:
+        query = query.filter(Game.type_tags.any(GameTypeTag.tag.in_(game_types)))
+    return query
 
 
 def _apply_date_window(query: Query, start_date: Optional[date], end_date: Optional[date]) -> Query:
@@ -204,8 +208,11 @@ def _season_rows(
     season_id: int,
     start_date: Optional[date],
     end_date: Optional[date],
+    game_types: Optional[Sequence[str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
-    query = _apply_date_window(_base_game_query(season_id), start_date, end_date)
+    query = _apply_date_window(
+        _base_game_query(season_id, game_types), start_date, end_date
+    )
     return _aggregate_rows(query.all(), _roster_names(season_id))
 
 
@@ -213,8 +220,11 @@ def _last_game_rows(
     season_id: int,
     start_date: Optional[date],
     end_date: Optional[date],
+    game_types: Optional[Sequence[str]] = None,
 ) -> Tuple[Dict[str, Dict[str, Any]], Optional[date]]:
-    base = _apply_date_window(_base_game_query(season_id), start_date, end_date)
+    base = _apply_date_window(
+        _base_game_query(season_id, game_types), start_date, end_date
+    )
 
     last_seen = (
         base.with_entities(
@@ -242,6 +252,30 @@ def _last_game_rows(
     if rows:
         latest_date = max(getattr(r.game, "game_date", None) for r in rows if getattr(r, "game", None))
     return players, latest_date
+
+
+def _season_rows_with_types(
+    season_id: int,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    game_types: Optional[Sequence[str]],
+) -> Dict[str, Dict[str, Any]]:
+    params = inspect.signature(_season_rows).parameters
+    if len(params) <= 3:
+        return _season_rows(season_id, start_date, end_date)  # type: ignore[misc]
+    return _season_rows(season_id, start_date, end_date, game_types)
+
+
+def _last_game_rows_with_types(
+    season_id: int,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    game_types: Optional[Sequence[str]],
+) -> Tuple[Dict[str, Dict[str, Any]], Optional[date]]:
+    params = inspect.signature(_last_game_rows).parameters
+    if len(params) <= 3:
+        return _last_game_rows(season_id, start_date, end_date)  # type: ignore[misc]
+    return _last_game_rows(season_id, start_date, end_date, game_types)
 
 
 def get_season_window(
@@ -464,8 +498,13 @@ def _build_slice(
     return LeaderboardSlice(rows=rows, totals=totals, note_date=note_date)
 
 
-def fetch_offense_shrinks(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_offense_shrinks(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_shrink_row,
@@ -482,9 +521,12 @@ def fetch_offense_shrinks(season_id: int, start_date: Optional[date] = None, end
 
 
 def fetch_offense_shrinks_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_shrink_row,
@@ -501,8 +543,13 @@ def fetch_offense_shrinks_last_game(
     )
 
 
-def fetch_atr_finishing(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_atr_finishing(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_atr_row,
@@ -515,9 +562,12 @@ def fetch_atr_finishing(season_id: int, start_date: Optional[date] = None, end_d
 
 
 def fetch_atr_finishing_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_atr_row,
@@ -530,8 +580,13 @@ def fetch_atr_finishing_last_game(
     )
 
 
-def fetch_oreb(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_oreb(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_off_reb_row,
@@ -545,9 +600,12 @@ def fetch_oreb(season_id: int, start_date: Optional[date] = None, end_date: Opti
 
 
 def fetch_oreb_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_off_reb_row,
@@ -561,8 +619,13 @@ def fetch_oreb_last_game(
     )
 
 
-def fetch_dreb(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_dreb(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_def_reb_row,
@@ -575,9 +638,12 @@ def fetch_dreb(season_id: int, start_date: Optional[date] = None, end_date: Opti
 
 
 def fetch_dreb_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_def_reb_row,
@@ -590,8 +656,13 @@ def fetch_dreb_last_game(
     )
 
 
-def fetch_collisions(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_collisions(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_collision_row,
@@ -603,9 +674,12 @@ def fetch_collisions(season_id: int, start_date: Optional[date] = None, end_date
 
 
 def fetch_collisions_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_collision_row,
@@ -617,8 +691,13 @@ def fetch_collisions_last_game(
     )
 
 
-def fetch_pass_contest(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_pass_contest(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_pass_contest_row,
@@ -630,9 +709,12 @@ def fetch_pass_contest(season_id: int, start_date: Optional[date] = None, end_da
 
 
 def fetch_pass_contest_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_pass_contest_row,
@@ -644,8 +726,13 @@ def fetch_pass_contest_last_game(
     )
 
 
-def fetch_gap_help(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_gap_help(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_gap_help_row,
@@ -657,9 +744,12 @@ def fetch_gap_help(season_id: int, start_date: Optional[date] = None, end_date: 
 
 
 def fetch_gap_help_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_gap_help_row,
@@ -671,8 +761,13 @@ def fetch_gap_help_last_game(
     )
 
 
-def fetch_low_man(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_low_man(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_low_man_row,
@@ -684,9 +779,12 @@ def fetch_low_man(season_id: int, start_date: Optional[date] = None, end_date: O
 
 
 def fetch_low_man_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_low_man_row,
@@ -698,8 +796,13 @@ def fetch_low_man_last_game(
     )
 
 
-def fetch_pnr_grade(season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> LeaderboardSlice:
-    players = _season_rows(season_id, start_date, end_date)
+def fetch_pnr_grade(
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
+) -> LeaderboardSlice:
+    players = _season_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_pnr_grade_row,
@@ -713,9 +816,12 @@ def fetch_pnr_grade(season_id: int, start_date: Optional[date] = None, end_date:
 
 
 def fetch_pnr_grade_last_game(
-    season_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None
+    season_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    game_types: Optional[Sequence[str]] = None,
 ) -> LeaderboardSlice:
-    players, note_date = _last_game_rows(season_id, start_date, end_date)
+    players, note_date = _last_game_rows_with_types(season_id, start_date, end_date, game_types)
     return _build_slice(
         players,
         _build_pnr_grade_row,

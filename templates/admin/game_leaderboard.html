@@ -30,12 +30,36 @@
     </select>
   </div>
   {% for key, values in request.args.lists() %}
-    {% if key not in ['season', 'start_date', 'end_date'] %}
+    {% if key not in ['season', 'start_date', 'end_date', 'game_type'] %}
       {% for v in values %}
         <input type="hidden" name="{{ key }}" value="{{ v }}">
       {% endfor %}
     {% endif %}
   {% endfor %}
+  <div class="flex flex-col gap-1">
+    <span class="text-sm font-semibold">Game Types:</span>
+    <div class="flex flex-wrap items-center gap-3">
+      {% for option in game_type_options %}
+        <label class="inline-flex items-center gap-1 text-sm">
+          <input
+            type="checkbox"
+            name="game_type"
+            value="{{ option }}"
+            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            {% if option in selected_game_types %}checked{% endif %}
+            hx-get="{{ url_for('admin.leaderboard_game') }}"
+            hx-trigger="change delay:250ms"
+            hx-target="#game-leaderboard-results"
+            hx-include="#game-leaderboard-form"
+            hx-select="#game-leaderboard-results"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+          <span>{{ option }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
   <div class="flex items-center gap-2">
     <label class="text-sm font-medium">Date:</label>
     <input
