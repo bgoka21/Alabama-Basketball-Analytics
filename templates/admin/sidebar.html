@@ -117,7 +117,7 @@
       <span class="flex-1 text-left">Team Totals</span>
     </a>
   </li>
-  {% set leaderboard_endpoints = ['admin.leaderboard', 'admin.leaderboard_game', 'admin.leaderboard_practice_new'] %}
+  {% set leaderboard_endpoints = ['admin.leaderboard', 'admin.leaderboard_game'] %}
   {% set leaderboards_active = request.endpoint in leaderboard_endpoints %}
   <li class="nav-item">
     <details class="group" {% if leaderboards_active %}open{% endif %}>
@@ -133,11 +133,6 @@
            href="{{ url_for('admin.leaderboard') }}">
           {{ icons.render('leaderboard') }}
           <span class="flex-1 text-left">Practice Leaderboard</span>
-        </a>
-        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.leaderboard_practice_new' %} {{ active_classes }}{% endif %}"
-           href="{{ url_for('admin.leaderboard_practice_new') }}">
-          {{ icons.render('leaderboard') }}
-          <span class="flex-1 text-left">New Practice Leaderboard Page</span>
         </a>
         <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.leaderboard_game' %} {{ active_classes }}{% endif %}"
            href="{{ url_for('admin.leaderboard_game') }}">
