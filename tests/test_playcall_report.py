@@ -165,6 +165,54 @@ def test_compute_from_dataframe_prefers_non_flow_series_label():
     assert flow_totals["chances"] == 1
 
 
+def test_compute_from_dataframe_normalizes_misc_unknown_rows():
+    df = pd.DataFrame(
+        [
+            {
+                "Row": "Offense",
+                "SERIES": "UKNOWN",
+                "PLAYCALL": "",
+                "TEAM": "Alabama",
+                "#1": "2FG+",
+            },
+            {
+                "Row": "Offense",
+                "SERIES": "UKNOWN",
+                "PLAYCALL": "Backdoor",
+                "TEAM": "Alabama",
+                "#1": "3FG+",
+            },
+            {
+                "Row": "Offense",
+                "SERIES": "UKNOWN",
+                "PLAYCALL": "UNKNOWN",
+                "TEAM": "Alabama",
+                "#1": "FT+",
+            },
+        ]
+    )
+
+    payload = playcall_service._compute_from_dataframe(df)
+
+    assert "UKNOWN" not in payload["series"]
+    misc_family = payload["series"].get("MISC")
+    assert misc_family is not None
+    assert set(misc_family["plays"].keys()) == {"Backdoor"}
+
+    misc_play = misc_family["plays"]["Backdoor"]
+    assert misc_play["ran"] == 1
+    assert misc_play["off_set"]["pts"] == 3
+    assert misc_play["off_set"]["chances"] == 1
+    assert misc_play["in_flow"]["pts"] == 0
+    assert misc_play["in_flow"]["chances"] == 0
+
+    totals = misc_family["totals"]
+    assert totals["off_set"]["pts"] == 3
+    assert totals["off_set"]["chances"] == 1
+    assert payload["meta"]["total_chances_off_set"] == 1
+    assert payload["meta"]["total_chances_in_flow"] == 0
+
+
 @pytest.fixture
 def sample_game_payloads():
     game_one = {
@@ -290,6 +338,67 @@ def test_aggregate_playcall_reports_combines_games(monkeypatch, sample_game_payl
     assert flow_totals["pts"] == 13
     assert flow_totals["chances"] == 6
     assert flow_totals["ppc"] == pytest.approx(2.17, rel=1e-2)
+
+
+def test_aggregate_playcall_reports_filters_misc_unknown_entries(monkeypatch):
+    misc_payload = {
+        "plays": {
+            "UNKNOWN": _make_play_payload(1, 2, 1, 0, 0),
+            "Backdoor": _make_play_payload(1, 3, 1, 2, 1),
+        },
+        "totals": {
+            "off_set": {"pts": 5, "chances": 2, "ppc": 2.5},
+            "in_flow": {"pts": 2, "chances": 1, "ppc": 2.0},
+        },
+    }
+    flow_payload = {
+        "plays": [
+            {"playcall": "UNKNOWN", "ran_in_flow": 1, "in_flow": {"pts": 0, "chances": 0, "ppc": 0.0}},
+            {"playcall": "Backdoor", "ran_in_flow": 1, "in_flow": {"pts": 2, "chances": 1, "ppc": 2.0}},
+        ],
+        "totals": {"in_flow": {"pts": 2, "chances": 1, "ppc": 2.0}},
+    }
+
+    cached_payload = {
+        "series": {"UKNOWN": misc_payload, "FLOW": flow_payload},
+        "meta": {"total_chances_off_set": 2, "total_chances_in_flow": 1},
+    }
+
+    def fake_cache(game_id):
+        return copy.deepcopy(cached_payload), {"updated_at": "2024-01-01T00:00:00Z"}
+
+    monkeypatch.setattr(
+        playcall_service,
+        "cache_get_or_compute_playcall_report",
+        fake_cache,
+    )
+
+    aggregated, meta = playcall_service.aggregate_playcall_reports([10])
+
+    assert meta["game_ids"] == [10]
+    assert meta["game_count"] == 1
+    assert aggregated["meta"]["total_chances_off_set"] == 1
+    assert aggregated["meta"]["total_chances_in_flow"] == 1
+
+    assert "UKNOWN" not in aggregated["series"]
+    misc_family = aggregated["series"].get("MISC")
+    assert misc_family is not None
+    assert list(misc_family["plays"].keys()) == ["Backdoor"]
+
+    misc_play = misc_family["plays"]["Backdoor"]
+    assert misc_play["ran"] == 1
+    assert misc_play["off_set"]["pts"] == 3
+    assert misc_play["off_set"]["chances"] == 1
+    assert misc_play["in_flow"]["pts"] == 2
+    assert misc_play["in_flow"]["chances"] == 1
+
+    flow_series = aggregated["series"].get("FLOW")
+    assert flow_series is not None
+    flow_rows = flow_series["plays"]
+    assert len(flow_rows) == 1
+    assert flow_rows[0]["playcall"] == "Backdoor"
+    assert flow_rows[0]["ran_in_flow"] == 1
+    assert flow_rows[0]["in_flow"]["chances"] == 1
 
 
 def test_api_playcall_report_season_view(app, monkeypatch):
@@ -448,7 +557,6 @@ def test_playcall_report_all_card_includes_flow_only(app, monkeypatch):
     assert flow_row["off_set_chances"] == 0
     assert flow_row["in_flow_pts"] == 5
     assert flow_row["in_flow_chances"] == 2
-
     totals = all_section["totals"]
     assert totals["ran"] == 5
     assert totals["off_set_pts"] == 4
@@ -457,6 +565,48 @@ def test_playcall_report_all_card_includes_flow_only(app, monkeypatch):
     assert totals["in_flow_chances"] == 4
     assert totals["off_set_ppc"] == "2.00"
     assert totals["in_flow_ppc"] == "2.75"
+
+
+def test_flatten_playcall_series_normalizes_misc_unknown_rows():
+    body = {
+        "series": {
+            "UKNOWN": {
+                "plays": {
+                    "UNKNOWN": _make_play_payload(1, 2, 1, 0, 0),
+                    "Backdoor": _make_play_payload(1, 3, 1, 1, 1),
+                },
+                "totals": {
+                    "off_set": {"pts": 5, "chances": 2, "ppc": 2.5},
+                    "in_flow": {"pts": 1, "chances": 1, "ppc": 1.0},
+                },
+            },
+            "FLOW": {
+                "plays": [
+                    {"playcall": "UNKNOWN", "ran_in_flow": 1, "in_flow": {"pts": 0, "chances": 0, "ppc": 0.0}},
+                    {"playcall": "Backdoor", "ran_in_flow": 1, "in_flow": {"pts": 1, "chances": 1, "ppc": 1.0}},
+                ],
+                "totals": {"in_flow": {"pts": 1, "chances": 1, "ppc": 1.0}},
+            },
+        }
+    }
+
+    routes_module = sys.modules.get("routes") or importlib.import_module("routes")
+
+    flat = routes_module._flatten_playcall_series(body["series"])
+
+    rows = flat["rows"]
+    assert all(row["series"] != "UKNOWN" for row in rows)
+    assert all(row["playcall"].upper() != "UNKNOWN" for row in rows)
+
+    misc_rows = [row for row in rows if row["series"] == "MISC"]
+    assert misc_rows and misc_rows[0]["playcall"] == "Backdoor"
+
+    flow_rows = [row for row in rows if row["series"] == "FLOW"]
+    assert flow_rows == []
+
+    assert flat["totals"]["ran"] == 1
+    assert flat["totals"]["off_set"]["chances"] == 1
+    assert flat["totals"]["in_flow"]["chances"] == 1
 
 
 def test_api_playcall_all_csv_and_json(app, monkeypatch):
