@@ -27,26 +27,55 @@
 
   <!-- Filters -->
   <div class="flex flex-wrap items-end gap-4 mb-4 no-print">
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', start_date=start_date, end_date=end_date, label=selected_labels) }}"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='game', start_date=start_date, end_date=end_date, label=selected_labels, game_type=selected_game_types) }}"
        class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'game' else 'bg-gray-200 text-black' }}">
       Game
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', start_date=start_date, end_date=end_date, label=selected_labels) }}"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='practice', start_date=start_date, end_date=end_date, label=selected_labels, game_type=selected_game_types) }}"
        class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'practice' else 'bg-gray-200 text-black' }}">
       Practice
     </a>
-    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='development', start_date=start_date, end_date=end_date, label=selected_labels) }}#skillDevelopment"
+    <a href="{{ url_for('admin.player_detail', player_name=player_name, mode='development', start_date=start_date, end_date=end_date, label=selected_labels, game_type=selected_game_types) }}#skillDevelopment"
        class="mode-link px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if mode == 'development' else 'bg-gray-200 text-black' }}">
       Development
     </a>
   </div>
 
   <div class="no-print" id="playerDetailFilters">
-    {% with label_options = label_options if mode == 'practice' else [] %}
+    {% if mode == 'practice' %}
       {% include "_filters_session.html" %}
-    {% endwith %}
+    {% elif mode == 'game' %}
+      <form method="GET" class="border rounded p-3 bg-gray-50 flex flex-col gap-3">
+        <input type="hidden" name="mode" value="game">
+        {% for key, values in request.args.lists() %}
+          {% if key not in ['mode', 'game_type'] %}
+            {% for v in values %}
+              <input type="hidden" name="{{ key }}" value="{{ v }}">
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+        <div class="text-sm font-medium">Game Types</div>
+        <div class="flex flex-wrap gap-3">
+          {% for option in game_type_options %}
+            <label class="inline-flex items-center text-sm">
+              <input type="checkbox" name="game_type" value="{{ option }}" {% if option in selected_game_types %}checked{% endif %}>
+              <span class="ml-1">{{ option }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <div>
+          <button type="submit" class="px-3 py-1 text-sm border rounded">Apply</button>
+        </div>
+      </form>
+    {% endif %}
     <div class="mt-2 text-sm text-right">
-      <a data-preserve-hash href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode) }}" class="text-gray-600 hover:underline">Clear</a>
+      {% if mode == 'game' %}
+        <a data-preserve-hash href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode, label=selected_labels, session=selected_session if selected_session and selected_session != 'All' else None, start_date=start_date or None, end_date=end_date or None) }}" class="text-gray-600 hover:underline">Clear</a>
+      {% elif mode == 'practice' %}
+        <a data-preserve-hash href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode, game_type=selected_game_types) }}" class="text-gray-600 hover:underline">Clear</a>
+      {% else %}
+        <a data-preserve-hash href="{{ url_for('admin.player_detail', player_name=player_name, mode=mode, label=selected_labels, game_type=selected_game_types) }}" class="text-gray-600 hover:underline">Clear</a>
+      {% endif %}
     </div>
   </div>
 
