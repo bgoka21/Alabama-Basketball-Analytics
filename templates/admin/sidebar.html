@@ -152,7 +152,8 @@
   {% if current_user.is_admin %}
   {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
                         'merge.merge_csv', 'admin.roster', 'admin.users_list',
-                        'admin.usage_report', 'admin.draft_upload',
+                        'admin.usage_report', 'admin.correlation_workbench',
+                        'admin.custom_stats_index', 'admin.draft_upload',
                         'admin.eybl_import', 'admin.eybl_identity', 'admin.eybl_synonyms'] %}
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
@@ -198,6 +199,10 @@
         <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.correlation_workbench' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.correlation_workbench') }}">
           {{ icons.render('correlation') }}
           <span class="flex-1 text-left">Correlation Workbench</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.custom_stats_index' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.custom_stats_index') }}">
+          {{ icons.render('table') }}
+          <span class="flex-1 text-left">Custom Table</span>
         </a>
         {% if view_exists('admin.draft_upload') %}
         <a class="{{ link_base_classes }}" href="{{ url_for('admin.draft_upload') }}">
