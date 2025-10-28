@@ -8233,31 +8233,51 @@ def leaderboard_game():
         except ValueError:
             end_date_arg = ''
 
+    raw_types = request.args.getlist('game_type')
+    if not raw_types:
+        single = (request.args.get('game_type') or '').strip()
+        if single:
+            raw_types = [single]
+
+    selected_game_types: list[str] = []
+    for value in raw_types:
+        match = next(
+            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
+            None,
+        )
+        if match and match not in selected_game_types:
+            selected_game_types.append(match)
+
     def _empty_slice() -> LeaderboardSlice:
         return LeaderboardSlice(rows=[], totals=None, note_date=None)
 
-    def _build_tables(season_id: int, window_start: Optional[date], window_end: Optional[date]):
+    def _build_tables(
+        season_id: int,
+        window_start: Optional[date],
+        window_end: Optional[date],
+        game_types: Sequence[str],
+    ):
         if not season_id:
             return _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice()
 
-        shrinks_season = fetch_offense_shrinks(season_id, window_start, window_end)
-        shrinks_last = fetch_offense_shrinks_last_game(season_id, window_start, window_end)
-        atr_season = fetch_atr_finishing(season_id, window_start, window_end)
-        atr_last = fetch_atr_finishing_last_game(season_id, window_start, window_end)
-        oreb_season = fetch_oreb(season_id, window_start, window_end)
-        oreb_last = fetch_oreb_last_game(season_id, window_start, window_end)
-        dreb_season = fetch_dreb(season_id, window_start, window_end)
-        dreb_last = fetch_dreb_last_game(season_id, window_start, window_end)
-        collision_season = fetch_collisions(season_id, window_start, window_end)
-        collision_last = fetch_collisions_last_game(season_id, window_start, window_end)
-        pass_season = fetch_pass_contest(season_id, window_start, window_end)
-        pass_last = fetch_pass_contest_last_game(season_id, window_start, window_end)
-        gap_season = fetch_gap_help(season_id, window_start, window_end)
-        gap_last = fetch_gap_help_last_game(season_id, window_start, window_end)
-        low_season = fetch_low_man(season_id, window_start, window_end)
-        low_last = fetch_low_man_last_game(season_id, window_start, window_end)
-        pnr_season = fetch_pnr_grade(season_id, window_start, window_end)
-        pnr_last = fetch_pnr_grade_last_game(season_id, window_start, window_end)
+        shrinks_season = fetch_offense_shrinks(season_id, window_start, window_end, game_types)
+        shrinks_last = fetch_offense_shrinks_last_game(season_id, window_start, window_end, game_types)
+        atr_season = fetch_atr_finishing(season_id, window_start, window_end, game_types)
+        atr_last = fetch_atr_finishing_last_game(season_id, window_start, window_end, game_types)
+        oreb_season = fetch_oreb(season_id, window_start, window_end, game_types)
+        oreb_last = fetch_oreb_last_game(season_id, window_start, window_end, game_types)
+        dreb_season = fetch_dreb(season_id, window_start, window_end, game_types)
+        dreb_last = fetch_dreb_last_game(season_id, window_start, window_end, game_types)
+        collision_season = fetch_collisions(season_id, window_start, window_end, game_types)
+        collision_last = fetch_collisions_last_game(season_id, window_start, window_end, game_types)
+        pass_season = fetch_pass_contest(season_id, window_start, window_end, game_types)
+        pass_last = fetch_pass_contest_last_game(season_id, window_start, window_end, game_types)
+        gap_season = fetch_gap_help(season_id, window_start, window_end, game_types)
+        gap_last = fetch_gap_help_last_game(season_id, window_start, window_end, game_types)
+        low_season = fetch_low_man(season_id, window_start, window_end, game_types)
+        low_last = fetch_low_man_last_game(season_id, window_start, window_end, game_types)
+        pnr_season = fetch_pnr_grade(season_id, window_start, window_end, game_types)
+        pnr_last = fetch_pnr_grade_last_game(season_id, window_start, window_end, game_types)
 
         return (
             shrinks_season,
@@ -8285,7 +8305,7 @@ def leaderboard_game():
     else:
         window_start, window_end = (start_date, end_date)
 
-    slices = _build_tables(selected_season, window_start, window_end)
+    slices = _build_tables(selected_season, window_start, window_end, selected_game_types)
     (
         shrinks_season,
         shrinks_last,
@@ -8414,6 +8434,8 @@ def leaderboard_game():
         'end_date': end_date_value,
         'leaderboard_groups': leaderboard_groups,
         'active_page': 'leaderboard',
+        'game_type_options': GAME_TYPE_OPTIONS,
+        'selected_game_types': selected_game_types,
     }
 
     if request.headers.get('HX-Request') == 'true':
