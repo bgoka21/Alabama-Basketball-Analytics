@@ -80,9 +80,16 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
     for family_name, payload in series_payload.items():
         if not isinstance(payload, Mapping):
             continue
-        if family_name == "FLOW":
+        if isinstance(family_name, str) and family_name.upper() == "FLOW":
             flow_payload = payload
             continue
+
+        if not isinstance(family_name, str):
+            continue
+
+        family_upper = family_name.upper()
+        treat_as_misc = family_upper in ("UKNOWN", "MISC")
+        family_label = "MISC" if treat_as_misc else family_name
 
         plays_map = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
         if not isinstance(plays_map, Mapping):
@@ -90,6 +97,13 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
 
         for playcall, entry in plays_map.items():
             if not isinstance(entry, Mapping):
+                continue
+
+            playcall_label = playcall if isinstance(playcall, str) else str(playcall)
+            normalized_playcall = playcall_label.strip()
+            display_playcall = normalized_playcall or playcall_label
+
+            if treat_as_misc and (not normalized_playcall or normalized_playcall.upper() == "UNKNOWN"):
                 continue
 
             ran_val = int(entry.get("ran", 0) or 0)
@@ -106,8 +120,8 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
 
             rows.append(
                 {
-                    "series": family_name,
-                    "playcall": playcall,
+                    "series": family_label,
+                    "playcall": display_playcall,
                     "ran": ran_val,
                     "off_set": {"pts": off_pts, "chances": off_chances, "ppc": off_ppc},
                     "in_flow": {"pts": in_pts, "chances": in_chances, "ppc": in_ppc},
@@ -120,7 +134,7 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
             totals["in_flow"]["pts"] += in_pts
             totals["in_flow"]["chances"] += in_chances
 
-            seen_playcalls.add(playcall)
+            seen_playcalls.add(display_playcall)
 
     if isinstance(flow_payload, Mapping):
         plays_payload = flow_payload.get("plays")
@@ -130,6 +144,9 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
                     continue
 
                 playcall = _normalize_flow_label(entry.get("playcall", ""))
+                if not playcall or playcall.upper() == "UNKNOWN":
+                    continue
+
                 if playcall in seen_playcalls:
                     continue
 

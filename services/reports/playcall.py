@@ -195,12 +195,19 @@ def _compute_from_dataframe(df: pd.DataFrame) -> Dict[str, object]:
 
         points = _row_points(row_mapping, player_cols)
 
+        family_label = series_value or "UNKNOWN"
+        normalized_family_upper = family_label.upper() if isinstance(family_label, str) else ""
+        if normalized_family_upper == "UKNOWN":
+            if not playcall_label or playcall_label.upper() == "UNKNOWN":
+                continue
+            family_label = "MISC"
+
         chance_increment = 0
         if has_playcall and not is_neutral:
             # Treat Off Reb rows as valid chances whenever a playcall exists.
             chance_increment = 1
 
-        family_key = None if flow_only else series_value or "UNKNOWN"
+        family_key = None if flow_only else family_label or "UNKNOWN"
         if family_key:
             if family_key not in families:
                 families[family_key] = {
@@ -434,6 +441,8 @@ def aggregate_playcall_reports(game_ids: Iterable[int]):
                         playcall = _normalize_flow_playcall_label(raw_playcall)
                         if not playcall:
                             playcall = _normalize_string(raw_playcall) or "UNKNOWN"
+                        if not playcall or playcall.upper() == "UNKNOWN":
+                            continue
                         if playcall not in flow_map:
                             flow_map[playcall] = {
                                 "playcall": playcall,
@@ -448,8 +457,60 @@ def aggregate_playcall_reports(game_ids: Iterable[int]):
                             flow_entry["in_flow"]["chances"] += int(in_flow_bucket.get("chances", 0) or 0)
                 continue
 
-            if family_name not in families_agg:
-                families_agg[family_name] = {
+            family_upper = family_name.upper()
+            treat_as_misc = family_upper in ("UKNOWN", "MISC")
+            target_family_name = "MISC" if family_upper == "UKNOWN" else ("MISC" if family_upper == "MISC" else family_name)
+
+            removed_totals = {
+                "off_set": {"pts": 0, "chances": 0},
+                "in_flow": {"pts": 0, "chances": 0},
+            }
+
+            filtered_entries: list[tuple[str, Mapping[str, object]]] = []
+            source_plays = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
+            if isinstance(source_plays, Mapping):
+                for playcall, entry in source_plays.items():
+                    if not isinstance(playcall, str) or not isinstance(entry, Mapping):
+                        continue
+                    trimmed_playcall = playcall.strip()
+                    if treat_as_misc and (not trimmed_playcall or trimmed_playcall.upper() == "UNKNOWN"):
+                        for bucket in ("off_set", "in_flow"):
+                            bucket_payload = entry.get(bucket)
+                            if isinstance(bucket_payload, Mapping):
+                                removed_totals[bucket]["pts"] += int(bucket_payload.get("pts", 0) or 0)
+                                removed_totals[bucket]["chances"] += int(bucket_payload.get("chances", 0) or 0)
+                        continue
+                    filtered_entries.append((playcall, entry))
+
+            totals_payload = payload.get("totals") if isinstance(payload.get("totals"), Mapping) else {}
+            normalized_totals = {
+                "off_set": {"pts": 0, "chances": 0},
+                "in_flow": {"pts": 0, "chances": 0},
+            }
+            if isinstance(totals_payload, Mapping):
+                for bucket in ("off_set", "in_flow"):
+                    bucket_payload = totals_payload.get(bucket)
+                    pts_val = 0
+                    chances_val = 0
+                    if isinstance(bucket_payload, Mapping):
+                        pts_val = int(bucket_payload.get("pts", 0) or 0)
+                        chances_val = int(bucket_payload.get("chances", 0) or 0)
+                    if treat_as_misc:
+                        pts_val = max(0, pts_val - removed_totals[bucket]["pts"])
+                        chances_val = max(0, chances_val - removed_totals[bucket]["chances"])
+                    normalized_totals[bucket] = {"pts": pts_val, "chances": chances_val}
+
+            has_family_data = bool(filtered_entries)
+            if not has_family_data:
+                for bucket in ("off_set", "in_flow"):
+                    if normalized_totals[bucket]["pts"] or normalized_totals[bucket]["chances"]:
+                        has_family_data = True
+                        break
+            if not has_family_data:
+                continue
+
+            if target_family_name not in families_agg:
+                families_agg[target_family_name] = {
                     "plays": OrderedDict(),
                     "totals": {
                         "off_set": {"pts": 0, "chances": 0},
@@ -457,39 +518,32 @@ def aggregate_playcall_reports(game_ids: Iterable[int]):
                     },
                 }
 
-            family_payload = families_agg[family_name]
+            family_payload = families_agg[target_family_name]
             plays_map: MutableMapping[str, Dict[str, object]] = family_payload["plays"]  # type: ignore[assignment]
 
-            source_plays = payload.get("plays") if isinstance(payload.get("plays"), Mapping) else {}
-            if isinstance(source_plays, Mapping):
-                for playcall, entry in source_plays.items():
-                    if not isinstance(playcall, str) or not isinstance(entry, Mapping):
-                        continue
-                    if playcall not in plays_map:
-                        plays_map[playcall] = {
-                            "ran": 0,
-                            "off_set": {"pts": 0, "chances": 0},
-                            "in_flow": {"pts": 0, "chances": 0},
-                        }
-                    dest_entry = plays_map[playcall]
-                    dest_entry["ran"] += int(entry.get("ran", 0) or 0)
-                    for bucket in ("off_set", "in_flow"):
-                        bucket_payload = entry.get(bucket)
-                        if isinstance(bucket_payload, Mapping):
-                            dest = dest_entry[bucket]
-                            dest["pts"] += int(bucket_payload.get("pts", 0) or 0)
-                            dest["chances"] += int(bucket_payload.get("chances", 0) or 0)
-
-            totals_payload = payload.get("totals") if isinstance(payload.get("totals"), Mapping) else {}
-            if isinstance(totals_payload, Mapping):
+            for playcall, entry in filtered_entries:
+                if playcall not in plays_map:
+                    plays_map[playcall] = {
+                        "ran": 0,
+                        "off_set": {"pts": 0, "chances": 0},
+                        "in_flow": {"pts": 0, "chances": 0},
+                    }
+                dest_entry = plays_map[playcall]
+                dest_entry["ran"] += int(entry.get("ran", 0) or 0)
                 for bucket in ("off_set", "in_flow"):
-                    bucket_payload = totals_payload.get(bucket)
+                    bucket_payload = entry.get(bucket)
                     if isinstance(bucket_payload, Mapping):
-                        family_bucket = family_payload["totals"][bucket]
-                        family_bucket["pts"] += int(bucket_payload.get("pts", 0) or 0)
-                        family_bucket["chances"] += int(bucket_payload.get("chances", 0) or 0)
-                        if bucket == "in_flow":
-                            family_in_flow_sum += int(bucket_payload.get("chances", 0) or 0)
+                        dest = dest_entry[bucket]
+                        dest["pts"] += int(bucket_payload.get("pts", 0) or 0)
+                        dest["chances"] += int(bucket_payload.get("chances", 0) or 0)
+
+            for bucket in ("off_set", "in_flow"):
+                bucket_totals = normalized_totals[bucket]
+                family_bucket = family_payload["totals"][bucket]
+                family_bucket["pts"] += bucket_totals["pts"]
+                family_bucket["chances"] += bucket_totals["chances"]
+                if bucket == "in_flow":
+                    family_in_flow_sum += bucket_totals["chances"]
 
         if total_in_flow_meta and family_in_flow_sum <= total_in_flow_meta:
             flow_only_chances += total_in_flow_meta - family_in_flow_sum
