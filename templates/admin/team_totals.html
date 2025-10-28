@@ -60,11 +60,11 @@
       </div>
       {% endif %}
       {% if label_options %}
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-medium">Drills:</span>
         {% for lbl in label_options %}
-          <label class="inline-flex items-center text-sm mr-2">
-            <input type="checkbox" name="trend_label" value="{{ lbl }}" {% if lbl in trend_selected_labels %}checked{% endif %}>
-            <span class="ml-1">{{ lbl }}</span>
+          <label class="text-sm mr-3">
+            <input type="checkbox" name="trend_label" value="{{ lbl }}" {% if lbl in trend_selected_labels %}checked{% endif %}> {{ lbl }}
           </label>
         {% endfor %}
       </div>
