@@ -268,16 +268,18 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
         if not col.startswith("#"):
             continue
         tokens = extract_tokens(row.get(col, ""))
-        if "FT+" in tokens:
-            if col not in player_stats_dict:
-                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            player_stats_dict[col]["ftm"] += 1
-            player_stats_dict[col]["fta"] += 1
-            player_stats_dict[col]["points"] += 1
-        elif "FT-" in tokens:
-            if col not in player_stats_dict:
-                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            player_stats_dict[col]["fta"] += 1
+        made_fts = tokens.count("FT+")
+        missed_fts = tokens.count("FT-")
+        if not (made_fts or missed_fts):
+            continue
+        if col not in player_stats_dict:
+            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+        if made_fts:
+            player_stats_dict[col]["ftm"] += made_fts
+            player_stats_dict[col]["points"] += made_fts
+        total_attempts = made_fts + missed_fts
+        if total_attempts:
+            player_stats_dict[col]["fta"] += total_attempts
 
     # 4) Miscellaneous mapped stats (Turnover, 2nd Assist, Fouled), excluding "Assist"/"Pot. Assist"
     for col in df_columns:
