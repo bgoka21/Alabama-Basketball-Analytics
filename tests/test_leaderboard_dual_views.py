@@ -5,7 +5,7 @@ from flask import Flask, render_template_string
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
-from models.database import db, Practice, Season, Session
+from models.database import db, Practice, Season, Session, PlayerStats, Roster
 from models.user import User
 from admin.routes import admin_bp
 
@@ -146,6 +146,64 @@ def _assert_dual_table_basics(html, section_title, expected_texts):
 
 @pytest.mark.usefixtures("app_client")
 class TestDualViews:
+
+    def test_practice_leaderboard_filters_non_roster_players(self, monkeypatch, app_client):
+        import admin.routes as rmod
+
+        practice = Practice(season_id=1, date=LAST_DT, category="Test")
+        roster_entry = Roster(season_id=1, player_name="Roster Player")
+        db.session.add_all([practice, roster_entry])
+        db.session.flush()
+
+        db.session.add_all(
+            [
+                PlayerStats(
+                    season_id=1,
+                    practice_id=practice.id,
+                    player_name="Roster Player",
+                    points=12,
+                ),
+                PlayerStats(
+                    season_id=1,
+                    practice_id=practice.id,
+                    player_name="Walk On",
+                    points=7,
+                ),
+            ]
+        )
+        db.session.commit()
+
+        class _Summary:
+            offensive_possessions_on = 10
+            ppp_on_offense = 1.1
+            ppp_off_offense = 0.95
+
+        monkeypatch.setattr(rmod, "get_on_off_summary", lambda **kwargs: _Summary())
+        monkeypatch.setattr(
+            rmod,
+            "get_turnover_rates_onfloor",
+            lambda **kwargs: {
+                'team_turnover_rate_on': 12.0,
+                'indiv_turnover_rate': 8.0,
+                'individual_team_turnover_pct': 5.0,
+                'bamalytics_turnover_rate': 7.0,
+            },
+        )
+        monkeypatch.setattr(
+            rmod,
+            "get_rebound_rates_onfloor",
+            lambda **kwargs: {
+                'off_reb_rate_on': 15.0,
+                'def_reb_opportunities_on': 4,
+                'def_reb_rate_on': 20.0,
+            },
+        )
+
+        _, rows, _ = rmod.compute_leaderboard('points', 1)
+
+        player_names = [name for name, _ in rows]
+        assert "Roster Player" in player_names
+        assert "Walk On" not in player_names
 
     def test_defense_bumps_dual(self, monkeypatch, app_client):
         import admin.routes as rmod

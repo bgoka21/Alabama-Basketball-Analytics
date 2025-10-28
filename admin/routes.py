@@ -711,6 +711,14 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         'fg3_late_attempts', 'fg3_late_makes',
         'fg3_no_contest_attempts', 'fg3_no_contest_makes',
     ]
+    roster_lookup_rows = (
+        db.session.query(Roster.player_name, Roster.id)
+        .filter(Roster.season_id == season_id)
+        .all()
+    )
+    roster_lookup = dict(roster_lookup_rows)
+    roster_players = set(roster_lookup)
+
     ps_q = (
         db.session.query(
             PlayerStats.player_name.label('player'),
@@ -746,7 +754,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                 )
             )
     ps_q = ps_q.group_by(PlayerStats.player_name)
-    ps_rows = {r.player: r._asdict() for r in ps_q.all()}
+    ps_results = ps_q.all()
 
     bc_fields = [
         'total_blue_collar','reb_tip','def_reb','misc',
@@ -956,11 +964,11 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
     events_q = events_q.group_by(Roster.player_name)
     event_rows = {r.player: r._asdict() for r in events_q.all()}
 
-    roster_lookup = dict(
-        db.session.query(Roster.player_name, Roster.id)
-        .filter(Roster.season_id == season_id)
-        .all()
-    )
+    ps_rows = {
+        r.player: r._asdict()
+        for r in ps_results
+        if r.player in roster_players
+    }
     helper_labels = list(label_set) if label_set else None
     candidate_players = (
         set(event_rows)
@@ -970,6 +978,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         | set(personal_fouls)
         | set(person_def_rebs)
     )
+    candidate_players &= roster_players
 
     extra_rows = {}
     for player in candidate_players:
@@ -1059,7 +1068,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
         }
 
     core_rows = {}
-    for player in set(ps_rows) | set(bc_rows) | set(extra_rows):
+    for player in (set(ps_rows) | set(bc_rows) | set(extra_rows)) & roster_players:
         base = {**ps_rows.get(player, {}), **bc_rows.get(player, {}), **extra_rows.get(player, {})}
         # derive additional shooting percentages
         atr_a = base.get('atr_attempts', 0)
@@ -1331,7 +1340,7 @@ def compute_leaderboard(stat_key, season_id, start_dt=None, end_dt=None, label_s
                 )
             checked += 1
 
-    all_players = set(core_rows) | set(shot_details)
+    all_players = (set(core_rows) | set(shot_details)) & roster_players
     leaderboard, team_totals = compute_leaderboard_rows(stat_key, all_players, core_rows, shot_details)
     return cfg, leaderboard, team_totals
 
