@@ -5929,6 +5929,22 @@ def player_detail(player_name):
     if selected_season_id:
         stats_query = stats_query.filter(PlayerStats.season_id == selected_season_id)
     all_stats_records = stats_query.all()
+
+    raw_game_types = request.args.getlist('game_type')
+    if not raw_game_types:
+        single_game_type = (request.args.get('game_type') or '').strip()
+        if single_game_type:
+            raw_game_types = [single_game_type]
+
+    selected_game_types: list[str] = []
+    for value in raw_game_types:
+        match = next(
+            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
+            None,
+        )
+        if match and match not in selected_game_types:
+            selected_game_types.append(match)
+
     if start_dt or end_dt:
         filtered_records = []
         for rec in all_stats_records:
@@ -5960,6 +5976,12 @@ def player_detail(player_name):
 
     # ─── Split into Game vs Practice records ────────────────────────────
     game_stats_records     = [r for r in all_stats_records if r.game_id]
+    if selected_game_types:
+        game_stats_records = [
+            r
+            for r in game_stats_records
+            if r.game and any(tag in selected_game_types for tag in r.game.game_types)
+        ]
     practice_stats_records = [r for r in all_stats_records if r.practice_id]
 
    # ─── Read blanket‐tab mode (‘game’ or ‘practice’), but if no games exist, switch to practice ──
@@ -6474,6 +6496,8 @@ def player_detail(player_name):
         has_stats                          = has_stats,
         label_options                      = label_options,
         selected_labels                    = selected_labels,
+        game_type_options                  = GAME_TYPE_OPTIONS,
+        selected_game_types                = selected_game_types,
         selected_session                   = selected_session,
         sessions                           = sessions,
         pnr_totals                         = pnr_totals,
