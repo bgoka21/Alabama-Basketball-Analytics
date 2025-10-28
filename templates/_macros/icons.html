@@ -1,0 +1,156 @@
+{% macro render(name, classes="") %}
+  {% set base_classes = "h-4 w-4 shrink-0 text-white transition-colors duration-200 group-hover:text-[#9E1B32] group-focus-visible:text-[#9E1B32] group-active:text-[#9E1B32] " %}
+  {% set icon_classes = base_classes ~ classes %}
+  {% if name == 'home' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 9.75V20.25a.75.75 0 00.75.75H9.75v-6h4.5v6h4.5a.75.75 0 00.75-.75V9.75" />
+  </svg>
+  {% elif name == 'reports' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16.5h6M8.25 3.75h7.5a2.25 2.25 0 012.25 2.25v12a2.25 2.25 0 01-2.25 2.25h-7.5A2.25 2.25 0 016 18V6a2.25 2.25 0 012.25-2.25z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 7.5h6" />
+  </svg>
+  {% elif name == 'profile' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 14.25a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 21a7.5 7.5 0 0115 0" />
+  </svg>
+  {% elif name == 'recruiting' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 12.75a3 3 0 100-6 3 3 0 000 6z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5a7.5 7.5 0 0115 0" />
+  </svg>
+  {% elif name == 'players' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 18.75a7.5 7.5 0 0115 0" />
+  </svg>
+  {% elif name == 'totals' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+  </svg>
+  {% elif name == 'free-throws' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 8.25l7.5 7.5M15.75 8.25l-7.5 7.5" />
+  </svg>
+  {% elif name == 'currency' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 8.25H11.1a2.1 2.1 0 100 4.2h1.8a2.1 2.1 0 110 4.2H8.25" />
+  </svg>
+  {% elif name == 'leaderboard' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 21v-6M12 21V3M15.75 21v-9" />
+  </svg>
+  {% elif name == 'summer' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75V3.75M12 20.25v-3M7.5 7.5l-2.121-2.121M18.621 18.621 16.5 16.5M6.75 12h-3M20.25 12h-3M7.5 16.5l-2.121 2.121M18.621 5.379 16.5 7.5" />
+    <circle cx="12" cy="12" r="3.75" />
+  </svg>
+  {% elif name == 'logout' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H9m9 0l-3 3m3-3l-3-3" />
+  </svg>
+  {% elif name == 'login' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h9m0 0l-3-3m3 3l-3 3" />
+  </svg>
+  {% elif name == 'management' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h10.5v10.5H6.75z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75h6M9 20.25h6M3.75 9v6M20.25 9v6" />
+  </svg>
+  {% elif name == 'files' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75h3.75L18 9v11.25a.75.75 0 01-.75.75H9A2.25 2.25 0 016.75 18.75V6A2.25 2.25 0 019 3.75z" />
+  </svg>
+  {% elif name == 'merge' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l4.5 4.5-4.5 4.5" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75v10.5" />
+  </svg>
+  {% elif name == 'roster' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5A2.25 2.25 0 1112 7.5a2.25 2.25 0 01-4.5 0zM15.75 7.5A2.25 2.25 0 1119.5 7.5a2.25 2.25 0 01-3.75 0z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18a5.25 5.25 0 0110.5 0v2.25H2.25V18zM14.25 18a5.25 5.25 0 019.75 2.25H14.25V18z" />
+  </svg>
+  {% elif name == 'sessions' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l3 3" />
+    <circle cx="12" cy="12" r="9" />
+  </svg>
+  {% elif name == 'users' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 8.25a2.25 2.25 0 104.5 0 2.25 2.25 0 00-4.5 0zM15.75 9.75A1.5 1.5 0 1118 9.75a1.5 1.5 0 01-2.25 0z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 18a3.75 3.75 0 017.5 0v2.25h-7.5V18zM14.25 18a3.75 3.75 0 017.5 0v2.25h-7.5V18z" />
+  </svg>
+  {% elif name == 'usage' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l3.75-4.5 3 3.75 3.75-4.5L19.5 21" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5h15v15" />
+  </svg>
+  {% elif name == 'correlation' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 19.5L9 14.25l3 3 8.25-8.25" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.75h6v6" />
+  </svg>
+  {% elif name == 'upload' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75L12 3l3.75 3.75" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75v2.25a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-2.25" />
+  </svg>
+  {% elif name == 'import' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21V9" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75L12 19.5l-3.75-3.75" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 8.25v-2.25A2.25 2.25 0 016.75 3.75h10.5a2.25 2.25 0 012.25 2.25v2.25" />
+  </svg>
+  {% elif name == 'identity' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6 8.25h12M6 11.25h6" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M18 15.75a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25A2.25 2.25 0 016 3h12a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25V5.25z" />
+  </svg>
+  {% elif name == 'synonyms' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h6" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h12A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75L18 18m0 0l2.25-2.25M18 18v-4.5" />
+  </svg>
+  {% elif name == 'analytics' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5V4.5h15v15z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15.75l2.25-3 3 3.75 2.25-3" />
+  </svg>
+  {% elif name == 'clipboard' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5h6" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3h4.5a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-4.5a.75.75 0 01-.75-.75v-1.5a.75.75 0 01.75-.75z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h10.5a.75.75 0 01.75.75v12a.75.75 0 01-.75.75H6.75a.75.75 0 01-.75-.75v-12a.75.75 0 01.75-.75z" />
+  </svg>
+  {% elif name == 'practice' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l4.5 4.5-4.5 4.5" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12.75 7.5l4.5 4.5-4.5 4.5" />
+  </svg>
+  {% elif name == 'development' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+  {% elif name == 'dashboard' %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75a2.25 2.25 0 110 4.5 2.25 2.25 0 010-4.5z" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5A7.5 7.5 0 0112 6a7.5 7.5 0 017.5 13.5" />
+  </svg>
+  {% else %}
+  <svg class="{{ icon_classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+  </svg>
+  {% endif %}
+{% endmacro %}
