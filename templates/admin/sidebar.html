@@ -24,10 +24,13 @@
   {% set reports_active = request.endpoint in ['admin.game_reports', 'admin.practice_reports', 'advanced_offense_report', 'playcall_report'] %}
   <li class="nav-item">
     <details class="group" {% if reports_active %}open{% endif %}>
-      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
-        Reports
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32] flex items-center justify-between gap-2">
+        <span>Reports</span>
+        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
+        </svg>
       </summary>
-      <div class="ml-4 mt-2 flex flex-col gap-2">
+      <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.game_reports' %} active{% endif %}" href="{{ url_for('admin.game_reports') }}">Game Reports</a>
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.practice_reports' %} active{% endif %}" href="{{ url_for('admin.practice_reports') }}">Practice Reports</a>
         {% if ADVANCED_POSSESSION_ENABLED %}
@@ -50,10 +53,13 @@
   </li>
   <li class="nav-item">
     <details class="group" {% if recruiting_active %}open{% endif %}>
-      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
-        Recruiting
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32] flex items-center justify-between gap-2">
+        <span>Recruiting</span>
+        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
+        </svg>
       </summary>
-      <div class="ml-4 mt-2 flex flex-col gap-2">
+      <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint and request.endpoint.startswith('recruits.') and request.endpoint != 'recruits.money_board' and not request.endpoint.startswith('recruits.money_coach') %} active{% endif %}"
            href="{{ recruit_list_url }}">Recruits</a>
 
@@ -83,10 +89,13 @@
   {% set leaderboards_active = request.endpoint in leaderboard_endpoints %}
   <li class="nav-item">
     <details class="group" {% if leaderboards_active %}open{% endif %}>
-      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
-        Leaderboards
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32] flex items-center justify-between gap-2">
+        <span>Leaderboards</span>
+        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
+        </svg>
       </summary>
-      <div class="ml-4 mt-2 flex flex-col gap-2">
+      <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.leaderboard' %} active{% endif %}"
            href="{{ url_for('admin.leaderboard') }}">Practice Leaderboard</a>
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.leaderboard_practice_new' %} active{% endif %}"
@@ -109,10 +118,13 @@
                         'admin.eybl_import', 'admin.eybl_identity', 'admin.eybl_synonyms'] %}
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
-      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32]">
-        Management
+      <summary class="nav-link px-3 py-2 rounded cursor-pointer transition hover:bg-white hover:text-[#9E1B32] flex items-center justify-between gap-2">
+        <span>Management</span>
+        <svg class="h-4 w-4 transition-transform duration-200 group-open:-rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.1l-4.25 3.846a.75.75 0 01-1.02 0L5.21 8.33a.75.75 0 01.02-1.12z" clip-rule="evenodd" />
+        </svg>
       </summary>
-      <div class="ml-4 mt-2 flex flex-col gap-2">
+      <div class="ml-4 mt-0 group-open:mt-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 transition-all flex flex-col space-y-1 opacity-0 -translate-y-1 group-open:opacity-100 group-open:translate-y-0">
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.dashboard' %} active{% endif %}" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
         <a class="nav-link block px-3 py-2 rounded transition hover:bg-white hover:text-[#9E1B32]{% if request.endpoint == 'admin.files_view_unique' %} active{% endif %}" href="{{ url_for('admin.files_view_unique') }}">Files</a>
         {% if view_exists('merge.merge_csv') %}
