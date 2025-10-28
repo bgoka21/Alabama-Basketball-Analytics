@@ -7691,7 +7691,9 @@ def team_totals():
         if end:
             query = query.filter(Game.game_date <= end)
         if game_types:
-            query = query.join(GameTypeTag).filter(GameTypeTag.tag.in_(game_types))
+            query = query.join(
+                GameTypeTag, GameTypeTag.game_id == Game.id
+            ).filter(GameTypeTag.tag.in_(game_types))
         return query.with_entities(Game.id).distinct()
 
     start_date = request.args.get('start_date')
@@ -7870,12 +7872,21 @@ def team_totals():
         shot_type_totals, shot_summaries = compute_team_shot_details(stats_list, label_set)
 
     else:
-        game_ids_for_totals = build_game_id_query(season_id, start_dt, end_dt, selected_game_types)
+        game_ids_for_totals = build_game_id_query(
+            season_id, start_dt, end_dt, selected_game_types
+        )
 
-        q = PlayerStats.query.filter(PlayerStats.game_id != None)
+        q = (
+            PlayerStats.query.join(Game, PlayerStats.game_id == Game.id)
+            .filter(PlayerStats.game_id != None)
+        )
         if season_id:
             q = q.filter(PlayerStats.season_id == season_id)
-        q = q.filter(PlayerStats.game_id.in_(game_ids_for_totals))
+        if start_dt:
+            q = q.filter(Game.game_date >= start_dt)
+        if end_dt:
+            q = q.filter(Game.game_date <= end_dt)
+        q = q.filter(Game.id.in_(game_ids_for_totals))
         stats_list = q.all()
 
         label_options = collect_practice_labels(stats_list)
@@ -8093,7 +8104,9 @@ def team_totals():
             trend_query = trend_query.filter(Practice.category.in_(trend_selected_categories))
         trend_rows = compute_trend_rows(trend_query, Practice.date)
     else:
-        trend_game_ids = build_game_id_query(trend_season_id, trend_start_dt, trend_end_dt, selected_game_types)
+        trend_game_ids = build_game_id_query(
+            trend_season_id, trend_start_dt, trend_end_dt, selected_game_types
+        )
         trend_query = (
             db.session.query(
                 Game.game_date.label('dt'),
@@ -8121,6 +8134,10 @@ def team_totals():
         trend_query = trend_query.filter(PlayerStats.game_id != None)
         if trend_season_id:
             trend_query = trend_query.filter(PlayerStats.season_id == trend_season_id)
+        if trend_start_dt:
+            trend_query = trend_query.filter(Game.game_date >= trend_start_dt)
+        if trend_end_dt:
+            trend_query = trend_query.filter(Game.game_date <= trend_end_dt)
         trend_query = trend_query.filter(Game.id.in_(trend_game_ids))
         trend_rows = compute_trend_rows(trend_query, Game.game_date)
 
