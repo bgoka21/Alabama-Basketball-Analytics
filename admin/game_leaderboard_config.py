@@ -26,7 +26,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         "columns": [
             "FG",
             "FG%",
-            "Freq",
             "Shrink 3FG",
             "Shrink 3FG %",
             "Shrink 3FG Freq",
@@ -43,10 +42,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
                 "attempt_keys": ("fg3_att", "fg3_attempts"),
             },
             "FG%": ("fg3_pct",),
-            "Freq": {
-                "keys": ("fg3_freq_pct",),
-                "format": "pct",
-            },
             "Shrink 3FG": {
                 "keys": ("fg3_shrink_make", "fg3_shrink_att"),
                 "numeric_keys": ("fg3_shrink_make",),
@@ -96,7 +91,6 @@ _GAME_CONFIG: Dict[str, ConfigMap] = {
         },
         "pct_columns": [
             "FG%",
-            "Freq",
             "Shrink 3FG %",
             "Shrink 3FG Freq",
             "Non-Shrink 3FG %",
