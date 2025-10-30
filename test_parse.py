@@ -628,19 +628,16 @@ def get_possession_breakdown_detailed(df):
 
         # 5) situational buckets mirror possession-type handling
         for col_name, off_bucket, def_bucket in situational_columns:
-            # Preprocessing to normalize composite or duplicate values
-            if col_name == "POSSESSION START":
-                raw_val = row.get(col_name, "")
-                if raw_val == "Missed FT, Off Rebound":
-                    raw_val = "Off Rebound"
-            elif col_name == "PAINT TOUCHES":
-                raw_val = row.get(col_name, "")
-                if raw_val == "1 PT, 1 PT":
-                    raw_val = "2 PT"
+            raw_val = str(row.get(col_name, "")).strip()
+
+            # Normalize known composite cases
+            if col_name == "POSSESSION START" and raw_val == "Missed FT, Off Rebound":
+                tokens = ["Off Rebound"]
+            elif col_name == "PAINT TOUCHES" and raw_val == "1 PT, 1 PT":
+                tokens = ["2 PT"]
             else:
-                raw_val = row.get(col_name, "")
+                tokens = [tok.strip() for tok in raw_val.split(",") if tok.strip()]
             
-            tokens = [tok.strip() for tok in str(raw_val).split(",") if tok.strip()]
 
             if not tokens:
                 tokens = ["N/A"]
