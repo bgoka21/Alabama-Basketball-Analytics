@@ -498,28 +498,69 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
 
 # --- New get_possession_breakdown_detailed() ---
 def get_possession_breakdown_detailed(df):
-    """
-    Returns four dicts:
-      1) breakdown_offense[token]  = {'count':…, 'points':…}
-      2) breakdown_defense[token]  = {'count':…, 'points':…}
-      3) periodic_offense[split]   = {'count':…, 'points':…}
-      4) periodic_defense[split]   = {'count':…, 'points':…}
-    Splits come from the "GAME SPLITS" column: "1st Half", "2nd Half", "Overtime".
-    Now excludes both Neutral and Off Reb rows for the ‘count’ buckets.
-    """
-    desired_tokens = ["Transition","Man","Zone","Press","UOB","SLOB","Garbage","OREB Putback"]
+    """Return possession-type, game-split, and situational breakdowns."""
 
-    # possession‐type buckets
-    breakdown_offense = {t:{'count':0,'points':0} for t in desired_tokens}
-    breakdown_defense = {t:{'count':0,'points':0} for t in desired_tokens}
+    desired_tokens = [
+        "Transition", "Man", "Zone", "Press",
+        "UOB", "SLOB", "Garbage", "OREB Putback",
+    ]
 
-    # game‐split buckets
+    # possession-type buckets
+    breakdown_offense = {t: {"count": 0, "points": 0} for t in desired_tokens}
+    breakdown_defense = {t: {"count": 0, "points": 0} for t in desired_tokens}
+
+    # game-split buckets
     periodic_offense = {
-        "1st Half": {'count':0,'points':0},
-        "2nd Half": {'count':0,'points':0},
-        "Overtime": {'count':0,'points':0},
+        "1st Half": {"count": 0, "points": 0},
+        "2nd Half": {"count": 0, "points": 0},
+        "Overtime": {"count": 0, "points": 0},
     }
-    periodic_defense = {k:v.copy() for k,v in periodic_offense.items()}
+    periodic_defense = {k: v.copy() for k, v in periodic_offense.items()}
+
+    # situational buckets
+    shot_clock_order = [
+        ":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A",
+    ]
+    possession_start_order = [
+        "Made FG", "Missed FG", "Steal", "Deadball", "Off Rebound", "N/A",
+    ]
+    paint_touches_order = ["0 PT", "1 PT", "2 PT", "3+ PT", "N/A"]
+    shot_clock_pt_order = [
+        ":01 - :03", ":04 - :06", ":07 - :09",
+        ":10 - :12", ":13 - :15", ":16+", "N/A",
+    ]
+
+    def _init_bucket(order):
+        return {label: {"count": 0, "points": 0} for label in order}
+
+    shot_clock_offense = _init_bucket(shot_clock_order)
+    shot_clock_defense = _init_bucket(shot_clock_order)
+    possession_start_offense = _init_bucket(possession_start_order)
+    possession_start_defense = _init_bucket(possession_start_order)
+    paint_touches_offense = _init_bucket(paint_touches_order)
+    paint_touches_defense = _init_bucket(paint_touches_order)
+    shot_clock_pt_offense = _init_bucket(shot_clock_pt_order)
+    shot_clock_pt_defense = _init_bucket(shot_clock_pt_order)
+
+    situational_columns = [
+        ("SHOT CLOCK", shot_clock_offense, shot_clock_defense),
+        ("POSSESSION START", possession_start_offense, possession_start_defense),
+        ("PAINT TOUCHES", paint_touches_offense, paint_touches_defense),
+        ("SHOT CLOCK PT", shot_clock_pt_offense, shot_clock_pt_defense),
+    ]
+
+    def _normalize_value(value: object) -> str:
+        text = str(value).strip()
+        if not text or text.lower() == "nan":
+            return "N/A"
+        return text
+
+    def _increment(bucket: dict, key: str, points: int, *, is_countable: bool):
+        if key not in bucket:
+            bucket[key] = {"count": 0, "points": 0}
+        if is_countable:
+            bucket[key]["count"] += 1
+        bucket[key]["points"] += points
 
     for _, row in df.iterrows():
         row_type = str(row.get("Row","")).strip()
@@ -565,11 +606,11 @@ def get_possession_breakdown_detailed(df):
             if tkn not in desired_tokens:
                 continue
             if row_type == "Offense":
-                if not is_neutral:
+                if not is_neutral and not is_off_reb:
                     breakdown_offense[tkn]['count'] += 1
                 breakdown_offense[tkn]['points'] += pts
             else:
-                if not is_neutral:
+                if not is_neutral and not is_opp_off_reb:
                     breakdown_defense[tkn]['count'] += 1
                 breakdown_defense[tkn]['points'] += pts
 
@@ -585,7 +626,37 @@ def get_possession_breakdown_detailed(df):
                     periodic_defense[split]['count'] += 1
                 periodic_defense[split]['points'] += pts
 
-    return breakdown_offense, breakdown_defense, periodic_offense, periodic_defense
+        # 5) situational buckets mirror possession-type handling
+        for col_name, off_bucket, def_bucket in situational_columns:
+            raw_val = row.get(col_name, "")
+            tokens = [tok.strip() for tok in str(raw_val).split(",") if tok.strip()]
+            if not tokens:
+                tokens = ["N/A"]
+            tokens = [_normalize_value(tok) for tok in tokens]
+
+            if row_type == "Offense":
+                countable = not is_neutral and not is_off_reb
+                for token in tokens:
+                    _increment(off_bucket, token, pts, is_countable=countable)
+            else:
+                countable = not is_neutral and not is_opp_off_reb
+                for token in tokens:
+                    _increment(def_bucket, token, pts, is_countable=countable)
+
+    return (
+        breakdown_offense,
+        breakdown_defense,
+        periodic_offense,
+        periodic_defense,
+        shot_clock_offense,
+        shot_clock_defense,
+        possession_start_offense,
+        possession_start_defense,
+        paint_touches_offense,
+        paint_touches_defense,
+        shot_clock_pt_offense,
+        shot_clock_pt_defense,
+    )
 
 
 
@@ -1378,8 +1449,20 @@ def parse_csv(file_path, game_id, season_id):
     
     # --- Calculate Possession Type Breakdowns using the new detailed function ---
     # --- Calculate Possession Type & Split Breakdowns ---
-    offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \
-        get_possession_breakdown_detailed(df)
+    (
+        offensive_breakdown,
+        defensive_breakdown,
+        periodic_offense,
+        periodic_defense,
+        shot_clock_offense,
+        shot_clock_defense,
+        possession_start_offense,
+        possession_start_defense,
+        paint_touches_offense,
+        paint_touches_defense,
+        shot_clock_pt_offense,
+        shot_clock_pt_defense,
+    ) = get_possession_breakdown_detailed(df)
 
 
     # ● compute lineup efficiencies (2-5 man units, min 10 poss)
@@ -1392,6 +1475,16 @@ def parse_csv(file_path, game_id, season_id):
     result = {
       "offensive_breakdown": offensive_breakdown,
       "defensive_breakdown": defensive_breakdown,
+      "periodic_offense": periodic_offense,
+      "periodic_defense": periodic_defense,
+      "shot_clock_offense": shot_clock_offense,
+      "shot_clock_defense": shot_clock_defense,
+      "possession_start_offense": possession_start_offense,
+      "possession_start_defense": possession_start_defense,
+      "paint_touches_offense": paint_touches_offense,
+      "paint_touches_defense": paint_touches_defense,
+      "shot_clock_pt_offense": shot_clock_pt_offense,
+      "shot_clock_pt_defense": shot_clock_pt_defense,
       "lineup_efficiencies": efficiencies
     }
 

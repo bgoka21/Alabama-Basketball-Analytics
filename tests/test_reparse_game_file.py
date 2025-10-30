@@ -120,7 +120,7 @@ def test_reparse_game(client, app, monkeypatch):
         upload = db.session.get(UploadedFile, 1)
         assert call_count['value'] == 1
         assert TeamStats.query.count() == 1
-        assert json.loads(upload.offensive_breakdown)['run'] == 1
+        assert json.loads(upload.offensive_breakdown)['possession_type']['run'] == 1
         game = Game.query.filter_by(csv_filename='game.csv').one()
         first_game_id = game.id
 
@@ -132,8 +132,8 @@ def test_reparse_game(client, app, monkeypatch):
         assert call_count['value'] == 2
         assert TeamStats.query.count() == 1
         assert TeamStats.query.first().total_points == 2
-        assert json.loads(upload.offensive_breakdown)['run'] == 2
-        assert json.loads(upload.defensive_breakdown)['run'] == 2
+        assert json.loads(upload.offensive_breakdown)['possession_type']['run'] == 2
+        assert json.loads(upload.defensive_breakdown)['possession_type']['run'] == 2
         assert upload.parse_status == 'Parsed Successfully'
         assert upload.last_parsed is not None
         game = Game.query.filter_by(csv_filename='game.csv').one()

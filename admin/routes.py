@@ -4590,10 +4590,22 @@ def parse_file(file_id):
             # 3) update UploadedFile with breakdowns + status
             uploaded_file.parse_status        = 'Parsed Successfully'
             uploaded_file.last_parsed         = datetime.utcnow()
-            uploaded_file.offensive_breakdown = json.dumps(
-                results.get('offensive_breakdown', {}) )
-            uploaded_file.defensive_breakdown = json.dumps(
-                results.get('defensive_breakdown', {}) )
+            uploaded_file.offensive_breakdown = json.dumps({
+                "possession_type": results.get('offensive_breakdown', {}),
+                "periodic": results.get('periodic_offense', {}),
+                "shot_clock": results.get('shot_clock_offense', {}),
+                "possession_start": results.get('possession_start_offense', {}),
+                "paint_touches": results.get('paint_touches_offense', {}),
+                "shot_clock_pt": results.get('shot_clock_pt_offense', {}),
+            })
+            uploaded_file.defensive_breakdown = json.dumps({
+                "possession_type": results.get('defensive_breakdown', {}),
+                "periodic": results.get('periodic_defense', {}),
+                "shot_clock": results.get('shot_clock_defense', {}),
+                "possession_start": results.get('possession_start_defense', {}),
+                "paint_touches": results.get('paint_touches_defense', {}),
+                "shot_clock_pt": results.get('shot_clock_pt_defense', {}),
+            })
             uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
             db.session.commit()
 
@@ -4688,12 +4700,22 @@ def _reparse_uploaded_game(uploaded_file, upload_path):
     uploaded_file.last_parsed = datetime.utcnow()
     uploaded_file.parse_error = None
     uploaded_file.parse_log = None
-    uploaded_file.offensive_breakdown = json.dumps(
-        results.get("offensive_breakdown", {})
-    )
-    uploaded_file.defensive_breakdown = json.dumps(
-        results.get("defensive_breakdown", {})
-    )
+    uploaded_file.offensive_breakdown = json.dumps({
+        "possession_type": results.get("offensive_breakdown", {}),
+        "periodic": results.get("periodic_offense", {}),
+        "shot_clock": results.get("shot_clock_offense", {}),
+        "possession_start": results.get("possession_start_offense", {}),
+        "paint_touches": results.get("paint_touches_offense", {}),
+        "shot_clock_pt": results.get("shot_clock_pt_offense", {}),
+    })
+    uploaded_file.defensive_breakdown = json.dumps({
+        "possession_type": results.get("defensive_breakdown", {}),
+        "periodic": results.get("periodic_defense", {}),
+        "shot_clock": results.get("shot_clock_defense", {}),
+        "possession_start": results.get("possession_start_defense", {}),
+        "paint_touches": results.get("paint_touches_defense", {}),
+        "shot_clock_pt": results.get("shot_clock_pt_defense", {}),
+    })
     uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
     db.session.commit()
 
@@ -5160,13 +5182,68 @@ def season_stats(season_id):
                 .str.strip()
             )
             dfs.append(df)
+    shot_clock_order = [":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A"]
+    possession_start_order = ["Made FG", "Missed FG", "Steal", "Deadball", "Off Rebound", "N/A"]
+    paint_touches_order = ["0 PT", "1 PT", "2 PT", "3+ PT", "N/A"]
+    shot_clock_pt_order = [":01 - :03", ":04 - :06", ":07 - :09", ":10 - :12", ":13 - :15", ":16+", "N/A"]
+
+    def _format_rows(buckets, order):
+        rows = []
+        seen = set()
+        buckets = buckets or {}
+        for label in order:
+            stats = buckets.get(label, {"points": 0, "count": 0})
+            rows.append({
+                "label": label,
+                "points": stats.get("points", 0),
+                "possessions": stats.get("count", 0),
+                "ppc": round(stats.get("points", 0) / stats.get("count", 0), 2) if stats.get("count", 0) else 0.0,
+            })
+            seen.add(label)
+        for label, stats in buckets.items():
+            if label in seen:
+                continue
+            rows.append({
+                "label": label,
+                "points": stats.get("points", 0),
+                "possessions": stats.get("count", 0),
+                "ppc": round(stats.get("points", 0) / stats.get("count", 0), 2) if stats.get("count", 0) else 0.0,
+            })
+        return rows
+
     if dfs:
         full_df = pd.concat(dfs, ignore_index=True)
-        off_break, def_break, per_off, per_def = get_possession_breakdown_detailed(full_df)
+        (
+            off_break,
+            def_break,
+            per_off,
+            per_def,
+            shot_clock_off,
+            shot_clock_def,
+            pos_start_off,
+            pos_start_def,
+            paint_touch_off,
+            paint_touch_def,
+            shot_clock_pt_off,
+            shot_clock_pt_def,
+        ) = get_possession_breakdown_detailed(full_df)
     else:
         off_break = def_break = {}
-        per_off = {h: SimpleNamespace(points=0, count=0) for h in ['1st Half','2nd Half','Overtime']}
-        per_def = per_off
+        per_off = {h: {"points": 0, "count": 0} for h in ['1st Half','2nd Half','Overtime']}
+        per_def = {h: {"points": 0, "count": 0} for h in ['1st Half','2nd Half','Overtime']}
+        shot_clock_off = shot_clock_def = {}
+        pos_start_off = pos_start_def = {}
+        paint_touch_off = paint_touch_def = {}
+        shot_clock_pt_off = shot_clock_pt_def = {}
+
+    shot_clock_off_rows = _format_rows(shot_clock_off, shot_clock_order)
+    shot_clock_def_rows = _format_rows(shot_clock_def, shot_clock_order)
+    pos_start_off_rows = _format_rows(pos_start_off, possession_start_order)
+    pos_start_def_rows = _format_rows(pos_start_def, possession_start_order)
+    paint_touch_off_rows = _format_rows(paint_touch_off, paint_touches_order)
+    paint_touch_def_rows = _format_rows(paint_touch_def, paint_touches_order)
+    shot_clock_pt_off_rows = _format_rows(shot_clock_pt_off, shot_clock_pt_order)
+    shot_clock_pt_def_rows = _format_rows(shot_clock_pt_def, shot_clock_pt_order)
 
         # collect all game-level lineup JSON
     season_lineups = {}
@@ -5212,6 +5289,14 @@ def season_stats(season_id):
         defensive_breakdown=def_break,
         periodic_offense=per_off,
         periodic_defense=per_def,
+        shot_clock_offense=shot_clock_off_rows,
+        shot_clock_defense=shot_clock_def_rows,
+        possession_start_offense=pos_start_off_rows,
+        possession_start_defense=pos_start_def_rows,
+        paint_touches_offense=paint_touch_off_rows,
+        paint_touches_defense=paint_touch_def_rows,
+        shot_clock_pt_offense=shot_clock_pt_off_rows,
+        shot_clock_pt_defense=shot_clock_pt_def_rows,
         best_offense=best_offense_season,
         worst_offense=worst_offense_season,
         best_defense=best_defense_season,
@@ -5284,8 +5369,58 @@ def game_stats(game_id):
     )
 
     # ─── POSSESSION BREAKDOWNS & LINEUPS (UNCHANGED) ──────────────────────────
-    offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \
-        get_possession_breakdown_detailed(df)
+    (
+        offensive_breakdown,
+        defensive_breakdown,
+        periodic_offense,
+        periodic_defense,
+        shot_clock_off,
+        shot_clock_def,
+        pos_start_off,
+        pos_start_def,
+        paint_touch_off,
+        paint_touch_def,
+        shot_clock_pt_off,
+        shot_clock_pt_def,
+    ) = get_possession_breakdown_detailed(df)
+
+    shot_clock_order = [":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A"]
+    possession_start_order = ["Made FG", "Missed FG", "Steal", "Deadball", "Off Rebound", "N/A"]
+    paint_touches_order = ["0 PT", "1 PT", "2 PT", "3+ PT", "N/A"]
+    shot_clock_pt_order = [":01 - :03", ":04 - :06", ":07 - :09", ":10 - :12", ":13 - :15", ":16+", "N/A"]
+
+    def _format_rows(buckets, order):
+        rows = []
+        seen = set()
+        buckets = buckets or {}
+        for label in order:
+            stats = buckets.get(label, {"points": 0, "count": 0})
+            rows.append({
+                "label": label,
+                "points": stats.get("points", 0),
+                "possessions": stats.get("count", 0),
+                "ppc": round(stats.get("points", 0) / stats.get("count", 0), 2) if stats.get("count", 0) else 0.0,
+            })
+            seen.add(label)
+        for label, stats in buckets.items():
+            if label in seen:
+                continue
+            rows.append({
+                "label": label,
+                "points": stats.get("points", 0),
+                "possessions": stats.get("count", 0),
+                "ppc": round(stats.get("points", 0) / stats.get("count", 0), 2) if stats.get("count", 0) else 0.0,
+            })
+        return rows
+
+    shot_clock_off_rows = _format_rows(shot_clock_off, shot_clock_order)
+    shot_clock_def_rows = _format_rows(shot_clock_def, shot_clock_order)
+    pos_start_off_rows = _format_rows(pos_start_off, possession_start_order)
+    pos_start_def_rows = _format_rows(pos_start_def, possession_start_order)
+    paint_touch_off_rows = _format_rows(paint_touch_off, paint_touches_order)
+    paint_touch_def_rows = _format_rows(paint_touch_def, paint_touches_order)
+    shot_clock_pt_off_rows = _format_rows(shot_clock_pt_off, shot_clock_pt_order)
+    shot_clock_pt_def_rows = _format_rows(shot_clock_pt_def, shot_clock_pt_order)
     uploaded_file = UploadedFile.query.filter_by(filename=game.csv_filename).first()
     lineup_efficiencies = (
         json.loads(uploaded_file.lineup_efficiencies)
@@ -5422,6 +5557,14 @@ def game_stats(game_id):
         defensive_breakdown=defensive_breakdown,
         periodic_offense=periodic_offense,
         periodic_defense=periodic_defense,
+        shot_clock_offense=shot_clock_off_rows,
+        shot_clock_defense=shot_clock_def_rows,
+        possession_start_offense=pos_start_off_rows,
+        possession_start_defense=pos_start_def_rows,
+        paint_touches_offense=paint_touch_off_rows,
+        paint_touches_defense=paint_touch_def_rows,
+        shot_clock_pt_offense=shot_clock_pt_off_rows,
+        shot_clock_pt_defense=shot_clock_pt_def_rows,
 
         # lineup efficiencies
         lineup_efficiencies=lineup_efficiencies,

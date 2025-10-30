@@ -170,6 +170,44 @@
       </div>
     </div>
 
+    <div class="mb-10">
+      <h2 class="text-2xl font-semibold mb-4">Situational Offense</h2>
+      <div class="grid gap-6 md:grid-cols-2">
+        {% for title, rows in [
+          ('Shot Clock', shot_clock_offense),
+          ('Possession Start', possession_start_offense),
+          ('Paint Touches', paint_touches_offense),
+          ("1st Paint Touch", shot_clock_pt_offense)
+        ] %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <h3 class="text-lg font-semibold mb-2">{{ title }}</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full table-auto border-collapse">
+              <thead class="bg-white border-b-2 border-[#9E1B32]">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase">Bucket</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase">PTS</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase">Poss</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase">PPC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-3 py-2">{{ row.label }}</td>
+                  <td class="px-3 py-2 text-center">{{ row.points }}</td>
+                  <td class="px-3 py-2 text-center">{{ row.possessions }}</td>
+                  <td class="px-3 py-2 text-center font-semibold">{{ '%.2f'|format(row.ppc) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
     <!-- Lineup Efficiency (Offense) -->
     <div class="mt-8 mb-10">
       <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
@@ -371,6 +409,44 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div class="mb-10">
+      <h2 class="text-2xl font-semibold mb-4">Situational Defense</h2>
+      <div class="grid gap-6 md:grid-cols-2">
+        {% for title, rows in [
+          ('Shot Clock', shot_clock_defense),
+          ('Possession Start', possession_start_defense),
+          ('Paint Touches', paint_touches_defense),
+          ("1st Paint Touch", shot_clock_pt_defense)
+        ] %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <h3 class="text-lg font-semibold mb-2">{{ title }}</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full table-auto border-collapse">
+              <thead class="bg-white border-b-2 border-[#9E1B32]">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase">Bucket</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase">PTS</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase">Poss</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase">PPC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-3 py-2">{{ row.label }}</td>
+                  <td class="px-3 py-2 text-center">{{ row.points }}</td>
+                  <td class="px-3 py-2 text-center">{{ row.possessions }}</td>
+                  <td class="px-3 py-2 text-center font-semibold">{{ '%.2f'|format(row.ppc) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endfor %}
       </div>
     </div>
 
