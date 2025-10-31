@@ -48,6 +48,32 @@ def safe_str(val, default=""):
     """Return the string representation of val if not NaN; otherwise, return default (empty string)."""
     return default if pd.isna(val) else str(val)
 
+
+def _count_points_from_offense_row(row, all_cols):
+    """
+    Sum points from any player column that starts with '#'.
+    A single cell can contain MULTIPLE labels. Count all of them.
+    Labels: ATR+=2, 2FG+=2, 3FG+=3, FT+=1.
+    Works even if labels are separated by spaces, commas, or semicolons.
+    """
+    import re
+
+    total = 0
+    for col in all_cols:
+        if not col.startswith("#"):
+            continue
+        raw = str(row.get(col, "") or "")
+        s = raw.replace(",", " ").replace(";", " ")
+        total += 2 * len(re.findall(r'\bATR\+\b', s))
+        total += 2 * len(re.findall(r'\b2FG\+\b', s))
+        total += 3 * len(re.findall(r'\b3FG\+\b', s))
+        total += 1 * len(re.findall(r'\bFT\+\b',  s))
+    return total
+
+
+def _ppc_two_decimals(points, poss):
+    return round((points / poss), 2) if poss else 0.00
+
 # BEGIN safe_increment_helper
 def inc_stat(bucket: dict, key: str, by: int = 1):
     """
@@ -581,16 +607,7 @@ def get_possession_breakdown_detailed(df):
         # 2) compute this row’s points
         pts = 0
         if row_type == "Offense":
-            for col in df.columns:
-                if col.startswith("#"):
-                    for tok in extract_tokens(row.get(col,"")):
-                        u = tok.upper()
-                        if u in ("ATR+","2FG+"):
-                            pts += 2
-                        elif u=="3FG+":
-                            pts += 3
-                        elif u=="FT+":
-                            pts += 1
+            pts = _count_points_from_offense_row(row, df.columns)
         else:
             for tok in extract_tokens(opp_stats_val):
                 u = tok.upper()
@@ -722,20 +739,12 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         points_scored = 0
         events = []
         if row_type == "Offense":
+            points_scored = _count_points_from_offense_row(row, df.columns)
             for col in df.columns:
                 if col.startswith("#"):
                     tokens = extract_tokens(row.get(col, ""))
                     for token in tokens:
                         events.append(token)
-                        token = token.upper()
-                        if token == "ATR+":
-                            points_scored += 2
-                        elif token == "2FG+":
-                            points_scored += 2
-                        elif token == "3FG+":
-                            points_scored += 3
-                        elif token == "FT+":
-                            points_scored += 1
         elif row_type == "Defense":
             tokens = extract_tokens(row.get("OPP STATS", ""))
             for token in tokens:
