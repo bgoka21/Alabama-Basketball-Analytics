@@ -631,8 +631,16 @@ def get_possession_breakdown_detailed(df):
             raw_val = str(row.get(col_name, "")).strip()
 
             # Normalize known composite cases
-            if col_name == "POSSESSION START" and raw_val == "Missed FT, Off Rebound":
-                tokens = ["Off Rebound"]
+            if col_name == "POSSESSION START":
+                if raw_val.startswith("Missed FT"):
+                    if "Off Rebound" in raw_val:
+                        tokens = ["Off Rebound"]
+                    else:
+                        tokens = ["Deadball"]
+                elif raw_val.startswith("Made FT"):
+                    tokens = ["Deadball"]
+                else:
+                    tokens = [tok.strip() for tok in raw_val.split(",") if tok.strip()]
             elif col_name == "PAINT TOUCHES" and raw_val == "1 PT, 1 PT":
                 tokens = ["2 PT"]
             else:
