@@ -1,5 +1,6 @@
 import os
 import json
+import re
 try:
     import pandas as pd
 except ModuleNotFoundError:  # pragma: no cover - allow tests without pandas
@@ -528,7 +529,7 @@ def get_possession_breakdown_detailed(df):
 
     desired_tokens = [
         "Transition", "Man", "Zone", "Press",
-        "UOB", "SLOB", "Garbage", "OREB Putback",
+        "UOB", "SLOB", "Garbage", "OREB Putback", "Half Court",
     ]
 
     # possession-type buckets
@@ -602,7 +603,21 @@ def get_possession_breakdown_detailed(df):
         is_opp_off_reb = "Off Reb" in opp_stats_val
 
         # 1) possession‐type tokens
-        poss_types = [t.strip() for t in str(row.get("POSSESSION TYPE","")).split(",") if t.strip()]
+        raw_possession_type = str(row.get("POSSESSION TYPE", ""))
+        normalized_possession_type = raw_possession_type.replace("/", ",")
+        candidate_tokens = extract_tokens(normalized_possession_type)
+        poss_types = []
+        if candidate_tokens:
+            lowered_candidates = [token.lower() for token in candidate_tokens]
+            for desired in desired_tokens:
+                desired_lower = desired.lower()
+                if desired_lower in lowered_candidates and desired not in poss_types:
+                    poss_types.append(desired)
+        if not poss_types and raw_possession_type:
+            lowered_raw = raw_possession_type.lower()
+            for desired in desired_tokens:
+                if re.search(r'(?<!\w)' + re.escape(desired.lower()) + r'(?!\w)', lowered_raw) and desired not in poss_types:
+                    poss_types.append(desired)
 
         # 2) compute this row’s points
         pts = 0
@@ -623,7 +638,7 @@ def get_possession_breakdown_detailed(df):
             if tkn not in desired_tokens:
                 continue
             if row_type == "Offense":
-                if not is_neutral and not is_off_reb:
+                if not is_neutral:
                     breakdown_offense[tkn]['count'] += 1
                 breakdown_offense[tkn]['points'] += pts
             else:
@@ -669,13 +684,33 @@ def get_possession_breakdown_detailed(df):
             tokens = [_normalize_value(tok) for tok in tokens]
 
             if row_type == "Offense":
-                countable = not is_neutral and not is_off_reb
+                countable = not is_neutral
                 for token in tokens:
                     _increment(off_bucket, token, pts, is_countable=countable)
             else:
                 countable = not is_neutral and not is_opp_off_reb
                 for token in tokens:
                     _increment(def_bucket, token, pts, is_countable=countable)
+
+    def _attach_ppc(bucket: dict):
+        for stats in bucket.values():
+            poss = stats.get("count", 0)
+            pts = stats.get("points", 0)
+            stats["ppc"] = _ppc_two_decimals(pts, poss)
+
+    for table in (
+        breakdown_offense,
+        breakdown_defense,
+        shot_clock_offense,
+        shot_clock_defense,
+        possession_start_offense,
+        possession_start_defense,
+        paint_touches_offense,
+        paint_touches_defense,
+        shot_clock_pt_offense,
+        shot_clock_pt_defense,
+    ):
+        _attach_ppc(table)
 
     return (
         breakdown_offense,
