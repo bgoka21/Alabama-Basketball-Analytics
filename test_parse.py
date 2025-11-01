@@ -589,6 +589,12 @@ def get_possession_breakdown_detailed(df):
             bucket[key]["count"] += 1
         bucket[key]["points"] += points
 
+    half_labels = ["1st Half", "2nd Half", "Overtime"]
+    half_tracking = {
+        label: {"run": 0, "neutral": 0, "oreb": 0, "points": 0}
+        for label in half_labels
+    }
+
     for _, row in df.iterrows():
         row_type = str(row.get("Row","")).strip()
         if row_type not in ("Offense","Defense"):
@@ -598,6 +604,9 @@ def get_possession_breakdown_detailed(df):
         team_val     = str(row.get("TEAM",""))
         is_neutral   = "Neutral" in team_val
         is_off_reb   = "Off Reb" in team_val
+
+        possession_start_val = str(row.get("POSSESSION START", ""))
+        game_splits_val = str(row.get("GAME SPLITS", ""))
 
         opp_stats_val  = str(row.get("OPP STATS",""))
         is_opp_off_reb = "Off Reb" in opp_stats_val
@@ -623,6 +632,16 @@ def get_possession_breakdown_detailed(df):
         pts = 0
         if row_type == "Offense":
             pts = _count_points_from_offense_row(row, df.columns)
+            for label in half_labels:
+                if label and label in game_splits_val:
+                    data = half_tracking[label]
+                    data["run"] += 1
+                    if is_neutral:
+                        data["neutral"] += 1
+                    else:
+                        data["points"] += pts
+                    if "Off Rebound" in possession_start_val:
+                        data["oreb"] += 1
         else:
             for tok in extract_tokens(opp_stats_val):
                 u = tok.upper()
@@ -691,6 +710,31 @@ def get_possession_breakdown_detailed(df):
                 countable = not is_neutral and not is_opp_off_reb
                 for token in tokens:
                     _increment(def_bucket, token, pts, is_countable=countable)
+
+    half_entries = {}
+    for label, data in half_tracking.items():
+        poss = data["run"] - data["neutral"] - data["oreb"]
+        if poss < 0:
+            poss = 0
+        half_entries[label] = {
+            "count": poss,
+            "points": data["points"],
+        }
+
+    if half_entries:
+        augmented_offense = {}
+        inserted = False
+        for key, value in breakdown_offense.items():
+            augmented_offense[key] = value
+            if key == "OREB Putback":
+                for label in half_labels:
+                    augmented_offense[label] = half_entries.get(label, {"count": 0, "points": 0})
+                inserted = True
+        if not inserted:
+            for label in half_labels:
+                augmented_offense[label] = half_entries.get(label, {"count": 0, "points": 0})
+        breakdown_offense.clear()
+        breakdown_offense.update(augmented_offense)
 
     def _attach_ppc(bucket: dict):
         for stats in bucket.values():
