@@ -683,20 +683,34 @@ def get_possession_breakdown_detailed(df):
 
             # Normalize known composite cases
             if col_name == "POSSESSION START":
-                if raw_val.startswith("Missed FT"):
-                    if "Off Rebound" in raw_val:
-                        tokens = ["Off Rebound"]
+                tokens = []
+                normalized_starts = raw_val.replace("/", ",")
+                base_chunks = [chunk.strip() for chunk in normalized_starts.split(",") if chunk.strip()]
+                if not base_chunks and raw_val:
+                    base_chunks = [raw_val]
+
+                for chunk in base_chunks:
+                    if chunk.startswith("Missed FT"):
+                        if "Off Rebound" in raw_val:
+                            candidate_tokens = ["Off Rebound"]
+                        else:
+                            candidate_tokens = ["Deadball"]
+                    elif chunk.startswith("Made FT"):
+                        candidate_tokens = ["Deadball"]
                     else:
-                        tokens = ["Deadball"]
-                elif raw_val.startswith("Made FT"):
-                    tokens = ["Deadball"]
-                else:
-                    tokens = [tok.strip() for tok in raw_val.split(",") if tok.strip()]
+                        candidate_tokens = [piece.strip() for piece in chunk.split("-") if piece.strip()]
+
+                    for candidate in candidate_tokens:
+                        if candidate not in tokens:
+                            tokens.append(candidate)
+
+                if "Off Rebound" in raw_val and "Off Rebound" not in tokens:
+                    tokens.append("Off Rebound")
             elif col_name == "PAINT TOUCHES" and raw_val == "1 PT, 1 PT":
                 tokens = ["2 PT"]
             else:
                 tokens = [tok.strip() for tok in raw_val.split(",") if tok.strip()]
-            
+
 
             if not tokens:
                 tokens = ["N/A"]
@@ -707,7 +721,7 @@ def get_possession_breakdown_detailed(df):
                 for token in tokens:
                     _increment(off_bucket, token, pts, is_countable=countable)
             else:
-                countable = not is_neutral and not is_opp_off_reb
+                countable = not is_neutral
                 for token in tokens:
                     _increment(def_bucket, token, pts, is_countable=countable)
 
