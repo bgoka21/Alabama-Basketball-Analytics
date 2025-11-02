@@ -199,6 +199,25 @@ def extract_tokens(text):
     return tokens
 
 
+_CANONICAL_PERIOD_LABELS = {"1st Half", "2nd Half", "Overtime"}
+
+
+def first_recognized_period_label(value: Any) -> str:
+    """Return the first recognized period label from a comma-separated cell."""
+    if pd.isna(value):
+        return ""
+
+    if not isinstance(value, str):
+        value = str(value)
+
+    for token in value.split(','):
+        normalized = normalize_period_label(token.strip())
+        if normalized in _CANONICAL_PERIOD_LABELS:
+            return normalized
+
+    return ""
+
+
 def _ensure_periodic_buckets(data):
     base = {
         "1st Half": {"points": 0, "count": 0},
@@ -5256,15 +5275,7 @@ def season_stats(season_id):
             df = pd.read_csv(path)
             # preserve the original “GAME SPLITS” column
             df['GAME_SPLITS'] = df.get('GAME SPLITS')
-            # split on the first comma only, then strip whitespace
-            df['Period'] = (
-                df['GAME_SPLITS']
-                .fillna('')
-                .str.split(',', n=1)
-                .str[0]
-                .str.strip()
-                .apply(normalize_period_label)
-            )
+            df['Period'] = df['GAME_SPLITS'].apply(first_recognized_period_label)
             dfs.append(df)
     shot_clock_order = [":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A"]
     possession_start_order = ["Made FG", "Missed FG", "Steal", "Deadball", "Off Rebound", "N/A"]
@@ -5452,13 +5463,7 @@ def game_stats(game_id):
     csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], game.csv_filename)
     df = pd.read_csv(csv_path)
     # Grab just “1st Half”, “2nd Half”, or “Overtime”
-    df['Period'] = (
-        df['GAME SPLITS']
-          .fillna('')
-          .str.split(',', n=1).str[0]
-          .str.strip()
-          .apply(normalize_period_label)
-    )
+    df['Period'] = df['GAME SPLITS'].apply(first_recognized_period_label)
 
     # ─── POSSESSION BREAKDOWNS & LINEUPS (UNCHANGED) ──────────────────────────
     (

@@ -1470,6 +1470,7 @@ def test_period_normalization_matches_totals():
     df = pd.DataFrame(
         [
             _build_test_row("Offense", "1st\xa0Half, Segment A"),
+            _build_test_row("Offense", "Transition, 1st Half, 20:00 - 16:00"),
             _build_test_row("Offense", "Second Half", event_token="3FG+"),
             _build_test_row("Offense", "OT", event_token="FT+"),
             _build_test_row("Defense", "2nd-half", opp_stats="2FG+"),
@@ -1483,13 +1484,18 @@ def test_period_normalization_matches_totals():
 
     # Match the route code by splitting but intentionally avoid normalization
     # to ensure get_possession_breakdown_detailed() now handles variants.
-    df['Period'] = (
-        df['GAME SPLITS']
-        .fillna('')
-        .str.split(',', n=1)
-        .str[0]
-        .str.strip()
-    )
+    def _extract_first_period(cell_value):
+        if pd.isna(cell_value):
+            return ""
+        if not isinstance(cell_value, str):
+            cell_value = str(cell_value)
+        for token in cell_value.split(','):
+            normalized = normalize_period_label(token.strip())
+            if normalized in {"1st Half", "2nd Half", "Overtime"}:
+                return normalized
+        return ""
+
+    df['Period'] = df['GAME SPLITS'].apply(_extract_first_period)
 
     (
         _,
@@ -1516,7 +1522,7 @@ def test_period_normalization_matches_totals():
     assert sum(bucket['count'] for bucket in periodic_offense.values()) == expected_offense
     assert sum(bucket['count'] for bucket in periodic_defense.values()) == expected_defense
 
-    assert periodic_offense['1st Half']['count'] == 2
+    assert periodic_offense['1st Half']['count'] == 3
     assert periodic_offense['2nd Half']['count'] == 1
     assert periodic_offense['Overtime']['count'] == 2
     assert periodic_defense['2nd Half']['count'] == 2
