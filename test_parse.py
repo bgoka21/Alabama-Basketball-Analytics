@@ -376,17 +376,30 @@ def process_defense_row(row, opponent_totals, stat_mapping):
         elif token in stat_mapping:
             opponent_totals[stat_mapping[token]] += 1
 
-blue_collar_mapping = {
-    "Reb Tip": "reb_tip",
-    "Def Reb": "def_reb",
-    "Misc": "misc",
-    "Deflection": "deflection",
-    "LB / Steal": "steal",
-    "Block": "block",
-    "Off Reb": "off_reb",
-    "Floor Dive": "floor_dive",
-    "Charge Taken": "charge_taken"
+BLUE_COLLAR_SYNONYMS = {
+    "screen assists": {"screen assists", "screen assist", "Screen Assist", "Screen Assists"},
+    "deflections": {"deflections", "deflection", "Deflection", "Deflections"},
+    "loose balls": {"loose balls", "loose ball", "Loose Ball", "Loose Balls"},
+    "charges": {"charges", "charge", "Charge", "Charges", "Charge Taken", "Charges Taken"},
+    "box outs": {"box outs", "box out", "Box Out", "Box Outs"},
+    "contest": {"contest", "Contest"},
+    "hustle": {"hustle", "Hustle"},
+    "save": {"save", "saves", "Save", "Saves"},
+    "dive": {"dive", "dives", "Dive", "Dives", "Floor Dive", "Floor Dives"},
+    "tap": {"tap", "taps", "Tap", "Taps"},
+    "tip": {"tip", "tips", "Tip", "Tips"},
 }
+
+
+def _build_blue_collar_mapping():
+    mapping = {}
+    for canonical, tokens in BLUE_COLLAR_SYNONYMS.items():
+        for token in tokens | {canonical}:
+            mapping[token.strip().lower()] = canonical
+    return mapping
+
+
+blue_collar_mapping = _build_blue_collar_mapping()
 
 def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals):
     for col in df_columns:
@@ -396,8 +409,8 @@ def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id,
                 if col not in player_stats_dict:
                     player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
                 for token in tokens:
-                    if token in blue_collar_mapping:
-                        key = blue_collar_mapping[token]
+                    key = blue_collar_mapping.get(token.strip().lower())
+                    if key:
                         player_stats_dict[col]["blue_collar_accum"][key] += 1
                         team_totals["total_blue_collar"] += blue_collar_values[key]
                 blue_total = sum(
@@ -416,8 +429,8 @@ def process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping,
                 player_stats_dict[player_name]["blue_collar_accum"][key] = 0
     tokens = extract_tokens(row.get(player_name, ""))
     for token in tokens:
-        if token in blue_collar_mapping:
-            key = blue_collar_mapping[token]
+        key = blue_collar_mapping.get(token.strip().lower())
+        if key:
             player_stats_dict[player_name]["blue_collar_accum"][key] += 1
             team_totals["total_blue_collar"] += blue_collar_values[key]
     blue_total = sum(
@@ -764,28 +777,20 @@ def parse_csv(file_path, game_id, season_id):
         "Fouled": "foul_by"
     }
     blue_collar_values = {
-        "reb_tip": 0.5,
-        "def_reb": 1.0,
-        "misc": 1.0,
-        "deflection": 1.0,
-        "steal": 1.0,
-        "block": 1.0,
-        "off_reb": 1.5,
-        "floor_dive": 2.0,
-        "charge_taken": 4.0
+        "screen assists": 0.5,
+        "deflections": 0.5,
+        "loose balls": 0.5,
+        "charges": 1,
+        "box outs": 0.5,
+        "contest": 0.5,
+        "hustle": 1,
+        "save": 1,
+        "dive": 1,
+        "tap": 1,
+        "tip": 1,
     }
     global blue_collar_mapping
-    blue_collar_mapping = {
-        "Reb Tip": "reb_tip",
-        "Def Reb": "def_reb",
-        "Misc": "misc",
-        "Deflection": "deflection",
-        "LB / Steal": "steal",
-        "Block": "block",
-        "Off Reb": "off_reb",
-        "Floor Dive": "floor_dive",
-        "Charge Taken": "charge_taken"
-    }
+    blue_collar_mapping = _build_blue_collar_mapping()
 
     player_stats_dict = {}
     team_totals = {
@@ -823,17 +828,19 @@ def parse_csv(file_path, game_id, season_id):
         "total_blue_collar": 0
     }
 
-    opponent_blue_collar_accum = {
-        "def_reb": 0,
-        "off_reb": 0,
-        "misc": 0,
-        "deflection": 0,
-        "steal": 0,
-        "block": 0,
-        "floor_dive": 0,
-        "charge_taken": 0,
-        "reb_tip": 0
-    }
+    opponent_blue_collar_accum = {key: 0 for key in blue_collar_values}
+    for legacy_key in (
+        "def_reb",
+        "off_reb",
+        "misc",
+        "deflection",
+        "steal",
+        "block",
+        "floor_dive",
+        "charge_taken",
+        "reb_tip",
+    ):
+        opponent_blue_collar_accum.setdefault(legacy_key, 0)
 
     offense_reb_rows = {
         "rebound opportunities",
@@ -933,10 +940,10 @@ def parse_csv(file_path, game_id, season_id):
         elif row_type == "Opponent Blue Collar Plays":
             tokens = extract_tokens(row.get("OPP STATS", ""))
             for token in tokens:
-                if token in blue_collar_mapping:
-                    key = blue_collar_mapping[token]
+                key = blue_collar_mapping.get(token.strip().lower())
+                if key:
                     opponent_totals["total_blue_collar"] += blue_collar_values[key]
-                    opponent_blue_collar_accum[key] += 1
+                    opponent_blue_collar_accum[key] = opponent_blue_collar_accum.get(key, 0) + 1
         elif row_type == "DEF Note":
             process_def_note_row(row, df.columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals)
         elif row_type.startswith("#"):
@@ -1262,8 +1269,8 @@ def parse_csv(file_path, game_id, season_id):
 
     # --- Insert Opponent Blue Collar Stats (ONE ROW) ---
     opponent_blue_total = sum(
-        opponent_blue_collar_accum[cat] * blue_collar_values[cat]
-        for cat in opponent_blue_collar_accum
+        opponent_blue_collar_accum.get(cat, 0) * blue_collar_values.get(cat, 0)
+        for cat in blue_collar_values
     )
     cursor = conn.cursor()
     cursor.execute(
@@ -1289,15 +1296,15 @@ def parse_csv(file_path, game_id, season_id):
             season_id,
             None,
             opponent_blue_total,
-            opponent_blue_collar_accum["reb_tip"],
-            opponent_blue_collar_accum["def_reb"],
-            opponent_blue_collar_accum["misc"],
-            opponent_blue_collar_accum["deflection"],
-            opponent_blue_collar_accum["steal"],
-            opponent_blue_collar_accum["block"],
-            opponent_blue_collar_accum["off_reb"],
-            opponent_blue_collar_accum["floor_dive"],
-            opponent_blue_collar_accum["charge_taken"]
+            opponent_blue_collar_accum.get("reb_tip", 0),
+            opponent_blue_collar_accum.get("def_reb", 0),
+            opponent_blue_collar_accum.get("misc", 0),
+            opponent_blue_collar_accum.get("deflection", 0),
+            opponent_blue_collar_accum.get("steal", 0),
+            opponent_blue_collar_accum.get("block", 0),
+            opponent_blue_collar_accum.get("off_reb", 0),
+            opponent_blue_collar_accum.get("floor_dive", 0),
+            opponent_blue_collar_accum.get("charge_taken", 0)
         )
     )
     conn.commit()
