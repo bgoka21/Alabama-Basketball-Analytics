@@ -77,8 +77,11 @@ from utils.shottype import (
     gather_labels_for_shot,
     get_player_shottype_3fg_breakdown,
 )
-from test_parse import get_possession_breakdown_detailed
-from test_parse import parse_csv           # your existing game parser
+from test_parse import (
+    get_possession_breakdown_detailed,
+    normalize_period_label,
+    parse_csv,  # your existing game parser
+)
 from parse_practice_csv import (
     parse_practice_csv,
     blue_collar_values,
@@ -5260,6 +5263,7 @@ def season_stats(season_id):
                 .str.split(',', n=1)
                 .str[0]
                 .str.strip()
+                .apply(normalize_period_label)
             )
             dfs.append(df)
     shot_clock_order = [":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A"]
@@ -5453,6 +5457,7 @@ def game_stats(game_id):
           .fillna('')
           .str.split(',', n=1).str[0]
           .str.strip()
+          .apply(normalize_period_label)
     )
 
     # ─── POSSESSION BREAKDOWNS & LINEUPS (UNCHANGED) ──────────────────────────
