@@ -49,16 +49,6 @@ def safe_str(val, default=""):
     return default if pd.isna(val) else str(val)
 
 # --- Period Normalization Helper ---
-_PERIOD_CANONICAL_MAP = {
-    "1st half": "1st Half",
-    "first half": "1st Half",
-    "2nd half": "2nd Half",
-    "second half": "2nd Half",
-    "overtime": "Overtime",
-    "ot": "Overtime",
-}
-
-
 def normalize_period_label(value):
     """Return a canonical period label from assorted CSV variations."""
     if pd.isna(value):
@@ -74,9 +64,22 @@ def normalize_period_label(value):
     normalized = " ".join(normalized.strip().split())
 
     lowered = normalized.lower()
-    canonical = _PERIOD_CANONICAL_MAP.get(lowered)
-    if canonical:
-        return canonical
+    if not lowered:
+        return ""
+
+    if "1st half" in lowered or "first half" in lowered:
+        return "1st Half"
+
+    if "2nd half" in lowered or "second half" in lowered:
+        return "2nd Half"
+
+    if "overtime" in lowered:
+        return "Overtime"
+
+    # Handle short "OT" tokens that may appear alone or before/after other words.
+    tokens = lowered.split()
+    if any(tok == "ot" for tok in tokens):
+        return "Overtime"
 
     return normalized
 
@@ -1471,6 +1474,10 @@ def test_period_normalization_matches_totals():
             _build_test_row("Offense", "OT", event_token="FT+"),
             _build_test_row("Defense", "2nd-half", opp_stats="2FG+"),
             _build_test_row("Defense", "overtime", opp_stats="3FG+"),
+            _build_test_row("Offense", "1st Half \u2013 Segment 2", event_token="ATR+"),
+            _build_test_row("Defense", "Second Half - Segment 4", opp_stats="FT+"),
+            _build_test_row("Offense", "OT \u2013 Segment 1", event_token="ATR+"),
+            _build_test_row("Defense", "OT - Segment 2", opp_stats="ATR+"),
         ]
     )
 
@@ -1509,11 +1516,11 @@ def test_period_normalization_matches_totals():
     assert sum(bucket['count'] for bucket in periodic_offense.values()) == expected_offense
     assert sum(bucket['count'] for bucket in periodic_defense.values()) == expected_defense
 
-    assert periodic_offense['1st Half']['count'] == 1
+    assert periodic_offense['1st Half']['count'] == 2
     assert periodic_offense['2nd Half']['count'] == 1
-    assert periodic_offense['Overtime']['count'] == 1
-    assert periodic_defense['2nd Half']['count'] == 1
-    assert periodic_defense['Overtime']['count'] == 1
+    assert periodic_offense['Overtime']['count'] == 2
+    assert periodic_defense['2nd Half']['count'] == 2
+    assert periodic_defense['Overtime']['count'] == 2
 
 
 def test_placeholder():
