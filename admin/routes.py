@@ -195,6 +195,86 @@ def extract_tokens(text):
     tokens = text.replace(',', ' ').split()
     return tokens
 
+
+def _ensure_periodic_buckets(data):
+    base = {
+        "1st Half": {"points": 0, "count": 0},
+        "2nd Half": {"points": 0, "count": 0},
+        "Overtime": {"points": 0, "count": 0},
+    }
+    if isinstance(data, Mapping):
+        for label, stats in data.items():
+            if isinstance(stats, Mapping):
+                base.setdefault(label, {"points": 0, "count": 0})
+                base[label]["points"] = stats.get("points", 0)
+                base[label]["count"] = stats.get("count", 0)
+    return base
+
+
+def _normalize_breakdown_result(result):
+    def _empty():
+        return (
+            {},
+            {},
+            _ensure_periodic_buckets({}),
+            _ensure_periodic_buckets({}),
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+        )
+
+    if not isinstance(result, (list, tuple)):
+        return _empty()
+
+    if len(result) == 12:
+        (
+            offensive_breakdown,
+            defensive_breakdown,
+            periodic_offense,
+            periodic_defense,
+            shot_clock_off,
+            shot_clock_def,
+            pos_start_off,
+            pos_start_def,
+            paint_touch_off,
+            paint_touch_def,
+            shot_clock_pt_off,
+            shot_clock_pt_def,
+        ) = result
+    elif len(result) == 4:
+        (
+            offensive_breakdown,
+            defensive_breakdown,
+            periodic_offense,
+            periodic_defense,
+        ) = result
+        shot_clock_off = shot_clock_def = {}
+        pos_start_off = pos_start_def = {}
+        paint_touch_off = paint_touch_def = {}
+        shot_clock_pt_off = shot_clock_pt_def = {}
+    else:
+        return _empty()
+
+    return (
+        offensive_breakdown or {},
+        defensive_breakdown or {},
+        _ensure_periodic_buckets(periodic_offense),
+        _ensure_periodic_buckets(periodic_defense),
+        shot_clock_off or {},
+        shot_clock_def or {},
+        pos_start_off or {},
+        pos_start_def or {},
+        paint_touch_off or {},
+        paint_touch_def or {},
+        shot_clock_pt_off or {},
+        shot_clock_pt_def or {},
+    )
+
 def make_pct(numer, denom):
     if not denom or denom == 0:
         return None  # render as "NA" in template
@@ -5226,15 +5306,22 @@ def season_stats(season_id):
             paint_touch_def,
             shot_clock_pt_off,
             shot_clock_pt_def,
-        ) = get_possession_breakdown_detailed(full_df)
+        ) = _normalize_breakdown_result(get_possession_breakdown_detailed(full_df))
     else:
-        off_break = def_break = {}
-        per_off = {h: {"points": 0, "count": 0} for h in ['1st Half','2nd Half','Overtime']}
-        per_def = {h: {"points": 0, "count": 0} for h in ['1st Half','2nd Half','Overtime']}
-        shot_clock_off = shot_clock_def = {}
-        pos_start_off = pos_start_def = {}
-        paint_touch_off = paint_touch_def = {}
-        shot_clock_pt_off = shot_clock_pt_def = {}
+        (
+            off_break,
+            def_break,
+            per_off,
+            per_def,
+            shot_clock_off,
+            shot_clock_def,
+            pos_start_off,
+            pos_start_def,
+            paint_touch_off,
+            paint_touch_def,
+            shot_clock_pt_off,
+            shot_clock_pt_def,
+        ) = _normalize_breakdown_result(())
 
     shot_clock_off_rows = _format_rows(shot_clock_off, shot_clock_order)
     shot_clock_def_rows = _format_rows(shot_clock_def, shot_clock_order)
@@ -5382,7 +5469,7 @@ def game_stats(game_id):
         paint_touch_def,
         shot_clock_pt_off,
         shot_clock_pt_def,
-    ) = get_possession_breakdown_detailed(df)
+    ) = _normalize_breakdown_result(get_possession_breakdown_detailed(df))
 
     shot_clock_order = [":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A"]
     possession_start_order = ["Made FG", "Missed FG", "Steal", "Deadball", "Off Rebound", "N/A"]
