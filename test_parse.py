@@ -268,16 +268,24 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
         if not col.startswith("#"):
             continue
         tokens = extract_tokens(row.get(col, ""))
-        if "FT+" in tokens:
-            if col not in player_stats_dict:
-                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            player_stats_dict[col]["ftm"] += 1
-            player_stats_dict[col]["fta"] += 1
-            player_stats_dict[col]["points"] += 1
-        elif "FT-" in tokens:
-            if col not in player_stats_dict:
-                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-            player_stats_dict[col]["fta"] += 1
+        if not tokens:
+            continue
+
+        ft_makes = tokens.count("FT+")
+        ft_misses = tokens.count("FT-")
+        if not ft_makes and not ft_misses:
+            continue
+
+        if col not in player_stats_dict:
+            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+
+        if ft_makes:
+            player_stats_dict[col]["ftm"] += ft_makes
+            player_stats_dict[col]["points"] += ft_makes
+
+        attempts = ft_makes + ft_misses
+        if attempts:
+            player_stats_dict[col]["fta"] += attempts
 
     # 4) Miscellaneous mapped stats (Turnover, 2nd Assist, Fouled), excluding "Assist"/"Pot. Assist"
     for col in df_columns:
@@ -376,30 +384,17 @@ def process_defense_row(row, opponent_totals, stat_mapping):
         elif token in stat_mapping:
             opponent_totals[stat_mapping[token]] += 1
 
-BLUE_COLLAR_SYNONYMS = {
-    "screen assists": {"screen assists", "screen assist", "Screen Assist", "Screen Assists"},
-    "deflections": {"deflections", "deflection", "Deflection", "Deflections"},
-    "loose balls": {"loose balls", "loose ball", "Loose Ball", "Loose Balls"},
-    "charges": {"charges", "charge", "Charge", "Charges", "Charge Taken", "Charges Taken"},
-    "box outs": {"box outs", "box out", "Box Out", "Box Outs"},
-    "contest": {"contest", "Contest"},
-    "hustle": {"hustle", "Hustle"},
-    "save": {"save", "saves", "Save", "Saves"},
-    "dive": {"dive", "dives", "Dive", "Dives", "Floor Dive", "Floor Dives"},
-    "tap": {"tap", "taps", "Tap", "Taps"},
-    "tip": {"tip", "tips", "Tip", "Tips"},
+blue_collar_mapping = {
+    "Reb Tip": "reb_tip",
+    "Def Reb": "def_reb",
+    "Misc": "misc",
+    "Deflection": "deflection",
+    "LB / Steal": "steal",
+    "Block": "block",
+    "Off Reb": "off_reb",
+    "Floor Dive": "floor_dive",
+    "Charge Taken": "charge_taken"
 }
-
-
-def _build_blue_collar_mapping():
-    mapping = {}
-    for canonical, tokens in BLUE_COLLAR_SYNONYMS.items():
-        for token in tokens | {canonical}:
-            mapping[token.strip().lower()] = canonical
-    return mapping
-
-
-blue_collar_mapping = _build_blue_collar_mapping()
 
 def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals):
     for col in df_columns:
@@ -409,9 +404,10 @@ def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id,
                 if col not in player_stats_dict:
                     player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
                 for token in tokens:
-                    key = blue_collar_mapping.get(token.strip().lower())
-                    if key:
+                    if token in blue_collar_mapping:
+                        key = blue_collar_mapping[token]
                         player_stats_dict[col]["blue_collar_accum"][key] += 1
+                        team_totals[key] = team_totals.get(key, 0) + 1
                         team_totals["total_blue_collar"] += blue_collar_values[key]
                 blue_total = sum(
                     player_stats_dict[col]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
@@ -429,9 +425,10 @@ def process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping,
                 player_stats_dict[player_name]["blue_collar_accum"][key] = 0
     tokens = extract_tokens(row.get(player_name, ""))
     for token in tokens:
-        key = blue_collar_mapping.get(token.strip().lower())
-        if key:
+        if token in blue_collar_mapping:
+            key = blue_collar_mapping[token]
             player_stats_dict[player_name]["blue_collar_accum"][key] += 1
+            team_totals[key] = team_totals.get(key, 0) + 1
             team_totals["total_blue_collar"] += blue_collar_values[key]
     blue_total = sum(
         player_stats_dict[player_name]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
@@ -777,20 +774,28 @@ def parse_csv(file_path, game_id, season_id):
         "Fouled": "foul_by"
     }
     blue_collar_values = {
-        "screen assists": 0.5,
-        "deflections": 0.5,
-        "loose balls": 0.5,
-        "charges": 1,
-        "box outs": 0.5,
-        "contest": 0.5,
-        "hustle": 1,
-        "save": 1,
-        "dive": 1,
-        "tap": 1,
-        "tip": 1,
+        "reb_tip": 0.5,
+        "def_reb": 1.0,
+        "misc": 1.0,
+        "deflection": 1.0,
+        "steal": 1.0,
+        "block": 1.0,
+        "off_reb": 1.5,
+        "floor_dive": 2.0,
+        "charge_taken": 4.0
     }
     global blue_collar_mapping
-    blue_collar_mapping = _build_blue_collar_mapping()
+    blue_collar_mapping = {
+        "Reb Tip": "reb_tip",
+        "Def Reb": "def_reb",
+        "Misc": "misc",
+        "Deflection": "deflection",
+        "LB / Steal": "steal",
+        "Block": "block",
+        "Off Reb": "off_reb",
+        "Floor Dive": "floor_dive",
+        "Charge Taken": "charge_taken"
+    }
 
     player_stats_dict = {}
     team_totals = {
@@ -808,7 +813,16 @@ def parse_csv(file_path, game_id, season_id):
         "total_ftm": 0,
         "total_fta": 0,
         "total_blue_collar": 0,
-        "foul_by": 0
+        "foul_by": 0,
+        "def_reb": 0,
+        "off_reb": 0,
+        "misc": 0,
+        "deflection": 0,
+        "steal": 0,
+        "block": 0,
+        "floor_dive": 0,
+        "charge_taken": 0,
+        "reb_tip": 0
     }
     opponent_totals = {
         "atr_makes": 0,
@@ -828,19 +842,17 @@ def parse_csv(file_path, game_id, season_id):
         "total_blue_collar": 0
     }
 
-    opponent_blue_collar_accum = {key: 0 for key in blue_collar_values}
-    for legacy_key in (
-        "def_reb",
-        "off_reb",
-        "misc",
-        "deflection",
-        "steal",
-        "block",
-        "floor_dive",
-        "charge_taken",
-        "reb_tip",
-    ):
-        opponent_blue_collar_accum.setdefault(legacy_key, 0)
+    opponent_blue_collar_accum = {
+        "def_reb": 0,
+        "off_reb": 0,
+        "misc": 0,
+        "deflection": 0,
+        "steal": 0,
+        "block": 0,
+        "floor_dive": 0,
+        "charge_taken": 0,
+        "reb_tip": 0
+    }
 
     offense_reb_rows = {
         "rebound opportunities",
@@ -871,6 +883,15 @@ def parse_csv(file_path, game_id, season_id):
             if col not in player_stats_dict:
                 player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
             row_tokens_by_col[col] = tokens
+
+        if row_type == "TEAM":
+            tokens = extract_tokens(row.get("TEAM", ""))
+            for token in tokens:
+                if token in blue_collar_mapping:
+                    key = blue_collar_mapping[token]
+                    team_totals[key] = team_totals.get(key, 0) + 1
+                    team_totals["total_blue_collar"] += blue_collar_values[key]
+            continue
 
         if row_tokens_by_col and row_type_lower == "pnr":
             for col, tokens in row_tokens_by_col.items():
@@ -940,87 +961,90 @@ def parse_csv(file_path, game_id, season_id):
         elif row_type == "Opponent Blue Collar Plays":
             tokens = extract_tokens(row.get("OPP STATS", ""))
             for token in tokens:
-                key = blue_collar_mapping.get(token.strip().lower())
-                if key:
+                if token in blue_collar_mapping:
+                    key = blue_collar_mapping[token]
                     opponent_totals["total_blue_collar"] += blue_collar_values[key]
-                    opponent_blue_collar_accum[key] = opponent_blue_collar_accum.get(key, 0) + 1
+                    opponent_blue_collar_accum[key] += 1
         elif row_type == "DEF Note":
             process_def_note_row(row, df.columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals)
         elif row_type.startswith("#"):
             process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals)
 
-    for stats in player_stats_dict.values():
-        stats["atr_total_attempts"] = stats.get("atr_attempts", 0)
-        stats["fg2_total_attempts"] = stats.get("fg2_attempts", 0)
-        stats["fg3_total_attempts"] = stats.get("fg3_attempts", 0)
-        stats["ft_total_attempts"]  = stats.get("fta", 0)
+    for player_stats in player_stats_dict.values():
+        player_stats["atr_total_attempts"] = player_stats.get("atr_attempts", 0)
+        player_stats["fg2_total_attempts"] = player_stats.get("fg2_attempts", 0)
+        player_stats["fg3_total_attempts"] = player_stats.get("fg3_attempts", 0)
+        player_stats["ft_total_attempts"]  = player_stats.get("fta", 0)
 
-        # --- Insert/Overwrite Player Stats into Database ---
-        with app_instance.app_context():
-            valid_cols = {c.name for c in PlayerStats.__table__.columns}
+    # --- Insert/Overwrite Player Stats into Database ---
+    with app_instance.app_context():
+        valid_cols = {c.name for c in PlayerStats.__table__.columns}
 
-            for player_name, stats in player_stats_dict.items():
-                # Remove any existing rows for this player & game to avoid duplicates
-                PlayerStats.query \
-                    .filter_by(player_name=player_name, game_id=game_id) \
-                    .delete()
+        for player_name, player_stats in player_stats_dict.items():
+            # Remove any existing rows for this player & game to avoid duplicates
+            PlayerStats.query \
+                .filter_by(player_name=player_name, game_id=game_id) \
+                .delete()
 
-                # Prepare shot-detail JSON (if any)
-                json_details = None
-                if stats.get("shot_type_details"):
-                    json_details = json.dumps(stats["shot_type_details"])
+            # Prepare shot-detail JSON (if any)
+            json_details = None
+            if player_stats.get("shot_type_details"):
+                json_details = json.dumps(player_stats["shot_type_details"])
 
-                # Build a fresh dict of only valid columns (excluding array/dict fields)
-                clean_stats = {
-                    k: safe_value(v)
-                    for k, v in stats.items()
-                    if k in valid_cols
-                    and not isinstance(v, (dict, list, tuple, np.ndarray, pd.Series))
-                }
+            # Build a fresh dict of only valid columns (excluding array/dict fields)
+            clean_stats = {
+                k: safe_value(v)
+                for k, v in player_stats.items()
+                if k in valid_cols
+                and not isinstance(v, (dict, list, tuple, np.ndarray, pd.Series))
+            }
 
-                # Ensure game_id, season_id, and player_name are set correctly:
-                clean_stats["game_id"]     = game_id
-                clean_stats["season_id"]   = season_id
-                clean_stats["player_name"] = player_name
-                # A game row should never have a practice_id
-                clean_stats["practice_id"] = None
+            # Ensure game_id, season_id, and player_name are set correctly:
+            clean_stats["game_id"]     = game_id
+            clean_stats["season_id"]   = season_id
+            clean_stats["player_name"] = player_name
+            # A game row should never have a practice_id
+            clean_stats["practice_id"] = None
 
-                # Attach shot_type_details JSON if present
-                if json_details is not None:
-                    clean_stats["shot_type_details"] = json_details
+            # Attach shot_type_details JSON if present
+            if json_details is not None:
+                clean_stats["shot_type_details"] = json_details
 
-                # Insert the new, non-duplicated PlayerStats row
-                player_stat = PlayerStats(**clean_stats)
-                db.session.add(player_stat)
-                persist_player_shot_details(
-                    player_stat,
-                    stats.get("shot_type_details") or [],
-                    replace=True,
-                )
+            # Insert the new, non-duplicated PlayerStats row
+            player_stat = PlayerStats(**clean_stats)
+            db.session.add(player_stat)
+            persist_player_shot_details(
+                player_stat,
+                player_stats.get("shot_type_details") or [],
+                replace=True,
+            )
 
-            # Commit once after processing all players
-            db.session.commit()
-
-
-
-            # 7) accumulate to your team_totals
-            team_totals["total_points"]        += safe_value(stats.get("points", 0))
-            team_totals["total_assists"]       += safe_value(stats.get("assists", 0))
-            team_totals["total_second_assists"]+= safe_value(stats.get("second_assists", 0))
-            team_totals["total_pot_assists"]   += safe_value(stats.get("pot_assists", 0))
-            team_totals["total_turnovers"]     += safe_value(stats.get("turnovers", 0))
-            team_totals["total_atr_makes"]     += safe_value(stats.get("atr_makes", 0))
-            team_totals["total_atr_attempts"]  += safe_value(stats.get("atr_attempts", 0))
-            team_totals["total_fg2_makes"]     += safe_value(stats.get("fg2_makes", 0))
-            team_totals["total_fg2_attempts"]  += safe_value(stats.get("fg2_attempts", 0))
-            team_totals["total_fg3_makes"]     += safe_value(stats.get("fg3_makes", 0))
-            team_totals["total_fg3_attempts"]  += safe_value(stats.get("fg3_attempts", 0))
-            team_totals["total_ftm"]           += safe_value(stats.get("ftm", 0))
-            team_totals["total_fta"]           += safe_value(stats.get("fta", 0))
-            team_totals["foul_by"]             += safe_value(stats.get("foul_by", 0))
-
-        # 8) commit once after looping
+        # Commit once after processing all players
         db.session.commit()
+
+        # Accumulate team totals from all player stats
+        for player_stats in player_stats_dict.values():
+            team_totals["total_points"]        += safe_value(player_stats.get("points", 0))
+            team_totals["total_assists"]       += safe_value(player_stats.get("assists", 0))
+            team_totals["total_second_assists"]+= safe_value(player_stats.get("second_assists", 0))
+            team_totals["total_pot_assists"]   += safe_value(player_stats.get("pot_assists", 0))
+            team_totals["total_turnovers"]     += safe_value(player_stats.get("turnovers", 0))
+            team_totals["total_atr_makes"]     += safe_value(player_stats.get("atr_makes", 0))
+            team_totals["total_atr_attempts"]  += safe_value(player_stats.get("atr_attempts", 0))
+            team_totals["total_fg2_makes"]     += safe_value(player_stats.get("fg2_makes", 0))
+            team_totals["total_fg2_attempts"]  += safe_value(player_stats.get("fg2_attempts", 0))
+            team_totals["total_fg3_makes"]     += safe_value(player_stats.get("fg3_makes", 0))
+            team_totals["total_fg3_attempts"]  += safe_value(player_stats.get("fg3_attempts", 0))
+            team_totals["total_ftm"]           += safe_value(player_stats.get("ftm", 0))
+            team_totals["total_fta"]           += safe_value(player_stats.get("fta", 0))
+            team_totals["foul_by"]             += safe_value(player_stats.get("foul_by", 0))
+
+        team_totals["total_points"] = (
+            2 * team_totals.get("total_atr_makes", 0)
+            + 2 * team_totals.get("total_fg2_makes", 0)
+            + 3 * team_totals.get("total_fg3_makes", 0)
+            + team_totals.get("total_ftm", 0)
+        )
 
 
         # Process possessions for bucket 2 (Team vs Opponent) with subtract_off_reb=True
@@ -1269,8 +1293,8 @@ def parse_csv(file_path, game_id, season_id):
 
     # --- Insert Opponent Blue Collar Stats (ONE ROW) ---
     opponent_blue_total = sum(
-        opponent_blue_collar_accum.get(cat, 0) * blue_collar_values.get(cat, 0)
-        for cat in blue_collar_values
+        opponent_blue_collar_accum[cat] * blue_collar_values[cat]
+        for cat in opponent_blue_collar_accum
     )
     cursor = conn.cursor()
     cursor.execute(
@@ -1296,15 +1320,15 @@ def parse_csv(file_path, game_id, season_id):
             season_id,
             None,
             opponent_blue_total,
-            opponent_blue_collar_accum.get("reb_tip", 0),
-            opponent_blue_collar_accum.get("def_reb", 0),
-            opponent_blue_collar_accum.get("misc", 0),
-            opponent_blue_collar_accum.get("deflection", 0),
-            opponent_blue_collar_accum.get("steal", 0),
-            opponent_blue_collar_accum.get("block", 0),
-            opponent_blue_collar_accum.get("off_reb", 0),
-            opponent_blue_collar_accum.get("floor_dive", 0),
-            opponent_blue_collar_accum.get("charge_taken", 0)
+            opponent_blue_collar_accum["reb_tip"],
+            opponent_blue_collar_accum["def_reb"],
+            opponent_blue_collar_accum["misc"],
+            opponent_blue_collar_accum["deflection"],
+            opponent_blue_collar_accum["steal"],
+            opponent_blue_collar_accum["block"],
+            opponent_blue_collar_accum["off_reb"],
+            opponent_blue_collar_accum["floor_dive"],
+            opponent_blue_collar_accum["charge_taken"]
         )
     )
     conn.commit()
