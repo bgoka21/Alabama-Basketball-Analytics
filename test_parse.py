@@ -48,6 +48,38 @@ def safe_str(val, default=""):
     """Return the string representation of val if not NaN; otherwise, return default (empty string)."""
     return default if pd.isna(val) else str(val)
 
+# --- Period Normalization Helper ---
+_PERIOD_CANONICAL_MAP = {
+    "1st half": "1st Half",
+    "first half": "1st Half",
+    "2nd half": "2nd Half",
+    "second half": "2nd Half",
+    "overtime": "Overtime",
+    "ot": "Overtime",
+}
+
+
+def normalize_period_label(value):
+    """Return a canonical period label from assorted CSV variations."""
+    if pd.isna(value):
+        return ""
+
+    raw_text = str(value)
+    normalized = raw_text.replace("\xa0", " ")
+    for dash in ("\u2010", "\u2011", "\u2012", "\u2013", "\u2014", "\u2015"):
+        normalized = normalized.replace(dash, "-")
+
+    # Treat any dash as a space to handle values like "2nd-half".
+    normalized = normalized.replace("-", " ")
+    normalized = " ".join(normalized.strip().split())
+
+    lowered = normalized.lower()
+    canonical = _PERIOD_CANONICAL_MAP.get(lowered)
+    if canonical:
+        return canonical
+
+    return normalized
+
 # BEGIN safe_increment_helper
 def inc_stat(bucket: dict, key: str, by: int = 1):
     """
@@ -574,7 +606,7 @@ def get_possession_breakdown_detailed(df):
                 breakdown_defense[tkn]['points'] += pts
 
         # 4) apply to split buckets, now excluding Off-Reb too
-        split = str(row.get("Period", "")).strip()
+        split = normalize_period_label(row.get("Period", ""))
         if split in periodic_offense:
             if row_type == "Offense":
                 if not is_neutral and not is_off_reb:
@@ -1416,6 +1448,72 @@ def parse_csv(file_path, game_id, season_id):
 
     return result
 
+
+# --- Tests -----------------------------------------------------------------
+
+
+def _build_test_row(row_type, game_split, team="Team", opp_stats="", possession_type="Man", event_token="ATR+"):
+    return {
+        "Row": row_type,
+        "TEAM": team,
+        "OPP STATS": opp_stats,
+        "GAME SPLITS": game_split,
+        "POSSESSION TYPE": possession_type,
+        "#1": event_token,
+    }
+
+
+def test_period_normalization_matches_totals():
+    df = pd.DataFrame(
+        [
+            _build_test_row("Offense", "1st\xa0Half, Segment A"),
+            _build_test_row("Offense", "Second Half", event_token="3FG+"),
+            _build_test_row("Offense", "OT", event_token="FT+"),
+            _build_test_row("Defense", "2nd-half", opp_stats="2FG+"),
+            _build_test_row("Defense", "overtime", opp_stats="3FG+"),
+        ]
+    )
+
+    # Match the route code by splitting but intentionally avoid normalization
+    # to ensure get_possession_breakdown_detailed() now handles variants.
+    df['Period'] = (
+        df['GAME SPLITS']
+        .fillna('')
+        .str.split(',', n=1)
+        .str[0]
+        .str.strip()
+    )
+
+    (
+        _,
+        _,
+        periodic_offense,
+        periodic_defense,
+    ) = get_possession_breakdown_detailed(df)
+
+    expected_offense = sum(
+        1
+        for _, row in df.iterrows()
+        if row['Row'] == "Offense"
+        and "Neutral" not in str(row['TEAM'])
+        and "Off Reb" not in str(row['TEAM'])
+    )
+    expected_defense = sum(
+        1
+        for _, row in df.iterrows()
+        if row['Row'] == "Defense"
+        and "Neutral" not in str(row['TEAM'])
+        and "Off Reb" not in str(row['OPP STATS'])
+    )
+
+    assert sum(bucket['count'] for bucket in periodic_offense.values()) == expected_offense
+    assert sum(bucket['count'] for bucket in periodic_defense.values()) == expected_defense
+
+    assert periodic_offense['1st Half']['count'] == 1
+    assert periodic_offense['2nd Half']['count'] == 1
+    assert periodic_offense['Overtime']['count'] == 1
+    assert periodic_defense['2nd Half']['count'] == 1
+    assert periodic_defense['Overtime']['count'] == 1
 
 
 def test_placeholder():
