@@ -1,6 +1,5 @@
 import os
 import json
-import re
 try:
     import pandas as pd
 except ModuleNotFoundError:  # pragma: no cover - allow tests without pandas
@@ -48,32 +47,6 @@ def safe_value(val, default=0):
 def safe_str(val, default=""):
     """Return the string representation of val if not NaN; otherwise, return default (empty string)."""
     return default if pd.isna(val) else str(val)
-
-
-def _count_points_from_offense_row(row, all_cols):
-    """
-    Sum points from any player column that starts with '#'.
-    A single cell can contain MULTIPLE labels. Count all of them.
-    Labels: ATR+=2, 2FG+=2, 3FG+=3, FT+=1.
-    Works even if labels are separated by spaces, commas, or semicolons.
-    """
-    import re
-
-    total = 0
-    for col in all_cols:
-        if not col.startswith("#"):
-            continue
-        raw = str(row.get(col, "") or "")
-        s = raw.replace(",", " ").replace(";", " ")
-        total += 2 * len(re.findall(r'\bATR\+\b', s))
-        total += 2 * len(re.findall(r'\b2FG\+\b', s))
-        total += 3 * len(re.findall(r'\b3FG\+\b', s))
-        total += 1 * len(re.findall(r'\bFT\+\b',  s))
-    return total
-
-
-def _ppc_two_decimals(points, poss):
-    return round((points / poss), 2) if poss else 0.00
 
 # BEGIN safe_increment_helper
 def inc_stat(bucket: dict, key: str, by: int = 1):
@@ -295,24 +268,16 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
         if not col.startswith("#"):
             continue
         tokens = extract_tokens(row.get(col, ""))
-        if not tokens:
-            continue
-
-        ft_makes = tokens.count("FT+")
-        ft_misses = tokens.count("FT-")
-        if not ft_makes and not ft_misses:
-            continue
-
-        if col not in player_stats_dict:
-            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
-
-        if ft_makes:
-            player_stats_dict[col]["ftm"] += ft_makes
-            player_stats_dict[col]["points"] += ft_makes
-
-        attempts = ft_makes + ft_misses
-        if attempts:
-            player_stats_dict[col]["fta"] += attempts
+        if "FT+" in tokens:
+            if col not in player_stats_dict:
+                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            player_stats_dict[col]["ftm"] += 1
+            player_stats_dict[col]["fta"] += 1
+            player_stats_dict[col]["points"] += 1
+        elif "FT-" in tokens:
+            if col not in player_stats_dict:
+                player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+            player_stats_dict[col]["fta"] += 1
 
     # 4) Miscellaneous mapped stats (Turnover, 2nd Assist, Fouled), excluding "Assist"/"Pot. Assist"
     for col in df_columns:
@@ -434,7 +399,6 @@ def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id,
                     if token in blue_collar_mapping:
                         key = blue_collar_mapping[token]
                         player_stats_dict[col]["blue_collar_accum"][key] += 1
-                        team_totals[key] = team_totals.get(key, 0) + 1
                         team_totals["total_blue_collar"] += blue_collar_values[key]
                 blue_total = sum(
                     player_stats_dict[col]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
@@ -455,7 +419,6 @@ def process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping,
         if token in blue_collar_mapping:
             key = blue_collar_mapping[token]
             player_stats_dict[player_name]["blue_collar_accum"][key] += 1
-            team_totals[key] = team_totals.get(key, 0) + 1
             team_totals["total_blue_collar"] += blue_collar_values[key]
     blue_total = sum(
         player_stats_dict[player_name]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
@@ -525,75 +488,28 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
 
 # --- New get_possession_breakdown_detailed() ---
 def get_possession_breakdown_detailed(df):
-    """Return possession-type, game-split, and situational breakdowns."""
+    """
+    Returns four dicts:
+      1) breakdown_offense[token]  = {'count':…, 'points':…}
+      2) breakdown_defense[token]  = {'count':…, 'points':…}
+      3) periodic_offense[split]   = {'count':…, 'points':…}
+      4) periodic_defense[split]   = {'count':…, 'points':…}
+    Splits come from the "GAME SPLITS" column: "1st Half", "2nd Half", "Overtime".
+    Now excludes both Neutral and Off Reb rows for the ‘count’ buckets.
+    """
+    desired_tokens = ["Transition","Man","Zone","Press","UOB","SLOB","Garbage","OREB Putback"]
 
-    desired_tokens = [
-        "Transition", "Man", "Zone", "Press",
-        "UOB", "SLOB", "Garbage", "OREB Putback", "Half Court",
-    ]
+    # possession‐type buckets
+    breakdown_offense = {t:{'count':0,'points':0} for t in desired_tokens}
+    breakdown_defense = {t:{'count':0,'points':0} for t in desired_tokens}
 
-    # possession-type buckets
-    breakdown_offense = {t: {"count": 0, "points": 0} for t in desired_tokens}
-    breakdown_defense = {t: {"count": 0, "points": 0} for t in desired_tokens}
-
-    # game-split buckets
+    # game‐split buckets
     periodic_offense = {
-        "1st Half": {"count": 0, "points": 0},
-        "2nd Half": {"count": 0, "points": 0},
-        "Overtime": {"count": 0, "points": 0},
+        "1st Half": {'count':0,'points':0},
+        "2nd Half": {'count':0,'points':0},
+        "Overtime": {'count':0,'points':0},
     }
-    periodic_defense = {k: v.copy() for k, v in periodic_offense.items()}
-
-    # situational buckets
-    shot_clock_order = [
-        ":01 - :06", ":07 - :12", ":13 - :18", ":19 - :24", ":25 - :30", "N/A",
-    ]
-    possession_start_order = [
-        "Made FG", "Missed FG", "Steal", "Deadball", "Off Rebound", "N/A",
-    ]
-    paint_touches_order = ["0 PT", "1 PT", "2 PT", "3+ PT", "N/A"]
-    shot_clock_pt_order = [
-        ":01 - :03", ":04 - :06", ":07 - :09",
-        ":10 - :12", ":13 - :15", ":16+", "N/A",
-    ]
-
-    def _init_bucket(order):
-        return {label: {"count": 0, "points": 0} for label in order}
-
-    shot_clock_offense = _init_bucket(shot_clock_order)
-    shot_clock_defense = _init_bucket(shot_clock_order)
-    possession_start_offense = _init_bucket(possession_start_order)
-    possession_start_defense = _init_bucket(possession_start_order)
-    paint_touches_offense = _init_bucket(paint_touches_order)
-    paint_touches_defense = _init_bucket(paint_touches_order)
-    shot_clock_pt_offense = _init_bucket(shot_clock_pt_order)
-    shot_clock_pt_defense = _init_bucket(shot_clock_pt_order)
-
-    situational_columns = [
-        ("SHOT CLOCK", shot_clock_offense, shot_clock_defense),
-        ("POSSESSION START", possession_start_offense, possession_start_defense),
-        ("PAINT TOUCHES", paint_touches_offense, paint_touches_defense),
-        ("SHOT CLOCK PT", shot_clock_pt_offense, shot_clock_pt_defense),
-    ]
-
-    def _normalize_value(value: object) -> str:
-        text = str(value).strip()
-        if not text or text.lower() == "nan":
-            return "N/A"
-        return text
-
-    def _increment(bucket: dict, key: str, points: int, *, is_countable: bool):
-        if key not in bucket:
-            bucket[key] = {"count": 0, "points": 0}
-        if is_countable:
-            bucket[key]["count"] += 1
-        bucket[key]["points"] += points
-
-    half_labels = ["1st Half", "2nd Half", "Overtime"]
-    half_tracking = {
-        label: {"run": 0, "neutral": 0, "oreb": 0, "points": 0}
-        for label in half_labels
-    }
+    periodic_defense = {k:v.copy() for k,v in periodic_offense.items()}
 
     for _, row in df.iterrows():
         row_type = str(row.get("Row","")).strip()
@@ -605,43 +521,25 @@ def get_possession_breakdown_detailed(df):
         is_neutral   = "Neutral" in team_val
         is_off_reb   = "Off Reb" in team_val
 
-        possession_start_val = str(row.get("POSSESSION START", ""))
-        game_splits_val = str(row.get("GAME SPLITS", ""))
-
         opp_stats_val  = str(row.get("OPP STATS",""))
         is_opp_off_reb = "Off Reb" in opp_stats_val
 
         # 1) possession‐type tokens
-        raw_possession_type = str(row.get("POSSESSION TYPE", ""))
-        normalized_possession_type = raw_possession_type.replace("/", ",")
-        candidate_tokens = extract_tokens(normalized_possession_type)
-        poss_types = []
-        if candidate_tokens:
-            lowered_candidates = [token.lower() for token in candidate_tokens]
-            for desired in desired_tokens:
-                desired_lower = desired.lower()
-                if desired_lower in lowered_candidates and desired not in poss_types:
-                    poss_types.append(desired)
-        if not poss_types and raw_possession_type:
-            lowered_raw = raw_possession_type.lower()
-            for desired in desired_tokens:
-                if re.search(r'(?<!\w)' + re.escape(desired.lower()) + r'(?!\w)', lowered_raw) and desired not in poss_types:
-                    poss_types.append(desired)
+        poss_types = [t.strip() for t in str(row.get("POSSESSION TYPE","")).split(",") if t.strip()]
 
         # 2) compute this row’s points
         pts = 0
         if row_type == "Offense":
-            pts = _count_points_from_offense_row(row, df.columns)
-            for label in half_labels:
-                if label and label in game_splits_val:
-                    data = half_tracking[label]
-                    data["run"] += 1
-                    if is_neutral:
-                        data["neutral"] += 1
-                    else:
-                        data["points"] += pts
-                    if "Off Rebound" in possession_start_val:
-                        data["oreb"] += 1
+            for col in df.columns:
+                if col.startswith("#"):
+                    for tok in extract_tokens(row.get(col,"")):
+                        u = tok.upper()
+                        if u in ("ATR+","2FG+"):
+                            pts += 2
+                        elif u=="3FG+":
+                            pts += 3
+                        elif u=="FT+":
+                            pts += 1
         else:
             for tok in extract_tokens(opp_stats_val):
                 u = tok.upper()
@@ -661,7 +559,7 @@ def get_possession_breakdown_detailed(df):
                     breakdown_offense[tkn]['count'] += 1
                 breakdown_offense[tkn]['points'] += pts
             else:
-                if not is_neutral and not is_opp_off_reb:
+                if not is_neutral:
                     breakdown_defense[tkn]['count'] += 1
                 breakdown_defense[tkn]['points'] += pts
 
@@ -677,113 +575,7 @@ def get_possession_breakdown_detailed(df):
                     periodic_defense[split]['count'] += 1
                 periodic_defense[split]['points'] += pts
 
-        # 5) situational buckets mirror possession-type handling
-        for col_name, off_bucket, def_bucket in situational_columns:
-            raw_val = str(row.get(col_name, "")).strip()
-
-            # Normalize known composite cases
-            if col_name == "POSSESSION START":
-                tokens = []
-                normalized_starts = raw_val.replace("/", ",")
-                base_chunks = [chunk.strip() for chunk in normalized_starts.split(",") if chunk.strip()]
-                if not base_chunks and raw_val:
-                    base_chunks = [raw_val]
-
-                for chunk in base_chunks:
-                    if chunk.startswith("Missed FT"):
-                        if "Off Rebound" in raw_val:
-                            candidate_tokens = ["Off Rebound"]
-                        else:
-                            candidate_tokens = ["Deadball"]
-                    elif chunk.startswith("Made FT"):
-                        candidate_tokens = ["Deadball"]
-                    else:
-                        candidate_tokens = [piece.strip() for piece in chunk.split("-") if piece.strip()]
-
-                    for candidate in candidate_tokens:
-                        if candidate not in tokens:
-                            tokens.append(candidate)
-
-                if "Off Rebound" in raw_val and "Off Rebound" not in tokens:
-                    tokens.append("Off Rebound")
-            elif col_name == "PAINT TOUCHES" and raw_val == "1 PT, 1 PT":
-                tokens = ["2 PT"]
-            else:
-                tokens = [tok.strip() for tok in raw_val.split(",") if tok.strip()]
-
-
-            if not tokens:
-                tokens = ["N/A"]
-            tokens = [_normalize_value(tok) for tok in tokens]
-
-            if row_type == "Offense":
-                countable = not is_neutral
-                for token in tokens:
-                    _increment(off_bucket, token, pts, is_countable=countable)
-            else:
-                countable = not is_neutral
-                for token in tokens:
-                    _increment(def_bucket, token, pts, is_countable=countable)
-
-    half_entries = {}
-    for label, data in half_tracking.items():
-        poss = data["run"] - data["neutral"] - data["oreb"]
-        if poss < 0:
-            poss = 0
-        half_entries[label] = {
-            "count": poss,
-            "points": data["points"],
-        }
-
-    if half_entries:
-        augmented_offense = {}
-        inserted = False
-        for key, value in breakdown_offense.items():
-            augmented_offense[key] = value
-            if key == "OREB Putback":
-                for label in half_labels:
-                    augmented_offense[label] = half_entries.get(label, {"count": 0, "points": 0})
-                inserted = True
-        if not inserted:
-            for label in half_labels:
-                augmented_offense[label] = half_entries.get(label, {"count": 0, "points": 0})
-        breakdown_offense.clear()
-        breakdown_offense.update(augmented_offense)
-
-    def _attach_ppc(bucket: dict):
-        for stats in bucket.values():
-            poss = stats.get("count", 0)
-            pts = stats.get("points", 0)
-            stats["ppc"] = _ppc_two_decimals(pts, poss)
-
-    for table in (
-        breakdown_offense,
-        breakdown_defense,
-        shot_clock_offense,
-        shot_clock_defense,
-        possession_start_offense,
-        possession_start_defense,
-        paint_touches_offense,
-        paint_touches_defense,
-        shot_clock_pt_offense,
-        shot_clock_pt_defense,
-    ):
-        _attach_ppc(table)
-
-    return (
-        breakdown_offense,
-        breakdown_defense,
-        periodic_offense,
-        periodic_defense,
-        shot_clock_offense,
-        shot_clock_defense,
-        possession_start_offense,
-        possession_start_defense,
-        paint_touches_offense,
-        paint_touches_defense,
-        shot_clock_pt_offense,
-        shot_clock_pt_defense,
-    )
+    return breakdown_offense, breakdown_defense, periodic_offense, periodic_defense
 
 
 
@@ -832,12 +624,20 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         points_scored = 0
         events = []
         if row_type == "Offense":
-            points_scored = _count_points_from_offense_row(row, df.columns)
             for col in df.columns:
                 if col.startswith("#"):
                     tokens = extract_tokens(row.get(col, ""))
                     for token in tokens:
                         events.append(token)
+                        token = token.upper()
+                        if token == "ATR+":
+                            points_scored += 2
+                        elif token == "2FG+":
+                            points_scored += 2
+                        elif token == "3FG+":
+                            points_scored += 3
+                        elif token == "FT+":
+                            points_scored += 1
         elif row_type == "Defense":
             tokens = extract_tokens(row.get("OPP STATS", ""))
             for token in tokens:
@@ -1003,16 +803,7 @@ def parse_csv(file_path, game_id, season_id):
         "total_ftm": 0,
         "total_fta": 0,
         "total_blue_collar": 0,
-        "foul_by": 0,
-        "def_reb": 0,
-        "off_reb": 0,
-        "misc": 0,
-        "deflection": 0,
-        "steal": 0,
-        "block": 0,
-        "floor_dive": 0,
-        "charge_taken": 0,
-        "reb_tip": 0
+        "foul_by": 0
     }
     opponent_totals = {
         "atr_makes": 0,
@@ -1073,15 +864,6 @@ def parse_csv(file_path, game_id, season_id):
             if col not in player_stats_dict:
                 player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
             row_tokens_by_col[col] = tokens
-
-        if row_type == "TEAM":
-            tokens = extract_tokens(row.get("TEAM", ""))
-            for token in tokens:
-                if token in blue_collar_mapping:
-                    key = blue_collar_mapping[token]
-                    team_totals[key] = team_totals.get(key, 0) + 1
-                    team_totals["total_blue_collar"] += blue_collar_values[key]
-            continue
 
         if row_tokens_by_col and row_type_lower == "pnr":
             for col, tokens in row_tokens_by_col.items():
@@ -1160,81 +942,78 @@ def parse_csv(file_path, game_id, season_id):
         elif row_type.startswith("#"):
             process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals)
 
-    for player_stats in player_stats_dict.values():
-        player_stats["atr_total_attempts"] = player_stats.get("atr_attempts", 0)
-        player_stats["fg2_total_attempts"] = player_stats.get("fg2_attempts", 0)
-        player_stats["fg3_total_attempts"] = player_stats.get("fg3_attempts", 0)
-        player_stats["ft_total_attempts"]  = player_stats.get("fta", 0)
+    for stats in player_stats_dict.values():
+        stats["atr_total_attempts"] = stats.get("atr_attempts", 0)
+        stats["fg2_total_attempts"] = stats.get("fg2_attempts", 0)
+        stats["fg3_total_attempts"] = stats.get("fg3_attempts", 0)
+        stats["ft_total_attempts"]  = stats.get("fta", 0)
 
-    # --- Insert/Overwrite Player Stats into Database ---
-    with app_instance.app_context():
-        valid_cols = {c.name for c in PlayerStats.__table__.columns}
+        # --- Insert/Overwrite Player Stats into Database ---
+        with app_instance.app_context():
+            valid_cols = {c.name for c in PlayerStats.__table__.columns}
 
-        for player_name, player_stats in player_stats_dict.items():
-            # Remove any existing rows for this player & game to avoid duplicates
-            PlayerStats.query \
-                .filter_by(player_name=player_name, game_id=game_id) \
-                .delete()
+            for player_name, stats in player_stats_dict.items():
+                # Remove any existing rows for this player & game to avoid duplicates
+                PlayerStats.query \
+                    .filter_by(player_name=player_name, game_id=game_id) \
+                    .delete()
 
-            # Prepare shot-detail JSON (if any)
-            json_details = None
-            if player_stats.get("shot_type_details"):
-                json_details = json.dumps(player_stats["shot_type_details"])
+                # Prepare shot-detail JSON (if any)
+                json_details = None
+                if stats.get("shot_type_details"):
+                    json_details = json.dumps(stats["shot_type_details"])
 
-            # Build a fresh dict of only valid columns (excluding array/dict fields)
-            clean_stats = {
-                k: safe_value(v)
-                for k, v in player_stats.items()
-                if k in valid_cols
-                and not isinstance(v, (dict, list, tuple, np.ndarray, pd.Series))
-            }
+                # Build a fresh dict of only valid columns (excluding array/dict fields)
+                clean_stats = {
+                    k: safe_value(v)
+                    for k, v in stats.items()
+                    if k in valid_cols
+                    and not isinstance(v, (dict, list, tuple, np.ndarray, pd.Series))
+                }
 
-            # Ensure game_id, season_id, and player_name are set correctly:
-            clean_stats["game_id"]     = game_id
-            clean_stats["season_id"]   = season_id
-            clean_stats["player_name"] = player_name
-            # A game row should never have a practice_id
-            clean_stats["practice_id"] = None
+                # Ensure game_id, season_id, and player_name are set correctly:
+                clean_stats["game_id"]     = game_id
+                clean_stats["season_id"]   = season_id
+                clean_stats["player_name"] = player_name
+                # A game row should never have a practice_id
+                clean_stats["practice_id"] = None
 
-            # Attach shot_type_details JSON if present
-            if json_details is not None:
-                clean_stats["shot_type_details"] = json_details
+                # Attach shot_type_details JSON if present
+                if json_details is not None:
+                    clean_stats["shot_type_details"] = json_details
 
-            # Insert the new, non-duplicated PlayerStats row
-            player_stat = PlayerStats(**clean_stats)
-            db.session.add(player_stat)
-            persist_player_shot_details(
-                player_stat,
-                player_stats.get("shot_type_details") or [],
-                replace=True,
-            )
+                # Insert the new, non-duplicated PlayerStats row
+                player_stat = PlayerStats(**clean_stats)
+                db.session.add(player_stat)
+                persist_player_shot_details(
+                    player_stat,
+                    stats.get("shot_type_details") or [],
+                    replace=True,
+                )
 
-        # Commit once after processing all players
+            # Commit once after processing all players
+            db.session.commit()
+
+
+
+            # 7) accumulate to your team_totals
+            team_totals["total_points"]        += safe_value(stats.get("points", 0))
+            team_totals["total_assists"]       += safe_value(stats.get("assists", 0))
+            team_totals["total_second_assists"]+= safe_value(stats.get("second_assists", 0))
+            team_totals["total_pot_assists"]   += safe_value(stats.get("pot_assists", 0))
+            team_totals["total_turnovers"]     += safe_value(stats.get("turnovers", 0))
+            team_totals["total_atr_makes"]     += safe_value(stats.get("atr_makes", 0))
+            team_totals["total_atr_attempts"]  += safe_value(stats.get("atr_attempts", 0))
+            team_totals["total_fg2_makes"]     += safe_value(stats.get("fg2_makes", 0))
+            team_totals["total_fg2_attempts"]  += safe_value(stats.get("fg2_attempts", 0))
+            team_totals["total_fg3_makes"]     += safe_value(stats.get("fg3_makes", 0))
+            team_totals["total_fg3_attempts"]  += safe_value(stats.get("fg3_attempts", 0))
+            team_totals["total_ftm"]           += safe_value(stats.get("ftm", 0))
+            team_totals["total_fta"]           += safe_value(stats.get("fta", 0))
+            team_totals["foul_by"]             += safe_value(stats.get("foul_by", 0))
+
+        # 8) commit once after looping
         db.session.commit()
-
-        # Accumulate team totals from all player stats
-        for player_stats in player_stats_dict.values():
-            team_totals["total_points"]        += safe_value(player_stats.get("points", 0))
-            team_totals["total_assists"]       += safe_value(player_stats.get("assists", 0))
-            team_totals["total_second_assists"]+= safe_value(player_stats.get("second_assists", 0))
-            team_totals["total_pot_assists"]   += safe_value(player_stats.get("pot_assists", 0))
-            team_totals["total_turnovers"]     += safe_value(player_stats.get("turnovers", 0))
-            team_totals["total_atr_makes"]     += safe_value(player_stats.get("atr_makes", 0))
-            team_totals["total_atr_attempts"]  += safe_value(player_stats.get("atr_attempts", 0))
-            team_totals["total_fg2_makes"]     += safe_value(player_stats.get("fg2_makes", 0))
-            team_totals["total_fg2_attempts"]  += safe_value(player_stats.get("fg2_attempts", 0))
-            team_totals["total_fg3_makes"]     += safe_value(player_stats.get("fg3_makes", 0))
-            team_totals["total_fg3_attempts"]  += safe_value(player_stats.get("fg3_attempts", 0))
-            team_totals["total_ftm"]           += safe_value(player_stats.get("ftm", 0))
-            team_totals["total_fta"]           += safe_value(player_stats.get("fta", 0))
-            team_totals["foul_by"]             += safe_value(player_stats.get("foul_by", 0))
-
-        team_totals["total_points"] = (
-            2 * team_totals.get("total_atr_makes", 0)
-            + 2 * team_totals.get("total_fg2_makes", 0)
-            + 3 * team_totals.get("total_fg3_makes", 0)
-            + team_totals.get("total_ftm", 0)
-        )
 
 
         # Process possessions for bucket 2 (Team vs Opponent) with subtract_off_reb=True
@@ -1568,20 +1347,8 @@ def parse_csv(file_path, game_id, season_id):
     
     # --- Calculate Possession Type Breakdowns using the new detailed function ---
     # --- Calculate Possession Type & Split Breakdowns ---
-    (
-        offensive_breakdown,
-        defensive_breakdown,
-        periodic_offense,
-        periodic_defense,
-        shot_clock_offense,
-        shot_clock_defense,
-        possession_start_offense,
-        possession_start_defense,
-        paint_touches_offense,
-        paint_touches_defense,
-        shot_clock_pt_offense,
-        shot_clock_pt_defense,
-    ) = get_possession_breakdown_detailed(df)
+    offensive_breakdown, defensive_breakdown, periodic_offense, periodic_defense = \
+        get_possession_breakdown_detailed(df)
 
 
     # ● compute lineup efficiencies (2-5 man units, min 10 poss)
@@ -1594,16 +1361,6 @@ def parse_csv(file_path, game_id, season_id):
     result = {
       "offensive_breakdown": offensive_breakdown,
       "defensive_breakdown": defensive_breakdown,
-      "periodic_offense": periodic_offense,
-      "periodic_defense": periodic_defense,
-      "shot_clock_offense": shot_clock_offense,
-      "shot_clock_defense": shot_clock_defense,
-      "possession_start_offense": possession_start_offense,
-      "possession_start_defense": possession_start_defense,
-      "paint_touches_offense": paint_touches_offense,
-      "paint_touches_defense": paint_touches_defense,
-      "shot_clock_pt_offense": shot_clock_pt_offense,
-      "shot_clock_pt_defense": shot_clock_pt_defense,
       "lineup_efficiencies": efficiencies
     }
 
