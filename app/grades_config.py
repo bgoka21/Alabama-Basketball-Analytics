@@ -14,6 +14,7 @@ from typing import Dict, List
 _BUMP_CONTACT_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
 _REBOUND_CONTACT_THRESHOLDS = [50.0, 60.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0]
 _HELP_COVERAGE_THRESHOLDS = [50.0, 60.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0]
+_GAP_HELP_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 75.0, 85.0, 95.0]
 _CONTEST_BREAKDOWN_THRESHOLDS = [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
 
 
@@ -37,7 +38,7 @@ GRADES: Dict[str, List[float]] = {
     "back_man_pct": _REBOUND_CONTACT_THRESHOLDS,
     "box_out_pct": _REBOUND_CONTACT_THRESHOLDS,
     # Gap / Low man help and pick-and-roll coverage responsibilities.
-    "gap_pct": _HELP_COVERAGE_THRESHOLDS,
+    "gap_pct": _GAP_HELP_THRESHOLDS,
     "low_pct": _HELP_COVERAGE_THRESHOLDS,
     "close_window_pct": _HELP_COVERAGE_THRESHOLDS,
     "shut_door_pct": _HELP_COVERAGE_THRESHOLDS,
