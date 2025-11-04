@@ -5173,6 +5173,7 @@ def season_stats(season_id):
         func.sum(TeamStats.total_ftm),          func.sum(TeamStats.total_fta),
         func.sum(TeamStats.total_assists),      func.sum(TeamStats.total_turnovers),
         func.sum(TeamStats.total_second_assists), func.sum(TeamStats.total_pot_assists),
+        func.sum(TeamStats.total_fouls_drawn),
         func.sum(TeamStats.total_blue_collar),  func.sum(TeamStats.total_possessions)
     ).filter(
         TeamStats.season_id == season_id,
@@ -5187,6 +5188,7 @@ def season_stats(season_id):
         func.sum(TeamStats.total_ftm),          func.sum(TeamStats.total_fta),
         func.sum(TeamStats.total_assists),      func.sum(TeamStats.total_turnovers),
         func.sum(TeamStats.total_second_assists), func.sum(TeamStats.total_pot_assists),
+        func.sum(TeamStats.total_fouls_drawn),
         func.sum(TeamStats.total_blue_collar),  func.sum(TeamStats.total_possessions)
     ).filter(
         TeamStats.season_id == season_id,
@@ -5195,9 +5197,9 @@ def season_stats(season_id):
 
     # Unpack for readability
     (tp,  atrm, atra, fg2m, fg2a, fg3m, fg3a, ftm, fta,
-     ast, tov, sec_ast, pot_ast, bc, poss) = team_agg
+     ast, tov, sec_ast, pot_ast, fouls_drawn, bc, poss) = team_agg
     (otp, o_atrm, o_atra, o_fg2m, o_fg2a, o_fg3m, o_fg3a, o_ftm, o_fta,
-     o_ast, o_tov, o_sec_ast, o_pot_ast, o_bc, o_poss) = opp_agg
+     o_ast, o_tov, o_sec_ast, o_pot_ast, o_fouls_drawn, o_bc, o_poss) = opp_agg
 
     # ─── Compute percentages ────────────────────────────────────────────────
     def pct(made, att, precision=1):
@@ -5211,6 +5213,7 @@ def season_stats(season_id):
       total_ftm          = ftm or 0,      total_fta           = fta or 0,
       total_assists      = ast or 0,      total_turnovers     = tov or 0,
       total_second_assists = sec_ast or 0, total_pot_assists   = pot_ast or 0,
+      total_fouls_drawn  = fouls_drawn or 0,
       total_blue_collar  = bc or 0,       total_possessions   = poss or 0,
       assist_pct    = pct(ast or 0, atrm+fg2m+fg3m),
       turnover_pct  = pct(tov or 0, poss or 1),
@@ -5228,6 +5231,7 @@ def season_stats(season_id):
       total_ftm          = o_ftm or 0,     total_fta           = o_fta or 0,
       total_assists      = o_ast or 0,     total_turnovers     = o_tov or 0,
       total_second_assists = o_sec_ast or 0, total_pot_assists  = o_pot_ast or 0,
+      total_fouls_drawn  = o_fouls_drawn or 0,
       total_blue_collar  = o_bc or 0,      total_possessions   = o_poss or 0,
       assist_pct    = pct(o_ast or 0, o_atrm+o_fg2m+o_fg3m),
       turnover_pct  = pct(o_tov or 0, o_poss or 1),
