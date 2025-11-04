@@ -92,4 +92,51 @@ def test_leaderboard_game_type_filter(client, app):
     assert response.status_code == 200
     html = response.data.decode("utf-8")
     assert "#1 Alpha" in html
-    assert "#2 Beta" not in html
+    assert "#2 Beta" in html
+
+
+def test_leaderboard_last_game_ignores_filter(client, app):
+    season_id = None
+    with app.app_context():
+        season = Season(
+            season_name="2024-25",
+            start_date=date(2024, 6, 1),
+            end_date=date(2025, 4, 1),
+        )
+        db.session.add(season)
+        db.session.flush()
+
+        _add_player_with_game(
+            season,
+            name="#1 Alpha",
+            jersey=1,
+            game_date=date(2024, 11, 5),
+            opponent="State",
+            game_types=["Conference"],
+            fg3_makes=2,
+            fg3_attempts=3,
+        )
+        _add_player_with_game(
+            season,
+            name="#2 Beta",
+            jersey=2,
+            game_date=date(2024, 11, 12),
+            opponent="Tech",
+            game_types=["Exhibition"],
+            atr_makes=4,
+            atr_attempts=6,
+        )
+
+        db.session.commit()
+        season_id = season.id
+
+    response = client.get(
+        "/admin/leaderboard/game",
+        query_string=[("season", season_id), ("game_type", "Conference")],
+    )
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+
+    assert "#1 Alpha" in html
+    assert "#2 Beta" in html
+    assert "Nov 12, 2024" in html

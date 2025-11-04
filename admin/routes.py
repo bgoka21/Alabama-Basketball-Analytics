@@ -8988,24 +8988,34 @@ def leaderboard_game():
         if not season_id:
             return _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice()
 
+        last_game_types: Optional[Sequence[str]] = None
+
         shrinks_season = fetch_offense_shrinks(season_id, window_start, window_end, game_types)
-        shrinks_last = fetch_offense_shrinks_last_game(season_id, window_start, window_end, game_types)
+        shrinks_last = fetch_offense_shrinks_last_game(
+            season_id, window_start, window_end, last_game_types
+        )
         atr_season = fetch_atr_finishing(season_id, window_start, window_end, game_types)
-        atr_last = fetch_atr_finishing_last_game(season_id, window_start, window_end, game_types)
+        atr_last = fetch_atr_finishing_last_game(
+            season_id, window_start, window_end, last_game_types
+        )
         oreb_season = fetch_oreb(season_id, window_start, window_end, game_types)
-        oreb_last = fetch_oreb_last_game(season_id, window_start, window_end, game_types)
+        oreb_last = fetch_oreb_last_game(season_id, window_start, window_end, last_game_types)
         dreb_season = fetch_dreb(season_id, window_start, window_end, game_types)
-        dreb_last = fetch_dreb_last_game(season_id, window_start, window_end, game_types)
+        dreb_last = fetch_dreb_last_game(season_id, window_start, window_end, last_game_types)
         collision_season = fetch_collisions(season_id, window_start, window_end, game_types)
-        collision_last = fetch_collisions_last_game(season_id, window_start, window_end, game_types)
+        collision_last = fetch_collisions_last_game(
+            season_id, window_start, window_end, last_game_types
+        )
         pass_season = fetch_pass_contest(season_id, window_start, window_end, game_types)
-        pass_last = fetch_pass_contest_last_game(season_id, window_start, window_end, game_types)
+        pass_last = fetch_pass_contest_last_game(
+            season_id, window_start, window_end, last_game_types
+        )
         gap_season = fetch_gap_help(season_id, window_start, window_end, game_types)
-        gap_last = fetch_gap_help_last_game(season_id, window_start, window_end, game_types)
+        gap_last = fetch_gap_help_last_game(season_id, window_start, window_end, last_game_types)
         low_season = fetch_low_man(season_id, window_start, window_end, game_types)
-        low_last = fetch_low_man_last_game(season_id, window_start, window_end, game_types)
+        low_last = fetch_low_man_last_game(season_id, window_start, window_end, last_game_types)
         pnr_season = fetch_pnr_grade(season_id, window_start, window_end, game_types)
-        pnr_last = fetch_pnr_grade_last_game(season_id, window_start, window_end, game_types)
+        pnr_last = fetch_pnr_grade_last_game(season_id, window_start, window_end, last_game_types)
 
         return (
             shrinks_season,

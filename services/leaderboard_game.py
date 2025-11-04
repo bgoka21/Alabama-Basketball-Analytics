@@ -270,7 +270,7 @@ def _last_game_rows_with_types(
     season_id: int,
     start_date: Optional[date],
     end_date: Optional[date],
-    game_types: Optional[Sequence[str]],
+    game_types: Optional[Sequence[str]] = None,
 ) -> Tuple[Dict[str, Dict[str, Any]], Optional[date]]:
     params = inspect.signature(_last_game_rows).parameters
     if len(params) <= 3:
