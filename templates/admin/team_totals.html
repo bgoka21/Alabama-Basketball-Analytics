@@ -290,7 +290,139 @@
   <div class="space-y-10">
     <section>
       <h2 class="text-lg sm:text-xl font-semibold mb-4">Game Offense</h2>
-      <p class="text-sm text-gray-600 dark:text-gray-300 italic">Offensive breakdown coming soon.</p>
+      <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+          <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
+            <tr>
+              <th rowspan="2" class="px-3 py-2 text-xs font-semibold text-left uppercase align-bottom">Date</th>
+              <th rowspan="2" class="px-3 py-2 text-xs font-semibold text-left uppercase align-bottom">Opponent</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">Scoring</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">ATR</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">2FG</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">3FG</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">3FG Shrink</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">3FG Non-Shrink</th>
+              <th colspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase">Free Throws</th>
+              <th rowspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase align-bottom">Good Shot %</th>
+              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">Assists</th>
+              <th colspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase">Turnovers</th>
+              <th colspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase">Fouls Drawn</th>
+            </tr>
+            <tr>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">PTS</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">POSS</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">PPP</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">FTM-FTA</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">FT%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">AST</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">POT</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">2ND</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Total</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">TO%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Total</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Foul%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if team_offense_rows %}
+              {% for row in team_offense_rows %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-3 py-2 text-sm">
+                    {% if row.date %}
+                      {{ row.date.strftime('%b %d, %Y') }}
+                    {% else %}
+                      --
+                    {% endif %}
+                  </td>
+                  <td class="px-3 py-2 text-sm">{{ row.opponent or '--' }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.points }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.possessions }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.ppp|round(3) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.atr.makes }}-{{ row.shots.atr.attempts }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.atr.pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.atr.freq|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg2.makes }}-{{ row.shots.fg2.attempts }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg2.pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg2.freq|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg3.makes }}-{{ row.shots.fg3.attempts }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg3.pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg3.freq|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_shrink.makes }}-{{ row.fg3_shrink.attempts }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_shrink.pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_shrink.freq|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_nonshrink.makes }}-{{ row.fg3_nonshrink.attempts }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_nonshrink.pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_nonshrink.freq|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.ftm }}-{{ row.fta }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.ft_pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.good_shot_pct|round(2) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.assists }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.pot_assists }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.second_assists }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.turnovers }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.turnover_pct|round(1) }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.fouls_drawn }}</td>
+                  <td class="px-3 py-2 text-sm text-center">{{ row.foul_pct|round(1) }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="30" class="px-3 py-6 text-center text-sm text-gray-500">No offensive game stats available for the selected filters.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+          {% if team_offense_totals %}
+            <tfoot class="bg-gray-100">
+              <tr class="font-semibold">
+                <td class="px-3 py-2 text-sm" colspan="2">Totals</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.points }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.possessions }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.ppp|round(3) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.atr.makes }}-{{ team_offense_totals.shots.atr.attempts }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.atr.pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.atr.freq|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg2.makes }}-{{ team_offense_totals.shots.fg2.attempts }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg2.pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg2.freq|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg3.makes }}-{{ team_offense_totals.shots.fg3.attempts }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg3.pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg3.freq|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_shrink.makes }}-{{ team_offense_totals.fg3_shrink.attempts }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_shrink.pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_shrink.freq|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_nonshrink.makes }}-{{ team_offense_totals.fg3_nonshrink.attempts }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_nonshrink.pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_nonshrink.freq|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.ftm }}-{{ team_offense_totals.fta }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.ft_pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.good_shot_pct|round(2) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.assists }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.pot_assists }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.second_assists }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.turnovers }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.turnover_pct|round(1) }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fouls_drawn }}</td>
+                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.foul_pct|round(1) }}</td>
+              </tr>
+            </tfoot>
+          {% endif %}
+        </table>
+      </div>
     </section>
 
     <section>
