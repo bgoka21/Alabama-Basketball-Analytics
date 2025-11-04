@@ -8281,6 +8281,10 @@ def team_totals():
     )
     shot_summaries = {'atr': SimpleNamespace(cats={}), 'fg2': SimpleNamespace(cats={}), 'fg3': SimpleNamespace(cats={})}
 
+    team_defense_rows: list[dict[str, Any]] = []
+    team_defense_totals: Optional[dict[str, Any]] = None
+    team_defense_possessions: dict[int, int] = {}
+
     if mode == 'practice':
         q = PlayerStats.query.filter(PlayerStats.practice_id != None)
         if season_id:
@@ -8398,6 +8402,314 @@ def team_totals():
             lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
         ]
         label_set = {lbl.upper() for lbl in selected_labels}
+
+        opponent_team_stats_query = (
+            db.session.query(
+                TeamStats,
+                Game.game_date,
+                Game.opponent_name,
+            )
+            .join(Game, TeamStats.game_id == Game.id)
+            .filter(
+                TeamStats.is_opponent == True,
+                TeamStats.game_id != None,
+                TeamStats.game_id.in_(game_ids_for_totals),
+            )
+        )
+        if season_id:
+            opponent_team_stats_query = opponent_team_stats_query.filter(
+                TeamStats.season_id == season_id
+            )
+
+        opponent_team_stats_rows = opponent_team_stats_query.all()
+
+        collision_by_game: dict[int, dict[str, int]] = defaultdict(
+            lambda: {"positive": 0, "missed": 0}
+        )
+        box_out_by_game: dict[int, dict[str, int]] = defaultdict(
+            lambda: {"positive": 0, "missed": 0}
+        )
+        for player_stat in stats_list:
+            if not player_stat.game_id:
+                continue
+            game_id = player_stat.game_id
+            collision_entry = collision_by_game[game_id]
+            collision_entry["positive"] += player_stat.collision_gap_positive or 0
+            collision_entry["missed"] += player_stat.collision_gap_missed or 0
+
+            box_out_entry = box_out_by_game[game_id]
+            box_out_entry["positive"] += player_stat.box_out_positive or 0
+            box_out_entry["missed"] += player_stat.box_out_missed or 0
+
+        totals_accumulator = {
+            "points": 0,
+            "possessions": 0,
+            "turnovers": 0,
+            "fouls_drawn": 0,
+            "ftm": 0,
+            "fta": 0,
+            "atr_makes": 0,
+            "atr_attempts": 0,
+            "fg2_makes": 0,
+            "fg2_attempts": 0,
+            "fg3_makes": 0,
+            "fg3_attempts": 0,
+            "collision_positive": 0,
+            "collision_missed": 0,
+            "box_out_positive": 0,
+            "box_out_missed": 0,
+        }
+
+        for team_stat, game_date, opponent_name in opponent_team_stats_rows:
+            poss = team_stat.total_possessions or 0
+            points = team_stat.total_points or 0
+            turnovers = team_stat.total_turnovers or 0
+            fouls_drawn = team_stat.total_fouls_drawn or 0
+            ftm = team_stat.total_ftm or 0
+            fta = team_stat.total_fta or 0
+            atr_makes = team_stat.total_atr_makes or 0
+            atr_attempts = team_stat.total_atr_attempts or 0
+            fg2_makes = team_stat.total_fg2_makes or 0
+            fg2_attempts = team_stat.total_fg2_attempts or 0
+            fg3_makes = team_stat.total_fg3_makes or 0
+            fg3_attempts = team_stat.total_fg3_attempts or 0
+
+            total_shots = atr_attempts + fg2_attempts + fg3_attempts
+            atr_pct = round(atr_makes / atr_attempts * 100, 1) if atr_attempts else 0.0
+            fg2_pct = round(fg2_makes / fg2_attempts * 100, 1) if fg2_attempts else 0.0
+            fg3_pct = round(fg3_makes / fg3_attempts * 100, 1) if fg3_attempts else 0.0
+            atr_freq = round(atr_attempts / total_shots * 100, 1) if total_shots else 0.0
+            fg2_freq = round(fg2_attempts / total_shots * 100, 1) if total_shots else 0.0
+            fg3_freq = round(fg3_attempts / total_shots * 100, 1) if total_shots else 0.0
+            ft_pct = round(ftm / fta * 100, 1) if fta else 0.0
+            ppp = round(points / poss, 3) if poss else 0.0
+            turnover_pct = round(turnovers / poss * 100, 1) if poss else 0.0
+            foul_pct = round(fouls_drawn / poss * 100, 1) if poss else 0.0
+
+            atr_missed = atr_attempts - atr_makes
+            fg2_missed = fg2_attempts - fg2_makes
+            fg3_missed = fg3_attempts - fg3_makes
+            good_shots = fta + atr_makes + atr_missed + fg3_makes + fg3_missed
+            bad_shots = fg2_makes + fg2_missed
+            good_shot_den = good_shots + bad_shots
+            good_shot_pct = (
+                round(good_shots / good_shot_den * 100, 2)
+                if good_shot_den
+                else 0.0
+            )
+
+            collision_entry = collision_by_game.get(team_stat.game_id, {"positive": 0, "missed": 0})
+            collision_total = collision_entry["positive"] + collision_entry["missed"]
+            collision_pct = (
+                round(collision_entry["positive"] / collision_total * 100, 1)
+                if collision_total
+                else 0.0
+            )
+
+            box_out_entry = box_out_by_game.get(team_stat.game_id, {"positive": 0, "missed": 0})
+            box_out_total = box_out_entry["positive"] + box_out_entry["missed"]
+            box_out_pct = (
+                round(box_out_entry["positive"] / box_out_total * 100, 1)
+                if box_out_total
+                else 0.0
+            )
+
+            team_defense_rows.append(
+                {
+                    "game_id": team_stat.game_id,
+                    "date": game_date,
+                    "opponent": opponent_name,
+                    "possessions": poss,
+                    "points": points,
+                    "ppp": ppp,
+                    "turnovers": turnovers,
+                    "turnover_pct": turnover_pct,
+                    "fouls_drawn": fouls_drawn,
+                    "foul_pct": foul_pct,
+                    "ft_pct": ft_pct,
+                    "good_shot_pct": good_shot_pct,
+                    "shots": {
+                        "atr": {
+                            "makes": atr_makes,
+                            "attempts": atr_attempts,
+                            "pct": atr_pct,
+                            "freq": atr_freq,
+                        },
+                        "fg2": {
+                            "makes": fg2_makes,
+                            "attempts": fg2_attempts,
+                            "pct": fg2_pct,
+                            "freq": fg2_freq,
+                        },
+                        "fg3": {
+                            "makes": fg3_makes,
+                            "attempts": fg3_attempts,
+                            "pct": fg3_pct,
+                            "freq": fg3_freq,
+                        },
+                    },
+                    "collision": {
+                        "positive": collision_entry["positive"],
+                        "missed": collision_entry["missed"],
+                        "pct": collision_pct,
+                    },
+                    "box_out": {
+                        "positive": box_out_entry["positive"],
+                        "missed": box_out_entry["missed"],
+                        "pct": box_out_pct,
+                    },
+                }
+            )
+
+            team_defense_possessions[team_stat.game_id] = poss
+
+            totals_accumulator["points"] += points
+            totals_accumulator["possessions"] += poss
+            totals_accumulator["turnovers"] += turnovers
+            totals_accumulator["fouls_drawn"] += fouls_drawn
+            totals_accumulator["ftm"] += ftm
+            totals_accumulator["fta"] += fta
+            totals_accumulator["atr_makes"] += atr_makes
+            totals_accumulator["atr_attempts"] += atr_attempts
+            totals_accumulator["fg2_makes"] += fg2_makes
+            totals_accumulator["fg2_attempts"] += fg2_attempts
+            totals_accumulator["fg3_makes"] += fg3_makes
+            totals_accumulator["fg3_attempts"] += fg3_attempts
+            totals_accumulator["collision_positive"] += collision_entry["positive"]
+            totals_accumulator["collision_missed"] += collision_entry["missed"]
+            totals_accumulator["box_out_positive"] += box_out_entry["positive"]
+            totals_accumulator["box_out_missed"] += box_out_entry["missed"]
+
+        team_defense_rows.sort(key=lambda r: (r["date"] or date.min))
+
+        total_possessions = totals_accumulator["possessions"]
+        total_points = totals_accumulator["points"]
+        total_turnovers = totals_accumulator["turnovers"]
+        total_fouls_drawn = totals_accumulator["fouls_drawn"]
+        total_ftm = totals_accumulator["ftm"]
+        total_fta = totals_accumulator["fta"]
+        total_atr_makes = totals_accumulator["atr_makes"]
+        total_atr_attempts = totals_accumulator["atr_attempts"]
+        total_fg2_makes = totals_accumulator["fg2_makes"]
+        total_fg2_attempts = totals_accumulator["fg2_attempts"]
+        total_fg3_makes = totals_accumulator["fg3_makes"]
+        total_fg3_attempts = totals_accumulator["fg3_attempts"]
+
+        total_shots = total_atr_attempts + total_fg2_attempts + total_fg3_attempts
+        total_ppp = round(total_points / total_possessions, 3) if total_possessions else 0.0
+        total_turnover_pct = (
+            round(total_turnovers / total_possessions * 100, 1)
+            if total_possessions
+            else 0.0
+        )
+        total_foul_pct = (
+            round(total_fouls_drawn / total_possessions * 100, 1)
+            if total_possessions
+            else 0.0
+        )
+        total_atr_pct = (
+            round(total_atr_makes / total_atr_attempts * 100, 1)
+            if total_atr_attempts
+            else 0.0
+        )
+        total_fg2_pct = (
+            round(total_fg2_makes / total_fg2_attempts * 100, 1)
+            if total_fg2_attempts
+            else 0.0
+        )
+        total_fg3_pct = (
+            round(total_fg3_makes / total_fg3_attempts * 100, 1)
+            if total_fg3_attempts
+            else 0.0
+        )
+        total_atr_freq = (
+            round(total_atr_attempts / total_shots * 100, 1)
+            if total_shots
+            else 0.0
+        )
+        total_fg2_freq = (
+            round(total_fg2_attempts / total_shots * 100, 1)
+            if total_shots
+            else 0.0
+        )
+        total_fg3_freq = (
+            round(total_fg3_attempts / total_shots * 100, 1)
+            if total_shots
+            else 0.0
+        )
+        total_ft_pct = round(total_ftm / total_fta * 100, 1) if total_fta else 0.0
+
+        total_atr_missed = total_atr_attempts - total_atr_makes
+        total_fg2_missed = total_fg2_attempts - total_fg2_makes
+        total_fg3_missed = total_fg3_attempts - total_fg3_makes
+        total_good_shots = total_fta + total_atr_makes + total_atr_missed + total_fg3_makes + total_fg3_missed
+        total_bad_shots = total_fg2_makes + total_fg2_missed
+        total_good_shot_den = total_good_shots + total_bad_shots
+        total_good_shot_pct = (
+            round(total_good_shots / total_good_shot_den * 100, 2)
+            if total_good_shot_den
+            else 0.0
+        )
+
+        total_collision_positive = totals_accumulator["collision_positive"]
+        total_collision_missed = totals_accumulator["collision_missed"]
+        total_collision_total = total_collision_positive + total_collision_missed
+        total_collision_pct = (
+            round(total_collision_positive / total_collision_total * 100, 1)
+            if total_collision_total
+            else 0.0
+        )
+
+        total_box_out_positive = totals_accumulator["box_out_positive"]
+        total_box_out_missed = totals_accumulator["box_out_missed"]
+        total_box_out_total = total_box_out_positive + total_box_out_missed
+        total_box_out_pct = (
+            round(total_box_out_positive / total_box_out_total * 100, 1)
+            if total_box_out_total
+            else 0.0
+        )
+
+        team_defense_totals = {
+            "possessions": total_possessions,
+            "points": total_points,
+            "ppp": total_ppp,
+            "turnovers": total_turnovers,
+            "turnover_pct": total_turnover_pct,
+            "fouls_drawn": total_fouls_drawn,
+            "foul_pct": total_foul_pct,
+            "ft_pct": total_ft_pct,
+            "good_shot_pct": total_good_shot_pct,
+            "shots": {
+                "atr": {
+                    "makes": total_atr_makes,
+                    "attempts": total_atr_attempts,
+                    "pct": total_atr_pct,
+                    "freq": total_atr_freq,
+                },
+                "fg2": {
+                    "makes": total_fg2_makes,
+                    "attempts": total_fg2_attempts,
+                    "pct": total_fg2_pct,
+                    "freq": total_fg2_freq,
+                },
+                "fg3": {
+                    "makes": total_fg3_makes,
+                    "attempts": total_fg3_attempts,
+                    "pct": total_fg3_pct,
+                    "freq": total_fg3_freq,
+                },
+            },
+            "collision": {
+                "positive": total_collision_positive,
+                "missed": total_collision_missed,
+                "pct": total_collision_pct,
+            },
+            "box_out": {
+                "positive": total_box_out_positive,
+                "missed": total_box_out_missed,
+                "pct": total_box_out_pct,
+            },
+        }
 
         trend_selected_labels = [
             lbl for lbl in request.args.getlist('trend_label') if lbl.upper() in label_options
@@ -8721,6 +9033,9 @@ def team_totals():
         game_type_options=GAME_TYPE_OPTIONS,
         practice_mode_url=practice_mode_url,
         game_mode_url=game_mode_url,
+        team_defense_rows=team_defense_rows,
+        team_defense_totals=team_defense_totals,
+        team_defense_possessions=team_defense_possessions,
         # >>> TEMPLATE CONTEXT SESSION START
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
         sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
