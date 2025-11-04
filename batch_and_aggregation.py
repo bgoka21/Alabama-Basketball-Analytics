@@ -92,6 +92,7 @@ def aggregate_team_stats(season_id):
             func.sum(TeamStats.total_fg3_attempts).label("total_fg3_attempts"),
             func.sum(TeamStats.total_ftm).label("total_ftm"),
             func.sum(TeamStats.total_fta).label("total_fta"),
+            func.sum(TeamStats.total_fouls_drawn).label("total_fouls_drawn"),
             func.sum(TeamStats.total_blue_collar).label("total_blue_collar"),
             func.sum(TeamStats.total_possessions).label("total_possessions")
         )

@@ -134,6 +134,7 @@ class TeamStats(db.Model):
     total_ftm            = db.Column(db.Integer)
     total_blue_collar    = db.Column(db.Integer, default=0)
     total_possessions    = db.Column(db.Integer)
+    total_fouls_drawn    = db.Column(db.Integer, default=0)
 
     assist_pct           = db.Column(db.Float, nullable=False, default=0.0)
     turnover_pct         = db.Column(db.Float, nullable=False, default=0.0)

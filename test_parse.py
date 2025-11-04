@@ -1229,6 +1229,7 @@ def parse_csv(file_path, game_id, season_id):
             total_fta=team_totals["total_fta"],
             total_blue_collar=team_totals["total_blue_collar"],
             total_possessions=team_totals["total_possessions"],
+            total_fouls_drawn=team_totals["foul_by"],
             assist_pct=team_totals["assist_pct"],
             turnover_pct=team_totals["turnover_pct"],
             tcr_pct=team_totals.get("tcr_pct", 0.0),
@@ -1258,6 +1259,7 @@ def parse_csv(file_path, game_id, season_id):
             total_fta=opponent_totals["fta"],
             total_blue_collar=opponent_totals["total_blue_collar"],
             total_possessions=opponent_totals["total_possessions"],
+            total_fouls_drawn=opponent_totals["foul_by"],
             is_opponent=True
         )
 
