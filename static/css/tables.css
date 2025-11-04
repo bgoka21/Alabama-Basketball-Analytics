@@ -54,6 +54,14 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
   background: var(--tbl-hover);
 }
 
+.unified-table tbody td,
+.unified-table tbody th,
+.unified-table tfoot td,
+.unified-table tfoot th {
+  font-size: 1rem;      /* text-base */
+  line-height: 1.35;    /* readable body copy */
+}
+
 /* Numeric helpers (extra safety even if Tailwind classes are present) */
 .unified-table td[data-align="right"],
 .unified-table th[data-align="right"],
@@ -201,6 +209,14 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
 .table-wrap .table-leaderboard td {
   padding: 0.5rem 1rem; /* py-2 px-4 */
   vertical-align: middle;
+}
+
+.table-wrap .table-leaderboard tbody td,
+.table-wrap .table-leaderboard tbody th,
+.table-wrap .table-leaderboard tfoot td,
+.table-wrap .table-leaderboard tfoot th {
+  font-size: 1rem;      /* text-base */
+  line-height: 1.35;
 }
 
 /* Striping + hover */
