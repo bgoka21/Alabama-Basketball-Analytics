@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Set
 
-from sqlalchemy import and_, func
 from sqlalchemy.orm import Query
 
 from models.database import Game, GameTypeTag, PlayerStats, Season, Roster, db
@@ -226,32 +225,21 @@ def _last_game_rows(
         _base_game_query(season_id, game_types), start_date, end_date
     )
 
-    last_seen = (
-        base.with_entities(
-            PlayerStats.player_name.label("player"),
-            func.max(Game.game_date).label("last_date"),
-        )
-        .group_by(PlayerStats.player_name)
-        .subquery()
+    latest_game = (
+        base.with_entities(Game.id, Game.game_date)
+        .order_by(Game.game_date.desc(), Game.id.desc())
+        .first()
     )
 
-    rows = (
-        base.join(
-            last_seen,
-            and_(
-                last_seen.c.player == PlayerStats.player_name,
-                last_seen.c.last_date == Game.game_date,
-            ),
-        )
-        .all()
-    )
+    if not latest_game:
+        return {}, None
+
+    latest_game_id, latest_game_date = latest_game
+    rows = base.filter(Game.id == latest_game_id).all()
 
     roster = _roster_names(season_id)
     players = _aggregate_rows(rows, roster)
-    latest_date = None
-    if rows:
-        latest_date = max(getattr(r.game, "game_date", None) for r in rows if getattr(r, "game", None))
-    return players, latest_date
+    return players, latest_game_date
 
 
 def _season_rows_with_types(
