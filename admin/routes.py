@@ -8281,6 +8281,9 @@ def team_totals():
     )
     shot_summaries = {'atr': SimpleNamespace(cats={}), 'fg2': SimpleNamespace(cats={}), 'fg3': SimpleNamespace(cats={})}
 
+    team_offense_rows: list[dict[str, Any]] = []
+    team_offense_totals: Optional[dict[str, Any]] = None
+
     team_defense_rows: list[dict[str, Any]] = []
     team_defense_totals: Optional[dict[str, Any]] = None
     team_defense_possessions: dict[int, int] = {}
@@ -8402,6 +8405,435 @@ def team_totals():
             lbl for lbl in request.args.getlist('label') if lbl.upper() in label_options
         ]
         label_set = {lbl.upper() for lbl in selected_labels}
+
+        team_stats_query = (
+            db.session.query(
+                TeamStats,
+                Game.game_date,
+                Game.opponent_name,
+            )
+            .join(Game, TeamStats.game_id == Game.id)
+            .filter(
+                TeamStats.is_opponent == False,
+                TeamStats.game_id != None,
+                TeamStats.game_id.in_(game_ids_for_totals),
+            )
+        )
+        if season_id:
+            team_stats_query = team_stats_query.filter(TeamStats.season_id == season_id)
+
+        team_stats_rows = team_stats_query.all()
+
+        shot_details_by_game: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        fouls_drawn_by_game: dict[int, int] = defaultdict(int)
+
+        def _load_shot_details(raw_value: Any) -> list[dict[str, Any]]:
+            if not raw_value:
+                return []
+            try:
+                data = json.loads(raw_value) if isinstance(raw_value, str) else raw_value
+            except (TypeError, ValueError):
+                return []
+            return data if isinstance(data, list) else []
+
+        for stat in stats_list:
+            if not stat.game_id:
+                continue
+            fouls_drawn_by_game[stat.game_id] += stat.foul_by or 0
+            for shot in _load_shot_details(stat.shot_type_details):
+                if isinstance(shot, Mapping):
+                    shot_details_by_game[stat.game_id].append(shot)
+
+        def _compute_shrink_splits(
+            game_id: int,
+            total_fg3_attempts: int,
+        ) -> tuple[SimpleNamespace, SimpleNamespace, int, int, int, int]:
+            shrink_attempts = 0
+            shrink_makes = 0
+            nonshrink_attempts = 0
+            nonshrink_makes = 0
+
+            for shot in shot_details_by_game.get(game_id, []):
+                if str(shot.get('shot_class', '')).lower() != '3fg':
+                    continue
+                label = str(shot.get('3fg_shrink', '') or '').strip().lower()
+                result = str(shot.get('result', '') or '').strip().lower()
+                made = result == 'made'
+                if label == 'shrink':
+                    shrink_attempts += 1
+                    if made:
+                        shrink_makes += 1
+                elif label == 'non-shrink':
+                    nonshrink_attempts += 1
+                    if made:
+                        nonshrink_makes += 1
+
+            shrink_pct = (
+                round(shrink_makes / shrink_attempts * 100, 1)
+                if shrink_attempts
+                else 0.0
+            )
+            nonshrink_pct = (
+                round(nonshrink_makes / nonshrink_attempts * 100, 1)
+                if nonshrink_attempts
+                else 0.0
+            )
+            shrink_freq = (
+                round(shrink_attempts / total_fg3_attempts * 100, 1)
+                if total_fg3_attempts
+                else 0.0
+            )
+            nonshrink_freq = (
+                round(nonshrink_attempts / total_fg3_attempts * 100, 1)
+                if total_fg3_attempts
+                else 0.0
+            )
+
+            shrink_ns = SimpleNamespace(
+                makes=shrink_makes,
+                attempts=shrink_attempts,
+                pct=shrink_pct,
+                freq=shrink_freq,
+            )
+            nonshrink_ns = SimpleNamespace(
+                makes=nonshrink_makes,
+                attempts=nonshrink_attempts,
+                pct=nonshrink_pct,
+                freq=nonshrink_freq,
+            )
+
+            return (
+                shrink_ns,
+                nonshrink_ns,
+                shrink_attempts,
+                shrink_makes,
+                nonshrink_attempts,
+                nonshrink_makes,
+            )
+
+        if team_stats_rows:
+            offense_totals = {
+                'points': 0,
+                'possessions': 0,
+                'turnovers': 0,
+                'assists': 0,
+                'pot_assists': 0,
+                'second_assists': 0,
+                'ftm': 0,
+                'fta': 0,
+                'atr_makes': 0,
+                'atr_attempts': 0,
+                'fg2_makes': 0,
+                'fg2_attempts': 0,
+                'fg3_makes': 0,
+                'fg3_attempts': 0,
+                'good_shots': 0,
+                'bad_shots': 0,
+                'fouls_drawn': 0,
+                'shrink_makes': 0,
+                'shrink_attempts': 0,
+                'nonshrink_makes': 0,
+                'nonshrink_attempts': 0,
+            }
+
+            for team_stat, game_date, opponent_name in team_stats_rows:
+                poss = team_stat.total_possessions or 0
+                points = team_stat.total_points or 0
+                turnovers = team_stat.total_turnovers or 0
+                assists = team_stat.total_assists or 0
+                pot_assists = team_stat.total_pot_assists or 0
+                second_assists = team_stat.total_second_assists or 0
+                ftm = team_stat.total_ftm or 0
+                fta = team_stat.total_fta or 0
+                atr_makes = team_stat.total_atr_makes or 0
+                atr_attempts = team_stat.total_atr_attempts or 0
+                fg2_makes = team_stat.total_fg2_makes or 0
+                fg2_attempts = team_stat.total_fg2_attempts or 0
+                fg3_makes = team_stat.total_fg3_makes or 0
+                fg3_attempts = team_stat.total_fg3_attempts or 0
+
+                total_shots = atr_attempts + fg2_attempts + fg3_attempts
+                fouls_drawn = fouls_drawn_by_game.get(team_stat.game_id, 0)
+
+                ppp = round(points / poss, 3) if poss else 0.0
+                turnover_pct = round(turnovers / poss * 100, 1) if poss else 0.0
+                foul_pct = round(fouls_drawn / poss * 100, 1) if poss else 0.0
+                ft_pct = round(ftm / fta * 100, 1) if fta else 0.0
+
+                shots = {
+                    'atr': SimpleNamespace(
+                        makes=atr_makes,
+                        attempts=atr_attempts,
+                        pct=(round(atr_makes / atr_attempts * 100, 1) if atr_attempts else 0.0),
+                        freq=(round(atr_attempts / total_shots * 100, 1) if total_shots else 0.0),
+                    ),
+                    'fg2': SimpleNamespace(
+                        makes=fg2_makes,
+                        attempts=fg2_attempts,
+                        pct=(round(fg2_makes / fg2_attempts * 100, 1) if fg2_attempts else 0.0),
+                        freq=(round(fg2_attempts / total_shots * 100, 1) if total_shots else 0.0),
+                    ),
+                    'fg3': SimpleNamespace(
+                        makes=fg3_makes,
+                        attempts=fg3_attempts,
+                        pct=(round(fg3_makes / fg3_attempts * 100, 1) if fg3_attempts else 0.0),
+                        freq=(round(fg3_attempts / total_shots * 100, 1) if total_shots else 0.0),
+                    ),
+                }
+
+                (
+                    fg3_shrink,
+                    fg3_nonshrink,
+                    shrink_attempts,
+                    shrink_makes,
+                    nonshrink_attempts,
+                    nonshrink_makes,
+                ) = _compute_shrink_splits(team_stat.game_id, fg3_attempts)
+
+                good_shots = fta + atr_attempts + fg3_attempts
+                bad_shots = fg2_attempts
+                good_shot_den = good_shots + bad_shots
+                good_shot_pct = (
+                    round(good_shots / good_shot_den * 100, 2)
+                    if good_shot_den
+                    else 0.0
+                )
+
+                team_offense_rows.append(
+                    {
+                        'game_id': team_stat.game_id,
+                        'date': game_date,
+                        'opponent': opponent_name,
+                        'points': points,
+                        'possessions': poss,
+                        'ppp': ppp,
+                        'shots': shots,
+                        'fg3_shrink': fg3_shrink,
+                        'fg3_nonshrink': fg3_nonshrink,
+                        'ftm': ftm,
+                        'fta': fta,
+                        'ft_pct': ft_pct,
+                        'good_shot_pct': good_shot_pct,
+                        'turnovers': turnovers,
+                        'turnover_pct': turnover_pct,
+                        'assists': assists,
+                        'pot_assists': pot_assists,
+                        'second_assists': second_assists,
+                        'fouls_drawn': fouls_drawn,
+                        'foul_pct': foul_pct,
+                    }
+                )
+
+                offense_totals['points'] += points
+                offense_totals['possessions'] += poss
+                offense_totals['turnovers'] += turnovers
+                offense_totals['assists'] += assists
+                offense_totals['pot_assists'] += pot_assists
+                offense_totals['second_assists'] += second_assists
+                offense_totals['ftm'] += ftm
+                offense_totals['fta'] += fta
+                offense_totals['atr_makes'] += atr_makes
+                offense_totals['atr_attempts'] += atr_attempts
+                offense_totals['fg2_makes'] += fg2_makes
+                offense_totals['fg2_attempts'] += fg2_attempts
+                offense_totals['fg3_makes'] += fg3_makes
+                offense_totals['fg3_attempts'] += fg3_attempts
+                offense_totals['good_shots'] += good_shots
+                offense_totals['bad_shots'] += bad_shots
+                offense_totals['fouls_drawn'] += fouls_drawn
+                offense_totals['shrink_makes'] += shrink_makes
+                offense_totals['shrink_attempts'] += shrink_attempts
+                offense_totals['nonshrink_makes'] += nonshrink_makes
+                offense_totals['nonshrink_attempts'] += nonshrink_attempts
+
+            team_offense_rows.sort(key=lambda r: (r['date'] or date.min))
+
+            total_offense_shots = (
+                offense_totals['atr_attempts']
+                + offense_totals['fg2_attempts']
+                + offense_totals['fg3_attempts']
+            )
+            total_fg3_attempts = offense_totals['fg3_attempts']
+
+            team_offense_totals = {
+                'points': offense_totals['points'],
+                'possessions': offense_totals['possessions'],
+                'ppp': (
+                    round(
+                        offense_totals['points'] / offense_totals['possessions'],
+                        3,
+                    )
+                    if offense_totals['possessions']
+                    else 0.0
+                ),
+                'shots': {
+                    'atr': SimpleNamespace(
+                        makes=offense_totals['atr_makes'],
+                        attempts=offense_totals['atr_attempts'],
+                        pct=(
+                            round(
+                                offense_totals['atr_makes']
+                                / offense_totals['atr_attempts']
+                                * 100,
+                                1,
+                            )
+                            if offense_totals['atr_attempts']
+                            else 0.0
+                        ),
+                        freq=(
+                            round(
+                                offense_totals['atr_attempts']
+                                / total_offense_shots
+                                * 100,
+                                1,
+                            )
+                            if total_offense_shots
+                            else 0.0
+                        ),
+                    ),
+                    'fg2': SimpleNamespace(
+                        makes=offense_totals['fg2_makes'],
+                        attempts=offense_totals['fg2_attempts'],
+                        pct=(
+                            round(
+                                offense_totals['fg2_makes']
+                                / offense_totals['fg2_attempts']
+                                * 100,
+                                1,
+                            )
+                            if offense_totals['fg2_attempts']
+                            else 0.0
+                        ),
+                        freq=(
+                            round(
+                                offense_totals['fg2_attempts']
+                                / total_offense_shots
+                                * 100,
+                                1,
+                            )
+                            if total_offense_shots
+                            else 0.0
+                        ),
+                    ),
+                    'fg3': SimpleNamespace(
+                        makes=offense_totals['fg3_makes'],
+                        attempts=offense_totals['fg3_attempts'],
+                        pct=(
+                            round(
+                                offense_totals['fg3_makes']
+                                / offense_totals['fg3_attempts']
+                                * 100,
+                                1,
+                            )
+                            if offense_totals['fg3_attempts']
+                            else 0.0
+                        ),
+                        freq=(
+                            round(
+                                offense_totals['fg3_attempts']
+                                / total_offense_shots
+                                * 100,
+                                1,
+                            )
+                            if total_offense_shots
+                            else 0.0
+                        ),
+                    ),
+                },
+                'fg3_shrink': SimpleNamespace(
+                    makes=offense_totals['shrink_makes'],
+                    attempts=offense_totals['shrink_attempts'],
+                    pct=(
+                        round(
+                            offense_totals['shrink_makes']
+                            / offense_totals['shrink_attempts']
+                            * 100,
+                            1,
+                        )
+                        if offense_totals['shrink_attempts']
+                        else 0.0
+                    ),
+                    freq=(
+                        round(
+                            offense_totals['shrink_attempts']
+                            / total_fg3_attempts
+                            * 100,
+                            1,
+                        )
+                        if total_fg3_attempts
+                        else 0.0
+                    ),
+                ),
+                'fg3_nonshrink': SimpleNamespace(
+                    makes=offense_totals['nonshrink_makes'],
+                    attempts=offense_totals['nonshrink_attempts'],
+                    pct=(
+                        round(
+                            offense_totals['nonshrink_makes']
+                            / offense_totals['nonshrink_attempts']
+                            * 100,
+                            1,
+                        )
+                        if offense_totals['nonshrink_attempts']
+                        else 0.0
+                    ),
+                    freq=(
+                        round(
+                            offense_totals['nonshrink_attempts']
+                            / total_fg3_attempts
+                            * 100,
+                            1,
+                        )
+                        if total_fg3_attempts
+                        else 0.0
+                    ),
+                ),
+                'ftm': offense_totals['ftm'],
+                'fta': offense_totals['fta'],
+                'ft_pct': (
+                    round(offense_totals['ftm'] / offense_totals['fta'] * 100, 1)
+                    if offense_totals['fta']
+                    else 0.0
+                ),
+                'good_shot_pct': (
+                    round(
+                        offense_totals['good_shots']
+                        / (
+                            offense_totals['good_shots']
+                            + offense_totals['bad_shots']
+                        )
+                        * 100,
+                        2,
+                    )
+                    if (offense_totals['good_shots'] + offense_totals['bad_shots'])
+                    else 0.0
+                ),
+                'turnovers': offense_totals['turnovers'],
+                'turnover_pct': (
+                    round(
+                        offense_totals['turnovers']
+                        / offense_totals['possessions']
+                        * 100,
+                        1,
+                    )
+                    if offense_totals['possessions']
+                    else 0.0
+                ),
+                'assists': offense_totals['assists'],
+                'pot_assists': offense_totals['pot_assists'],
+                'second_assists': offense_totals['second_assists'],
+                'fouls_drawn': offense_totals['fouls_drawn'],
+                'foul_pct': (
+                    round(
+                        offense_totals['fouls_drawn']
+                        / offense_totals['possessions']
+                        * 100,
+                        1,
+                    )
+                    if offense_totals['possessions']
+                    else 0.0
+                ),
+            }
 
         opponent_team_stats_query = (
             db.session.query(
@@ -9037,6 +9469,8 @@ def team_totals():
         game_type_options=GAME_TYPE_OPTIONS,
         practice_mode_url=practice_mode_url,
         game_mode_url=game_mode_url,
+        team_offense_rows=team_offense_rows,
+        team_offense_totals=team_offense_totals,
         team_defense_rows=team_defense_rows,
         team_defense_totals=team_defense_totals,
         team_defense_possessions=team_defense_possessions,
