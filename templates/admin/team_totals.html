@@ -1,5 +1,13 @@
 {% extends 'admin/base.html' %}
 
+{% macro stacked_metric(first_line, second_line, third_line, second_class='') -%}
+  <div class="flex flex-col items-center leading-tight">
+    <span class="text-sm font-semibold">{{ first_line }}</span>
+    <span class="text-xs font-medium uppercase tracking-wide{{ second_class }}">{{ second_line }}</span>
+    <span class="text-[11px] text-gray-600">{{ third_line }}</span>
+  </div>
+{%- endmacro %}
+
 {% block page_controls %}
 <div id="mainControls">
   <div class="flex flex-wrap items-center gap-4 mb-4 no-print">
@@ -294,48 +302,48 @@
         <table class="min-w-full table-auto border-collapse bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
           <thead class="bg-white dark:bg-gray-800 border-b-2 border-[#9E1B32]">
             <tr>
-              <th rowspan="2" class="px-3 py-2 text-xs font-semibold text-left uppercase align-bottom">Date</th>
-              <th rowspan="2" class="px-3 py-2 text-xs font-semibold text-left uppercase align-bottom">Opponent</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">Scoring</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">ATR</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">2FG</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">3FG</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">3FG Shrink</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">3FG Non-Shrink</th>
-              <th colspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase">Free Throws</th>
-              <th rowspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase align-bottom">Good Shot %</th>
-              <th colspan="3" class="px-3 py-2 text-xs font-semibold text-center uppercase">Assists</th>
-              <th colspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase">Turnovers</th>
-              <th colspan="2" class="px-3 py-2 text-xs font-semibold text-center uppercase">Fouls Drawn</th>
-            </tr>
-            <tr>
+              <th class="px-3 py-2 text-xs font-semibold text-left uppercase">Date</th>
+              <th class="px-3 py-2 text-xs font-semibold text-left uppercase">Opponent</th>
               <th class="px-3 py-2 text-xs font-semibold text-center uppercase">PTS</th>
               <th class="px-3 py-2 text-xs font-semibold text-center uppercase">POSS</th>
               <th class="px-3 py-2 text-xs font-semibold text-center uppercase">PPP</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">M-A</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Freq%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">FTM-FTA</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">FT%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">AST</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">POT</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">2ND</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Total</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">TO%</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Total</th>
-              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Foul%</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>ATR</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">M/A · % · Freq</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>2FG</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">M/A · % · Freq</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>3FG</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">M/A · % · Freq</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>3FG Shrink</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">M/A · % · Freq</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>3FG Non-Shrink</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">M/A · % · Freq</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>FT</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">M/A · % · Rate</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">Good Shot %</th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>Assists</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">AST · POT · 2ND</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>Turnovers</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">Total · TO% · /Poss</div>
+              </th>
+              <th class="px-3 py-2 text-xs font-semibold text-center uppercase">
+                <div>Fouls Drawn</div>
+                <div class="mt-1 text-[10px] font-normal tracking-wide text-gray-600">Total · Foul% · /Poss</div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -353,36 +361,84 @@
                   <td class="px-3 py-2 text-sm text-center">{{ row.points }}</td>
                   <td class="px-3 py-2 text-sm text-center">{{ row.possessions }}</td>
                   <td class="px-3 py-2 text-sm text-center">{{ row.ppp|round(3) }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.atr.makes }}-{{ row.shots.atr.attempts }}</td>
-                  <td class="px-3 py-2 text-sm text-center{{ row.shots.atr.pct|grade_atr2fg_pct(row.shots.atr.attempts) }}">{{ row.shots.atr.pct|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.atr.freq|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg2.makes }}-{{ row.shots.fg2.attempts }}</td>
-                  <td class="px-3 py-2 text-sm text-center{{ row.shots.fg2.pct|grade_atr2fg_pct(row.shots.fg2.attempts) }}">{{ row.shots.fg2.pct|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg2.freq|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg3.makes }}-{{ row.shots.fg3.attempts }}</td>
-                  <td class="px-3 py-2 text-sm text-center{{ row.shots.fg3.pct|grade_3fg_pct(row.shots.fg3.attempts) }}">{{ row.shots.fg3.pct|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.shots.fg3.freq|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_shrink.makes }}-{{ row.fg3_shrink.attempts }}</td>
-                  <td class="px-3 py-2 text-sm text-center{{ row.fg3_shrink.pct|grade_3fg_pct(row.fg3_shrink.attempts) }}">{{ row.fg3_shrink.pct|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_shrink.freq|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_nonshrink.makes }}-{{ row.fg3_nonshrink.attempts }}</td>
-                  <td class="px-3 py-2 text-sm text-center{{ row.fg3_nonshrink.pct|grade_3fg_pct(row.fg3_nonshrink.attempts) }}">{{ row.fg3_nonshrink.pct|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.fg3_nonshrink.freq|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.ftm }}-{{ row.fta }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.ft_pct|round(1) }}%</td>
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      row.shots.atr.makes ~ '-' ~ row.shots.atr.attempts,
+                      (row.shots.atr.pct|round(1)) ~ '%',
+                      (row.shots.atr.freq|round(1)) ~ '%',
+                      row.shots.atr.pct|grade_atr2fg_pct(row.shots.atr.attempts)
+                    ) }}
+                  </td>
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      row.shots.fg2.makes ~ '-' ~ row.shots.fg2.attempts,
+                      (row.shots.fg2.pct|round(1)) ~ '%',
+                      (row.shots.fg2.freq|round(1)) ~ '%',
+                      row.shots.fg2.pct|grade_atr2fg_pct(row.shots.fg2.attempts)
+                    ) }}
+                  </td>
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      row.shots.fg3.makes ~ '-' ~ row.shots.fg3.attempts,
+                      (row.shots.fg3.pct|round(1)) ~ '%',
+                      (row.shots.fg3.freq|round(1)) ~ '%',
+                      row.shots.fg3.pct|grade_3fg_pct(row.shots.fg3.attempts)
+                    ) }}
+                  </td>
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      row.fg3_shrink.makes ~ '-' ~ row.fg3_shrink.attempts,
+                      (row.fg3_shrink.pct|round(1)) ~ '%',
+                      (row.fg3_shrink.freq|round(1)) ~ '%',
+                      row.fg3_shrink.pct|grade_3fg_pct(row.fg3_shrink.attempts)
+                    ) }}
+                  </td>
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      row.fg3_nonshrink.makes ~ '-' ~ row.fg3_nonshrink.attempts,
+                      (row.fg3_nonshrink.pct|round(1)) ~ '%',
+                      (row.fg3_nonshrink.freq|round(1)) ~ '%',
+                      row.fg3_nonshrink.pct|grade_3fg_pct(row.fg3_nonshrink.attempts)
+                    ) }}
+                  </td>
+                  {% set total_shots = row.shots.atr.attempts + row.shots.fg2.attempts + row.shots.fg3.attempts %}
+                  {% set ft_rate = (row.fta / total_shots * 100)|round(1) if total_shots else 0 %}
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      row.ftm ~ '-' ~ row.fta,
+                      'FT%: ' ~ (row.ft_pct|round(1)) ~ '%',
+                      'Rate: ' ~ ft_rate ~ '%'
+                    ) }}
+                  </td>
                   <td class="px-3 py-2 text-sm text-center">{{ row.good_shot_pct|round(2) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.assists }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.pot_assists }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.second_assists }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.turnovers }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.turnover_pct|round(1) }}%</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.fouls_drawn }}</td>
-                  <td class="px-3 py-2 text-sm text-center">{{ row.foul_pct|round(1) }}%</td>
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      'AST: ' ~ row.assists,
+                      'POT: ' ~ row.pot_assists,
+                      '2ND: ' ~ row.second_assists
+                    ) }}
+                  </td>
+                  {% set to_per_poss = ('%.2f' % (row.turnovers / row.possessions)) if row.possessions else '0.00' %}
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      'Total: ' ~ row.turnovers,
+                      'TO%: ' ~ (row.turnover_pct|round(1)) ~ '%',
+                      'Per Poss: ' ~ to_per_poss
+                    ) }}
+                  </td>
+                  {% set foul_per_poss = ('%.2f' % (row.fouls_drawn / row.possessions)) if row.possessions else '0.00' %}
+                  <td class="px-3 py-2 text-sm text-center">
+                    {{ stacked_metric(
+                      'Total: ' ~ row.fouls_drawn,
+                      'Foul%: ' ~ (row.foul_pct|round(1)) ~ '%',
+                      'Per Poss: ' ~ foul_per_poss
+                    ) }}
+                  </td>
                 </tr>
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="30" class="px-3 py-6 text-center text-sm text-gray-500">No offensive game stats available for the selected filters.</td>
+                <td colspan="15" class="px-3 py-6 text-center text-sm text-gray-500">No offensive game stats available for the selected filters.</td>
               </tr>
             {% endif %}
           </tbody>
@@ -393,31 +449,79 @@
                 <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.points }}</td>
                 <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.possessions }}</td>
                 <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.ppp|round(3) }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.atr.makes }}-{{ team_offense_totals.shots.atr.attempts }}</td>
-                <td class="px-3 py-2 text-sm text-center{{ team_offense_totals.shots.atr.pct|grade_atr2fg_pct(team_offense_totals.shots.atr.attempts) }}">{{ team_offense_totals.shots.atr.pct|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.atr.freq|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg2.makes }}-{{ team_offense_totals.shots.fg2.attempts }}</td>
-                <td class="px-3 py-2 text-sm text-center{{ team_offense_totals.shots.fg2.pct|grade_atr2fg_pct(team_offense_totals.shots.fg2.attempts) }}">{{ team_offense_totals.shots.fg2.pct|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg2.freq|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg3.makes }}-{{ team_offense_totals.shots.fg3.attempts }}</td>
-                <td class="px-3 py-2 text-sm text-center{{ team_offense_totals.shots.fg3.pct|grade_3fg_pct(team_offense_totals.shots.fg3.attempts) }}">{{ team_offense_totals.shots.fg3.pct|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.shots.fg3.freq|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_shrink.makes }}-{{ team_offense_totals.fg3_shrink.attempts }}</td>
-                <td class="px-3 py-2 text-sm text-center{{ team_offense_totals.fg3_shrink.pct|grade_3fg_pct(team_offense_totals.fg3_shrink.attempts) }}">{{ team_offense_totals.fg3_shrink.pct|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_shrink.freq|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_nonshrink.makes }}-{{ team_offense_totals.fg3_nonshrink.attempts }}</td>
-                <td class="px-3 py-2 text-sm text-center{{ team_offense_totals.fg3_nonshrink.pct|grade_3fg_pct(team_offense_totals.fg3_nonshrink.attempts) }}">{{ team_offense_totals.fg3_nonshrink.pct|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fg3_nonshrink.freq|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.ftm }}-{{ team_offense_totals.fta }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.ft_pct|round(1) }}%</td>
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    team_offense_totals.shots.atr.makes ~ '-' ~ team_offense_totals.shots.atr.attempts,
+                    (team_offense_totals.shots.atr.pct|round(1)) ~ '%',
+                    (team_offense_totals.shots.atr.freq|round(1)) ~ '%',
+                    team_offense_totals.shots.atr.pct|grade_atr2fg_pct(team_offense_totals.shots.atr.attempts)
+                  ) }}
+                </td>
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    team_offense_totals.shots.fg2.makes ~ '-' ~ team_offense_totals.shots.fg2.attempts,
+                    (team_offense_totals.shots.fg2.pct|round(1)) ~ '%',
+                    (team_offense_totals.shots.fg2.freq|round(1)) ~ '%',
+                    team_offense_totals.shots.fg2.pct|grade_atr2fg_pct(team_offense_totals.shots.fg2.attempts)
+                  ) }}
+                </td>
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    team_offense_totals.shots.fg3.makes ~ '-' ~ team_offense_totals.shots.fg3.attempts,
+                    (team_offense_totals.shots.fg3.pct|round(1)) ~ '%',
+                    (team_offense_totals.shots.fg3.freq|round(1)) ~ '%',
+                    team_offense_totals.shots.fg3.pct|grade_3fg_pct(team_offense_totals.shots.fg3.attempts)
+                  ) }}
+                </td>
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    team_offense_totals.fg3_shrink.makes ~ '-' ~ team_offense_totals.fg3_shrink.attempts,
+                    (team_offense_totals.fg3_shrink.pct|round(1)) ~ '%',
+                    (team_offense_totals.fg3_shrink.freq|round(1)) ~ '%',
+                    team_offense_totals.fg3_shrink.pct|grade_3fg_pct(team_offense_totals.fg3_shrink.attempts)
+                  ) }}
+                </td>
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    team_offense_totals.fg3_nonshrink.makes ~ '-' ~ team_offense_totals.fg3_nonshrink.attempts,
+                    (team_offense_totals.fg3_nonshrink.pct|round(1)) ~ '%',
+                    (team_offense_totals.fg3_nonshrink.freq|round(1)) ~ '%',
+                    team_offense_totals.fg3_nonshrink.pct|grade_3fg_pct(team_offense_totals.fg3_nonshrink.attempts)
+                  ) }}
+                </td>
+                {% set total_offense_shots = team_offense_totals.shots.atr.attempts + team_offense_totals.shots.fg2.attempts + team_offense_totals.shots.fg3.attempts %}
+                {% set totals_ft_rate = (team_offense_totals.fta / total_offense_shots * 100)|round(1) if total_offense_shots else 0 %}
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    team_offense_totals.ftm ~ '-' ~ team_offense_totals.fta,
+                    'FT%: ' ~ (team_offense_totals.ft_pct|round(1)) ~ '%',
+                    'Rate: ' ~ totals_ft_rate ~ '%'
+                  ) }}
+                </td>
                 <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.good_shot_pct|round(2) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.assists }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.pot_assists }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.second_assists }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.turnovers }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.turnover_pct|round(1) }}%</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.fouls_drawn }}</td>
-                <td class="px-3 py-2 text-sm text-center">{{ team_offense_totals.foul_pct|round(1) }}%</td>
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    'AST: ' ~ team_offense_totals.assists,
+                    'POT: ' ~ team_offense_totals.pot_assists,
+                    '2ND: ' ~ team_offense_totals.second_assists
+                  ) }}
+                </td>
+                {% set totals_to_per_poss = ('%.2f' % (team_offense_totals.turnovers / team_offense_totals.possessions)) if team_offense_totals.possessions else '0.00' %}
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    'Total: ' ~ team_offense_totals.turnovers,
+                    'TO%: ' ~ (team_offense_totals.turnover_pct|round(1)) ~ '%',
+                    'Per Poss: ' ~ totals_to_per_poss
+                  ) }}
+                </td>
+                {% set totals_foul_per_poss = ('%.2f' % (team_offense_totals.fouls_drawn / team_offense_totals.possessions)) if team_offense_totals.possessions else '0.00' %}
+                <td class="px-3 py-2 text-sm text-center">
+                  {{ stacked_metric(
+                    'Total: ' ~ team_offense_totals.fouls_drawn,
+                    'Foul%: ' ~ (team_offense_totals.foul_pct|round(1)) ~ '%',
+                    'Per Poss: ' ~ totals_foul_per_poss
+                  ) }}
+                </td>
               </tr>
             </tfoot>
           {% endif %}
