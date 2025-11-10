@@ -144,26 +144,34 @@
       {%- set cached_token = none -%}
     {%- endif -%}
   {%- endif -%}
-  {%- set attempts = none -%}
+  {%- set attempt_data = namespace(value=none) -%}
   {%- for attempt_slug in attempt_slugs -%}
-    {%- if attempts is none -%}
+    {%- if attempt_data.value is none -%}
       {%- set attempt_key = prefix ~ attempt_slug -%}
-      {%- set attempts = row.get(attempt_key ~ '_value') -%}
-      {%- if attempts is none -%}
-        {%- set attempts = row.get(attempt_key) -%}
+      {%- set candidate = row.get(attempt_key ~ '_value') -%}
+      {%- if candidate is none -%}
+        {%- set candidate = row.get(attempt_key) -%}
+      {%- endif -%}
+      {%- if candidate is not none -%}
+        {%- set attempt_data.value = candidate -%}
       {%- endif -%}
     {%- endif -%}
   {%- endfor -%}
-  {%- set min_required = fallback_min -%}
+  {%- set attempts = attempt_data.value -%}
+  {%- set minimum_data = namespace(value=fallback_min) -%}
   {%- for min_slug in minimum_slugs -%}
-    {%- if min_required is none -%}
+    {%- if minimum_data.value is none -%}
       {%- set min_key = prefix ~ min_slug -%}
-      {%- set min_required = row.get(min_key ~ '_value') -%}
-      {%- if min_required is none -%}
-        {%- set min_required = row.get(min_key) -%}
+      {%- set candidate = row.get(min_key ~ '_value') -%}
+      {%- if candidate is none -%}
+        {%- set candidate = row.get(min_key) -%}
+      {%- endif -%}
+      {%- if candidate is not none -%}
+        {%- set minimum_data.value = candidate -%}
       {%- endif -%}
     {%- endif -%}
   {%- endfor -%}
+  {%- set min_required = minimum_data.value -%}
   {%- set attempts_clean = attempts -%}
   {%- if attempts_clean is string -%}
     {%- set attempts_clean = attempts_clean|trim -%}
@@ -196,7 +204,8 @@
     {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, insufficient=True, tooltip=tooltip, placeholder=placeholder, token=cached_token) -%}
     {%- set _ = row.update({cell_key: rendered, value_key: ''}) -%}
   {%- else -%}
-    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, placeholder=placeholder, token=cached_token) -%}
+    {%- set resolved_token = 'grade-NA' if attempts_clean is not none and attempts_clean|float == 0 else cached_token -%}
+    {%- set rendered = percent_box(metric_key, raw_value, display, shrink_alias=shrink_alias, placeholder=placeholder, token=resolved_token) -%}
     {%- set _ = row.update({cell_key: rendered}) -%}
     {%- if raw_value is none -%}
       {%- set _ = row.update({value_key: ''}) -%}

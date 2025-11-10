@@ -652,6 +652,85 @@ def test_collision_percent_wrappers_include_tokens(app_client):
     assert "percent-box" in totals["last_collision_pct"]
 
 
+def test_percent_wrappers_zero_attempts_use_neutral_token(app_client):
+    from admin._leaderboard_helpers import build_dual_table
+    from admin.game_leaderboard_config import (
+        columns_for,
+        column_map_for,
+        pct_columns_for,
+        percent_specs_for,
+        sort_default_for,
+        table_id_for,
+    )
+
+    table = build_dual_table(
+        base_columns=columns_for("collisions"),
+        season_rows=[
+            {
+                "player": "Alpha",
+                "jersey": 1,
+                "gap_plus": 0,
+                "gap_opps": 0,
+                "gap_pct": 0.0,
+            }
+        ],
+        last_rows=[
+            {
+                "player": "Alpha",
+                "jersey": 1,
+                "gap_plus": 0,
+                "gap_opps": 0,
+                "gap_pct": 0.0,
+            }
+        ],
+        season_totals={
+            "player": "Team Totals",
+            "gap_plus": 0,
+            "gap_opps": 0,
+            "gap_pct": 0.0,
+        },
+        last_totals={
+            "player": "Team Totals",
+            "gap_plus": 0,
+            "gap_opps": 0,
+            "gap_pct": 0.0,
+        },
+        column_map=column_map_for("collisions"),
+        pct_columns=pct_columns_for("collisions"),
+        table_id=table_id_for("collisions"),
+        default_sort=sort_default_for("collisions"),
+    )
+
+    for row in table["rows"]:
+        row["totals_gap_opps_value"] = 0.0
+        row["totals_gap_opp_value"] = 0.0
+        row["last_gap_opps_value"] = 0.0
+        row["last_gap_opp_value"] = 0.0
+
+    totals_row = table["totals"]
+    if totals_row is not None:
+        totals_row["totals_gap_opps_value"] = 0.0
+        totals_row["totals_gap_opp_value"] = 0.0
+        totals_row["last_gap_opps_value"] = 0.0
+        totals_row["last_gap_opp_value"] = 0.0
+
+    macro = app_client.application.jinja_env.get_template("_macros/percent_box.html").module
+    macro.apply_percent_wrappers(table, percent_specs_for("collisions"))
+
+    row = table["rows"][0]
+    assert "grade-NA" in row["totals_collision_pct"]
+    assert "grade-token--0" not in row["totals_collision_pct"]
+    assert "grade-NA" in row["last_collision_pct"]
+    assert "grade-token--0" not in row["last_collision_pct"]
+
+    totals = table["totals"]
+    assert totals is not None
+    assert "grade-NA" in totals["totals_collision_pct"]
+    assert "grade-token--0" not in totals["totals_collision_pct"]
+    assert "grade-NA" in totals["last_collision_pct"]
+    assert "grade-token--0" not in totals["last_collision_pct"]
+
+
 def test_low_man_percent_wrappers_include_tokens(app_client):
     from admin._leaderboard_helpers import build_dual_table
     from admin.game_leaderboard_config import (
