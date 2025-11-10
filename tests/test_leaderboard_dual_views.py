@@ -388,6 +388,31 @@ class TestDualViews:
         assert "collision_pct" not in grade_token_calls
         assert "gap_pct" in grade_scale_calls
 
+    def test_collisions_gap_help_zero_percent_renders(self, monkeypatch, app_client):
+        import admin.routes as rmod
+
+        _patch_last_practice(monkeypatch)
+
+        season_rows = [{"player_name": "Zero", "plus": 0, "opps": 2}]
+        season_totals = {"plus": 0, "opps": 2}
+
+        last_rows = [{"player_name": "Zero", "plus": 0, "opps": 2}]
+        last_totals = {"plus": 0, "opps": 2}
+
+        fake = _mk_dual_compute_fake(season_rows, season_totals, last_rows, last_totals)
+        monkeypatch.setattr(rmod, "compute_collisions_gap_help", fake)
+
+        resp = app_client.get("/admin/leaderboard/collisions/gap-help")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+
+        _assert_dual_table_basics(
+            html,
+            section_title="Collisions — Gap Help",
+            expected_texts=["0", "2", "0.0%"],
+        )
+        assert "0.0%" in html
+
     def test_atr_fg_pct_dual_view(self, monkeypatch, app_client):
         import admin.routes as rmod
 

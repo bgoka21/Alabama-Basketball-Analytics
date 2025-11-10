@@ -85,9 +85,11 @@ def _roster_names(season_id: int) -> Set[str]:
 
 def _safe_pct(numer: Optional[float], denom: Optional[float]) -> Optional[float]:
     try:
-        if not numer or not denom:
+        denom_val = float(denom)
+        if not denom_val:
             return None
-        return (float(numer) / float(denom)) * 100.0
+        numer_val = float(numer) if numer else 0.0
+        return (numer_val / denom_val) * 100.0
     except (TypeError, ZeroDivisionError, ValueError):
         return None
 
@@ -366,8 +368,9 @@ def _build_def_reb_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
 
 def _build_collision_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
     row = _build_common(player, data)
-    plus = data.get("collision_gap_positive", 0)
-    opps = plus + data.get("collision_gap_missed", 0)
+    plus = data.get("collision_gap_positive") or 0
+    missed = data.get("collision_gap_missed") or 0
+    opps = plus + missed
     row.update(
         {
             "gap_plus": plus,
