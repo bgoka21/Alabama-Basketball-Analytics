@@ -1686,7 +1686,26 @@
           if (!container) {
             throw new Error('Missing table container');
           }
-          const canvas = await html2canvas(container, { backgroundColor: '#ffffff', scale: 2 });
+
+          const tableBodyWrapper = container.querySelector('.table-card-body');
+          const tableElement = container.querySelector('table');
+          const target = tableBodyWrapper || tableElement || container;
+          const previousOverflowX = target.style.overflowX;
+          const previousWidth = target.style.width;
+          const desiredWidth = target.scrollWidth;
+
+          if (desiredWidth && Number.isFinite(desiredWidth)) {
+            target.style.overflowX = 'visible';
+            target.style.width = `${desiredWidth}px`;
+          }
+
+          let canvas;
+          try {
+            canvas = await html2canvas(target, { backgroundColor: '#ffffff', scale: 2 });
+          } finally {
+            target.style.overflowX = previousOverflowX;
+            target.style.width = previousWidth;
+          }
           canvas.toBlob((blob) => {
             if (!blob) {
               console.error('[custom-stats] Failed to render PNG');
