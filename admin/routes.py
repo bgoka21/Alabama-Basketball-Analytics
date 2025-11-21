@@ -3293,7 +3293,6 @@ def _build_practice_table_dataset(request_data):
 
 
 def _build_game_table_dataset(request_data):
-    from services.correlation import Grouping, StudyScope, _load_game_player_rows
 
     player_ids = request_data.get('player_ids') or []
     if not isinstance(player_ids, list):
@@ -3332,18 +3331,28 @@ def _build_game_table_dataset(request_data):
         ),
     )
 
-    season_id = roster_rows[0].season_id if roster_rows else None
-    roster_ids = [row.id for row in roster_rows]
     game_rows: dict[str, dict[str, Any]] = {}
-    if season_id:
-        scope = StudyScope(
-            season_id=season_id,
-            roster_ids=roster_ids,
-            start_date=date_from,
-            end_date=date_to,
-            group_by=Grouping.PLAYER,
+
+    for roster_entry in roster_rows:
+        aggregates = _collect_player_session_stats(
+            roster_entry,
+            source='game',
+            date_from=date_from,
+            date_to=date_to,
         )
-        game_rows = _load_game_player_rows(scope)
+
+        totals = dict(aggregates.get('totals') or {})
+        blue = dict(aggregates.get('blue') or {})
+        session_count = aggregates.get('session_count', 0)
+
+        flattened = {
+            **totals,
+            **blue,
+            'game_count': session_count,
+            'session_count': session_count,
+        }
+
+        game_rows[roster_entry.player_name] = flattened
 
     rows = []
 
