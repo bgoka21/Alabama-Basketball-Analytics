@@ -3630,7 +3630,7 @@ def _prepare_custom_stats_columns(dataset_columns):
         if key == 'player':
             mapped['align'] = 'left'
             mapped['width'] = 'sticky-player-header min-w-[14rem]'
-            mapped['cell_class'] = 'sticky-player-cell'
+            mapped['cell_class'] = 'sticky-player-cell whitespace-nowrap text-ellipsis'
             player_col = mapped
         else:
             mapped['align'] = align
