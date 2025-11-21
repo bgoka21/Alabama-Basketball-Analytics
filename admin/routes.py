@@ -2899,21 +2899,17 @@ def _collect_player_session_stats(roster_entry, source='practice', date_from=Non
     }
 
 
-def _format_session_stat_row(
-    roster_entry,
-    aggregates,
-    field_keys,
+def _build_practice_cells(
+    totals,
+    blue,
+    extras,
+    session_count,
+    *,
     mode,
-    source,
-    date_from=None,
-    date_to=None,
-    labels=None,
+    onoff=None,
+    to_rates=None,
+    reb_rates=None,
 ):
-    totals = dict(aggregates['totals'])
-    blue = dict(aggregates['blue'])
-    extras = aggregates['extra']
-    session_count = aggregates['session_count']
-
     agg = dict(totals)
     agg['potential_assists'] = totals.get('potential_assists', totals.get('pot_assists', 0))
     agg['second_assists'] = totals.get('second_assists', 0)
@@ -2932,26 +2928,6 @@ def _format_session_stat_row(
                 return None
             return value / session_count
         return value
-
-    helper_labels = labels if labels else None
-    onoff = get_on_off_summary(
-        player_id=roster_entry.id,
-        date_from=date_from,
-        date_to=date_to,
-        labels=helper_labels,
-    )
-    to_rates = get_turnover_rates_onfloor(
-        player_id=roster_entry.id,
-        date_from=date_from,
-        date_to=date_to,
-        labels=helper_labels,
-    ) or {}
-    reb_rates = get_rebound_rates_onfloor(
-        player_id=roster_entry.id,
-        date_from=date_from,
-        date_to=date_to,
-        labels=helper_labels,
-    ) or {}
 
     total_fg_makes = (
         (totals.get('atr_makes', 0) or 0)
@@ -3141,6 +3117,59 @@ def _format_session_stat_row(
     cells['three_fg_pct'] = cells.get('shooting_fg3_pct', {'display': '—', 'data_value': None})
     cells['fg3_pct'] = cells.get('shooting_fg3_pct', {'display': '—', 'data_value': None})
 
+    return cells
+
+
+def _format_session_stat_row(
+    roster_entry,
+    aggregates,
+    field_keys,
+    mode,
+    source,
+    date_from=None,
+    date_to=None,
+    labels=None,
+    *,
+    onoff=None,
+    to_rates=None,
+    reb_rates=None,
+):
+    totals = dict(aggregates['totals'])
+    blue = dict(aggregates['blue'])
+    extras = aggregates['extra']
+    session_count = aggregates['session_count']
+
+    helper_labels = labels if labels else None
+    onoff = onoff or get_on_off_summary(
+        player_id=roster_entry.id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=helper_labels,
+    )
+    to_rates = to_rates or get_turnover_rates_onfloor(
+        player_id=roster_entry.id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=helper_labels,
+    ) or {}
+    reb_rates = reb_rates or get_rebound_rates_onfloor(
+        player_id=roster_entry.id,
+        date_from=date_from,
+        date_to=date_to,
+        labels=helper_labels,
+    ) or {}
+
+    cells = _build_practice_cells(
+        totals,
+        blue,
+        extras,
+        session_count,
+        mode=mode,
+        onoff=onoff,
+        to_rates=to_rates,
+        reb_rates=reb_rates,
+    )
+
     rows = {}
     for key in field_keys:
         rows[key] = cells.get(key, {'display': '—', 'data_value': None})
@@ -3246,6 +3275,24 @@ def _build_practice_table_dataset(request_data):
     )
 
     rows = []
+    aggregate_totals: dict[str, float] = defaultdict(float)
+    aggregate_blue: dict[str, float] = defaultdict(float)
+    aggregate_extras: dict[str, float] = defaultdict(float)
+    total_sessions = 0
+    to_rate_sums: dict[str, float] = defaultdict(float)
+    to_rate_weights: dict[str, float] = defaultdict(float)
+    reb_rate_sums: dict[str, float] = defaultdict(float)
+    reb_rate_weights: dict[str, float] = defaultdict(float)
+    onoff_accum = {
+        'off_possessions_on': 0,
+        'def_possessions_on': 0,
+        'off_possessions_off': 0,
+        'def_possessions_off': 0,
+        'points_on_offense': 0.0,
+        'points_on_defense': 0.0,
+        'points_off_offense': 0.0,
+        'points_off_defense': 0.0,
+    }
 
     for roster_entry in roster_rows:
         aggregates = _collect_player_session_stats(
@@ -3254,6 +3301,26 @@ def _build_practice_table_dataset(request_data):
             date_from=date_from,
             date_to=date_to,
         )
+
+        helper_labels = labels if labels else None
+        onoff = get_on_off_summary(
+            player_id=roster_entry.id,
+            date_from=date_from,
+            date_to=date_to,
+            labels=helper_labels,
+        )
+        to_rates = get_turnover_rates_onfloor(
+            player_id=roster_entry.id,
+            date_from=date_from,
+            date_to=date_to,
+            labels=helper_labels,
+        ) or {}
+        reb_rates = get_rebound_rates_onfloor(
+            player_id=roster_entry.id,
+            date_from=date_from,
+            date_to=date_to,
+            labels=helper_labels,
+        ) or {}
 
         row_display = {
             'player': roster_entry.player_name,
@@ -3269,10 +3336,46 @@ def _build_practice_table_dataset(request_data):
                 date_from=date_from,
                 date_to=date_to,
                 labels=labels,
+                onoff=onoff,
+                to_rates=to_rates,
+                reb_rates=reb_rates,
             )
             row_display.update(field_values)
 
         rows.append(row_display)
+
+        total_sessions += aggregates.get('session_count', 0) or 0
+        for key, value in aggregates.get('totals', {}).items():
+            aggregate_totals[key] += value or 0
+        for key, value in aggregates.get('blue', {}).items():
+            aggregate_blue[key] += value or 0
+        for key in ('good_shot_sum', 'good_shot_count', 'oreb_pct_sum', 'oreb_pct_count'):
+            aggregate_extras[key] += aggregates.get('extra', {}).get(key, 0) or 0
+
+        if onoff:
+            onoff_accum['off_possessions_on'] += onoff.offensive_possessions_on or 0
+            onoff_accum['def_possessions_on'] += onoff.defensive_possessions_on or 0
+            onoff_accum['off_possessions_off'] += onoff.offensive_possessions_off or 0
+            onoff_accum['def_possessions_off'] += onoff.defensive_possessions_off or 0
+            onoff_accum['points_on_offense'] += (onoff.ppp_on_offense or 0) * (onoff.offensive_possessions_on or 0)
+            onoff_accum['points_on_defense'] += (onoff.ppp_on_defense or 0) * (onoff.defensive_possessions_on or 0)
+            onoff_accum['points_off_offense'] += (onoff.ppp_off_offense or 0) * (onoff.offensive_possessions_off or 0)
+            onoff_accum['points_off_defense'] += (onoff.ppp_off_defense or 0) * (onoff.defensive_possessions_off or 0)
+
+        weight = aggregates.get('session_count', 0) or 1
+        if to_rates:
+            for key, value in to_rates.items():
+                if value is None:
+                    continue
+                to_rate_sums[key] += value * weight
+                to_rate_weights[key] += weight
+
+        if reb_rates:
+            for key, value in reb_rates.items():
+                if value is None:
+                    continue
+                reb_rate_sums[key] += value * weight
+                reb_rate_weights[key] += weight
 
     columns = [
         {'key': 'player', 'label': 'Player', 'format': 'text', 'sortable': True},
@@ -3289,7 +3392,67 @@ def _build_practice_table_dataset(request_data):
         }
         columns.append(column)
 
-    return {'columns': columns, 'rows': rows}
+    totals_row = None
+
+    if rows:
+        agg_onoff = None
+        if any(onoff_accum.values()):
+            agg_onoff = SimpleNamespace(
+                offensive_possessions_on=onoff_accum['off_possessions_on'],
+                defensive_possessions_on=onoff_accum['def_possessions_on'],
+                offensive_possessions_off=onoff_accum['off_possessions_off'],
+                defensive_possessions_off=onoff_accum['def_possessions_off'],
+                ppp_on_offense=_safe_div(
+                    onoff_accum['points_on_offense'],
+                    onoff_accum['off_possessions_on'],
+                ),
+                ppp_on_defense=_safe_div(
+                    onoff_accum['points_on_defense'],
+                    onoff_accum['def_possessions_on'],
+                ),
+                ppp_off_offense=_safe_div(
+                    onoff_accum['points_off_offense'],
+                    onoff_accum['off_possessions_off'],
+                ),
+                ppp_off_defense=_safe_div(
+                    onoff_accum['points_off_defense'],
+                    onoff_accum['def_possessions_off'],
+                ),
+            )
+
+        agg_to_rates = {
+            key: (to_rate_sums[key] / to_rate_weights[key])
+            for key in to_rate_sums
+            if to_rate_weights.get(key)
+        }
+        agg_reb_rates = {
+            key: (reb_rate_sums[key] / reb_rate_weights[key])
+            for key in reb_rate_sums
+            if reb_rate_weights.get(key)
+        }
+
+        totals_cells = _build_practice_cells(
+            aggregate_totals,
+            aggregate_blue,
+            {
+                'good_shot_sum': aggregate_extras.get('good_shot_sum', 0),
+                'good_shot_count': aggregate_extras.get('good_shot_count', 0),
+                'oreb_pct_sum': aggregate_extras.get('oreb_pct_sum', 0),
+                'oreb_pct_count': aggregate_extras.get('oreb_pct_count', 0),
+            },
+            total_sessions,
+            mode=mode,
+            onoff=agg_onoff,
+            to_rates=agg_to_rates,
+            reb_rates=agg_reb_rates,
+        )
+
+        totals_row = {'player': 'Totals'}
+        for key in selected_fields:
+            cell = totals_cells.get(key, {'display': '—'})
+            totals_row[key] = cell.get('display') if isinstance(cell, Mapping) else cell
+
+    return {'columns': columns, 'rows': rows, 'totals': totals_row}
 
 
 def _build_game_table_dataset(request_data):
@@ -3355,6 +3518,8 @@ def _build_game_table_dataset(request_data):
         game_rows[roster_entry.player_name] = flattened
 
     rows = []
+    combined_agg: dict[str, float] = defaultdict(float)
+    total_sessions = 0
 
     for roster_entry in roster_rows:
         aggregates = game_rows.get(roster_entry.player_name) or {}
@@ -3375,6 +3540,16 @@ def _build_game_table_dataset(request_data):
 
         rows.append(row_display)
 
+        total_sessions += aggregates.get('session_count', 0) or 0
+        for key, value in aggregates.items():
+            if key in {'session_count', 'game_count'}:
+                continue
+            if isinstance(value, (int, float)):
+                combined_agg[key] += value or 0
+
+    combined_agg['session_count'] = total_sessions
+    combined_agg['game_count'] = total_sessions
+
     columns = [
         {'key': 'player', 'label': 'Player', 'format': 'text', 'sortable': True},
     ]
@@ -3392,7 +3567,22 @@ def _build_game_table_dataset(request_data):
             column['value_key'] = entry['value_key']
         columns.append(column)
 
-    return {'columns': columns, 'rows': rows}
+    totals_row = None
+    if rows:
+        totals_cells = _format_game_stat_row(
+            roster_entry=None,
+            aggregates=combined_agg,
+            field_keys=selected_fields,
+            mode=mode,
+            catalog=catalog,
+        )
+
+        totals_row = {'player': 'Totals'}
+        for key in selected_fields:
+            cell = totals_cells.get(key, {'display': '—'})
+            totals_row[key] = cell.get('display') if isinstance(cell, Mapping) else cell
+
+    return {'columns': columns, 'rows': rows, 'totals': totals_row}
 
 
 @admin_bp.route('/api/practice/table', methods=['POST'])
@@ -3636,10 +3826,12 @@ def custom_stats_table_partial():
 
     columns = _prepare_custom_stats_columns(dataset.get('columns', []))
     rows = dataset.get('rows', [])
+    totals = dataset.get('totals')
     return render_template(
         'admin/_custom_stats_table.html',
         columns=columns,
         rows=rows,
+        totals=totals,
         source=source,
     )
 
