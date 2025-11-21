@@ -4,7 +4,7 @@ import math
 import os, json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Any, Dict, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import datetime as datetime_module
@@ -98,6 +98,9 @@ from services.reports.playcall import invalidate_playcall_report
 # END Playcall Report
 from parse_recruits_csv import parse_recruits_csv
 from stats_config import LEADERBOARD_STATS
+
+if TYPE_CHECKING:
+    from services.correlation import Grouping, StudyScope
 from admin._leaderboard_helpers import (
     build_dual_context,
     build_dual_table,
@@ -2562,23 +2565,18 @@ def _build_game_field_catalog_map():
     catalog: dict[str, dict[str, Any]] = {}
 
     practice_catalog = _flatten_practice_field_catalog()
-    for key, entry in practice_catalog.items():
-        if key not in SUPPORTED_GAME_METRICS:
+    leaderboard_catalog = {entry['key']: entry for entry in _build_leaderboard_catalog()}
+
+    for key in SUPPORTED_GAME_METRICS:
+        base = leaderboard_catalog.get(key) or practice_catalog.get(key)
+        if not base:
             continue
-        mapped = dict(entry)
-        mapped.setdefault('format', 'count')
+
+        mapped = dict(base)
+        mapped.setdefault('format', base.get('format', 'count'))
         if key == 'pps':
             mapped['label'] = 'Game PPS'
-        mapped['source'] = 'practice'
-        catalog[key] = mapped
-
-    for entry in _build_leaderboard_catalog():
-        key = entry.get('key')
-        if not key or key not in SUPPORTED_GAME_METRICS:
-            continue
-        mapped = dict(entry)
-        mapped.setdefault('format', entry.get('format', 'count'))
-        mapped['source'] = 'leaderboard'
+        mapped['source'] = 'leaderboard' if key in leaderboard_catalog else 'practice'
         catalog[key] = mapped
 
     return catalog
@@ -3150,6 +3148,63 @@ def _format_session_stat_row(
     return rows
 
 
+def _format_game_stat_row(roster_entry, aggregates, field_keys, mode, catalog):
+    from services.correlation import _GAME_METRICS
+
+    agg = dict(aggregates or {})
+    session_count = agg.get('game_count') or agg.get('session_count') or 0
+
+    total_fg_makes = (
+        (agg.get('atr_makes', 0) or 0)
+        + (agg.get('fg2_makes', 0) or 0)
+        + (agg.get('fg3_makes', 0) or 0)
+    )
+    total_fg_attempts = (
+        (agg.get('atr_attempts', 0) or 0)
+        + (agg.get('fg2_attempts', 0) or 0)
+        + (agg.get('fg3_attempts', 0) or 0)
+    )
+
+    cells: dict[str, dict[str, Any]] = {}
+
+    cells['fg'] = _format_shooting_split(
+        total_fg_makes, total_fg_attempts, mode, session_count
+    )
+    cells['fg3'] = _format_shooting_split(
+        agg.get('fg3_makes', 0), agg.get('fg3_attempts', 0), mode, session_count
+    )
+    cells['ft'] = _format_shooting_split(
+        agg.get('ftm', 0), agg.get('fta', 0), mode, session_count
+    )
+    cells['efg'] = _format_percent(_calc_efg(agg))
+
+    for key in field_keys:
+        fmt = catalog.get(key, {}).get('format', 'count')
+
+        if key in {'fg', 'fg3', 'ft', 'efg'}:
+            continue
+
+        metric_key = 'shooting_pps' if key == 'pps' else key
+        spec = _GAME_METRICS.get(metric_key)
+        value = spec.compute(agg) if spec else agg.get(metric_key)
+
+        if fmt in {'percent', 'pct'}:
+            cells[key] = _format_percent(value)
+        elif fmt == 'ratio':
+            cells[key] = _format_ratio(value, decimals=2)
+        elif fmt == 'shooting_split':
+            if key == 'fg3':
+                cells[key] = cells.get('fg3')
+            elif key == 'ft':
+                cells[key] = cells.get('ft')
+            else:
+                cells[key] = cells.get('fg')
+        else:
+            cells[key] = _format_count(value, mode, session_count)
+
+    return {key: cells.get(key, {'display': '—', 'data_value': None}) for key in field_keys}
+
+
 def _build_practice_table_dataset(request_data):
     player_ids = request_data.get('player_ids') or []
     if not isinstance(player_ids, list):
@@ -3238,6 +3293,8 @@ def _build_practice_table_dataset(request_data):
 
 
 def _build_game_table_dataset(request_data):
+    from services.correlation import Grouping, StudyScope, _load_game_player_rows
+
     player_ids = request_data.get('player_ids') or []
     if not isinstance(player_ids, list):
         player_ids = []
@@ -3262,7 +3319,7 @@ def _build_game_table_dataset(request_data):
     catalog = _build_game_field_catalog_map()
     selected_fields = [key for key in field_keys if key in catalog]
 
-    roster_rows = []
+    roster_rows: list[Roster] = []
     if player_ids:
         roster_rows = Roster.query.filter(Roster.id.in_(player_ids)).all()
 
@@ -3275,30 +3332,35 @@ def _build_game_table_dataset(request_data):
         ),
     )
 
+    season_id = roster_rows[0].season_id if roster_rows else None
+    roster_ids = [row.id for row in roster_rows]
+    game_rows: dict[str, dict[str, Any]] = {}
+    if season_id:
+        scope = StudyScope(
+            season_id=season_id,
+            roster_ids=roster_ids,
+            start_date=date_from,
+            end_date=date_to,
+            group_by=Grouping.PLAYER,
+        )
+        game_rows = _load_game_player_rows(scope)
+
     rows = []
 
     for roster_entry in roster_rows:
-        aggregates = _collect_player_session_stats(
-            roster_entry,
-            source='game',
-            date_from=date_from,
-            date_to=date_to,
-        )
+        aggregates = game_rows.get(roster_entry.player_name) or {}
 
         row_display = {
             'player': roster_entry.player_name,
         }
 
         if selected_fields:
-            field_values = _format_session_stat_row(
+            field_values = _format_game_stat_row(
                 roster_entry=roster_entry,
                 aggregates=aggregates,
                 field_keys=selected_fields,
                 mode=mode,
-                source='game',
-                date_from=date_from,
-                date_to=date_to,
-                labels=labels,
+                catalog=catalog,
             )
             row_display.update(field_values)
 
