@@ -59,6 +59,7 @@
   }
 
   ready(initTableSorting);
+  document.addEventListener('custom:table:updated', () => initTableSorting());
 
   function initTableSorting() {
     const tables = Array.from(document.querySelectorAll('table')).filter(
@@ -66,6 +67,10 @@
     );
 
     tables.forEach((table) => {
+      if (table.dataset.tableSortBound === 'true') {
+        return;
+      }
+
       const sortableHeaders = Array.from(table.querySelectorAll(SORTABLE_HEADER_SELECTOR)).filter(
         (header) => header.getAttribute('data-sortable') === 'true'
       );
@@ -78,6 +83,8 @@
       if (!primaryBody) {
         return;
       }
+
+      table.dataset.tableSortBound = 'true';
 
       sortableHeaders.forEach((header) => {
         if (!hasFocusableChild(header)) {
