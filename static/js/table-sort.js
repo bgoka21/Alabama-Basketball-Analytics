@@ -61,6 +61,39 @@
   ready(initTableSorting);
   document.addEventListener('custom:table:updated', () => initTableSorting());
 
+  // Some tables are injected dynamically after the initial DOMContentLoaded event.
+  // Observe the document and re-run the binding logic when new tables appear so
+  // late-rendered tables still receive sorting behavior.
+  ready(() => {
+    if (!('MutationObserver' in window)) {
+      return;
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      let shouldInit = false;
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element)) {
+            continue;
+          }
+          if (node.tagName === 'TABLE' || node.querySelector('table')) {
+            shouldInit = true;
+            break;
+          }
+        }
+        if (shouldInit) {
+          break;
+        }
+      }
+
+      if (shouldInit) {
+        initTableSorting();
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+
   function initTableSorting() {
     const tables = Array.from(document.querySelectorAll('table')).filter(
       (table) => !table.classList.contains('table-exempt')
