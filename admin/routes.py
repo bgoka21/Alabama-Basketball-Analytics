@@ -2567,6 +2567,8 @@ def _build_game_field_catalog_map():
             continue
         mapped = dict(entry)
         mapped.setdefault('format', 'count')
+        if key == 'pps':
+            mapped['label'] = 'Game PPS'
         mapped['source'] = 'practice'
         catalog[key] = mapped
 
