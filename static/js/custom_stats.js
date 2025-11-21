@@ -216,7 +216,8 @@
       fieldCheckboxes: [],
       refreshTimer: null,
       activeRequest: null,
-      html2CanvasPromise: null
+      html2CanvasPromise: null,
+      requestRefresh: null
     };
 
     const playerUI = buildPlayerPicker(elements.playerRoot, state, queueRefresh);
@@ -254,6 +255,8 @@
         refreshTable(config, elements, state);
       }, REFRESH_DEBOUNCE_MS);
     }
+
+    state.requestRefresh = queueRefresh;
 
     function resolveFieldsUrl(source) {
       const normalized = normalizeSource(source);
@@ -330,6 +333,7 @@
       });
 
       state.selectedFields = dedupeAndSortFields(state.selectedFields, state.fieldOrder);
+      state.fieldOrder = rebuildFieldOrder(state.selectedFields, state.fieldOrder);
       state.selectedFieldsBySource[normalized] = state.selectedFields.slice();
       syncFieldCheckboxes(state);
 
@@ -804,6 +808,8 @@
       container.appendChild(details);
     });
 
+    state.fieldOrder = rebuildFieldOrder(state.selectedFields, state.fieldOrder);
+
     const previousSelection = state.selectedFields.slice();
     const filteredSelection = previousSelection.filter((key) => availableKeys.has(key));
     const selectionChanged = filteredSelection.length !== previousSelection.length;
@@ -834,6 +840,47 @@
       return a.localeCompare(b);
     });
     return filtered;
+  }
+
+  function rebuildFieldOrder(selectedKeys, baseOrder) {
+    const hasMap = baseOrder instanceof Map;
+    const next = new Map();
+    let counter = 0;
+
+    (selectedKeys || []).forEach((key) => {
+      if (hasMap && baseOrder.has(key) && !next.has(key)) {
+        next.set(key, counter++);
+      }
+    });
+
+    if (hasMap) {
+      baseOrder.forEach((_, key) => {
+        if (!next.has(key)) {
+          next.set(key, counter++);
+        }
+      });
+    }
+
+    return next;
+  }
+
+  function reorderSelectedFields(list, fromKey, toKey, insertAfter) {
+    if (!Array.isArray(list)) {
+      return null;
+    }
+    const working = list.slice();
+    const fromIndex = working.indexOf(fromKey);
+    const targetIndex = working.indexOf(toKey);
+    if (fromIndex === -1 || targetIndex === -1) {
+      return null;
+    }
+    const [moved] = working.splice(fromIndex, 1);
+    let insertIndex = insertAfter ? targetIndex + 1 : targetIndex;
+    if (fromIndex < insertIndex) {
+      insertIndex -= 1;
+    }
+    working.splice(insertIndex, 0, moved);
+    return working;
   }
 
   function filterFields(query, state) {
@@ -1474,6 +1521,7 @@
     const next = dedupeAndSortFields(prepared, state.fieldOrder);
     const prev = state.selectedFields.slice();
     state.selectedFields = next;
+    state.fieldOrder = rebuildFieldOrder(next, state.fieldOrder);
     state.selectedFieldsBySource[state.source] = next.slice();
     syncFieldCheckboxes(state);
 
@@ -1554,6 +1602,7 @@
       });
       if (fieldsChanged) {
         state.selectedFields = dedupeAndSortFields(mergedFields, state.fieldOrder);
+        state.fieldOrder = rebuildFieldOrder(state.selectedFields, state.fieldOrder);
         state.selectedFieldsBySource[state.source] = state.selectedFields.slice();
         changed = true;
       }
@@ -1746,6 +1795,134 @@
       });
   }
 
+  function enableColumnDrag(tableContainer, state, config, elements) {
+    if (!tableContainer) {
+      return;
+    }
+
+    const table = tableContainer.querySelector('table[data-draggable-headers="true"]');
+    if (!table) {
+      return;
+    }
+
+    const headerRows = Array.from(table.querySelectorAll('tr[data-header-row="columns"]'));
+    if (!headerRows.length) {
+      return;
+    }
+
+    const handles = headerRows.flatMap((row) => Array.from(row.querySelectorAll('[data-drag-handle]')));
+    if (!handles.length) {
+      return;
+    }
+
+    let dragKey = null;
+    let activeTarget = null;
+
+    function clearHighlights() {
+      if (activeTarget) {
+        activeTarget.classList.remove('drag-target');
+      }
+      activeTarget = null;
+    }
+
+    function resetDragState() {
+      clearHighlights();
+      dragKey = null;
+    }
+
+    function handleDrop(event) {
+      if (!dragKey) {
+        return;
+      }
+      event.preventDefault();
+      const th = event.target.closest('th[data-key]');
+      clearHighlights();
+      if (!th) {
+        resetDragState();
+        return;
+      }
+      const targetKey = th.dataset.key;
+      if (!targetKey || targetKey === dragKey || targetKey === 'player') {
+        resetDragState();
+        return;
+      }
+
+      const rect = th.getBoundingClientRect();
+      const insertAfter = event.clientX > rect.left + rect.width / 2;
+      const nextOrder = reorderSelectedFields(state.selectedFields, dragKey, targetKey, insertAfter);
+      if (nextOrder) {
+        state.selectedFields = nextOrder;
+        state.selectedFieldsBySource[state.source] = nextOrder.slice();
+        state.fieldOrder = rebuildFieldOrder(nextOrder, state.fieldOrder);
+        state.lastPayload = null;
+        if (state.autoRefresh && typeof state.requestRefresh === 'function') {
+          state.requestRefresh('column-reorder');
+        } else if (config && elements) {
+          refreshTable(config, elements, state);
+        }
+      }
+      resetDragState();
+    }
+
+    headerRows.forEach((row) => {
+      if (row.dataset.dragBound === '1') {
+        return;
+      }
+      row.dataset.dragBound = '1';
+      row.addEventListener('dragover', (event) => {
+        if (!dragKey) {
+          return;
+        }
+        const th = event.target.closest('th[data-key]');
+        if (!th || th.dataset.key === 'player' || th.dataset.key === dragKey) {
+          return;
+        }
+        event.preventDefault();
+        if (activeTarget && activeTarget !== th) {
+          activeTarget.classList.remove('drag-target');
+        }
+        activeTarget = th;
+        th.classList.add('drag-target');
+      });
+      row.addEventListener('dragleave', (event) => {
+        const th = event.target.closest('th[data-key]');
+        if (th && th === activeTarget) {
+          th.classList.remove('drag-target');
+          activeTarget = null;
+        }
+      });
+      row.addEventListener('drop', handleDrop);
+    });
+
+    handles.forEach((handle) => {
+      if (handle.dataset.dragBound === '1') {
+        return;
+      }
+      handle.dataset.dragBound = '1';
+      handle.addEventListener('dragstart', (event) => {
+        const th = event.target.closest('th[data-key]');
+        const key = th ? th.dataset.key : null;
+        if (!key || key === 'player') {
+          event.preventDefault();
+          return;
+        }
+        dragKey = key;
+        clearHighlights();
+        event.dataTransfer.effectAllowed = 'move';
+        try {
+          event.dataTransfer.setData('text/plain', key);
+        } catch (error) {
+          // ignore
+        }
+      });
+      handle.addEventListener('dragend', resetDragState);
+      handle.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+    });
+  }
+
   function refreshTable(config, elements, state) {
     const payload = buildPayload(state, elements);
     state.lastPayload = payload;
@@ -1788,6 +1965,7 @@
         }
         if (elements.tableContainer) {
           elements.tableContainer.innerHTML = html;
+          enableColumnDrag(elements.tableContainer, state, config, elements);
         }
         reapplyTableSort();
       })

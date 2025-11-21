@@ -7,7 +7,8 @@
   sticky_header=False,
   caption=None,
   default_sort=None,
-  header_rows=None
+  header_rows=None,
+  draggable_headers=False
 ) -%}
   {%- set container_classes = 'rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden' -%}
   {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
@@ -18,7 +19,7 @@
       {%- if sticky_header -%}
         {%- set table_classes = table_classes ~ ' thead-sticky' -%}
       {%- endif -%}
-      <table id="{{ id }}" role="table" class="{{ table_classes }}"{% if default_sort %} data-default-sort="{{ default_sort }}"{% endif %}>
+      <table id="{{ id }}" role="table" class="{{ table_classes }}"{% if default_sort %} data-default-sort="{{ default_sort }}"{% endif %}{% if draggable_headers %} data-draggable-headers="true"{% endif %}>
         {%- if caption %}
         <caption class="sr-only">{{ caption }}</caption>
         {%- endif %}
@@ -29,7 +30,7 @@
         <thead class="{{ thead_classes }}{% if sticky_header %} sticky top-0 z-10{% endif %}">
           {%- if has_custom_header -%}
             {%- for row in header_rows_data -%}
-              <tr>
+              <tr{% if draggable_headers %} data-header-row="columns"{% endif %}>
                 {%- for cell in row -%}
                   {%- set cell_type = cell.type if cell.type is defined else 'group' -%}
                   {%- set cell_colspan = cell.colspan if cell.colspan is defined else 1 -%}
@@ -59,14 +60,21 @@
                         aria-sort="none"
                         {%- if cell_rowspan | int > 1 %} rowspan="{{ cell_rowspan }}"{%- endif -%}
                         {%- if cell_colspan | int > 1 %} colspan="{{ cell_colspan }}"{%- endif -%}>
+                    {%- set drag_handle -%}
+                      {%- if draggable_headers and col.key != 'player' -%}
+                        <span class="col-drag-handle" draggable="true" data-drag-handle aria-label="Reorder column" title="Drag to reorder">⋮⋮</span>
+                      {%- endif -%}
+                    {%- endset -%}
                     {%- if col.sortable -%}
-                      <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                      <button type="button" class="inline-flex items-center gap-2 w-full {{ justify_class }} group"
                               aria-label="Sort by {{ col.label }}">
+                        {{ drag_handle }}
                         <span>{{ col.label | safe }}</span>
                         <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                       </button>
                     {%- else -%}
                       <div class="inline-flex items-center w-full {{ justify_class }}">
+                        {{ drag_handle }}
                         <span>{{ col.label | safe }}</span>
                       </div>
                     {%- endif -%}
@@ -83,7 +91,7 @@
                 {%- endfor -%}
               </tr>
             {%- endfor -%}
-            <tr>
+            <tr{% if draggable_headers %} data-header-row="columns"{% endif %}>
               {%- for col in columns if col.render_header is not defined or col.render_header -%}
                 {%- set align = col.align | default('left') -%}
                 {%- set align_class = {
@@ -106,17 +114,24 @@
                     data-sortable="{{ 'true' if col.sortable else 'false' }}"
                     data-key="{{ col.key }}"
                     aria-sort="none">
-                    {%- if col.sortable -%}
-                      <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
-                              aria-label="Sort by {{ col.label }}">
-                        <span>{{ col.label | safe }}</span>
-                        <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
-                      </button>
-                    {%- else -%}
-                      <div class="inline-flex items-center w-full {{ justify_class }}">
-                        <span>{{ col.label | safe }}</span>
-                      </div>
-                    {%- endif -%}
+                {%- set drag_handle -%}
+                  {%- if draggable_headers and col.key != 'player' -%}
+                    <span class="col-drag-handle" draggable="true" data-drag-handle aria-label="Reorder column" title="Drag to reorder">⋮⋮</span>
+                  {%- endif -%}
+                {%- endset -%}
+                {%- if col.sortable -%}
+                  <button type="button" class="inline-flex items-center gap-2 w-full {{ justify_class }} group"
+                          aria-label="Sort by {{ col.label }}">
+                    {{ drag_handle }}
+                    <span>{{ col.label | safe }}</span>
+                    <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
+                  </button>
+                {%- else -%}
+                  <div class="inline-flex items-center w-full {{ justify_class }}">
+                    {{ drag_handle }}
+                    <span>{{ col.label | safe }}</span>
+                  </div>
+                {%- endif -%}
                 </th>
               {%- endfor %}
             </tr>
@@ -150,7 +165,7 @@
               {%- set header_state.items = header_state.items + [{'type': 'group', 'label': header_state.current_label, 'span': header_state.current_span}] -%}
             {%- endif -%}
             {%- set header_groups = header_state.items -%}
-            <tr>
+            <tr{% if draggable_headers %} data-header-row="columns"{% endif %}>
               {%- for item in header_groups -%}
                 {%- if item.type == 'group' -%}
                   {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
@@ -181,14 +196,21 @@
                       data-key="{{ col.key }}"
                       aria-sort="none"
                       rowspan="2">
+                    {%- set drag_handle -%}
+                      {%- if draggable_headers and col.key != 'player' -%}
+                        <span class="col-drag-handle" draggable="true" data-drag-handle aria-label="Reorder column" title="Drag to reorder">⋮⋮</span>
+                      {%- endif -%}
+                    {%- endset -%}
                     {%- if col.sortable -%}
-                      <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                      <button type="button" class="inline-flex items-center gap-2 w-full {{ justify_class }} group"
                               aria-label="Sort by {{ col.label }}">
+                        {{ drag_handle }}
                         <span>{{ col.label | safe }}</span>
                         <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                       </button>
                     {%- else -%}
                       <div class="inline-flex items-center w-full {{ justify_class }}">
+                        {{ drag_handle }}
                         <span>{{ col.label | safe }}</span>
                       </div>
                     {%- endif -%}
@@ -196,7 +218,7 @@
                 {%- endif -%}
               {%- endfor %}
             </tr>
-            <tr>
+            <tr{% if draggable_headers %} data-header-row="columns"{% endif %}>
               {%- for col in columns if col.group is defined and col.group -%}
                 {%- set align = col.align | default('left') -%}
                 {%- set align_class = {
@@ -219,14 +241,21 @@
                     data-sortable="{{ 'true' if col.sortable else 'false' }}"
                     data-key="{{ col.key }}"
                     aria-sort="none">
+                  {%- set drag_handle -%}
+                    {%- if draggable_headers and col.key != 'player' -%}
+                      <span class="col-drag-handle" draggable="true" data-drag-handle aria-label="Reorder column" title="Drag to reorder">⋮⋮</span>
+                    {%- endif -%}
+                  {%- endset -%}
                   {%- if col.sortable -%}
-                    <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                    <button type="button" class="inline-flex items-center gap-2 w-full {{ justify_class }} group"
                             aria-label="Sort by {{ col.label }}">
+                      {{ drag_handle }}
                       <span>{{ col.label | safe }}</span>
                       <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                     </button>
                   {%- else -%}
                     <div class="inline-flex items-center w-full {{ justify_class }}">
+                      {{ drag_handle }}
                       <span>{{ col.label | safe }}</span>
                     </div>
                   {%- endif -%}
@@ -234,7 +263,7 @@
               {%- endfor %}
             </tr>
           {%- else -%}
-            <tr>
+            <tr{% if draggable_headers %} data-header-row="columns"{% endif %}>
               {%- for col in columns %}
                 {%- set align = col.align | default('left') -%}
                 {%- set align_class = {
@@ -257,14 +286,21 @@
                     data-sortable="{{ 'true' if col.sortable else 'false' }}"
                     data-key="{{ col.key }}"
                     aria-sort="none">
+                  {%- set drag_handle -%}
+                    {%- if draggable_headers and col.key != 'player' -%}
+                      <span class="col-drag-handle" draggable="true" data-drag-handle aria-label="Reorder column" title="Drag to reorder">⋮⋮</span>
+                    {%- endif -%}
+                  {%- endset -%}
                   {%- if col.sortable -%}
-                    <button type="button" class="inline-flex items-center gap-1 w-full {{ justify_class }} group"
+                    <button type="button" class="inline-flex items-center gap-2 w-full {{ justify_class }} group"
                             aria-label="Sort by {{ col.label }}">
+                      {{ drag_handle }}
                       <span>{{ col.label | safe }}</span>
                       <span class="sort-caret opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></span>
                     </button>
                   {%- else -%}
                     <div class="inline-flex items-center w-full {{ justify_class }}">
+                      {{ drag_handle }}
                       <span>{{ col.label | safe }}</span>
                     </div>
                   {%- endif -%}

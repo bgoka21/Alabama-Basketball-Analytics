@@ -12,7 +12,8 @@
     dense=True,
     sticky_header=True,
     caption='Custom ' ~ source_title|lower ~ ' stats',
-    default_sort='player:asc'
+    default_sort='player:asc',
+    draggable_headers=True
   ) }}
 
   {% if rows | length == 0 %}
@@ -48,5 +49,20 @@
 
   .dark .custom-stats-table tbody tr:nth-child(even) td.sticky-player-cell {
     background-color: var(--sticky-player-bg-even-dark, #1F2937);
+  }
+
+  .custom-stats-table [data-draggable-headers] .col-drag-handle {
+    cursor: grab;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    line-height: 1;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .custom-stats-table [data-draggable-headers] th.drag-target {
+    outline: 2px dashed #9E1B32;
+    outline-offset: 2px;
   }
 </style>
