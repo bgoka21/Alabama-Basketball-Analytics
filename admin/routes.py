@@ -2582,6 +2582,17 @@ def _build_game_field_catalog_map():
     return catalog
 
 
+def _normalize_game_field_label(label: str) -> str:
+    if not label:
+        return label
+
+    cleaned = label
+    if 'Practice ' in cleaned:
+        cleaned = cleaned.replace('Practice ', '', 1)
+
+    return cleaned
+
+
 def _group_game_field_catalog():
     """Return grouped catalog payload for the game field picker."""
 
@@ -2596,12 +2607,14 @@ def _group_game_field_catalog():
                 f"Game Leaderboard • {base_group}" if base_group else 'Game Leaderboard'
             )
         else:
-            group_label = f"Practice • {base_group or 'Practice Metrics'}"
+            group_label = base_group or 'Practice Metrics'
+            if group_label.startswith('Practice • '):
+                group_label = group_label.replace('Practice • ', '', 1)
 
         grouped[group_label].append(
             {
                 'key': key,
-                'label': entry.get('label') or key,
+                'label': _normalize_game_field_label(entry.get('label') or key),
                 'format': entry.get('format', 'count'),
             }
         )
