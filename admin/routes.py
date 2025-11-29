@@ -3598,18 +3598,41 @@ def _build_game_table_dataset(request_data):
             off_possessions_off = onoff.offensive_possessions_off or 0
             def_possessions_off = onoff.defensive_possessions_off or 0
 
-            ppp_on_offense = (
-                onoff.ppp_on_offense if off_possessions_on else None
-            )
-            ppp_on_defense = (
-                onoff.ppp_on_defense if def_possessions_on else None
-            )
-            ppp_off_offense = (
-                onoff.ppp_off_offense if off_possessions_off else None
-            )
-            ppp_off_defense = (
-                onoff.ppp_off_defense if def_possessions_off else None
-            )
+            if off_possessions_on > 0:
+                ppp_on_offense = (
+                    round(onoff.ppp_on_offense, 2)
+                    if onoff.ppp_on_offense is not None
+                    else None
+                )
+            else:
+                ppp_on_offense = None
+
+            if def_possessions_on > 0:
+                ppp_on_defense = (
+                    round(onoff.ppp_on_defense, 2)
+                    if onoff.ppp_on_defense is not None
+                    else None
+                )
+            else:
+                ppp_on_defense = None
+
+            if off_possessions_off > 0:
+                ppp_off_offense = (
+                    round(onoff.ppp_off_offense, 2)
+                    if onoff.ppp_off_offense is not None
+                    else None
+                )
+            else:
+                ppp_off_offense = None
+
+            if def_possessions_off > 0:
+                ppp_off_defense = (
+                    round(onoff.ppp_off_defense, 2)
+                    if onoff.ppp_off_defense is not None
+                    else None
+                )
+            else:
+                ppp_off_defense = None
 
             flattened.update(
                 {
@@ -3620,12 +3643,12 @@ def _build_game_table_dataset(request_data):
                     'adv_ppp_off_offense': ppp_off_offense,
                     'adv_ppp_off_defense': ppp_off_defense,
                     'adv_offensive_leverage': (
-                        ppp_on_offense - ppp_off_offense
+                        round(ppp_on_offense - ppp_off_offense, 2)
                         if ppp_on_offense is not None and ppp_off_offense is not None
                         else None
                     ),
                     'adv_defensive_leverage': (
-                        ppp_off_defense - ppp_on_defense
+                        round(ppp_off_defense - ppp_on_defense, 2)
                         if ppp_off_defense is not None and ppp_on_defense is not None
                         else None
                     ),
@@ -3677,17 +3700,28 @@ def _build_game_table_dataset(request_data):
     combined_agg['game_count'] = total_sessions
 
     if any(onoff_accum.values()):
-        ppp_on_offense = _safe_div(
-            onoff_accum['points_on_offense'], onoff_accum['off_possessions_on']
+        def _round_or_none(value):
+            return round(value, 2) if value is not None else None
+
+        ppp_on_offense = _round_or_none(
+            _safe_div(
+                onoff_accum['points_on_offense'], onoff_accum['off_possessions_on']
+            )
         )
-        ppp_on_defense = _safe_div(
-            onoff_accum['points_on_defense'], onoff_accum['def_possessions_on']
+        ppp_on_defense = _round_or_none(
+            _safe_div(
+                onoff_accum['points_on_defense'], onoff_accum['def_possessions_on']
+            )
         )
-        ppp_off_offense = _safe_div(
-            onoff_accum['points_off_offense'], onoff_accum['off_possessions_off']
+        ppp_off_offense = _round_or_none(
+            _safe_div(
+                onoff_accum['points_off_offense'], onoff_accum['off_possessions_off']
+            )
         )
-        ppp_off_defense = _safe_div(
-            onoff_accum['points_off_defense'], onoff_accum['def_possessions_off']
+        ppp_off_defense = _round_or_none(
+            _safe_div(
+                onoff_accum['points_off_defense'], onoff_accum['def_possessions_off']
+            )
         )
 
         combined_agg.update(
@@ -3699,12 +3733,12 @@ def _build_game_table_dataset(request_data):
                 'adv_ppp_off_offense': ppp_off_offense,
                 'adv_ppp_off_defense': ppp_off_defense,
                 'adv_offensive_leverage': (
-                    ppp_on_offense - ppp_off_offense
+                    _round_or_none(ppp_on_offense - ppp_off_offense)
                     if ppp_on_offense is not None and ppp_off_offense is not None
                     else None
                 ),
                 'adv_defensive_leverage': (
-                    ppp_off_defense - ppp_on_defense
+                    _round_or_none(ppp_off_defense - ppp_on_defense)
                     if ppp_off_defense is not None and ppp_on_defense is not None
                     else None
                 ),
