@@ -3032,12 +3032,40 @@ def _build_practice_cells(
     off_possessions_on = _per_session(onoff.offensive_possessions_on if onoff else None)
     def_possessions_on = _per_session(onoff.defensive_possessions_on if onoff else None)
 
+    possession_counts = [
+        getattr(onoff, 'offensive_possessions_on', None),
+        getattr(onoff, 'offensive_possessions_off', None),
+        getattr(onoff, 'defensive_possessions_on', None),
+        getattr(onoff, 'defensive_possessions_off', None),
+    ] if onoff else []
+
+    if onoff and not any((count or 0) == 0 for count in possession_counts):
+        ppp_on_offense = None if onoff.ppp_on_offense is None else round(onoff.ppp_on_offense, 2)
+        ppp_off_offense = None if onoff.ppp_off_offense is None else round(onoff.ppp_off_offense, 2)
+        ppp_on_defense = None if onoff.ppp_on_defense is None else round(onoff.ppp_on_defense, 2)
+        ppp_off_defense = None if onoff.ppp_off_defense is None else round(onoff.ppp_off_defense, 2)
+        offensive_leverage = (
+            round(ppp_on_offense - ppp_off_offense, 2)
+            if ppp_on_offense is not None and ppp_off_offense is not None
+            else None
+        )
+        defensive_leverage = (
+            round(ppp_off_defense - ppp_on_defense, 2)
+            if ppp_off_defense is not None and ppp_on_defense is not None
+            else None
+        )
+    else:
+        ppp_on_offense = ppp_off_offense = ppp_on_defense = ppp_off_defense = None
+        offensive_leverage = defensive_leverage = None
+
     cells['adv_offensive_possessions'] = _cell_count(off_possessions_on)
     cells['adv_defensive_possessions'] = _cell_count(def_possessions_on)
-    cells['adv_ppp_on_offense'] = _cell_ratio(onoff.ppp_on_offense if onoff else None)
-    cells['adv_ppp_on_defense'] = _cell_ratio(onoff.ppp_on_defense if onoff else None)
-    cells['adv_ppp_off_offense'] = _cell_ratio(onoff.ppp_off_offense if onoff else None)
-    cells['adv_ppp_off_defense'] = _cell_ratio(onoff.ppp_off_defense if onoff else None)
+    cells['adv_ppp_on_offense'] = _cell_ratio(ppp_on_offense)
+    cells['adv_ppp_on_defense'] = _cell_ratio(ppp_on_defense)
+    cells['adv_ppp_off_offense'] = _cell_ratio(ppp_off_offense)
+    cells['adv_ppp_off_defense'] = _cell_ratio(ppp_off_defense)
+    cells['adv_offensive_leverage'] = _cell_ratio(offensive_leverage)
+    cells['adv_defensive_leverage'] = _cell_ratio(defensive_leverage)
 
     cells['adv_off_reb_rate'] = _cell_pct(reb_rates.get('off_reb_rate_on'))
     cells['adv_def_reb_rate'] = _cell_pct(reb_rates.get('def_reb_rate_on'))
