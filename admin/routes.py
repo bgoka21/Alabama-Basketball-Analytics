@@ -3537,12 +3537,31 @@ def _build_game_table_dataset(request_data):
 
     game_rows: dict[str, dict[str, Any]] = {}
 
+    onoff_accum = {
+        'off_possessions_on': 0,
+        'def_possessions_on': 0,
+        'off_possessions_off': 0,
+        'def_possessions_off': 0,
+        'points_on_offense': 0.0,
+        'points_on_defense': 0.0,
+        'points_off_offense': 0.0,
+        'points_off_defense': 0.0,
+    }
+
     for roster_entry in roster_rows:
         aggregates = _collect_player_session_stats(
             roster_entry,
             source='game',
             date_from=date_from,
             date_to=date_to,
+        )
+
+        helper_labels = labels if labels else None
+        onoff = get_on_off_summary(
+            player_id=roster_entry.id,
+            date_from=date_from,
+            date_to=date_to,
+            labels=helper_labels,
         )
 
         totals = dict(aggregates.get('totals') or {})
@@ -3555,6 +3574,55 @@ def _build_game_table_dataset(request_data):
             'game_count': session_count,
             'session_count': session_count,
         }
+
+        if onoff:
+            off_possessions_on = onoff.offensive_possessions_on or 0
+            def_possessions_on = onoff.defensive_possessions_on or 0
+            off_possessions_off = onoff.offensive_possessions_off or 0
+            def_possessions_off = onoff.defensive_possessions_off or 0
+
+            ppp_on_offense = (
+                onoff.ppp_on_offense if off_possessions_on else None
+            )
+            ppp_on_defense = (
+                onoff.ppp_on_defense if def_possessions_on else None
+            )
+            ppp_off_offense = (
+                onoff.ppp_off_offense if off_possessions_off else None
+            )
+            ppp_off_defense = (
+                onoff.ppp_off_defense if def_possessions_off else None
+            )
+
+            flattened.update(
+                {
+                    'adv_offensive_possessions': off_possessions_on,
+                    'adv_defensive_possessions': def_possessions_on,
+                    'adv_ppp_on_offense': ppp_on_offense,
+                    'adv_ppp_on_defense': ppp_on_defense,
+                    'adv_ppp_off_offense': ppp_off_offense,
+                    'adv_ppp_off_defense': ppp_off_defense,
+                    'adv_offensive_leverage': (
+                        ppp_on_offense - ppp_off_offense
+                        if ppp_on_offense is not None and ppp_off_offense is not None
+                        else None
+                    ),
+                    'adv_defensive_leverage': (
+                        ppp_off_defense - ppp_on_defense
+                        if ppp_off_defense is not None and ppp_on_defense is not None
+                        else None
+                    ),
+                }
+            )
+
+            onoff_accum['off_possessions_on'] += off_possessions_on
+            onoff_accum['def_possessions_on'] += def_possessions_on
+            onoff_accum['off_possessions_off'] += off_possessions_off
+            onoff_accum['def_possessions_off'] += def_possessions_off
+            onoff_accum['points_on_offense'] += (ppp_on_offense or 0) * off_possessions_on
+            onoff_accum['points_on_defense'] += (ppp_on_defense or 0) * def_possessions_on
+            onoff_accum['points_off_offense'] += (ppp_off_offense or 0) * off_possessions_off
+            onoff_accum['points_off_defense'] += (ppp_off_defense or 0) * def_possessions_off
 
         game_rows[roster_entry.player_name] = flattened
 
@@ -3590,6 +3658,41 @@ def _build_game_table_dataset(request_data):
 
     combined_agg['session_count'] = total_sessions
     combined_agg['game_count'] = total_sessions
+
+    if any(onoff_accum.values()):
+        ppp_on_offense = _safe_div(
+            onoff_accum['points_on_offense'], onoff_accum['off_possessions_on']
+        )
+        ppp_on_defense = _safe_div(
+            onoff_accum['points_on_defense'], onoff_accum['def_possessions_on']
+        )
+        ppp_off_offense = _safe_div(
+            onoff_accum['points_off_offense'], onoff_accum['off_possessions_off']
+        )
+        ppp_off_defense = _safe_div(
+            onoff_accum['points_off_defense'], onoff_accum['def_possessions_off']
+        )
+
+        combined_agg.update(
+            {
+                'adv_offensive_possessions': onoff_accum['off_possessions_on'],
+                'adv_defensive_possessions': onoff_accum['def_possessions_on'],
+                'adv_ppp_on_offense': ppp_on_offense,
+                'adv_ppp_on_defense': ppp_on_defense,
+                'adv_ppp_off_offense': ppp_off_offense,
+                'adv_ppp_off_defense': ppp_off_defense,
+                'adv_offensive_leverage': (
+                    ppp_on_offense - ppp_off_offense
+                    if ppp_on_offense is not None and ppp_off_offense is not None
+                    else None
+                ),
+                'adv_defensive_leverage': (
+                    ppp_off_defense - ppp_on_defense
+                    if ppp_off_defense is not None and ppp_on_defense is not None
+                    else None
+                ),
+            }
+        )
 
     columns = [
         {'key': 'player', 'label': 'Player', 'format': 'text', 'sortable': True},
