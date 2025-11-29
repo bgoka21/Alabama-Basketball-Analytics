@@ -284,6 +284,12 @@ def _practice_metric_specs() -> Dict[str, _MetricSpec]:
             ("points", "atr_attempts", "fg2_attempts", "fg3_attempts"),
             lambda row: _safe_div(row.get("points"), _total_fga(row)),
         ),
+        "adv_ppp_on_offense": direct("adv_ppp_on_offense"),
+        "adv_ppp_off_offense": direct("adv_ppp_off_offense"),
+        "adv_ppp_on_defense": direct("adv_ppp_on_defense"),
+        "adv_ppp_off_defense": direct("adv_ppp_off_defense"),
+        "adv_offensive_leverage": direct("adv_offensive_leverage"),
+        "adv_defensive_leverage": direct("adv_defensive_leverage"),
         "rd_crash_plus": direct("crash_positive"),
         "rd_crash_att": _MetricSpec(
             ("crash_positive", "crash_missed"),
