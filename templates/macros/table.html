@@ -12,6 +12,14 @@
 ) -%}
   {%- set container_classes = 'rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden' -%}
   {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
+  {%- set advanced_onoff_keys = [
+    'adv_ppp_on_offense',
+    'adv_ppp_off_offense',
+    'adv_offensive_leverage',
+    'adv_ppp_on_defense',
+    'adv_ppp_off_defense',
+    'adv_defensive_leverage'
+  ] -%}
   <div class="{{ container_classes }}">
     <div class="table-card-accent" aria-hidden="true"></div>
     <div class="overflow-x-auto table-card-body">
@@ -331,7 +339,21 @@
                   {%- set data_value = cell_value.data_value -%}
                 {%- endif -%}
               {%- else -%}
-                {%- set display_value = cell_value if cell_value is not none and cell_value is not undefined else '' -%}
+                {%- set raw_value = cell_value if cell_value is not none and cell_value is not undefined else none -%}
+                {%- if col.key in advanced_onoff_keys -%}
+                  {%- if raw_value is number -%}
+                    {%- set display_value = '%.2f' % raw_value -%}
+                    {%- set data_value = raw_value -%}
+                  {%- elif raw_value not in (none, '') -%}
+                    {%- set numeric_value = raw_value | float -%}
+                    {%- set display_value = '%.2f' % numeric_value -%}
+                    {%- set data_value = numeric_value -%}
+                  {%- else -%}
+                    {%- set display_value = '—' -%}
+                  {%- endif -%}
+                {%- else -%}
+                  {%- set display_value = raw_value if raw_value is not none else '' -%}
+                {%- endif -%}
               {%- endif -%}
               {%- if col.value_key is defined and col.value_key -%}
                 {%- if row is mapping -%}
@@ -371,7 +393,17 @@
                 </th>
               {%- else -%}
                 <td class="{{ padding_class }} {{ align_class }}{{ numeric_class }}{% if cell_class %} {{ cell_class }}{% endif %}">
-                  {{ total_value if total_value is not none else '' }}
+                  {%- if col.key in advanced_onoff_keys -%}
+                    {%- if total_value is number -%}
+                      {{ '%.2f' % total_value }}
+                    {%- elif total_value not in (none, '') -%}
+                      {{ '%.2f' % (total_value | float) }}
+                    {%- else -%}
+                      —
+                    {%- endif -%}
+                  {%- else -%}
+                    {{ total_value if total_value is not none else '' }}
+                  {%- endif -%}
                 </td>
               {%- endif -%}
             {%- endfor %}
