@@ -198,7 +198,7 @@ def test_game_field_catalog_endpoint_returns_grouped_options(client, sample_cust
     assert response.status_code == 200
     payload = response.get_json()
     assert isinstance(payload, dict)
-    assert any(label.startswith('Practice •') for label in payload.keys())
+    assert not any(label.startswith('Practice •') for label in payload.keys())
     assert any('Game Leaderboard' in label for label in payload.keys())
     assert any('pts' in [field['key'] for field in fields] for fields in payload.values())
 
