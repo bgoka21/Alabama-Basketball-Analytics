@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from types import SimpleNamespace
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from sqlalchemy import case, func, or_, and_
 from sqlalchemy.orm import Query
@@ -402,11 +402,72 @@ def _sum_team_off_rebounds(season_id: int) -> float:
     )
 
 
+def _normalize_precomputed_possessions(possessions: Optional[object]):
+    """Return mapping of on/off possession and point totals when provided.
+
+    Accepts either ``None`` (no precomputed data) or a mapping containing
+    on/off possession counts and point totals. Missing values are coerced to
+    ``None`` so the caller can decide whether to fall back to queries.
+    """
+
+    if not isinstance(possessions, Mapping):
+        return None
+
+    def _coerce_int(value):
+        try:
+            return int(value)
+        except Exception:
+            return None
+
+    def _coerce_float(value):
+        try:
+            return float(value)
+        except Exception:
+            return None
+
+    off_on = _coerce_int(
+        possessions.get("offensive_possessions_on")
+        or possessions.get("off_possessions_on")
+    )
+    def_on = _coerce_int(
+        possessions.get("defensive_possessions_on")
+        or possessions.get("def_possessions_on")
+    )
+    off_off = _coerce_int(
+        possessions.get("offensive_possessions_off")
+        or possessions.get("off_possessions_off")
+    )
+    def_off = _coerce_int(
+        possessions.get("defensive_possessions_off")
+        or possessions.get("def_possessions_off")
+    )
+
+    points_on_offense = _coerce_float(possessions.get("points_on_offense"))
+    points_on_defense = _coerce_float(possessions.get("points_on_defense"))
+    points_off_offense = _coerce_float(possessions.get("points_off_offense"))
+    points_off_defense = _coerce_float(possessions.get("points_off_defense"))
+
+    if all(value is None for value in (off_on, def_on, off_off, def_off)):
+        return None
+
+    return {
+        "off_possessions_on": off_on or 0,
+        "def_possessions_on": def_on or 0,
+        "off_possessions_off": off_off or 0,
+        "def_possessions_off": def_off or 0,
+        "points_on_offense": points_on_offense,
+        "points_on_defense": points_on_defense,
+        "points_off_offense": points_off_offense,
+        "points_off_defense": points_off_defense,
+    }
+
+
 def get_on_off_summary(
     player_id: int,
     date_from: Optional[object] = None,
     date_to: Optional[object] = None,
     labels: Optional[object] = None,
+    possessions: Optional[object] = None,
 ) -> OnOffSummary:
     roster = db.session.get(Roster, player_id)
     if not roster:
@@ -415,6 +476,45 @@ def get_on_off_summary(
     start_dt = _coerce_date(date_from)
     end_dt = _coerce_date(date_to)
     label_set = _normalize_labels(labels)
+
+    precomputed = _normalize_precomputed_possessions(possessions)
+    if precomputed is not None:
+        off_on = precomputed["off_possessions_on"]
+        def_on = precomputed["def_possessions_on"]
+        off_off = precomputed["off_possessions_off"]
+        def_off = precomputed["def_possessions_off"]
+
+        ppp_on_offense = (
+            round(precomputed.get("points_on_offense", 0) / off_on, 2)
+            if off_on
+            else None
+        )
+        ppp_on_defense = (
+            round(precomputed.get("points_on_defense", 0) / def_on, 2)
+            if def_on
+            else None
+        )
+        ppp_off_offense = (
+            round(precomputed.get("points_off_offense", 0) / off_off, 2)
+            if off_off
+            else None
+        )
+        ppp_off_defense = (
+            round(precomputed.get("points_off_defense", 0) / def_off, 2)
+            if def_off
+            else None
+        )
+
+        return OnOffSummary(
+            offensive_possessions_on=off_on,
+            defensive_possessions_on=def_on,
+            ppp_on_offense=ppp_on_offense,
+            ppp_on_defense=ppp_on_defense,
+            offensive_possessions_off=off_off,
+            defensive_possessions_off=def_off,
+            ppp_off_offense=ppp_off_offense,
+            ppp_off_defense=ppp_off_defense,
+        )
 
     on_poss, on_pts = _get_player_possession_totals(
         player_id, roster, "Offense", start_dt, end_dt, label_set

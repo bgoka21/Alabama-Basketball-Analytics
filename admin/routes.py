@@ -19,6 +19,8 @@ import pandas as pd  # Added pandas import for CSV parsing and NaN handling
 from types import SimpleNamespace
 import pdfkit
 
+from admin.custom_stats_schema import PlayerGameStatsRow
+
 try:
     from bs4.element import ResultSet as _BeautifulSoupResultSet
 except ImportError:  # pragma: no cover - BeautifulSoup not installed in some contexts
@@ -3316,6 +3318,7 @@ def _build_practice_table_dataset(request_data):
 
     catalog = _flatten_practice_field_catalog()
     selected_fields = [key for key in field_keys if key in catalog]
+    possessions = request_data.get('possessions')
 
     roster_rows = []
     if player_ids:
@@ -3366,6 +3369,7 @@ def _build_practice_table_dataset(request_data):
             date_from=date_from,
             date_to=date_to,
             labels=helper_labels,
+            possessions=possessions,
         )
         to_rates = get_turnover_rates_onfloor(
             player_id=roster_entry.id,
@@ -3538,6 +3542,7 @@ def _build_game_table_dataset(request_data):
 
     catalog = _build_game_field_catalog_map()
     selected_fields = [key for key in field_keys if key in catalog]
+    possessions = request_data.get('possessions')
 
     roster_rows: list[Roster] = []
     if player_ids:
@@ -3579,6 +3584,7 @@ def _build_game_table_dataset(request_data):
             date_from=date_from,
             date_to=date_to,
             labels=helper_labels,
+            possessions=possessions,
         )
 
         totals = dict(aggregates.get('totals') or {})
@@ -3666,14 +3672,14 @@ def _build_game_table_dataset(request_data):
 
         game_rows[roster_entry.player_name] = flattened
 
-    rows = []
+    rows: list[PlayerGameStatsRow] = []
     combined_agg: dict[str, float] = defaultdict(float)
     total_sessions = 0
 
     for roster_entry in roster_rows:
         aggregates = game_rows.get(roster_entry.player_name) or {}
 
-        row_display = {
+        row_display: PlayerGameStatsRow = {
             'player': roster_entry.player_name,
         }
 
