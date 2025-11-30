@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import math
 import os, json
 from collections import defaultdict
@@ -5143,7 +5144,11 @@ def parse_file(file_id):
         # GAME branch
         else:
             # 2c) run your existing game parser
-            results = parse_csv(upload_path, None, season_id)
+            parse_csv_params = inspect.signature(parse_csv).parameters
+            if "file_date" in parse_csv_params:
+                results = parse_csv(upload_path, None, season_id, uploaded_file.file_date)
+            else:
+                results = parse_csv(upload_path, None, season_id)
 
             # 2d) JSON-ify the lineup efficiencies
             raw_lineups = results.get('lineup_efficiencies', {})
@@ -5254,7 +5259,11 @@ def _reparse_uploaded_game(uploaded_file, upload_path):
     # Commit the deletions so the parser sees a clean slate
     db.session.commit()
 
-    results = parse_csv(upload_path, None, season_id)
+    parse_csv_params = inspect.signature(parse_csv).parameters
+    if "file_date" in parse_csv_params:
+        results = parse_csv(upload_path, None, season_id, uploaded_file.file_date)
+    else:
+        results = parse_csv(upload_path, None, season_id)
 
     raw_lineups = results.get("lineup_efficiencies", {})
     json_lineups = {

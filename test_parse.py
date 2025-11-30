@@ -753,7 +753,7 @@ def calculate_derived_metrics(player_stats):
             stats["points_per_shot"] = None
     return player_stats
 
-def parse_csv(file_path, game_id, season_id):
+def parse_csv(file_path, game_id, season_id, file_date=None):
     #print("✅ Starting CSV Processing...")
     #print(f"🔍 Checking file path: {os.path.abspath(file_path)}")
     #print(f"🔍 File exists? {os.path.exists(file_path)}")
@@ -774,9 +774,14 @@ def parse_csv(file_path, game_id, season_id):
     with app_instance.app_context():
         game_entry = Game.query.filter_by(csv_filename=os.path.basename(file_path)).first()
         if not game_entry:
+            parsed_game_date = (
+                pd.to_datetime(file_date).date()
+                if file_date is not None
+                else pd.to_datetime("today").date()
+            )
             game_entry = Game(
                 season_id=season_id,
-                game_date=pd.to_datetime("today").date(),
+                game_date=parsed_game_date,
                 opponent_name="Unknown",
                 home_or_away="Home",
                 result="N/A",
