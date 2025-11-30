@@ -1375,7 +1375,12 @@ def parse_csv(file_path, game_id, season_id):
     with app_instance.app_context():
         for poss in possession_data:
             possession_side = poss.get("side", "")
-            time_segment = "Offense" if possession_side == "Team" else "Defense"
+            side_normalized = possession_side.strip().lower()
+            time_segment = (
+                "Offense"
+                if side_normalized in {"alabama", "offense", "team"}
+                else "Defense"
+            )
 
             new_poss = Possession(
                 game_id=game_id,
@@ -1394,9 +1399,13 @@ def parse_csv(file_path, game_id, season_id):
             # Insert PlayerPossession entries
             player_ids = []
             for jersey in poss.get("players_on_floor", []):
+                player_name = jersey
+                if "#" in player_name:
+                    player_name = player_name.split(" ", 1)[1]
+
                 roster_entry = Roster.query.filter_by(
                     season_id=season_id,
-                    player_name=jersey,
+                    player_name=player_name,
                 ).first()
                 if roster_entry:
                     player_ids.append(roster_entry.id)
