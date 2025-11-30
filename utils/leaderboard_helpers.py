@@ -536,8 +536,9 @@ def get_on_off_summary(
     def_poss_off = max(team_def_poss - def_poss_on, 0)
     def_pts_off = max(team_def_pts - def_pts_on, 0.0)
 
+    off_poss_on = on_poss
     summary = OnOffSummary(
-        offensive_possessions_on=on_poss,
+        offensive_possessions_on=off_poss_on,
         defensive_possessions_on=def_poss_on,
         ppp_on_offense=round(on_pts / on_poss, 2) if on_poss else 0.0,
         ppp_on_defense=round(def_pts_on / def_poss_on, 2) if def_poss_on else 0.0,
@@ -545,6 +546,9 @@ def get_on_off_summary(
         defensive_possessions_off=def_poss_off,
         ppp_off_offense=round(off_pts_off / off_poss_off, 2) if off_poss_off else 0.0,
         ppp_off_defense=round(def_pts_off / def_poss_off, 2) if def_poss_off else 0.0,
+    )
+    print(
+        f"{roster.player_name}: {off_poss_on=}, {off_poss_off=}, {def_poss_on=}, {def_poss_off=}"
     )
     return summary
 
