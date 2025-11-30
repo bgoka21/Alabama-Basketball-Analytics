@@ -173,6 +173,7 @@ from services.leaderboard_game import (
     get_season_window,
 )
 from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
+from utils.reparse_uploaded_file import reparse_uploaded_file
 
 try:  # Optional CSRF protection – not every deployment wires this up
     from app.extensions import csrf  # type: ignore[attr-defined]
@@ -5373,42 +5374,21 @@ def _reparse_uploaded_recruit(uploaded_file, upload_path):
 def reparse_file(file_id):
     """Re-parse a previously uploaded CSV without removing the file."""
     uploaded_file = UploadedFile.query.get_or_404(file_id)
-    filename = uploaded_file.filename
-    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-
-    if not os.path.exists(upload_path):
-        flash(f"File '{filename}' not found on server.", "error")
-        return redirect(url_for('admin.files_view_unique'))
 
     try:
-        category = normalize_category(uploaded_file.category)
-        uploaded_file.category = category
-        if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
-            practice_id, season_id = _reparse_uploaded_practice(uploaded_file, upload_path)
-            flash("Practice re-parsed successfully!", "success")
-            return redirect(
-                url_for('admin.edit_practice', practice_id=practice_id, season_id=season_id)
-            )
-
-        if category == 'Recruit':
-            rid = _reparse_uploaded_recruit(uploaded_file, upload_path)
-            flash('Recruit file re-parsed successfully!', 'success')
-            return redirect(url_for('recruits.detail_recruit', id=rid))
-
-        game_id, _season_id = _reparse_uploaded_game(uploaded_file, upload_path)
-        flash('Game re-parsed successfully!', 'success')
-        return redirect(url_for('admin.edit_game', game_id=game_id))
-
-        flash('Reparse not supported for this file type.', 'error')
-        return redirect(url_for('admin.files_view_unique'))
-
+        reparse_uploaded_file(uploaded_file)
+        flash("File re-parsed successfully!", "success")
     except Exception as e:
         current_app.logger.exception('Error re-parsing CSV')
         uploaded_file.parse_status = 'Error'
         uploaded_file.parse_error = str(e)
         db.session.commit()
-        flash(f"Re-parsing failed for '{filename}': {e}", 'error')
-        return redirect(url_for('admin.files_view_unique'))
+        flash(
+            f"Re-parsing failed for '{uploaded_file.filename}': {e}",
+            'error',
+        )
+
+    return redirect(url_for('admin.files_view_unique'))
 
 
 
@@ -5536,19 +5516,27 @@ def bulk_action_view():
         memory_file.seek(0)
         return send_file(memory_file, download_name="downloaded_files.zip", as_attachment=True)
     elif action == 'reparse':
-        count = 0
+        success_count = 0
+        failure_reasons: list[str] = []
         for file in files:
-            path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
-            if os.path.exists(path):
-                category = normalize_category(file.category)
-                file.category = category
-                if category in ['Summer Workouts', 'Pickup', 'Fall Workouts', 'Official Practice']:
-                    _reparse_uploaded_practice(file, path)
-                    count += 1
-                elif category == 'Recruit':
-                    _reparse_uploaded_recruit(file, path)
-                    count += 1
-        flash(f"Re-parsed {count} files.", "success")
+            try:
+                reparse_uploaded_file(file)
+                success_count += 1
+            except Exception as e:
+                current_app.logger.exception('Error re-parsing CSV')
+                file.parse_status = 'Error'
+                file.parse_error = str(e)
+                db.session.commit()
+                failure_reasons.append(str(e))
+
+        if failure_reasons:
+            reason_text = "; ".join(sorted(set(failure_reasons)))
+            flash(
+                f"Reparsed {success_count} files, {len(failure_reasons)} failed ({reason_text}).",
+                "error",
+            )
+        else:
+            flash(f"Reparsed {success_count} files.", "success")
 
     return redirect(url_for('admin.files_view_unique'))
 

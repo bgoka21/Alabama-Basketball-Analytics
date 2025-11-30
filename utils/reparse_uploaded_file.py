@@ -5,7 +5,6 @@ from typing import Optional
 
 from flask import current_app
 
-from app.utils.category_normalization import normalize_category
 from models.database import (
     BlueCollarStats,
     Game,
@@ -18,8 +17,6 @@ from models.database import (
     db,
 )
 from models.uploaded_file import UploadedFile
-from parse_practice_csv import parse_practice_csv
-from test_parse import parse_csv
 
 
 def _format_lineup_efficiencies(raw_lineups: dict) -> dict:
@@ -71,9 +68,17 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
         Possession.query.filter_by(game_id=game.id).delete()
         db.session.commit()
 
-        result = parse_csv(filepath, game_id=None, season_id=file.season_id)
+        from admin import routes as admin_routes
+
+        result = admin_routes.parse_csv(
+            filepath, game_id=None, season_id=file.season_id
+        )
 
     elif file.category in {"Official Practice", "Fall Workouts", "Summer Workouts", "Pickup"}:
+        from app.utils.category_normalization import normalize_category
+
+        from admin import routes as admin_routes
+
         normalized_category = normalize_category(file.category)
         practice = Practice.query.filter_by(
             season_id=file.season_id,
@@ -100,7 +105,7 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
         Possession.query.filter_by(practice_id=practice.id).delete()
         db.session.commit()
 
-        result = parse_practice_csv(
+        result = admin_routes.parse_practice_csv(
             filepath,
             season_id=file.season_id,
             category=normalized_category,
@@ -113,17 +118,7 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
     raw_lineups = _format_lineup_efficiencies(result.get("lineup_efficiencies", {}))
     file.lineup_efficiencies = json.dumps(raw_lineups)
 
-    offensive_payload = result.get("offensive_breakdown")
-    defensive_payload = result.get("defensive_breakdown")
-
-    # Include detailed breakdowns when present (game parser)
-    if any(key in result for key in [
-        "periodic_offense",
-        "shot_clock_offense",
-        "possession_start_offense",
-        "paint_touches_offense",
-        "shot_clock_pt_offense",
-    ]):
+    if file.category == "Game":
         offensive_payload = {
             "possession_type": result.get("offensive_breakdown", {}),
             "periodic": result.get("periodic_offense", {}),
@@ -132,14 +127,6 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
             "paint_touches": result.get("paint_touches_offense", {}),
             "shot_clock_pt": result.get("shot_clock_pt_offense", {}),
         }
-
-    if any(key in result for key in [
-        "periodic_defense",
-        "shot_clock_defense",
-        "possession_start_defense",
-        "paint_touches_defense",
-        "shot_clock_pt_defense",
-    ]):
         defensive_payload = {
             "possession_type": result.get("defensive_breakdown", {}),
             "periodic": result.get("periodic_defense", {}),
@@ -148,6 +135,41 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
             "paint_touches": result.get("paint_touches_defense", {}),
             "shot_clock_pt": result.get("shot_clock_pt_defense", {}),
         }
+    else:
+        offensive_payload = result.get("offensive_breakdown")
+        defensive_payload = result.get("defensive_breakdown")
+
+        if any(key in result for key in [
+            "periodic_offense",
+            "shot_clock_offense",
+            "possession_start_offense",
+            "paint_touches_offense",
+            "shot_clock_pt_offense",
+        ]):
+            offensive_payload = {
+                "possession_type": result.get("offensive_breakdown", {}),
+                "periodic": result.get("periodic_offense", {}),
+                "shot_clock": result.get("shot_clock_offense", {}),
+                "possession_start": result.get("possession_start_offense", {}),
+                "paint_touches": result.get("paint_touches_offense", {}),
+                "shot_clock_pt": result.get("shot_clock_pt_offense", {}),
+            }
+
+        if any(key in result for key in [
+            "periodic_defense",
+            "shot_clock_defense",
+            "possession_start_defense",
+            "paint_touches_defense",
+            "shot_clock_pt_defense",
+        ]):
+            defensive_payload = {
+                "possession_type": result.get("defensive_breakdown", {}),
+                "periodic": result.get("periodic_defense", {}),
+                "shot_clock": result.get("shot_clock_defense", {}),
+                "possession_start": result.get("possession_start_defense", {}),
+                "paint_touches": result.get("paint_touches_defense", {}),
+                "shot_clock_pt": result.get("shot_clock_pt_defense", {}),
+            }
 
     file.offensive_breakdown = json.dumps(offensive_payload or {})
     file.defensive_breakdown = json.dumps(defensive_payload or {})
