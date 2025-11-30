@@ -1374,16 +1374,20 @@ def parse_csv(file_path, game_id, season_id):
     possession_data, _, _ = process_possessions(df, game_id, season_id, subtract_off_reb=False)
     with app_instance.app_context():
         for poss in possession_data:
+            possession_side = poss.get("side", "")
+            time_segment = "Offense" if possession_side == "Team" else "Defense"
+
             new_poss = Possession(
                 game_id=game_id,
                 season_id=season_id,
-                possession_side=poss.get("side", ""),
+                possession_side=possession_side,
                 possession_type=poss.get("possession_type", ""),
                 possession_start=poss.get("possession_start", ""),
                 paint_touches=poss.get("paint_touches", ""),
                 shot_clock=poss.get("shot_clock", ""),
                 shot_clock_pt=poss.get("shot_clock_pt", ""),
-                points_scored=poss.get("points_scored", 0)
+                points_scored=poss.get("points_scored", 0),
+                time_segment=time_segment,
             )
             db.session.add(new_poss)
             db.session.flush()
