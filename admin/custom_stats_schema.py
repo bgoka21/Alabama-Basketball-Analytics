@@ -13,4 +13,6 @@ class PlayerGameStatsRow(TypedDict, total=False):
     adv_ppp_on_defense: Optional[float]
     adv_ppp_off_defense: Optional[float]
     adv_defensive_leverage: Optional[float]
+    adv_off_possession_pct: Optional[float]
+    adv_def_possession_pct: Optional[float]
 
