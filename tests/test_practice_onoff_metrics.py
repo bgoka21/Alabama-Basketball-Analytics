@@ -77,4 +77,4 @@ def test_adv_ppp_fields_none_when_no_possessions():
         'adv_defensive_leverage',
     ):
         assert cells[field]['display'] == '—'
-        assert cells[field]['data_value'] == 0.0
+        assert cells[field]['data_value'] is None

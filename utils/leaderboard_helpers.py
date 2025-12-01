@@ -25,6 +25,10 @@ class OnOffSummary:
     defensive_possessions_off: int
     ppp_off_offense: Optional[float]
     ppp_off_defense: Optional[float]
+    team_offensive_possessions: int = 0
+    team_defensive_possessions: int = 0
+    offensive_possession_pct: Optional[float] = None
+    defensive_possession_pct: Optional[float] = None
 
 
 def _coerce_date(value: Optional[object]) -> Optional[date]:
@@ -168,28 +172,15 @@ def _get_player_possession_totals(
     end_dt: Optional[date],
     label_set: Set[str],
 ) -> Tuple[int, float]:
-    q = (
-        db.session.query(
-            func.count(PlayerPossession.id),
-            func.coalesce(func.sum(Possession.points_scored), 0),
-        )
-        .join(Possession, PlayerPossession.possession_id == Possession.id)
-        .filter(
-            PlayerPossession.player_id == player_id,
-            Possession.season_id == roster.season_id,
-        )
+    poss_q = _build_possession_id_query(
+        season_id=roster.season_id,
+        side=side,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        label_set=label_set,
+        player_id=player_id,
     )
-    q = _apply_side_filter(q, side)
-    q = _apply_possession_filters(q, start_dt, end_dt, label_set)
-    excluded_possessions = select(ShotDetail.possession_id).where(
-        or_(
-            ShotDetail.event_type.ilike("%Neutral%"),
-            ShotDetail.event_type == "TEAM Off Reb",
-        )
-    )
-    q = q.filter(~Possession.id.in_(excluded_possessions))
-    count, points = q.one()
-    return int(count or 0), float(points or 0)
+    return _summarize_possessions(poss_q)
 
 
 def _get_team_possession_totals(
@@ -199,26 +190,81 @@ def _get_team_possession_totals(
     end_dt: Optional[date],
     label_set: Set[str],
 ) -> Tuple[int, float]:
-    q = (
+    poss_q = _build_possession_id_query(
+        season_id=season_id,
+        side=side,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        label_set=label_set,
+        player_id=None,
+    )
+    return _summarize_possessions(poss_q)
+
+
+def _build_possession_id_query(
+    *,
+    season_id: int,
+    side: str,
+    start_dt: Optional[date],
+    end_dt: Optional[date],
+    label_set: Set[str],
+    player_id: Optional[int],
+) -> Query:
+    base = db.session.query(Possession.id).filter(Possession.season_id == season_id)
+    if player_id is not None:
+        base = base.join(PlayerPossession, PlayerPossession.possession_id == Possession.id)
+        base = base.filter(PlayerPossession.player_id == player_id)
+    base = _apply_side_filter(base, side)
+    base = _apply_possession_filters(base, start_dt, end_dt, label_set)
+    return base.distinct()
+
+
+def _summarize_possessions(possession_query: Query) -> Tuple[int, float]:
+    """Return (possession_count, points_scored) for the provided possession ids.
+
+    This mirrors the game-report possession logic by removing neutral rows and
+    off-rebound extensions before counting possessions.
+    """
+
+    poss_subquery = possession_query.subquery()
+
+    event_counts = (
         db.session.query(
-            func.count(Possession.id),
-            func.coalesce(func.sum(Possession.points_scored), 0),
+            ShotDetail.possession_id.label("pid"),
+            func.sum(case((ShotDetail.event_type.ilike("%Neutral%"), 1), else_=0)).label(
+                "neutral_hits"
+            ),
+            func.sum(case((ShotDetail.event_type == "TEAM Off Reb", 1), else_=0)).label(
+                "off_reb_hits"
+            ),
         )
-        .filter(
-            Possession.season_id == season_id,
-        )
+        .filter(ShotDetail.possession_id.in_(select(poss_subquery.c.id)))
+        .group_by(ShotDetail.possession_id)
+        .subquery()
     )
-    q = _apply_side_filter(q, side)
-    q = _apply_possession_filters(q, start_dt, end_dt, label_set)
-    excluded_possessions = select(ShotDetail.possession_id).where(
-        or_(
-            ShotDetail.event_type.ilike("%Neutral%"),
-            ShotDetail.event_type == "TEAM Off Reb",
+
+    row = (
+        db.session.query(
+            func.count(poss_subquery.c.id).label("run_count"),
+            func.coalesce(
+                func.sum(case((event_counts.c.neutral_hits > 0, 1), else_=0)), 0
+            ).label("neutral_count"),
+            func.coalesce(
+                func.sum(case((event_counts.c.off_reb_hits > 0, 1), else_=0)), 0
+            ).label("off_reb_count"),
+            func.coalesce(func.sum(Possession.points_scored), 0).label("points"),
         )
+        .select_from(poss_subquery)
+        .outerjoin(Possession, Possession.id == poss_subquery.c.id)
+        .outerjoin(event_counts, event_counts.c.pid == poss_subquery.c.id)
+        .one()
     )
-    q = q.filter(~Possession.id.in_(excluded_possessions))
-    count, points = q.one()
-    return int(count or 0), float(points or 0)
+
+    run_count = int(row.run_count or 0)
+    neutral_count = int(row.neutral_count or 0)
+    off_reb_count = int(row.off_reb_count or 0)
+    possessions = max(run_count - neutral_count - off_reb_count, 0)
+    return possessions, float(row.points or 0)
 
 
 def _get_possession_ids(
@@ -528,6 +574,10 @@ def get_on_off_summary(
             defensive_possessions_off=def_off,
             ppp_off_offense=ppp_off_offense,
             ppp_off_defense=ppp_off_defense,
+            team_offensive_possessions=off_on + off_off,
+            team_defensive_possessions=def_on + def_off,
+            offensive_possession_pct=(off_on / (off_on + off_off)) if (off_on + off_off) else None,
+            defensive_possession_pct=(def_on / (def_on + def_off)) if (def_on + def_off) else None,
         )
 
     on_poss, on_pts = _get_player_possession_totals(
@@ -550,21 +600,28 @@ def get_on_off_summary(
     def_poss_off = max(team_def_poss - def_poss_on, 0)
     def_pts_off = max(team_def_pts - def_pts_on, 0.0)
 
-    off_poss_on = on_poss
-    summary = OnOffSummary(
-        offensive_possessions_on=off_poss_on,
+    def _calc_ppp(points: float, possessions: int) -> Optional[float]:
+        if possessions <= 0:
+            return None
+        return round(points / possessions, 2)
+
+    team_off_pct = (on_poss / team_off_poss) if team_off_poss else None
+    team_def_pct = (def_poss_on / team_def_poss) if team_def_poss else None
+
+    return OnOffSummary(
+        offensive_possessions_on=on_poss,
         defensive_possessions_on=def_poss_on,
-        ppp_on_offense=round(on_pts / on_poss, 2) if on_poss else 0.0,
-        ppp_on_defense=round(def_pts_on / def_poss_on, 2) if def_poss_on else 0.0,
+        ppp_on_offense=_calc_ppp(on_pts, on_poss),
+        ppp_on_defense=_calc_ppp(def_pts_on, def_poss_on),
         offensive_possessions_off=off_poss_off,
         defensive_possessions_off=def_poss_off,
-        ppp_off_offense=round(off_pts_off / off_poss_off, 2) if off_poss_off else 0.0,
-        ppp_off_defense=round(def_pts_off / def_poss_off, 2) if def_poss_off else 0.0,
+        ppp_off_offense=_calc_ppp(off_pts_off, off_poss_off),
+        ppp_off_defense=_calc_ppp(def_pts_off, def_poss_off),
+        team_offensive_possessions=team_off_poss,
+        team_defensive_possessions=team_def_poss,
+        offensive_possession_pct=team_off_pct,
+        defensive_possession_pct=team_def_pct,
     )
-    print(
-        f"{roster.player_name}: {off_poss_on=}, {off_poss_off=}, {def_poss_on=}, {def_poss_off=}"
-    )
-    return summary
 
 
 def get_turnover_rates_onfloor(

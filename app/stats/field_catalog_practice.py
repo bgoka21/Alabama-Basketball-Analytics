@@ -69,6 +69,8 @@ PRACTICE_FIELD_GROUPS = {
         {"key": "adv_ppp_off_defense", "label": "Defensive PPP (Off)", "format": "ratio"},
         {"key": "adv_offensive_leverage", "label": "Offensive Leverage", "format": "ratio"},
         {"key": "adv_defensive_leverage", "label": "Defensive Leverage", "format": "ratio"},
+        {"key": "adv_off_possession_pct", "label": "% of Off Possessions", "format": "percent"},
+        {"key": "adv_def_possession_pct", "label": "% of Def Possessions", "format": "percent"},
         {"key": "adv_offensive_possessions", "label": "Offensive Possessions", "format": "count"},
         {"key": "adv_defensive_possessions", "label": "Defensive Possessions", "format": "count"},
         {"key": "adv_off_reb_rate", "label": "Off Rebound Rate", "format": "percent"},

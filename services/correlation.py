@@ -290,6 +290,8 @@ def _practice_metric_specs() -> Dict[str, _MetricSpec]:
         "adv_ppp_off_defense": direct("adv_ppp_off_defense"),
         "adv_offensive_leverage": direct("adv_offensive_leverage"),
         "adv_defensive_leverage": direct("adv_defensive_leverage"),
+        "adv_off_possession_pct": direct("adv_off_possession_pct"),
+        "adv_def_possession_pct": direct("adv_def_possession_pct"),
         "rd_crash_plus": direct("crash_positive"),
         "rd_crash_att": _MetricSpec(
             ("crash_positive", "crash_missed"),
