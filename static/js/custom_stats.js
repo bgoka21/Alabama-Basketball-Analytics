@@ -198,6 +198,10 @@
       return;
     }
 
+    const defaultSource = normalizeSource(config && config.defaultSource ? config.defaultSource : 'practice');
+    const initialDateFrom = elements.dateFrom && elements.dateFrom.value ? elements.dateFrom.value : null;
+    const initialDateTo = elements.dateTo && elements.dateTo.value ? elements.dateTo.value : null;
+
     const state = {
       roster: normalizeRosterData(resolveRosterData(config)),
       selectedPlayers: [],
@@ -207,17 +211,24 @@
       selectedFieldsBySource: { practice: [], game: [] },
       mode: 'totals',
       modeSelections: { practice: 'totals', game: 'totals' },
-      source: normalizeSource(config && config.defaultSource ? config.defaultSource : 'practice'),
+      source: defaultSource,
       autoRefresh: Boolean(elements.autoRefresh ? elements.autoRefresh.checked : true),
       lastPayload: null,
       presets: { players: [], stats: [], dates: [], combined: [] },
-      dateFrom: elements.dateFrom && elements.dateFrom.value ? elements.dateFrom.value : null,
-      dateTo: elements.dateTo && elements.dateTo.value ? elements.dateTo.value : null,
+      dateSelections: {
+        practice: { from: null, to: null },
+        game: { from: null, to: null }
+      },
       fieldCheckboxes: [],
       refreshTimer: null,
       activeRequest: null,
       html2CanvasPromise: null,
       requestRefresh: null
+    };
+
+    state.dateSelections[defaultSource] = {
+      from: initialDateFrom,
+      to: initialDateTo
     };
 
     const playerUI = buildPlayerPicker(elements.playerRoot, state, queueRefresh);
@@ -271,6 +282,14 @@
       const force = Boolean(options.force);
       const previousSource = state.source;
 
+      const currentDates = getDateSelection(state, previousSource);
+      const nextFrom = elements.dateFrom ? (elements.dateFrom.value ? elements.dateFrom.value : null) : currentDates.from;
+      const nextTo = elements.dateTo ? (elements.dateTo.value ? elements.dateTo.value : null) : currentDates.to;
+      setDateSelection(state, previousSource, {
+        from: elements.dateFrom ? nextFrom : currentDates.from,
+        to: elements.dateTo ? nextTo : currentDates.to
+      });
+
       if (!force && normalized === previousSource) {
         if (Array.isArray(options.presetFields)) {
           state.selectedFields = options.presetFields.slice();
@@ -291,6 +310,13 @@
         updateModeToggleLabels(state, elements);
         updateSourceHeadline(state, elements);
         updateSourceButtons(state, elements);
+        const activeDates = getDateSelection(state, normalized);
+        if (elements.dateFrom) {
+          elements.dateFrom.value = activeDates.from || '';
+        }
+        if (elements.dateTo) {
+          elements.dateTo.value = activeDates.to || '';
+        }
         syncFieldCheckboxes(state);
         if (options.queueRefresh !== false) {
           queueRefresh('source');
@@ -321,6 +347,13 @@
       updateModeToggleLabels(state, elements);
       updateSourceHeadline(state, elements);
       updateSourceButtons(state, elements);
+      const activeDates = getDateSelection(state, normalized);
+      if (elements.dateFrom) {
+        elements.dateFrom.value = activeDates.from || '';
+      }
+      if (elements.dateTo) {
+        elements.dateTo.value = activeDates.to || '';
+      }
       state.lastPayload = null;
 
       if (elements.statSearch) {
@@ -913,31 +946,60 @@
     });
   }
 
+  function getDateSelection(state, source) {
+    if (!state || !state.dateSelections) {
+      return { from: null, to: null };
+    }
+    const normalized = normalizeSource(source || state.source);
+    const selection = state.dateSelections[normalized] || { from: null, to: null };
+    if (!state.dateSelections[normalized]) {
+      state.dateSelections[normalized] = selection;
+    }
+    return {
+      from: selection.from || null,
+      to: selection.to || null
+    };
+  }
+
+  function setDateSelection(state, source, { from = null, to = null } = {}) {
+    if (!state.dateSelections) {
+      state.dateSelections = { practice: { from: null, to: null }, game: { from: null, to: null } };
+    }
+    const normalized = normalizeSource(source || state.source);
+    if (!state.dateSelections[normalized]) {
+      state.dateSelections[normalized] = { from: null, to: null };
+    }
+    state.dateSelections[normalized].from = from || null;
+    state.dateSelections[normalized].to = to || null;
+  }
+
   function hydrateDates(elements, state, queueRefresh) {
+    const activeDates = getDateSelection(state);
+
     if (elements.dateFrom) {
-      elements.dateFrom.value = state.dateFrom || '';
+      elements.dateFrom.value = activeDates.from || '';
       elements.dateFrom.addEventListener('change', () => {
-        state.dateFrom = elements.dateFrom.value ? elements.dateFrom.value : null;
+        const nextFrom = elements.dateFrom.value ? elements.dateFrom.value : null;
+        const current = getDateSelection(state);
+        setDateSelection(state, state.source, { from: nextFrom, to: current.to });
         state.lastPayload = null;
         if (typeof queueRefresh === 'function') {
           queueRefresh('dateFrom');
         }
       });
-    } else {
-      state.dateFrom = null;
     }
 
     if (elements.dateTo) {
-      elements.dateTo.value = state.dateTo || '';
+      elements.dateTo.value = activeDates.to || '';
       elements.dateTo.addEventListener('change', () => {
-        state.dateTo = elements.dateTo.value ? elements.dateTo.value : null;
+        const nextTo = elements.dateTo.value ? elements.dateTo.value : null;
+        const current = getDateSelection(state);
+        setDateSelection(state, state.source, { from: current.from, to: nextTo });
         state.lastPayload = null;
         if (typeof queueRefresh === 'function') {
           queueRefresh('dateTo');
         }
       });
-    } else {
-      state.dateTo = null;
     }
   }
 
@@ -1295,8 +1357,9 @@
           notify('error', 'Enter a name for the preset.');
           return;
         }
-        const currentFrom = elements.dateFrom ? elements.dateFrom.value : state.dateFrom;
-        const currentTo = elements.dateTo ? elements.dateTo.value : state.dateTo;
+        const activeDates = getDateSelection(state);
+        const currentFrom = elements.dateFrom ? elements.dateFrom.value || activeDates.from : activeDates.from;
+        const currentTo = elements.dateTo ? elements.dateTo.value || activeDates.to : activeDates.to;
         const from = currentFrom ? currentFrom : null;
         const to = currentTo ? currentTo : null;
         if (!from && !to) {
@@ -1544,9 +1607,9 @@
   function applyDatesPreset(preset, state, elements) {
     const from = preset && preset.date_from ? preset.date_from : null;
     const to = preset && preset.date_to ? preset.date_to : null;
-    const changed = state.dateFrom !== from || state.dateTo !== to;
-    state.dateFrom = from;
-    state.dateTo = to;
+    const previous = getDateSelection(state);
+    const changed = previous.from !== from || previous.to !== to;
+    setDateSelection(state, state.source, { from, to });
     if (elements.dateFrom) {
       elements.dateFrom.value = from || '';
     }
@@ -1623,9 +1686,9 @@
 
     const nextDateFrom = preset && preset.date_from ? preset.date_from : null;
     const nextDateTo = preset && preset.date_to ? preset.date_to : null;
-    if (state.dateFrom !== nextDateFrom || state.dateTo !== nextDateTo) {
-      state.dateFrom = nextDateFrom;
-      state.dateTo = nextDateTo;
+    const previousDates = getDateSelection(state);
+    if (previousDates.from !== nextDateFrom || previousDates.to !== nextDateTo) {
+      setDateSelection(state, state.source, { from: nextDateFrom, to: nextDateTo });
       if (elements && elements.dateFrom) {
         elements.dateFrom.value = nextDateFrom || '';
       }
@@ -2012,11 +2075,12 @@
       mode: normalizeModeForSource(state.mode, source),
       source
     };
-    if (state.dateFrom) {
-      payload.date_from = state.dateFrom;
+    const activeDates = getDateSelection(state, source);
+    if (activeDates.from) {
+      payload.date_from = activeDates.from;
     }
-    if (state.dateTo) {
-      payload.date_to = state.dateTo;
+    if (activeDates.to) {
+      payload.date_to = activeDates.to;
     }
     return payload;
   }
