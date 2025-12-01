@@ -5,7 +5,7 @@ from datetime import date, datetime
 from types import SimpleNamespace
 from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
-from sqlalchemy import case, func, or_, and_
+from sqlalchemy import case, func, or_, and_, select
 from sqlalchemy.orm import Query
 
 from models.database import (
@@ -181,6 +181,13 @@ def _get_player_possession_totals(
     )
     q = _apply_side_filter(q, side)
     q = _apply_possession_filters(q, start_dt, end_dt, label_set)
+    excluded_possessions = select(ShotDetail.possession_id).where(
+        or_(
+            ShotDetail.event_type.ilike("%Neutral%"),
+            ShotDetail.event_type == "TEAM Off Reb",
+        )
+    )
+    q = q.filter(~Possession.id.in_(excluded_possessions))
     count, points = q.one()
     return int(count or 0), float(points or 0)
 
@@ -203,6 +210,13 @@ def _get_team_possession_totals(
     )
     q = _apply_side_filter(q, side)
     q = _apply_possession_filters(q, start_dt, end_dt, label_set)
+    excluded_possessions = select(ShotDetail.possession_id).where(
+        or_(
+            ShotDetail.event_type.ilike("%Neutral%"),
+            ShotDetail.event_type == "TEAM Off Reb",
+        )
+    )
+    q = q.filter(~Possession.id.in_(excluded_possessions))
     count, points = q.one()
     return int(count or 0), float(points or 0)
 
