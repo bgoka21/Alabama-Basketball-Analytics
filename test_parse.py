@@ -1404,14 +1404,27 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
             # Insert PlayerPossession entries
             player_ids = []
             for jersey in poss.get("players_on_floor", []):
-                player_name = jersey
-                if "#" in player_name:
-                    player_name = player_name.split(" ", 1)[1]
+                player_name = jersey.strip()
+                if not player_name:
+                    continue
 
+                # First, try to match the roster entry exactly as provided
                 roster_entry = Roster.query.filter_by(
                     season_id=season_id,
                     player_name=player_name,
                 ).first()
+
+                # If not found, attempt a fallback without the jersey prefix
+                if not roster_entry and player_name.startswith("#"):
+                    name_no_number = (
+                        player_name.split(" ", 1)[1]
+                        if " " in player_name
+                        else player_name.lstrip("#")
+                    )
+                    roster_entry = Roster.query.filter_by(
+                        season_id=season_id,
+                        player_name=name_no_number,
+                    ).first()
                 if roster_entry:
                     player_ids.append(roster_entry.id)
 
