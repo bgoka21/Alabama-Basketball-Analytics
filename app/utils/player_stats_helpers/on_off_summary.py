@@ -66,6 +66,7 @@ def get_on_off_summary(df: pd.DataFrame, player_name: str) -> Dict[str, Any]:
 
     team_points_allowed = valid_def_rows["OPP STATS"].apply(_get_def_points).sum()
     team_def_possessions = len(valid_def_rows)
+    total_possessions = team_def_possessions
 
     player_def_rows = valid_def_rows[
         valid_def_rows["PLAYER POSSESSIONS"].str.contains(player_name, na=False)
@@ -80,10 +81,14 @@ def get_on_off_summary(df: pd.DataFrame, player_name: str) -> Dict[str, Any]:
     )
     leverage_def = ppp_def_off - ppp_def_on
 
+    percent_off = off_possessions / team_possessions if team_possessions else 0
+    percent_def = def_possessions / total_possessions if total_possessions else 0
+
     return {
         "offense": {
             "possessions_on": off_possessions,
             "team_possessions": team_possessions,
+            "percent_of_team_possessions": percent_off,
             "ppp_on": ppp_on,
             "ppp_off": ppp_off,
             "leverage": leverage_off,
@@ -91,6 +96,7 @@ def get_on_off_summary(df: pd.DataFrame, player_name: str) -> Dict[str, Any]:
         "defense": {
             "possessions_on": def_possessions,
             "team_possessions": team_def_possessions,
+            "percent_of_team_possessions": percent_def,
             "ppp_on": ppp_def_on,
             "ppp_off": ppp_def_off,
             "leverage": leverage_def,
