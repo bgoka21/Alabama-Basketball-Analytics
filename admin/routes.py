@@ -144,6 +144,7 @@ from utils.leaderboard_helpers import (
     get_turnover_rates_onfloor,
     get_rebound_rates_onfloor,
 )
+from utils.player_stats_helpers.cooe import get_game_on_off_stats
 from utils.scope import resolve_scope
 from services.eybl_ingest import (
     load_csvs,
@@ -2662,6 +2663,15 @@ def _pct(n):
     return None if n is None else n * 100.0
 
 
+def _round_or_none(value, digits=2):
+    if value is None:
+        return None
+    try:
+        return round(value, digits)
+    except Exception:
+        return None
+
+
 def _fmt_count(n):
     if n is None:
         return "—"
@@ -2910,6 +2920,7 @@ def _collect_player_session_stats(roster_entry, source='practice', date_from=Non
         'player_name': roster_entry.player_name,
         'jersey': _extract_jersey_number(roster_entry.player_name),
         'session_count': len(session_ids),
+        'session_ids': sorted(session_ids),
         'totals': numeric_fields,
         'blue': blue_totals,
         'extra': extra_averages,
@@ -3314,7 +3325,10 @@ def _format_game_stat_row(roster_entry, aggregates, field_keys, mode, catalog):
         value = spec.compute(agg) if spec else agg.get(metric_key)
 
         if fmt in {'percent', 'pct'}:
-            cells[key] = _format_percent(value)
+            normalized_value = value
+            if normalized_value is not None and abs(normalized_value) <= 1:
+                normalized_value = normalized_value * 100
+            cells[key] = _format_percent(normalized_value)
         elif fmt == 'ratio':
             cells[key] = _format_ratio(value, decimals=2)
         elif fmt == 'shooting_split':
@@ -3355,6 +3369,7 @@ def _build_practice_table_dataset(request_data):
     catalog = _flatten_practice_field_catalog()
     selected_fields = [key for key in field_keys if key in catalog]
     possessions = request_data.get('possessions')
+    helper_labels = labels if labels else None
 
     roster_rows = []
     if player_ids:
@@ -3401,7 +3416,6 @@ def _build_practice_table_dataset(request_data):
             date_to=date_to,
         )
 
-        helper_labels = labels if labels else None
         onoff = get_on_off_summary(
             player_id=roster_entry.id,
             date_from=date_from,
@@ -3632,14 +3646,8 @@ def _build_game_table_dataset(request_data):
             date_to=date_to,
         )
 
-        helper_labels = labels if labels else None
-        onoff = get_on_off_summary(
-            player_id=roster_entry.id,
-            date_from=date_from,
-            date_to=date_to,
-            labels=helper_labels,
-            possessions=possessions,
-        )
+        session_ids = aggregates.get('session_ids')
+        onoff = get_game_on_off_stats(session_ids, roster_entry.id)
 
         totals = dict(aggregates.get('totals') or {})
         blue = dict(aggregates.get('blue') or {})
@@ -3658,37 +3666,18 @@ def _build_game_table_dataset(request_data):
             off_possessions_off = onoff.offensive_possessions_off or 0
             def_possessions_off = onoff.defensive_possessions_off or 0
 
-            ppp_on_offense = onoff.ppp_on_offense if off_possessions_on else None
-            ppp_on_defense = onoff.ppp_on_defense if def_possessions_on else None
-            ppp_off_offense = (
-                onoff.ppp_off_offense if off_possessions_off else None
-            )
-            ppp_off_defense = onoff.ppp_off_defense if def_possessions_off else None
-
             flattened.update(
                 {
                     'adv_offensive_possessions': off_possessions_on,
                     'adv_defensive_possessions': def_possessions_on,
-                    'adv_ppp_on_offense': ppp_on_offense,
-                    'adv_ppp_on_defense': ppp_on_defense,
-                    'adv_ppp_off_offense': ppp_off_offense,
-                    'adv_ppp_off_defense': ppp_off_defense,
-                    'adv_offensive_leverage': (
-                        round(ppp_on_offense - ppp_off_offense, 2)
-                        if ppp_on_offense is not None and ppp_off_offense is not None
-                        else None
-                    ),
-                    'adv_defensive_leverage': (
-                        round(ppp_off_defense - ppp_on_defense, 2)
-                        if ppp_off_defense is not None and ppp_on_defense is not None
-                        else None
-                    ),
-                    'adv_off_possession_pct': _pct(
-                        getattr(onoff, 'offensive_possession_pct', None)
-                    ),
-                    'adv_def_possession_pct': _pct(
-                        getattr(onoff, 'defensive_possession_pct', None)
-                    ),
+                    'adv_ppp_on_offense': _round_or_none(onoff.adv_ppp_on_offense),
+                    'adv_ppp_on_defense': _round_or_none(onoff.adv_ppp_on_defense),
+                    'adv_ppp_off_offense': _round_or_none(onoff.adv_ppp_off_offense),
+                    'adv_ppp_off_defense': _round_or_none(onoff.adv_ppp_off_defense),
+                    'adv_offensive_leverage': _round_or_none(onoff.adv_offensive_leverage),
+                    'adv_defensive_leverage': _round_or_none(onoff.adv_defensive_leverage),
+                    'adv_off_possession_pct': onoff.adv_off_possession_pct,
+                    'adv_def_possession_pct': onoff.adv_def_possession_pct,
                 }
             )
 
@@ -3696,19 +3685,14 @@ def _build_game_table_dataset(request_data):
             onoff_accum['def_possessions_on'] += def_possessions_on
             onoff_accum['off_possessions_off'] += off_possessions_off
             onoff_accum['def_possessions_off'] += def_possessions_off
-            onoff_accum['points_on_offense'] += (ppp_on_offense or 0) * off_possessions_on
-            onoff_accum['points_on_defense'] += (ppp_on_defense or 0) * def_possessions_on
-            onoff_accum['points_off_offense'] += (ppp_off_offense or 0) * off_possessions_off
-            onoff_accum['points_off_defense'] += (ppp_off_defense or 0) * def_possessions_off
+            onoff_accum['points_on_offense'] += onoff.points_on_offense or 0
+            onoff_accum['points_on_defense'] += onoff.points_on_defense or 0
+            onoff_accum['points_off_offense'] += onoff.points_off_offense or 0
+            onoff_accum['points_off_defense'] += onoff.points_off_defense or 0
 
-            if team_off_total is None and getattr(onoff, 'team_offensive_possessions', None):
+            if team_off_total is None and getattr(onoff, 'team_offensive_possessions', None) is not None:
                 team_off_total = onoff.team_offensive_possessions
-            if team_def_total is None and getattr(onoff, 'team_defensive_possessions', None):
-                team_def_total = onoff.team_defensive_possessions
-
-            if team_off_total is None and getattr(onoff, 'team_offensive_possessions', None):
-                team_off_total = onoff.team_offensive_possessions
-            if team_def_total is None and getattr(onoff, 'team_defensive_possessions', None):
+            if team_def_total is None and getattr(onoff, 'team_defensive_possessions', None) is not None:
                 team_def_total = onoff.team_defensive_possessions
 
         game_rows[roster_entry.player_name] = flattened
@@ -3722,7 +3706,7 @@ def _build_game_table_dataset(request_data):
 
         row_display: PlayerGameStatsRow = {
             'player': roster_entry.player_name,
-            'summary': _build_custom_summary_payload(flattened),
+            'summary': _build_custom_summary_payload(aggregates),
         }
 
         if selected_fields:
@@ -3748,9 +3732,6 @@ def _build_game_table_dataset(request_data):
     combined_agg['game_count'] = total_sessions
 
     if any(onoff_accum.values()):
-        def _round_or_none(value):
-            return round(value, 2) if value is not None else None
-
         ppp_on_offense = _round_or_none(
             _safe_div(
                 onoff_accum['points_on_offense'], onoff_accum['off_possessions_on']
@@ -3790,11 +3771,11 @@ def _build_game_table_dataset(request_data):
                     if ppp_off_defense is not None and ppp_on_defense is not None
                     else None
                 ),
-                'adv_off_possession_pct': _pct(
-                    _safe_div(onoff_accum['off_possessions_on'], team_off_total)
+                'adv_off_possession_pct': _safe_div(
+                    onoff_accum['off_possessions_on'], team_off_total
                 ),
-                'adv_def_possession_pct': _pct(
-                    _safe_div(onoff_accum['def_possessions_on'], team_def_total)
+                'adv_def_possession_pct': _safe_div(
+                    onoff_accum['def_possessions_on'], team_def_total
                 ),
             }
         )
