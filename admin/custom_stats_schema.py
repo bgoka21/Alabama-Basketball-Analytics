@@ -15,4 +15,5 @@ class PlayerGameStatsRow(TypedDict, total=False):
     adv_defensive_leverage: Optional[float]
     adv_off_possession_pct: Optional[float]
     adv_def_possession_pct: Optional[float]
+    summary: dict
 
