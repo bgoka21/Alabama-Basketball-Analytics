@@ -1,10 +1,8 @@
 export type OnOffLine = {
-  possessions_on: number;
-  team_possessions: number;
-  percent_of_team_possessions: number;
-  ppp_on: number;
-  ppp_off: number;
-  leverage: number;
+  ppp_on: number | null;
+  ppp_off: number | null;
+  leverage: number | null;
+  poss_pct: number | null;
 };
 
 export type OnOffSummary = {
@@ -15,38 +13,62 @@ export type OnOffSummary = {
 export type FieldDescriptor = {
   key: string;
   label: string;
-  accessor: (summary: OnOffSummary) => string;
+  category: string;
+  format: (value: number | null) => string;
 };
 
 /**
- * Field definitions for the custom on/off summary panel. Each accessor formats the
- * value already provided by the backend `get_on_off_summary` helper—no local
- * recalculation happens here.
+ * Field definitions for the custom on/off summary panel. Each formatter receives
+ * a single COOE metric from the backend summary payload and applies the display
+ * fallback expected by the UI.
  */
 export const customStatsFields: FieldDescriptor[] = [
   {
-    key: 'offensive_ppp',
-    label: 'Offensive PPP',
-    accessor: (summary) => summary.offense.ppp_on.toFixed(2),
+    key: 'summary.offense.ppp_on',
+    label: 'PPP On',
+    category: 'Offense',
+    format: (v) => (v == null ? '—' : v.toFixed(2)),
   },
   {
-    key: 'defensive_ppp',
-    label: 'Defensive PPP',
-    accessor: (summary) => summary.defense.ppp_on.toFixed(2),
+    key: 'summary.offense.ppp_off',
+    label: 'PPP Off',
+    category: 'Offense',
+    format: (v) => (v == null ? '—' : v.toFixed(2)),
   },
   {
-    key: 'offensive_leverage',
-    label: 'Offensive Leverage',
-    accessor: (summary) => summary.offense.leverage.toFixed(2),
+    key: 'summary.offense.leverage',
+    label: 'Leverage',
+    category: 'Offense',
+    format: (v) => (v == null ? '—' : v.toFixed(2)),
   },
   {
-    key: 'defensive_leverage',
-    label: 'Defensive Leverage',
-    accessor: (summary) => summary.defense.leverage.toFixed(2),
+    key: 'summary.offense.poss_pct',
+    label: '% Poss',
+    category: 'Offense',
+    format: (v) => (v == null ? '—' : `${(v * 100).toFixed(1)}%`),
   },
   {
-    key: 'percent_possessions',
-    label: '% Possessions',
-    accessor: (summary) => `${(summary.offense.percent_of_team_possessions * 100).toFixed(1)}%`,
+    key: 'summary.defense.ppp_on',
+    label: 'PPP On',
+    category: 'Defense',
+    format: (v) => (v == null ? '—' : v.toFixed(2)),
+  },
+  {
+    key: 'summary.defense.ppp_off',
+    label: 'PPP Off',
+    category: 'Defense',
+    format: (v) => (v == null ? '—' : v.toFixed(2)),
+  },
+  {
+    key: 'summary.defense.leverage',
+    label: 'Leverage',
+    category: 'Defense',
+    format: (v) => (v == null ? '—' : v.toFixed(2)),
+  },
+  {
+    key: 'summary.defense.poss_pct',
+    label: '% Poss',
+    category: 'Defense',
+    format: (v) => (v == null ? '—' : `${(v * 100).toFixed(1)}%`),
   },
 ];

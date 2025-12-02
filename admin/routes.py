@@ -3424,6 +3424,7 @@ def _build_practice_table_dataset(request_data):
 
         row_display = {
             'player': roster_entry.player_name,
+            'summary': _build_custom_summary_payload(onoff),
         }
 
         if selected_fields:
@@ -3721,6 +3722,7 @@ def _build_game_table_dataset(request_data):
 
         row_display: PlayerGameStatsRow = {
             'player': roster_entry.player_name,
+            'summary': _build_custom_summary_payload(flattened),
         }
 
         if selected_fields:
@@ -3890,6 +3892,43 @@ def _prepare_custom_stats_columns(dataset_columns):
         ordered.append(player_col)
     ordered.extend(stat_columns)
     return ordered
+
+
+def _build_custom_summary_payload(onoff):
+    """Map COOE on/off metrics into a nested summary payload."""
+
+    def _value(key: str):
+        if onoff is None:
+            return None
+        if isinstance(onoff, Mapping):
+            return onoff.get(key)
+        return getattr(onoff, key, None)
+
+    def _first_available(*keys: str):
+        for key in keys:
+            value = _value(key)
+            if value is not None:
+                return value
+        return None
+
+    return {
+        'offense': {
+            'ppp_on': _first_available('adv_ppp_on_offense', 'ppp_on_offense'),
+            'ppp_off': _first_available('adv_ppp_off_offense', 'ppp_off_offense'),
+            'leverage': _first_available('adv_offensive_leverage', 'offensive_leverage'),
+            'poss_pct': _first_available(
+                'adv_off_possession_pct', 'offensive_possession_pct'
+            ),
+        },
+        'defense': {
+            'ppp_on': _first_available('adv_ppp_on_defense', 'ppp_on_defense'),
+            'ppp_off': _first_available('adv_ppp_off_defense', 'ppp_off_defense'),
+            'leverage': _first_available('adv_defensive_leverage', 'defensive_leverage'),
+            'poss_pct': _first_available(
+                'adv_def_possession_pct', 'defensive_possession_pct'
+            ),
+        },
+    }
 
 
 @admin_bp.route('/correlation-workbench', methods=['GET'])
