@@ -3661,34 +3661,72 @@ def _build_game_table_dataset(request_data):
         }
 
         if onoff:
-            off_possessions_on = onoff.offensive_possessions_on or 0
-            def_possessions_on = onoff.defensive_possessions_on or 0
-            off_possessions_off = onoff.offensive_possessions_off or 0
-            def_possessions_off = onoff.defensive_possessions_off or 0
+            player_off_poss = onoff.offensive_possessions_on or 0
+            player_def_poss = onoff.defensive_possessions_on or 0
+            team_off_poss = onoff.team_offensive_possessions or 0
+            team_def_poss = onoff.team_defensive_possessions or 0
+
+            team_off_points = (onoff.points_on_offense or 0) + (onoff.points_off_offense or 0)
+            team_def_points = (onoff.points_on_defense or 0) + (onoff.points_off_defense or 0)
+
+            off_possessions_off = max(team_off_poss - player_off_poss, 0)
+            def_possessions_off = max(team_def_poss - player_def_poss, 0)
+
+            ppp_on_offense = _safe_div(onoff.points_on_offense, player_off_poss)
+            ppp_on_defense = _safe_div(onoff.points_on_defense, player_def_poss)
+            ppp_off_offense = _safe_div(team_off_points - (onoff.points_on_offense or 0), off_possessions_off)
+            ppp_off_defense = _safe_div(team_def_points - (onoff.points_on_defense or 0), def_possessions_off)
+
+            team_ppp_offense = _safe_div(team_off_points, team_off_poss)
+            team_ppp_defense = _safe_div(team_def_points, team_def_poss)
+
+            offensive_leverage = (
+                ppp_on_offense - team_ppp_offense
+                if ppp_on_offense is not None and team_ppp_offense is not None
+                else None
+            )
+            defensive_leverage = (
+                team_ppp_defense - ppp_on_defense
+                if ppp_on_defense is not None and team_ppp_defense is not None
+                else None
+            )
+
+            off_possession_pct = _safe_div(player_off_poss, team_off_poss)
+            def_possession_pct = _safe_div(player_def_poss, team_def_poss)
 
             flattened.update(
                 {
-                    'adv_offensive_possessions': off_possessions_on,
-                    'adv_defensive_possessions': def_possessions_on,
-                    'adv_ppp_on_offense': _round_or_none(onoff.adv_ppp_on_offense),
-                    'adv_ppp_on_defense': _round_or_none(onoff.adv_ppp_on_defense),
-                    'adv_ppp_off_offense': _round_or_none(onoff.adv_ppp_off_offense),
-                    'adv_ppp_off_defense': _round_or_none(onoff.adv_ppp_off_defense),
-                    'adv_offensive_leverage': _round_or_none(onoff.adv_offensive_leverage),
-                    'adv_defensive_leverage': _round_or_none(onoff.adv_defensive_leverage),
-                    'adv_off_possession_pct': onoff.adv_off_possession_pct,
-                    'adv_def_possession_pct': onoff.adv_def_possession_pct,
+                    'offensive_possessions_on': player_off_poss,
+                    'defensive_possessions_on': player_def_poss,
+                    'offensive_possessions_off': off_possessions_off,
+                    'defensive_possessions_off': def_possessions_off,
+                    'team_offensive_possessions': team_off_poss,
+                    'team_defensive_possessions': team_def_poss,
+                    'points_on_offense': onoff.points_on_offense or 0,
+                    'points_on_defense': onoff.points_on_defense or 0,
+                    'points_off_offense': team_off_points - (onoff.points_on_offense or 0),
+                    'points_off_defense': team_def_points - (onoff.points_on_defense or 0),
+                    'adv_offensive_possessions': player_off_poss,
+                    'adv_defensive_possessions': player_def_poss,
+                    'adv_ppp_on_offense': _round_or_none(ppp_on_offense),
+                    'adv_ppp_on_defense': _round_or_none(ppp_on_defense),
+                    'adv_ppp_off_offense': _round_or_none(ppp_off_offense),
+                    'adv_ppp_off_defense': _round_or_none(ppp_off_defense),
+                    'adv_offensive_leverage': _round_or_none(offensive_leverage),
+                    'adv_defensive_leverage': _round_or_none(defensive_leverage),
+                    'adv_off_possession_pct': off_possession_pct,
+                    'adv_def_possession_pct': def_possession_pct,
                 }
             )
 
-            onoff_accum['off_possessions_on'] += off_possessions_on
-            onoff_accum['def_possessions_on'] += def_possessions_on
+            onoff_accum['off_possessions_on'] += player_off_poss
+            onoff_accum['def_possessions_on'] += player_def_poss
             onoff_accum['off_possessions_off'] += off_possessions_off
             onoff_accum['def_possessions_off'] += def_possessions_off
             onoff_accum['points_on_offense'] += onoff.points_on_offense or 0
             onoff_accum['points_on_defense'] += onoff.points_on_defense or 0
-            onoff_accum['points_off_offense'] += onoff.points_off_offense or 0
-            onoff_accum['points_off_defense'] += onoff.points_off_defense or 0
+            onoff_accum['points_off_offense'] += team_off_points - (onoff.points_on_offense or 0)
+            onoff_accum['points_off_defense'] += team_def_points - (onoff.points_on_defense or 0)
 
             if team_off_total is None and getattr(onoff, 'team_offensive_possessions', None) is not None:
                 team_off_total = onoff.team_offensive_possessions
@@ -3732,43 +3770,48 @@ def _build_game_table_dataset(request_data):
     combined_agg['game_count'] = total_sessions
 
     if any(onoff_accum.values()):
-        ppp_on_offense = _round_or_none(
-            _safe_div(
-                onoff_accum['points_on_offense'], onoff_accum['off_possessions_on']
-            )
+        ppp_on_offense = _safe_div(
+            onoff_accum['points_on_offense'], onoff_accum['off_possessions_on']
         )
-        ppp_on_defense = _round_or_none(
-            _safe_div(
-                onoff_accum['points_on_defense'], onoff_accum['def_possessions_on']
-            )
+        ppp_on_defense = _safe_div(
+            onoff_accum['points_on_defense'], onoff_accum['def_possessions_on']
         )
-        ppp_off_offense = _round_or_none(
-            _safe_div(
-                onoff_accum['points_off_offense'], onoff_accum['off_possessions_off']
-            )
+
+        team_off_points_total = (
+            onoff_accum['points_on_offense'] + onoff_accum['points_off_offense']
         )
-        ppp_off_defense = _round_or_none(
-            _safe_div(
-                onoff_accum['points_off_defense'], onoff_accum['def_possessions_off']
-            )
+        team_def_points_total = (
+            onoff_accum['points_on_defense'] + onoff_accum['points_off_defense']
         )
+
+        ppp_off_offense = _safe_div(
+            team_off_points_total - onoff_accum['points_on_offense'],
+            onoff_accum['off_possessions_off'],
+        )
+        ppp_off_defense = _safe_div(
+            team_def_points_total - onoff_accum['points_on_defense'],
+            onoff_accum['def_possessions_off'],
+        )
+
+        team_ppp_offense = _safe_div(team_off_points_total, team_off_total)
+        team_ppp_defense = _safe_div(team_def_points_total, team_def_total)
 
         combined_agg.update(
             {
                 'adv_offensive_possessions': onoff_accum['off_possessions_on'],
                 'adv_defensive_possessions': onoff_accum['def_possessions_on'],
-                'adv_ppp_on_offense': ppp_on_offense,
-                'adv_ppp_on_defense': ppp_on_defense,
-                'adv_ppp_off_offense': ppp_off_offense,
-                'adv_ppp_off_defense': ppp_off_defense,
+                'adv_ppp_on_offense': _round_or_none(ppp_on_offense),
+                'adv_ppp_on_defense': _round_or_none(ppp_on_defense),
+                'adv_ppp_off_offense': _round_or_none(ppp_off_offense),
+                'adv_ppp_off_defense': _round_or_none(ppp_off_defense),
                 'adv_offensive_leverage': (
-                    _round_or_none(ppp_on_offense - ppp_off_offense)
-                    if ppp_on_offense is not None and ppp_off_offense is not None
+                    _round_or_none(ppp_on_offense - team_ppp_offense)
+                    if ppp_on_offense is not None and team_ppp_offense is not None
                     else None
                 ),
                 'adv_defensive_leverage': (
-                    _round_or_none(ppp_off_defense - ppp_on_defense)
-                    if ppp_off_defense is not None and ppp_on_defense is not None
+                    _round_or_none(team_ppp_defense - ppp_on_defense)
+                    if ppp_on_defense is not None and team_ppp_defense is not None
                     else None
                 ),
                 'adv_off_possession_pct': _safe_div(

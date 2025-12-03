@@ -628,32 +628,25 @@ def get_possession_breakdown_detailed(df):
 
 # --- Updated process_possessions() ---
 def process_possessions(df, game_id, season_id, subtract_off_reb=True):
-    # Compute overall possession counts using non-neutral rows for count totals.
-    offense_rows = df[df['Row'] == "Offense"]
-    offense_count = len(offense_rows)
-    if subtract_off_reb:
-        offense_invalid = offense_rows['TEAM'].apply(
-            lambda val: ("Neutral" in str(val)) or ("Off Reb" in str(val))
-        ).sum()
-    else:
-        offense_invalid = offense_rows['TEAM'].apply(
-            lambda val: ("Neutral" in str(val))
-        ).sum()
-    offensive_possessions = offense_count - offense_invalid
+    # Compute overall possession counts using TRUE possession rules.
+    offensive_possessions = 0
+    defensive_possessions = 0
 
-    defense_rows = df[df['Row'] == "Defense"]
-    defense_count = len(defense_rows)
-    if subtract_off_reb:
-        defense_invalid = defense_rows.apply(
-            lambda r: (("Off Reb" in str(r['OPP STATS'])) or ("Neutral" in str(r['TEAM']))),
-            axis=1
-        ).sum()
-    else:
-        defense_invalid = defense_rows.apply(
-            lambda r: ("Neutral" in str(r['TEAM'])),
-            axis=1
-        ).sum()
-    defensive_possessions = defense_count - defense_invalid
+    for _, row in df.iterrows():
+        row_type = str(row.get("Row", "")).strip()
+        team_val = str(row.get("TEAM", ""))
+        opp_team_val = str(row.get("OPP TEAM", ""))
+
+        is_off_neutral = "Neutral" in team_val
+        is_off_reb = "Off Reb" in team_val
+        is_def_neutral = "Neutral" in opp_team_val
+
+        if row_type == "Offense":
+            if not is_off_neutral and not (is_off_reb and subtract_off_reb):
+                offensive_possessions += 1
+        elif row_type == "Defense":
+            if not is_def_neutral:
+                defensive_possessions += 1
 
     #print("📝 Possession Summary:")
     #print(f"   Offensive Possessions: {offensive_possessions} (from {offense_count} Offense rows, {offense_invalid} disregarded)")
@@ -665,7 +658,18 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         if row_type not in ["Offense", "Defense"]:
             continue
 
-        is_neutral = "Neutral" in str(row.get("TEAM", ""))
+        team_val = str(row.get("TEAM", ""))
+        opp_team_val = str(row.get("OPP TEAM", ""))
+        is_neutral = "Neutral" in team_val
+        is_off_reb = "Off Reb" in team_val
+        is_opp_neutral = "Neutral" in opp_team_val
+
+        is_true_possession = False
+        if row_type == "Offense":
+            is_true_possession = not is_neutral and not is_off_reb
+        elif row_type == "Defense":
+            is_true_possession = not is_opp_neutral
+
         points_scored = 0
         events = []
         if row_type == "Offense":
@@ -683,6 +687,10 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
                             points_scored += 3
                         elif token == "FT+":
                             points_scored += 1
+            if is_neutral:
+                events.append("Neutral")
+            if is_off_reb:
+                events.append("TEAM Off Reb")
         elif row_type == "Defense":
             tokens = extract_tokens(row.get("OPP STATS", ""))
             for token in tokens:
@@ -696,6 +704,8 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
                     points_scored += 3
                 elif token == "FT+":
                     points_scored += 1
+            if is_opp_neutral:
+                events.append("Neutral")
 
         poss = {
             "game_id": game_id or 0,
@@ -709,7 +719,8 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
             "players_on_floor": extract_tokens(row.get("PLAYER POSSESSIONS", "")),
             "points_scored": points_scored,
             "is_neutral": is_neutral,
-            "events": events
+            "events": events,
+            "is_true_possession": is_true_possession,
         }
         possession_data.append(poss)
     #print("\n📝 Detailed Possession Data:")
@@ -1403,30 +1414,18 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
             db.session.flush()
             # Insert PlayerPossession entries
             player_ids = []
-            for jersey in poss.get("players_on_floor", []):
-                player_name = jersey.strip()
-                if not player_name:
-                    continue
+            if poss.get("is_true_possession"):
+                for jersey in poss.get("players_on_floor", []):
+                    player_name = jersey.strip()
+                    if not player_name:
+                        continue
 
-                # First, try to match the roster entry exactly as provided
-                roster_entry = Roster.query.filter_by(
-                    season_id=season_id,
-                    player_name=player_name,
-                ).first()
-
-                # If not found, attempt a fallback without the jersey prefix
-                if not roster_entry and player_name.startswith("#"):
-                    name_no_number = (
-                        player_name.split(" ", 1)[1]
-                        if " " in player_name
-                        else player_name.lstrip("#")
-                    )
                     roster_entry = Roster.query.filter_by(
                         season_id=season_id,
-                        player_name=name_no_number,
+                        player_name=player_name,
                     ).first()
-                if roster_entry:
-                    player_ids.append(roster_entry.id)
+                    if roster_entry:
+                        player_ids.append(roster_entry.id)
 
             for pid in player_ids:
                 db.session.add(PlayerPossession(
