@@ -29,7 +29,7 @@
 
   const TABLE_CONTAINER_CLASS = "rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden";
   const TABLE_BODY_WRAPPER_CLASS = "overflow-x-auto table-card-body";
-  const TABLE_BASE_CLASS = "min-w-full text-sm table-auto unified-table";
+  const TABLE_BASE_CLASS = "w-full min-w-full text-sm table-fixed unified-table";
   const THEAD_BASE_CLASS = "bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700";
   const TABLE_ROW_CLASS = "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors";
   const TOTAL_ROW_CLASS = "bg-gray-50 dark:bg-gray-800/60 font-semibold border-t border-gray-200 dark:border-gray-700";
