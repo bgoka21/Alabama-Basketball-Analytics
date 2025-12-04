@@ -640,12 +640,13 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         is_off_neutral = "Neutral" in team_val
         is_off_reb = "Off Reb" in team_val
         is_def_neutral = "Neutral" in opp_team_val
+        is_def_off_reb = "Off Reb" in opp_team_val
 
         if row_type == "Offense":
             if not is_off_neutral and not (is_off_reb and subtract_off_reb):
                 offensive_possessions += 1
         elif row_type == "Defense":
-            if not is_def_neutral:
+            if not is_def_neutral and not (is_def_off_reb and subtract_off_reb):
                 defensive_possessions += 1
 
     #print("📝 Possession Summary:")
@@ -663,12 +664,13 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         is_neutral = "Neutral" in team_val
         is_off_reb = "Off Reb" in team_val
         is_opp_neutral = "Neutral" in opp_team_val
+        is_opp_off_reb = "Off Reb" in opp_team_val
 
         is_true_possession = False
         if row_type == "Offense":
             is_true_possession = not is_neutral and not is_off_reb
         elif row_type == "Defense":
-            is_true_possession = not is_opp_neutral
+            is_true_possession = not is_opp_neutral and not (is_opp_off_reb and subtract_off_reb)
 
         points_scored = 0
         events = []
