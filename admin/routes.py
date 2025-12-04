@@ -137,6 +137,38 @@ GAME_TYPE_OPTIONS = [
     "Conference",
     "Postseason",
 ]
+DEFAULT_GAME_TYPE_SELECTION = [
+    "Non-Conference",
+    "Conference",
+    "Postseason",
+]
+
+
+def _normalize_game_types(raw_types, default_types=None):
+    selected: list[str] = []
+    for value in raw_types:
+        match = next(
+            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
+            None,
+        )
+        if match and match not in selected:
+            selected.append(match)
+
+    if selected:
+        return selected
+    if default_types is not None:
+        return list(default_types)
+    return []
+
+
+def parse_game_type_params(param_source, default_types=DEFAULT_GAME_TYPE_SELECTION):
+    raw_types = param_source.getlist('game_type')
+    if not raw_types:
+        single = (param_source.get('game_type') or '').strip()
+        if single:
+            raw_types = [single]
+
+    return _normalize_game_types(raw_types, default_types)
 from utils.leaderboard_helpers import (
     get_player_overall_stats,
     get_on_court_metrics,
@@ -5647,20 +5679,7 @@ def game_reports():
     if selected_season is None and all_seasons:
         selected_season = all_seasons[0].id
 
-    raw_types = request.args.getlist('game_type')
-    if not raw_types:
-        single = (request.args.get('game_type') or '').strip()
-        if single:
-            raw_types = [single]
-
-    selected_game_types: list[str] = []
-    for value in raw_types:
-        match = next(
-            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
-            None,
-        )
-        if match and match not in selected_game_types:
-            selected_game_types.append(match)
+    selected_game_types = parse_game_type_params(request.args)
 
     games: list[Game] = []
     if selected_season:
@@ -6972,20 +6991,7 @@ def player_detail(player_name):
         stats_query = stats_query.filter(PlayerStats.season_id == selected_season_id)
     all_stats_records = stats_query.all()
 
-    raw_game_types = request.args.getlist('game_type')
-    if not raw_game_types:
-        single_game_type = (request.args.get('game_type') or '').strip()
-        if single_game_type:
-            raw_game_types = [single_game_type]
-
-    selected_game_types: list[str] = []
-    for value in raw_game_types:
-        match = next(
-            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
-            None,
-        )
-        if match and match not in selected_game_types:
-            selected_game_types.append(match)
+    selected_game_types = parse_game_type_params(request.args)
 
     if start_dt or end_dt:
         filtered_records = []
@@ -8715,14 +8721,7 @@ def team_totals():
                 practice_categories.append(canonical)
                 seen_categories.add(canonical)
 
-    selected_game_types: list[str] = []
-    for value in request.args.getlist('game_type'):
-        match = next(
-            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
-            None,
-        )
-        if match and match not in selected_game_types:
-            selected_game_types.append(match)
+    selected_game_types = parse_game_type_params(request.args)
 
     def build_game_id_query(target_season_id, start, end, game_types):
         query = Game.query
@@ -10256,20 +10255,7 @@ def leaderboard_game():
         except ValueError:
             end_date_arg = ''
 
-    raw_types = request.args.getlist('game_type')
-    if not raw_types:
-        single = (request.args.get('game_type') or '').strip()
-        if single:
-            raw_types = [single]
-
-    selected_game_types: list[str] = []
-    for value in raw_types:
-        match = next(
-            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
-            None,
-        )
-        if match and match not in selected_game_types:
-            selected_game_types.append(match)
+    selected_game_types = parse_game_type_params(request.args)
 
     def _empty_slice() -> LeaderboardSlice:
         return LeaderboardSlice(rows=[], totals=None, note_date=None)
