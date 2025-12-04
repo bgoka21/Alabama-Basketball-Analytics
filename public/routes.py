@@ -200,6 +200,8 @@ def game_homepage():
         # both 'season' and 'true_data' use the full season
         game_ids = get_all_game_ids_for_current_season(selected_game_types)
 
+    games = Game.query.filter(Game.id.in_(game_ids)).all()
+
     # 3) Attempt‐thresholds: only apply for season & last5
     min_3fg = None if filter_opt == "true_data" else 10
     min_atr = None if filter_opt == "true_data" else 10
@@ -227,12 +229,40 @@ def game_homepage():
     #  ───────────────────────────────────────────
     #  Determine winning games among our selection
     #  ───────────────────────────────────────────
-    winning_game_ids = [
-        g.id
-        for g in Game.query.filter(
-            Game.id.in_(game_ids), func.lower(func.trim(Game.result)).like("w%")
-        ).all()
-    ]
+    team_scores = (
+        db.session.query(
+            TeamStats.game_id,
+            TeamStats.is_opponent,
+            TeamStats.total_points,
+        )
+        .filter(TeamStats.game_id.in_(game_ids))
+        .all()
+    )
+
+    scores_by_game: dict[int, dict[str, int | None]] = {}
+    for game_id, is_opponent, total_points in team_scores:
+        scores_by_game.setdefault(game_id, {"us": None, "opp": None})[
+            "opp" if is_opponent else "us"
+        ] = total_points
+
+    winning_game_ids: list[int] = []
+    losing_game_ids: list[int] = []
+    for g in games:
+        if _is_win(g.result):
+            winning_game_ids.append(g.id)
+            continue
+        if _is_loss(g.result):
+            losing_game_ids.append(g.id)
+            continue
+
+        score_line = scores_by_game.get(g.id, {})
+        us_pts, opp_pts = score_line.get("us"), score_line.get("opp")
+        if us_pts is None or opp_pts is None:
+            continue
+        if us_pts > opp_pts:
+            winning_game_ids.append(g.id)
+        elif us_pts < opp_pts:
+            losing_game_ids.append(g.id)
 
     # ─── 4B) Hard Hat Winners (only in wins) ──────────────────────────
     # 1) Sum each player’s BCP in each winning game
@@ -374,9 +404,8 @@ def game_homepage():
     ]
 
     # ── Summary cards data ────────────────────────────
-    games = Game.query.filter(Game.id.in_(game_ids)).all()
-    wins = sum(1 for g in games if _is_win(g.result))
-    losses = sum(1 for g in games if _is_loss(g.result))
+    wins = len(winning_game_ids)
+    losses = len(losing_game_ids)
     record = f"{wins}–{losses}"
 
     # 2) Avg. BCP per game over those same games (USE weighted total_blue_collar)
