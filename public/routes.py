@@ -197,14 +197,14 @@ def game_homepage():
     # ─── 4A) Blue Collar Points Leaders ──────────────
     bcp_sub = (
         db.session.query(
-            PlayerStats.player_name.label("player_name"),
+            Roster.player_name.label("player_name"),
             func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
                 "total_bcp"
             ),
         )
-        .join(BlueCollarStats, BlueCollarStats.player_id == PlayerStats.id)
+        .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
         .filter(BlueCollarStats.game_id.in_(game_ids))
-        .group_by(PlayerStats.player_name)
+        .group_by(Roster.player_name)
         .subquery()
     )
 
@@ -258,8 +258,8 @@ def game_homepage():
 
     # 3) Count how many times each player hit that max in a winning game
     hard_hats = (
-        db.session.query(PlayerStats.player_name, func.count().label("hard_hat_count"))
-        .join(player_bcp, player_bcp.c.player_id == PlayerStats.id)
+        db.session.query(Roster.player_name, func.count().label("hard_hat_count"))
+        .join(player_bcp, player_bcp.c.player_id == Roster.id)
         .join(
             max_bcp_sub,
             and_(
@@ -269,7 +269,7 @@ def game_homepage():
         )
         # only count games where someone actually scored >0 BCP
         .filter(max_bcp_sub.c.max_bcp > 0)
-        .group_by(PlayerStats.player_name)
+        .group_by(Roster.player_name)
         .order_by(desc("hard_hat_count"))
         .all()
     )
@@ -320,13 +320,13 @@ def game_homepage():
     # b) Count each player’s total possessions **across all games** by name
     pps_sub = (
         db.session.query(
-            PlayerStats.player_name.label("player_name"),
+            Roster.player_name.label("player_name"),
             func.count(PlayerPossession.id).label("possessions"),
         )
-        .join(PlayerStats, PlayerPossession.player_id == PlayerStats.id)
+        .join(Roster, PlayerPossession.player_id == Roster.id)
         .join(Possession, PlayerPossession.possession_id == Possession.id)
         .filter(Possession.game_id.in_(game_ids))
-        .group_by(PlayerStats.player_name)
+        .group_by(Roster.player_name)
         .subquery()
     )
 
