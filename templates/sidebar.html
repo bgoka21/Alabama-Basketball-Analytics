@@ -22,9 +22,9 @@
     </a>
   </li>
   {% else %}
-  {% set home_url = url_for('public.homepage') if view_exists('public.homepage') else '#' %}
+  {% set home_url = url_for('public.game_homepage') if view_exists('public.game_homepage') else (url_for('public.homepage') if view_exists('public.homepage') else '#') %}
   <li class="nav-item">
-    <a class="{{ link_base_classes }}{% if request.endpoint == 'public.homepage' %} {{ active_classes }}{% endif %}" href="{{ home_url }}">
+    <a class="{{ link_base_classes }}{% if request.endpoint in ['public.game_homepage','public.homepage'] %} {{ active_classes }}{% endif %}" href="{{ home_url }}">
       {{ icons.render('home') }}
       <span class="flex-1 text-left">Home</span>
     </a>

@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 # Endpoints a logged-in player is allowed to access without being redirected.
 PLAYER_ALLOWED_ENDPOINTS = {
     'public.practice_homepage',
+    'public.game_homepage',
     'public.homepage',
     'public.skill_dev',
     'admin.player_detail',

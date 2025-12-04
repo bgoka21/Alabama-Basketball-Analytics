@@ -4924,7 +4924,7 @@ def login():
             elif user.is_player:
                 if user.player_name:
                     return redirect(url_for('admin.player_detail', player_name=user.player_name))
-                return redirect(url_for('public.homepage'))
+                return redirect(url_for('public.game_homepage'))
             else:
                 return redirect(url_for('public.root'))
 
@@ -5057,7 +5057,7 @@ def logout():
     """Log the current user out."""
     logout_user()
     flash("Logged out successfully.", "success")
-    return redirect(url_for('public.homepage'))
+    return redirect(url_for('public.game_homepage'))
 
 
 @admin_bp.route('/upload', methods=['POST'])
