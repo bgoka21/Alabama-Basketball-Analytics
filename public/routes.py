@@ -110,6 +110,16 @@ def _parse_selected_game_types(args):
     return list(DEFAULT_GAME_TYPE_SELECTION)
 
 
+def _is_win(result: str | None) -> bool:
+    sanitized = (result or "").strip().lower()
+    return sanitized.startswith("w")
+
+
+def _is_loss(result: str | None) -> bool:
+    sanitized = (result or "").strip().lower()
+    return sanitized.startswith("l")
+
+
 def get_all_game_ids_for_current_season(selected_game_types=None):
     """Return a list of all game IDs in the current season."""
     season_id = get_current_season_id()
@@ -220,7 +230,7 @@ def game_homepage():
     winning_game_ids = [
         g.id
         for g in Game.query.filter(
-            Game.id.in_(game_ids), Game.result.ilike("win")
+            Game.id.in_(game_ids), func.lower(func.trim(Game.result)).like("w%")
         ).all()
     ]
 
@@ -365,8 +375,8 @@ def game_homepage():
 
     # ── Summary cards data ────────────────────────────
     games = Game.query.filter(Game.id.in_(game_ids)).all()
-    wins = sum(1 for g in games if g.result.lower() == "win")
-    losses = sum(1 for g in games if g.result.lower() == "loss")
+    wins = sum(1 for g in games if _is_win(g.result))
+    losses = sum(1 for g in games if _is_loss(g.result))
     record = f"{wins}–{losses}"
 
     # 2) Avg. BCP per game over those same games (USE weighted total_blue_collar)
