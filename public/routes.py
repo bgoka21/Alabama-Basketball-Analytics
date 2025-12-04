@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from stats_config import LEADERBOARD_STATS
 from admin.routes import (
     GAME_TYPE_OPTIONS,
+    DEFAULT_GAME_TYPE_SELECTION,
     collect_practice_labels,
     compute_filtered_blue,
     compute_filtered_totals,
@@ -104,7 +105,9 @@ def _parse_selected_game_types(args):
         if match and match not in selected_types:
             selected_types.append(match)
 
-    return selected_types
+    if selected_types:
+        return selected_types
+    return list(DEFAULT_GAME_TYPE_SELECTION)
 
 
 def get_all_game_ids_for_current_season(selected_game_types=None):
@@ -112,6 +115,9 @@ def get_all_game_ids_for_current_season(selected_game_types=None):
     season_id = get_current_season_id()
     if not season_id:
         return []
+
+    if selected_game_types is None:
+        selected_game_types = DEFAULT_GAME_TYPE_SELECTION
 
     query = Game.query.filter_by(season_id=season_id)
     if selected_game_types:
@@ -124,6 +130,9 @@ def get_all_game_ids_for_current_season(selected_game_types=None):
 
 def get_last_n_game_ids(n, selected_game_types=None):
     """Return the IDs of the last n games by date."""
+    if selected_game_types is None:
+        selected_game_types = DEFAULT_GAME_TYPE_SELECTION
+
     query = Game.query.order_by(Game.game_date.desc())
     if selected_game_types:
         query = query.filter(
