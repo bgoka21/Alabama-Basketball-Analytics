@@ -12,6 +12,7 @@ import json
 from types import SimpleNamespace
 from stats_config import LEADERBOARD_STATS
 from admin.routes import (
+    GAME_TYPE_OPTIONS,
     collect_practice_labels,
     compute_filtered_blue,
     compute_filtered_totals,
@@ -24,6 +25,7 @@ from models.database import (
     BlueCollarStats,
     PlayerStats,
     Game,
+    GameTypeTag,
     Season,
     TeamStats,
     PlayerPossession,
@@ -86,17 +88,48 @@ def get_current_season_id():
     return latest.id if latest else None
 
 
-def get_all_game_ids_for_current_season():
+def _parse_selected_game_types(args):
+    raw_types = args.getlist("game_type")
+    if not raw_types:
+        single = (args.get("game_type") or "").strip()
+        if single:
+            raw_types = [single]
+
+    selected_types: list[str] = []
+    for value in raw_types:
+        match = next(
+            (option for option in GAME_TYPE_OPTIONS if option.lower() == value.lower()),
+            None,
+        )
+        if match and match not in selected_types:
+            selected_types.append(match)
+
+    return selected_types
+
+
+def get_all_game_ids_for_current_season(selected_game_types=None):
     """Return a list of all game IDs in the current season."""
     season_id = get_current_season_id()
     if not season_id:
         return []
-    return [g.id for g in Game.query.filter_by(season_id=season_id).all()]
+
+    query = Game.query.filter_by(season_id=season_id)
+    if selected_game_types:
+        query = query.filter(
+            Game.type_tags.any(GameTypeTag.tag.in_(selected_game_types))
+        )
+
+    return [g.id for g in query.all()]
 
 
-def get_last_n_game_ids(n):
+def get_last_n_game_ids(n, selected_game_types=None):
     """Return the IDs of the last n games by date."""
-    return [g.id for g in Game.query.order_by(Game.game_date.desc()).limit(n).all()]
+    query = Game.query.order_by(Game.game_date.desc())
+    if selected_game_types:
+        query = query.filter(
+            Game.type_tags.any(GameTypeTag.tag.in_(selected_game_types))
+        )
+    return [g.id for g in query.limit(n).all()]
 
 
 def _player_cell(name, can_link=True):
@@ -139,13 +172,14 @@ def game_homepage():
     view_opt = request.args.get("view", "season")  # reserved for future use
     # Read sort choice from query string (default to total BCP)
     sort_by = request.args.get("sort", "bcp")  # 'bcp' or 'efficiency'
+    selected_game_types = _parse_selected_game_types(request.args)
 
     # 2) Pick games to include
     if filter_opt == "last5":
-        game_ids = get_last_n_game_ids(5)
+        game_ids = get_last_n_game_ids(5, selected_game_types)
     else:
         # both 'season' and 'true_data' use the full season
-        game_ids = get_all_game_ids_for_current_season()
+        game_ids = get_all_game_ids_for_current_season(selected_game_types)
 
     # 3) Attempt‐thresholds: only apply for season & last5
     min_3fg = None if filter_opt == "true_data" else 10
@@ -441,6 +475,8 @@ def game_homepage():
         filter_opt=filter_opt,
         view_opt=view_opt,
         sort_by=sort_by,
+        game_type_options=GAME_TYPE_OPTIONS,
+        selected_game_types=selected_game_types,
         active_page="home",
         summary=summary,
     )
