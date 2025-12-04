@@ -23,7 +23,7 @@
   <div class="{{ container_classes }}">
     <div class="table-card-accent" aria-hidden="true"></div>
     <div class="overflow-x-auto table-card-body">
-      {%- set table_classes = 'min-w-max text-sm table-auto unified-table' -%}
+      {%- set table_classes = 'w-full min-w-full text-sm table-fixed unified-table' -%}
       {%- if sticky_header -%}
         {%- set table_classes = table_classes ~ ' thead-sticky' -%}
       {%- endif -%}
