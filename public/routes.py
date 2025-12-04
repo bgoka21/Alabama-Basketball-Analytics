@@ -230,17 +230,9 @@ def game_homepage():
         db.session.query(
             BlueCollarStats.player_id.label("player_id"),
             BlueCollarStats.game_id.label("game_id"),
-            (
-                func.coalesce(func.sum(BlueCollarStats.def_reb), 0)
-                + func.coalesce(func.sum(BlueCollarStats.off_reb), 0)
-                + func.coalesce(func.sum(BlueCollarStats.misc), 0)
-                + func.coalesce(func.sum(BlueCollarStats.deflection), 0)
-                + func.coalesce(func.sum(BlueCollarStats.steal), 0)
-                + func.coalesce(func.sum(BlueCollarStats.block), 0)
-                + func.coalesce(func.sum(BlueCollarStats.floor_dive), 0)
-                + func.coalesce(func.sum(BlueCollarStats.charge_taken), 0)
-                + func.coalesce(func.sum(BlueCollarStats.reb_tip), 0)
-            ).label("bcp"),
+            func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
+                "bcp"
+            ),
         )
         .filter(BlueCollarStats.game_id.in_(winning_game_ids))
         .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
