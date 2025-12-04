@@ -273,7 +273,7 @@ def create_app():
                 if current_user.player_name:
                     target = url_for('admin.player_detail', player_name=current_user.player_name)
                 else:
-                    target = url_for('public.homepage')
+                    target = url_for('public.game_homepage')
                 return redirect(target)
 
     @app.before_request

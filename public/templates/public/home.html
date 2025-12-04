@@ -42,15 +42,15 @@
 
 <!-- Filter Row -->
 <div class="flex flex-wrap gap-4 mb-6">
-  <a href="{{ url_for('public.homepage', filter='season',  view=view_opt) }}"
+  <a href="{{ url_for('public.game_homepage', filter='season',  view=view_opt) }}"
      class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='season'  else 'bg-gray-200 text-black' }}">
     Season
   </a>
-  <a href="{{ url_for('public.homepage', filter='last5',  view=view_opt) }}"
+  <a href="{{ url_for('public.game_homepage', filter='last5',  view=view_opt) }}"
      class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='last5'  else 'bg-gray-200 text-black' }}">
     Last 5 Games
   </a>
-  <a href="{{ url_for('public.homepage', filter='true_data', view=view_opt) }}"
+  <a href="{{ url_for('public.game_homepage', filter='true_data', view=view_opt) }}"
      class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='true_data' else 'bg-gray-200 text-black' }}">
     True Data
   </a>

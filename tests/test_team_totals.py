@@ -46,7 +46,7 @@ def app():
             if request.endpoint not in PLAYER_ALLOWED_ENDPOINTS:
                 target = (
                     url_for('player_view', player_name=current_user.player_name)
-                    if current_user.player_name else url_for('public.homepage')
+                    if current_user.player_name else url_for('public.game_homepage')
                 )
                 return redirect(target)
     with app.app_context():

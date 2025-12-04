@@ -946,8 +946,8 @@ def practice_homepage(active_page="practice_home"):
 @public_bp.route("/home", methods=["GET"])
 @login_required
 def homepage():
-    """Alias for practice_homepage as the main home view."""
-    return practice_homepage(active_page="home")
+    """Redirect the legacy home route to the game homepage."""
+    return redirect(url_for("public.game_homepage"))
 
 
 @public_bp.route('/api/direct_pnr_for_player/<int:player_id>', methods=['GET'])
