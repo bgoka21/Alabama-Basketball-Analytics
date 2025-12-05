@@ -839,40 +839,164 @@ def _load_game_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
 
     blue_result = blue_query.one_or_none()
 
-    if base_result is None and blue_result is None:
-        return {}
+    rows: Dict[str, Dict[str, Any]] = {}
 
-    row: Dict[str, Any] = {
-        "label": "Team Total",
-        "grouping": Grouping.TEAM.value,
-        "group_label": None,
-        "row_key": "team",
-    }
+    if base_result or blue_result:
+        row: Dict[str, Any] = {
+            "label": "Team Total",
+            "grouping": Grouping.TEAM.value,
+            "group_label": None,
+            "row_key": "team",
+            "player": "Team",
+        }
 
-    if base_result:
-        row["game_count"] = int(base_result.game_count or 0)
+        if base_result:
+            row["game_count"] = int(base_result.game_count or 0)
+            for field in _GAME_PLAYER_FIELDS:
+                row[field] = _as_float(getattr(base_result, field))
+
+        if opponent_result:
+            existing_count = int(row.get("game_count", 0) or 0)
+            opponent_count = int(opponent_result.game_count or 0)
+            row["game_count"] = opponent_count or existing_count
+            row["opponent_turnovers"] = _as_float(getattr(opponent_result, "opponent_turnovers"))
+
+        row.setdefault("opponent_turnovers", 0.0)
+
+        if blue_result:
+            for field in _PRACTICE_BLUE_FIELDS:
+                row[field] = _as_float(getattr(blue_result, field))
+
+        numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
+        blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+        extra_values = [row.get(field, 0.0) for field in _GAME_ADDITIONAL_FIELDS]
+        if any(value not in (0.0, None) for value in numeric_values + blue_values + extra_values):
+            rows["team"] = row
+
+    opponent_stats = aliased(TeamStats)
+
+    per_game_query = (
+        db.session.query(
+            PlayerStats.game_id.label("game_id"),
+            Game.game_date.label("game_date"),
+            Game.opponent_name.label("opponent"),
+            *[
+                func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
+                for field in _GAME_PLAYER_FIELDS
+            ],
+            func.coalesce(func.sum(opponent_stats.total_turnovers), 0).label("opponent_turnovers"),
+        )
+        .join(
+            Roster,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        )
+        .join(Game, PlayerStats.game_id == Game.id)
+        .outerjoin(
+            opponent_stats,
+            and_(
+                opponent_stats.game_id == PlayerStats.game_id,
+                opponent_stats.season_id == scope.season_id,
+                opponent_stats.is_opponent.is_(True),
+            ),
+        )
+        .filter(PlayerStats.game_id.isnot(None))
+        .filter(PlayerStats.season_id == scope.season_id)
+        .filter(Game.season_id == scope.season_id)
+    )
+
+    if scope.roster_ids:
+        per_game_query = per_game_query.filter(Roster.id.in_(scope.roster_ids))
+
+    if scope.start_date:
+        per_game_query = per_game_query.filter(Game.game_date >= scope.start_date)
+    if scope.end_date:
+        per_game_query = per_game_query.filter(Game.game_date <= scope.end_date)
+
+    per_game_query = per_game_query.group_by(
+        PlayerStats.game_id,
+        Game.game_date,
+        Game.opponent_name,
+    )
+
+    per_game_rows: Dict[int, Dict[str, Any]] = {}
+    for result in per_game_query.all():
+        game_id = int(result.game_id)
+        row = per_game_rows.setdefault(
+            game_id,
+            {
+                "game_id": game_id,
+                "player": "Team",
+                "player_name": "Team",
+                "game_date": result.game_date,
+                "opponent": result.opponent,
+                "game_count": 1,
+                "grouping": Grouping.TEAM.value,
+            },
+        )
         for field in _GAME_PLAYER_FIELDS:
-            row[field] = _as_float(getattr(base_result, field))
+            row[field] = _as_float(getattr(result, field))
+        row["opponent_turnovers"] = _as_float(getattr(result, "opponent_turnovers"))
 
-    if opponent_result:
-        existing_count = int(row.get("game_count", 0) or 0)
-        opponent_count = int(opponent_result.game_count or 0)
-        row["game_count"] = opponent_count or existing_count
-        row["opponent_turnovers"] = _as_float(getattr(opponent_result, "opponent_turnovers"))
+    blue_per_game_query = (
+        db.session.query(
+            BlueCollarStats.game_id.label("game_id"),
+            *[
+                func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
+                for field in _PRACTICE_BLUE_FIELDS
+            ],
+        )
+        .join(Game, BlueCollarStats.game_id == Game.id)
+        .filter(BlueCollarStats.game_id.isnot(None))
+        .filter(BlueCollarStats.season_id == scope.season_id)
+        .filter(Game.season_id == scope.season_id)
+    )
 
-    row.setdefault("opponent_turnovers", 0.0)
+    if scope.roster_ids:
+        blue_per_game_query = blue_per_game_query.filter(BlueCollarStats.player_id.in_(scope.roster_ids))
 
-    if blue_result:
+    if scope.start_date:
+        blue_per_game_query = blue_per_game_query.filter(Game.game_date >= scope.start_date)
+    if scope.end_date:
+        blue_per_game_query = blue_per_game_query.filter(Game.game_date <= scope.end_date)
+
+    blue_per_game_query = blue_per_game_query.group_by(BlueCollarStats.game_id)
+
+    for result in blue_per_game_query.all():
+        game_id = int(result.game_id)
+        row = per_game_rows.get(game_id)
+        if not row:
+            row = per_game_rows.setdefault(
+                game_id,
+                {
+                    "game_id": game_id,
+                    "player": "Team",
+                    "player_name": "Team",
+                    "game_date": None,
+                    "opponent": None,
+                    "game_count": 1,
+                    "grouping": Grouping.TEAM.value,
+                },
+            )
         for field in _PRACTICE_BLUE_FIELDS:
-            row[field] = _as_float(getattr(blue_result, field))
+            row[field] = _as_float(getattr(result, field))
 
-    numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
-    blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
-    extra_values = [row.get(field, 0.0) for field in _GAME_ADDITIONAL_FIELDS]
-    if not any(value not in (0.0, None) for value in numeric_values + blue_values + extra_values):
-        return {}
+    for row in per_game_rows.values():
+        numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
+        blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+        extra_values = [row.get(field, 0.0) for field in _GAME_ADDITIONAL_FIELDS]
+        if not any(value not in (0.0, None) for value in numeric_values + blue_values + extra_values):
+            continue
+        game_label = _format_game_session_label(row.get("game_date"), row.get("opponent"))
+        point_key = f"team-game:{row['game_id']}"
+        row["label"] = f"Team – {game_label}"
+        row["group_label"] = game_label
+        row["row_key"] = point_key
+        rows[point_key] = row
 
-    return {"team": row}
+    return rows
 
 
 def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
