@@ -605,6 +605,14 @@
           column: 'Game',
           empty: 'Run a study to list game-level values.',
           samples: 'Games included after filters.'
+        },
+        team: {
+          group: 'Each point represents team totals across the selected filters.',
+          roster: 'Optional: select players to limit which contributions roll up to the team.',
+          label: 'Team Totals',
+          column: 'Team',
+          empty: 'Run a study to list team-level values.',
+          samples: 'Team totals included after filters.'
         }
       };
 
