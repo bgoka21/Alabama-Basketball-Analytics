@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 from app import create_app
 from models.database import Game, Roster
+from admin.routes import _collect_player_session_stats, _round_or_none
 from utils.player_stats_helpers.cooe import get_game_on_off_stats
 
 
@@ -46,6 +47,21 @@ def _find_player() -> Optional[Roster]:
 
 
 def _find_game_by_fragment(fragment: str) -> Optional[Game]:
+    patterns = {fragment}
+    normalized = fragment.replace("_", " ").replace("'", "").replace(".", " ")
+    patterns.update({normalized, normalized.replace(" ", ""), normalized.lower()})
+
+    games = Game.query.order_by(Game.id).all()
+    for game in games:
+        haystacks = [game.csv_filename or "", game.opponent_name or ""]
+        for haystack in haystacks:
+            cleaned = haystack.replace("_", " ").replace("'", "").replace(".", " ")
+            normalized_haystack = cleaned.lower().replace(" ", "")
+            for pat in patterns:
+                needle = pat.lower().replace(" ", "")
+                if needle and needle in normalized_haystack:
+                    return game
+
     return (
         Game.query.filter(Game.csv_filename.contains(fragment))
         .order_by(Game.id)
@@ -59,22 +75,43 @@ def _fmt(value: Optional[float]) -> str:
     return f"{value:.4f}" if isinstance(value, float) else str(value)
 
 
+def _fetch_custom_stats(game: Game, player: Roster) -> tuple[Optional[dict], list[int]]:
+    aggregates = _collect_player_session_stats(
+        player,
+        source="game",
+        date_from=game.game_date,
+        date_to=game.game_date,
+    )
+
+    session_ids = list(aggregates.get("session_ids") or [])
+    onoff = get_game_on_off_stats(session_ids, player.id)
+
+    if not onoff:
+        return None, session_ids
+
+    return (
+        {
+            "poss_on": onoff.offensive_possessions_on or 0,
+            "poss_off": onoff.offensive_possessions_off or 0,
+            "pts_on": onoff.points_on_offense or 0.0,
+            "pts_off": onoff.points_off_offense or 0.0,
+            "ppp_on": _round_or_none(onoff.adv_ppp_on_offense),
+            "ppp_off": _round_or_none(onoff.adv_ppp_off_offense),
+            "cooe": _round_or_none(onoff.adv_offensive_leverage),
+        },
+        session_ids,
+    )
+
+
 def _print_truth_and_app(label: str, game: Game, player: Roster):
     truth = TRUTH[label]
-    stats = get_game_on_off_stats([game.id], player.id)
+    app_vals, session_ids = _fetch_custom_stats(game, player)
 
-    app_vals = {
-        "poss_on": stats.offensive_possessions_on or 0,
-        "poss_off": stats.offensive_possessions_off or 0,
-        "pts_on": stats.points_on_offense or 0.0,
-        "pts_off": stats.points_off_offense or 0.0,
-        "ppp_on": stats.ppp_on_offense,
-        "ppp_off": stats.ppp_off_offense,
-        "cooe": stats.adv_offensive_leverage,
-    }
+    if not app_vals:
+        app_vals = {key: None for key in truth}
 
     diffs = {
-        key: (app_vals[key] - truth[key]) if app_vals[key] is not None else None
+        key: (app_vals.get(key) - truth[key]) if app_vals.get(key) is not None else None
         for key in truth
     }
 
@@ -89,14 +126,15 @@ def _print_truth_and_app(label: str, game: Game, player: Roster):
     print(f"  PPP OFF       = {_fmt(truth['ppp_off'])}")
     print(f"  COOE          = {_fmt(truth['cooe'])}")
 
-    print("\nAPP (DB + cooe.py):")
-    print(f"  Off poss ON   = {app_vals['poss_on']}")
-    print(f"  Off poss OFF  = {app_vals['poss_off']}")
-    print(f"  Points ON     = {app_vals['pts_on']}")
-    print(f"  Points OFF    = {app_vals['pts_off']}")
-    print(f"  PPP ON        = {_fmt(app_vals['ppp_on'])}")
-    print(f"  PPP OFF       = {_fmt(app_vals['ppp_off'])}")
-    print(f"  COOE          = {_fmt(app_vals['cooe'])}")
+    print("\nAPP (Custom Stats pipeline):")
+    print(f"  Session IDs   = {session_ids}")
+    print(f"  Off poss ON   = {app_vals.get('poss_on')}")
+    print(f"  Off poss OFF  = {app_vals.get('poss_off')}")
+    print(f"  Points ON     = {app_vals.get('pts_on')}")
+    print(f"  Points OFF    = {app_vals.get('pts_off')}")
+    print(f"  PPP ON        = {_fmt(app_vals.get('ppp_on'))}")
+    print(f"  PPP OFF       = {_fmt(app_vals.get('ppp_off'))}")
+    print(f"  COOE          = {_fmt(app_vals.get('cooe'))}")
 
     print("\nDIFF (APP – TRUTH):")
     print(f"  poss ON   = {diffs['poss_on']}")
