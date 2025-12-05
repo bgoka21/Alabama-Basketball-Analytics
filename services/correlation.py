@@ -77,6 +77,7 @@ class StudyScope:
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     group_by: Grouping = Grouping.PLAYER
+    include_team_total: bool = True
 
 
 # -- Metric catalog helpers --------------------------------------------------
@@ -474,7 +475,10 @@ def _load_practice_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     if not any(value not in (0.0, None) for value in numeric_values + blue_values):
         return {}
 
-    return {"team": row}
+    if scope.include_team_total:
+        return {"team": row}
+
+    return {}
 
 
 def _load_practice_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
@@ -841,7 +845,7 @@ def _load_game_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
 
     rows: Dict[str, Dict[str, Any]] = {}
 
-    if base_result or blue_result:
+    if scope.include_team_total and (base_result or blue_result):
         row: Dict[str, Any] = {
             "label": "Team Total",
             "grouping": Grouping.TEAM.value,
@@ -1375,12 +1379,19 @@ def _coerce_scope(scope: StudyScope | Mapping[str, Any]) -> StudyScope:
         except ValueError as exc:
             raise ValueError(f"Unsupported group_by value '{raw_group}'") from exc
 
+    include_team_total_raw = scope.get("include_team_total", True)
+    if isinstance(include_team_total_raw, str):
+        include_team_total = include_team_total_raw.strip().lower() not in {"false", "0", "no", "off"}
+    else:
+        include_team_total = bool(include_team_total_raw)
+
     return StudyScope(
         season_id=int(season_id),
         roster_ids=roster_ids,
         start_date=start_date,
         end_date=end_date,
         group_by=group_by,
+        include_team_total=include_team_total,
     )
 
 

@@ -122,6 +122,18 @@
             </div>
             <p class="text-xs text-gray-500" id="correlation-group-help">Each point represents a player.</p>
           </fieldset>
+
+          <div class="flex items-center justify-between gap-3" id="correlation-team-total-toggle" hidden>
+            <label for="correlation-include-team-total" class="text-sm font-medium text-gray-700">
+              Include season total point
+            </label>
+            <input
+              type="checkbox"
+              id="correlation-include-team-total"
+              class="h-4 w-4 rounded border-gray-300 text-[#9E1B32] focus:ring-[#9E1B32]"
+              checked
+            />
+          </div>
         </section>
 
         <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
