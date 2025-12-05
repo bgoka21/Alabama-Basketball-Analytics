@@ -1416,18 +1416,17 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
             db.session.flush()
             # Insert PlayerPossession entries
             player_ids = []
-            if poss.get("is_true_possession"):
-                for jersey in poss.get("players_on_floor", []):
-                    player_name = jersey.strip()
-                    if not player_name:
-                        continue
+            for jersey in poss.get("players_on_floor", []):
+                player_name = jersey.strip()
+                if not player_name:
+                    continue
 
-                    roster_entry = Roster.query.filter_by(
-                        season_id=season_id,
-                        player_name=player_name,
-                    ).first()
-                    if roster_entry:
-                        player_ids.append(roster_entry.id)
+                roster_entry = Roster.query.filter_by(
+                    season_id=season_id,
+                    player_name=player_name,
+                ).first()
+                if roster_entry:
+                    player_ids.append(roster_entry.id)
 
             for pid in player_ids:
                 db.session.add(PlayerPossession(
