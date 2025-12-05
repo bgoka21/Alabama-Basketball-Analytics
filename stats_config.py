@@ -43,6 +43,7 @@ LEADERBOARD_STATS.extend([
     {"key": "overall_low_man", "label": "Overall Low Man"},
     {"key": "pnr_gap_help", "label": "PnR Gap Help"},
     {"key": "pnr_grade", "label": "PnR Grade"},
+    {"key": "opponent_turnovers", "label": "Opponent TOs/G", "format": "float"},
 ])
 
 # ─── Simple Shot Type FG% Categories ─────────────────────────────────────────

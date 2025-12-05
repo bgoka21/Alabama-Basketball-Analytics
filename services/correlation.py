@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, 
 
 import pandas as pd
 from sqlalchemy import and_, func
+from sqlalchemy.orm import aliased
 
 from app.stats.field_catalog_practice import PRACTICE_FIELD_GROUPS
 from models.database import (
@@ -25,6 +26,7 @@ from models.database import (
     PlayerStats,
     Practice,
     Roster,
+    TeamStats,
     db,
 )
 from stats_config import LEADERBOARD_STATS
@@ -720,6 +722,7 @@ def _load_practice_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
 
 
 _GAME_PLAYER_FIELDS: Sequence[str] = _PRACTICE_PLAYER_FIELDS
+_GAME_ADDITIONAL_FIELDS: Sequence[str] = ("opponent_turnovers",)
 
 
 def _game_metric_specs() -> Dict[str, _MetricSpec]:
@@ -743,6 +746,10 @@ def _game_metric_specs() -> Dict[str, _MetricSpec]:
         "assist_turnover_ratio": _MetricSpec(
             ("assists", "turnovers"),
             lambda row: _safe_div(row.get("assists"), row.get("turnovers")),
+        ),
+        "opponent_turnovers": _MetricSpec(
+            ("opponent_turnovers", "game_count"),
+            lambda row: _safe_div(row.get("opponent_turnovers"), row.get("game_count")),
         ),
     }
 
@@ -793,6 +800,24 @@ def _load_game_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
 
     base_result = base_query.one_or_none()
 
+    opponent_query = db.session.query(
+        func.count(func.distinct(TeamStats.game_id)).label("game_count"),
+        func.coalesce(func.sum(TeamStats.total_turnovers), 0).label("opponent_turnovers"),
+    ).filter(
+        TeamStats.game_id.isnot(None),
+        TeamStats.season_id == scope.season_id,
+        TeamStats.is_opponent.is_(True),
+    )
+
+    if scope.start_date or scope.end_date:
+        opponent_query = opponent_query.join(Game, TeamStats.game_id == Game.id)
+        if scope.start_date:
+            opponent_query = opponent_query.filter(Game.game_date >= scope.start_date)
+        if scope.end_date:
+            opponent_query = opponent_query.filter(Game.game_date <= scope.end_date)
+
+    opponent_result = opponent_query.one_or_none()
+
     blue_query = db.session.query(
         *[
             func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
@@ -829,13 +854,22 @@ def _load_game_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         for field in _GAME_PLAYER_FIELDS:
             row[field] = _as_float(getattr(base_result, field))
 
+    if opponent_result:
+        existing_count = int(row.get("game_count", 0) or 0)
+        opponent_count = int(opponent_result.game_count or 0)
+        row["game_count"] = opponent_count or existing_count
+        row["opponent_turnovers"] = _as_float(getattr(opponent_result, "opponent_turnovers"))
+
+    row.setdefault("opponent_turnovers", 0.0)
+
     if blue_result:
         for field in _PRACTICE_BLUE_FIELDS:
             row[field] = _as_float(getattr(blue_result, field))
 
     numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
     blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
-    if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+    extra_values = [row.get(field, 0.0) for field in _GAME_ADDITIONAL_FIELDS]
+    if not any(value not in (0.0, None) for value in numeric_values + blue_values + extra_values):
         return {}
 
     return {"team": row}
@@ -855,6 +889,8 @@ def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         for entry in roster_entries
     }
 
+    opponent_stats = aliased(TeamStats)
+
     game_query = (
         db.session.query(
             Roster.id.label("roster_id"),
@@ -863,6 +899,7 @@ def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
                 func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
                 for field in _GAME_PLAYER_FIELDS
             ],
+            func.coalesce(func.sum(opponent_stats.total_turnovers), 0).label("opponent_turnovers"),
         )
         .join(
             PlayerStats,
@@ -872,6 +909,14 @@ def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
             ),
         )
         .join(Game, PlayerStats.game_id == Game.id)
+        .outerjoin(
+            opponent_stats,
+            and_(
+                opponent_stats.game_id == PlayerStats.game_id,
+                opponent_stats.season_id == scope.season_id,
+                opponent_stats.is_opponent.is_(True),
+            ),
+        )
         .filter(PlayerStats.game_id.isnot(None))
         .filter(PlayerStats.season_id == scope.season_id)
         .filter(Game.season_id == scope.season_id)
@@ -894,6 +939,7 @@ def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         row["game_count"] = int(result.game_count or 0)
         for field in _GAME_PLAYER_FIELDS:
             row[field] = _as_float(getattr(result, field))
+        row["opponent_turnovers"] = _as_float(getattr(result, "opponent_turnovers"))
 
     blue_query = (
         db.session.query(
@@ -932,7 +978,8 @@ def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     for row in rows.values():
         numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
         blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
-        if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+        extra_values = [row.get(field, 0.0) for field in _GAME_ADDITIONAL_FIELDS]
+        if not any(value not in (0.0, None) for value in numeric_values + blue_values + extra_values):
             continue
         key = row["player"]
         row["player_name"] = row["player"]
@@ -955,6 +1002,8 @@ def _load_game_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
 
     roster_lookup: Dict[int, Roster] = {entry.id: entry for entry in roster_entries}
 
+    opponent_stats = aliased(TeamStats)
+
     game_query = (
         db.session.query(
             PlayerStats.game_id.label("game_id"),
@@ -966,6 +1015,7 @@ def _load_game_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
                 func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
                 for field in _GAME_PLAYER_FIELDS
             ],
+            func.coalesce(func.max(opponent_stats.total_turnovers), 0).label("opponent_turnovers"),
         )
         .join(
             Roster,
@@ -975,6 +1025,14 @@ def _load_game_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
             ),
         )
         .join(Game, PlayerStats.game_id == Game.id)
+        .outerjoin(
+            opponent_stats,
+            and_(
+                opponent_stats.game_id == PlayerStats.game_id,
+                opponent_stats.season_id == scope.season_id,
+                opponent_stats.is_opponent.is_(True),
+            ),
+        )
         .filter(PlayerStats.game_id.isnot(None))
         .filter(PlayerStats.season_id == scope.season_id)
         .filter(Game.season_id == scope.season_id)
@@ -1016,6 +1074,7 @@ def _load_game_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
         )
         for field in _GAME_PLAYER_FIELDS:
             row[field] = _as_float(getattr(result, field))
+        row["opponent_turnovers"] = _as_float(getattr(result, "opponent_turnovers"))
 
     blue_query = (
         db.session.query(
@@ -1071,7 +1130,8 @@ def _load_game_session_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     for key, row in rows.items():
         numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
         blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
-        if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+        extra_values = [row.get(field, 0.0) for field in _GAME_ADDITIONAL_FIELDS]
+        if not any(value not in (0.0, None) for value in numeric_values + blue_values + extra_values):
             continue
         game_label = _format_game_session_label(row.get("game_date"), row.get("opponent"))
         display_label = f"{row['player_name']} – {game_label}"
