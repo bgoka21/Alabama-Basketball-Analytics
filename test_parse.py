@@ -740,6 +740,8 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
                     points_scored += 1
             if is_opp_neutral:
                 events.append("Neutral")
+            if is_opp_off_reb:
+                events.append("Off Reb")
 
         poss = {
             "game_id": game_id or 0,
