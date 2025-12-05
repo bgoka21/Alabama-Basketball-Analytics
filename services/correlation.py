@@ -179,6 +179,8 @@ _PRACTICE_PLAYER_FIELDS: Sequence[str] = (
     "box_out_positive",
     "box_out_missed",
     "off_reb_given_up",
+    "collision_gap_positive",
+    "collision_gap_missed",
 )
 
 _PRACTICE_BLUE_FIELDS: Sequence[str] = (
@@ -335,6 +337,22 @@ def _practice_metric_specs() -> Dict[str, _MetricSpec]:
             ),
         ),
         "rd_given_up": direct("off_reb_given_up"),
+        "collision_gap_plus": direct("collision_gap_positive"),
+        "collision_gap_att": _MetricSpec(
+            ("collision_gap_positive", "collision_gap_missed"),
+            lambda row: _as_float(row.get("collision_gap_positive"))
+            + _as_float(row.get("collision_gap_missed")),
+        ),
+        "collision_gap_pct": _MetricSpec(
+            ("collision_gap_positive", "collision_gap_missed"),
+            lambda row: _pct(
+                _safe_div(
+                    row.get("collision_gap_positive"),
+                    _as_float(row.get("collision_gap_positive"))
+                    + _as_float(row.get("collision_gap_missed")),
+                )
+            ),
+        ),
         "bcp_total": blue("total_blue_collar"),
         "deflections": blue("deflection"),
         "charges": blue("charge_taken"),
