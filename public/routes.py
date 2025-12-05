@@ -234,16 +234,26 @@ def game_homepage():
             TeamStats.game_id,
             TeamStats.is_opponent,
             TeamStats.total_points,
+            TeamStats.wins,
+            TeamStats.losses,
         )
         .filter(TeamStats.game_id.in_(game_ids))
         .all()
     )
 
     scores_by_game: dict[int, dict[str, int | None]] = {}
-    for game_id, is_opponent, total_points in team_scores:
+    win_loss_flags: dict[int, str] = {}
+    for game_id, is_opponent, total_points, wins, losses in team_scores:
         scores_by_game.setdefault(game_id, {"us": None, "opp": None})[
             "opp" if is_opponent else "us"
         ] = total_points
+
+        # Keep a fallback record flag if the CSV score is missing but wins/losses are set.
+        if not is_opponent:
+            if wins and wins > 0:
+                win_loss_flags[game_id] = "win"
+            elif losses and losses > 0:
+                win_loss_flags[game_id] = "loss"
 
     winning_game_ids: list[int] = []
     losing_game_ids: list[int] = []
@@ -252,6 +262,14 @@ def game_homepage():
             winning_game_ids.append(g.id)
             continue
         if _is_loss(g.result):
+            losing_game_ids.append(g.id)
+            continue
+
+        flagged_result = win_loss_flags.get(g.id)
+        if flagged_result == "win":
+            winning_game_ids.append(g.id)
+            continue
+        if flagged_result == "loss":
             losing_game_ids.append(g.id)
             continue
 
