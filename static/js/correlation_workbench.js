@@ -538,6 +538,8 @@
     const dateFromInput = document.getElementById('correlation-date-from');
     const dateToInput = document.getElementById('correlation-date-to');
     const trendlineToggle = document.getElementById('correlation-trendline');
+    const teamTotalToggleRow = document.getElementById('correlation-team-total-toggle');
+    const teamTotalToggle = document.getElementById('correlation-include-team-total');
     const groupingRadios = document.querySelectorAll('input[name="correlation-group"]');
     const groupHelp = document.getElementById('correlation-group-help');
     const rosterHelp = document.getElementById('correlation-roster-help');
@@ -624,7 +626,14 @@
         rosterHelp.textContent = messages.roster;
       }
       if (samplesHelp) {
-        samplesHelp.textContent = messages.samples;
+        if (grouping === 'team' && teamTotalToggle) {
+          const sampleMessage = teamTotalToggle.checked
+            ? messages.samples
+            : 'Per-game team totals included after filters.';
+          samplesHelp.textContent = sampleMessage;
+        } else {
+          samplesHelp.textContent = messages.samples;
+        }
       }
       if (pointsLabel) {
         pointsLabel.textContent = messages.label;
@@ -634,6 +643,10 @@
       }
       if (pointsEmpty) {
         pointsEmpty.textContent = messages.empty;
+      }
+
+      if (teamTotalToggleRow) {
+        teamTotalToggleRow.hidden = grouping !== 'team';
       }
     }
 
@@ -645,6 +658,12 @@
         radio.addEventListener('change', () => {
           updateGroupingUI(getSelectedGrouping(groupingRadios));
         });
+      });
+    }
+
+    if (teamTotalToggle) {
+      teamTotalToggle.addEventListener('change', () => {
+        updateGroupingUI(getSelectedGrouping(groupingRadios));
       });
     }
 
@@ -764,6 +783,9 @@
       }
 
       const scope = { season_id: seasonId, group_by: grouping };
+      if (grouping === 'team' && teamTotalToggle) {
+        scope.include_team_total = teamTotalToggle.checked;
+      }
       if (rosterIds.length) {
         scope.roster_ids = rosterIds;
       }
