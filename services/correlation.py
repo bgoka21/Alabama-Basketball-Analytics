@@ -63,6 +63,7 @@ class Grouping(str, Enum):
     PLAYER = "player"
     PRACTICE = "practice"
     GAME = "game"
+    TEAM = "team"
 
 
 @dataclass(frozen=True)
@@ -392,7 +393,86 @@ def _format_game_session_label(session_date: Optional[date], opponent: Optional[
 def _load_practice_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     if scope.group_by is Grouping.PRACTICE:
         return _load_practice_session_rows(scope)
+    if scope.group_by is Grouping.TEAM:
+        return _load_practice_team_rows(scope)
     return _load_practice_player_rows(scope)
+
+
+def _load_practice_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
+    base_query = db.session.query(
+        func.count(func.distinct(PlayerStats.practice_id)).label("practice_count"),
+        *[
+            func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
+            for field in _PRACTICE_PLAYER_FIELDS
+        ],
+    ).filter(PlayerStats.practice_id.isnot(None))
+
+    if scope.start_date or scope.end_date:
+        base_query = base_query.join(Practice, PlayerStats.practice_id == Practice.id)
+        if scope.start_date:
+            base_query = base_query.filter(Practice.date >= scope.start_date)
+        if scope.end_date:
+            base_query = base_query.filter(Practice.date <= scope.end_date)
+
+    base_query = base_query.filter(PlayerStats.season_id == scope.season_id)
+
+    if scope.roster_ids:
+        base_query = base_query.join(
+            Roster,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        ).filter(Roster.id.in_(scope.roster_ids))
+
+    base_result = base_query.one_or_none()
+
+    blue_query = db.session.query(
+        *[
+            func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
+            for field in _PRACTICE_BLUE_FIELDS
+        ]
+    ).filter(BlueCollarStats.practice_id.isnot(None))
+
+    if scope.start_date or scope.end_date:
+        blue_query = blue_query.join(Practice, BlueCollarStats.practice_id == Practice.id)
+        if scope.start_date:
+            blue_query = blue_query.filter(Practice.date >= scope.start_date)
+        if scope.end_date:
+            blue_query = blue_query.filter(Practice.date <= scope.end_date)
+
+    blue_query = blue_query.filter(BlueCollarStats.season_id == scope.season_id)
+
+    if scope.roster_ids:
+        blue_query = blue_query.filter(BlueCollarStats.player_id.in_(scope.roster_ids))
+
+    blue_result = blue_query.one_or_none()
+
+    if base_result is None and blue_result is None:
+        return {}
+
+    row: Dict[str, Any] = {
+        "label": "Team Total",
+        "grouping": Grouping.TEAM.value,
+        "group_label": None,
+        "row_key": "team",
+    }
+
+    if base_result:
+        row["practice_count"] = int(base_result.practice_count or 0)
+        for field in _PRACTICE_PLAYER_FIELDS:
+            row[field] = _as_float(getattr(base_result, field))
+
+    if blue_result:
+        for field in _PRACTICE_BLUE_FIELDS:
+            row[field] = _as_float(getattr(blue_result, field))
+
+    numeric_values = [row.get(field, 0.0) for field in _PRACTICE_PLAYER_FIELDS]
+    blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+    if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+        return {}
+
+    return {"team": row}
 
 
 def _load_practice_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
@@ -679,7 +759,86 @@ SUPPORTED_GAME_METRICS: FrozenSet[str] = frozenset(_GAME_METRICS)
 def _load_game_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
     if scope.group_by is Grouping.GAME:
         return _load_game_session_rows(scope)
+    if scope.group_by is Grouping.TEAM:
+        return _load_game_team_rows(scope)
     return _load_game_player_rows(scope)
+
+
+def _load_game_team_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
+    base_query = db.session.query(
+        func.count(func.distinct(PlayerStats.game_id)).label("game_count"),
+        *[
+            func.coalesce(func.sum(getattr(PlayerStats, field)), 0).label(field)
+            for field in _GAME_PLAYER_FIELDS
+        ],
+    ).filter(PlayerStats.game_id.isnot(None))
+
+    if scope.start_date or scope.end_date:
+        base_query = base_query.join(Game, PlayerStats.game_id == Game.id)
+        if scope.start_date:
+            base_query = base_query.filter(Game.game_date >= scope.start_date)
+        if scope.end_date:
+            base_query = base_query.filter(Game.game_date <= scope.end_date)
+
+    base_query = base_query.filter(PlayerStats.season_id == scope.season_id)
+
+    if scope.roster_ids:
+        base_query = base_query.join(
+            Roster,
+            and_(
+                PlayerStats.player_name == Roster.player_name,
+                PlayerStats.season_id == Roster.season_id,
+            ),
+        ).filter(Roster.id.in_(scope.roster_ids))
+
+    base_result = base_query.one_or_none()
+
+    blue_query = db.session.query(
+        *[
+            func.coalesce(func.sum(getattr(BlueCollarStats, field)), 0).label(field)
+            for field in _PRACTICE_BLUE_FIELDS
+        ]
+    ).filter(BlueCollarStats.game_id.isnot(None))
+
+    if scope.start_date or scope.end_date:
+        blue_query = blue_query.join(Game, BlueCollarStats.game_id == Game.id)
+        if scope.start_date:
+            blue_query = blue_query.filter(Game.game_date >= scope.start_date)
+        if scope.end_date:
+            blue_query = blue_query.filter(Game.game_date <= scope.end_date)
+
+    blue_query = blue_query.filter(BlueCollarStats.season_id == scope.season_id)
+
+    if scope.roster_ids:
+        blue_query = blue_query.filter(BlueCollarStats.player_id.in_(scope.roster_ids))
+
+    blue_result = blue_query.one_or_none()
+
+    if base_result is None and blue_result is None:
+        return {}
+
+    row: Dict[str, Any] = {
+        "label": "Team Total",
+        "grouping": Grouping.TEAM.value,
+        "group_label": None,
+        "row_key": "team",
+    }
+
+    if base_result:
+        row["game_count"] = int(base_result.game_count or 0)
+        for field in _GAME_PLAYER_FIELDS:
+            row[field] = _as_float(getattr(base_result, field))
+
+    if blue_result:
+        for field in _PRACTICE_BLUE_FIELDS:
+            row[field] = _as_float(getattr(blue_result, field))
+
+    numeric_values = [row.get(field, 0.0) for field in _GAME_PLAYER_FIELDS]
+    blue_values = [row.get(field, 0.0) for field in _PRACTICE_BLUE_FIELDS]
+    if not any(value not in (0.0, None) for value in numeric_values + blue_values):
+        return {}
+
+    return {"team": row}
 
 
 def _load_game_player_rows(scope: StudyScope) -> Dict[str, Dict[str, Any]]:
