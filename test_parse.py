@@ -48,6 +48,38 @@ def safe_str(val, default=""):
     """Return the string representation of val if not NaN; otherwise, return default (empty string)."""
     return default if pd.isna(val) else str(val)
 
+
+def _find_roster_entry(player_name: str, season_id: int):
+    """Return the first roster entry matching the raw or normalized player token."""
+    if not player_name:
+        return None
+
+    candidates = []
+
+    raw = player_name.strip()
+    if raw:
+        candidates.append(raw)
+
+    no_hash = raw.lstrip("#").strip()
+    if no_hash and no_hash not in candidates:
+        candidates.append(no_hash)
+
+    parts = no_hash.split(None, 1)
+    if parts and parts[0].isdigit():
+        without_jersey = parts[1].strip() if len(parts) > 1 else ""
+        if without_jersey and without_jersey not in candidates:
+            candidates.append(without_jersey)
+
+    for candidate in candidates:
+        roster_entry = Roster.query.filter_by(
+            season_id=season_id,
+            player_name=candidate,
+        ).first()
+        if roster_entry:
+            return roster_entry
+
+    return None
+
 # --- Period Normalization Helper ---
 def normalize_period_label(value):
     """Return a canonical period label from assorted CSV variations."""
@@ -1415,18 +1447,15 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
             db.session.add(new_poss)
             db.session.flush()
             # Insert PlayerPossession entries
-            player_ids = []
+            player_ids = set()
             for jersey in poss.get("players_on_floor", []):
                 player_name = jersey.strip()
                 if not player_name:
                     continue
 
-                roster_entry = Roster.query.filter_by(
-                    season_id=season_id,
-                    player_name=player_name,
-                ).first()
+                roster_entry = _find_roster_entry(player_name, season_id)
                 if roster_entry:
-                    player_ids.append(roster_entry.id)
+                    player_ids.add(roster_entry.id)
 
             for pid in player_ids:
                 db.session.add(PlayerPossession(
