@@ -48,6 +48,11 @@ PRACTICE_FIELD_GROUPS = {
         {"key": "rd_box_pct", "label": "Box Out %", "format": "percent"},
         {"key": "rd_given_up", "label": "Off Rebs Given Up", "format": "count"},
     ],
+    "Collisions": [
+        {"key": "collision_gap_plus", "label": "Collision +", "format": "count"},
+        {"key": "collision_gap_att", "label": "Collision Att", "format": "count"},
+        {"key": "collision_gap_pct", "label": "Collision %", "format": "percent"},
+    ],
     "Traditional": [
         {"key": "pts", "label": "PTS", "format": "count"},
         {"key": "ast", "label": "AST", "format": "count"},
