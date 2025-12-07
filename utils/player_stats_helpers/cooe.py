@@ -56,16 +56,36 @@ def _build_game_possession_query(
 
 
 def _summarize_game_possessions(possession_query) -> Tuple[int, float]:
+    """
+    Return (possession_count, points_scored) for the provided possession ids.
+
+    This should mirror the same possession logic used in the game reports and
+    leaderboard helpers:
+
+    - Start from all Offense/Defense rows ("runs")
+    - Subtract any runs that are Neutral
+    - Subtract any runs that are TEAM Off Reb extensions
+
+    NOTE:
+    - Only TEAM Off Reb (from the TEAM column) should reduce possessions.
+      Player Off Reb blue-collar tags must NOT change the possession count.
+    """
     poss_subquery = possession_query.subquery()
 
     event_counts = (
         db.session.query(
             ShotDetail.possession_id.label("pid"),
-            func.sum(case((ShotDetail.event_type.ilike("%Neutral%"), 1), else_=0)).label(
-                "neutral_hits"
-            ),
             func.sum(
-                case((ShotDetail.event_type.in_(("Off Reb", "TEAM Off Reb")), 1), else_=0)
+                case(
+                    (ShotDetail.event_type.ilike("%Neutral%"), 1),
+                    else_=0,
+                )
+            ).label("neutral_hits"),
+            func.sum(
+                case(
+                    (ShotDetail.event_type == "TEAM Off Reb", 1),
+                    else_=0,
+                )
             ).label("off_reb_hits"),
         )
         .filter(ShotDetail.possession_id.in_(select(poss_subquery.c.id)))
@@ -76,12 +96,18 @@ def _summarize_game_possessions(possession_query) -> Tuple[int, float]:
     row = (
         db.session.query(
             func.count(poss_subquery.c.id).label("run_count"),
-            func.coalesce(func.sum(case((event_counts.c.neutral_hits > 0, 1), else_=0)), 0).label(
-                "neutral_count"
-            ),
-            func.coalesce(func.sum(case((event_counts.c.off_reb_hits > 0, 1), else_=0)), 0).label(
-                "off_reb_count"
-            ),
+            func.coalesce(
+                func.sum(
+                    case((event_counts.c.neutral_hits > 0, 1), else_=0)
+                ),
+                0,
+            ).label("neutral_count"),
+            func.coalesce(
+                func.sum(
+                    case((event_counts.c.off_reb_hits > 0, 1), else_=0)
+                ),
+                0,
+            ).label("off_reb_count"),
             func.coalesce(func.sum(Possession.points_scored), 0).label("points"),
         )
         .select_from(poss_subquery)
@@ -93,8 +119,9 @@ def _summarize_game_possessions(possession_query) -> Tuple[int, float]:
     run_count = int(row.run_count or 0)
     neutral_count = int(row.neutral_count or 0)
     off_reb_count = int(row.off_reb_count or 0)
+
     possessions = max(run_count - neutral_count - off_reb_count, 0)
-    return possessions, float(row.points or 0)
+    return possessions, float(row.points or 0.0)
 
 
 def get_game_on_off_stats(game_ids: Optional[Iterable[int]], player_id: int):
