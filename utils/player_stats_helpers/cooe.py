@@ -83,7 +83,7 @@ def _summarize_game_possessions(possession_query) -> Tuple[int, float]:
             ).label("neutral_hits"),
             func.sum(
                 case(
-                    (ShotDetail.event_type == "TEAM Off Reb", 1),
+                    (ShotDetail.event_type.ilike("%Off Reb%"), 1),
                     else_=0,
                 )
             ).label("off_reb_hits"),
