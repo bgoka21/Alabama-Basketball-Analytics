@@ -671,8 +671,11 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
 
         is_off_neutral = "Neutral" in team_val
         is_off_reb = "Off Reb" in team_val
-        is_def_neutral = "Neutral" in opp_team_val
-        is_def_off_reb = "Off Reb" in opp_team_val
+
+        # Defense neutrals / Off Reb can be tagged in OPP TEAM or TEAM.
+        # This mirrors the offensive logic but for the defensive side.
+        is_def_neutral = ("Neutral" in opp_team_val) or ("Neutral" in team_val)
+        is_def_off_reb = ("Off Reb" in opp_team_val) or ("Off Reb" in team_val)
 
         if row_type == "Offense":
             if not is_off_neutral and not (is_off_reb and subtract_off_reb):
@@ -693,16 +696,21 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
 
         team_val = str(row.get("TEAM", ""))
         opp_team_val = str(row.get("OPP TEAM", ""))
+
+        # Offense neutrals / Off Reb: already correct, stay based on TEAM.
         is_neutral = "Neutral" in team_val
         is_off_reb = "Off Reb" in team_val
-        is_opp_neutral = "Neutral" in opp_team_val
-        is_opp_off_reb = "Off Reb" in opp_team_val
+
+        # Defense neutrals / Off Reb: can be tagged in OPP TEAM or TEAM.
+        # We need this to mirror the true Sportscode run classification.
+        is_def_neutral = ("Neutral" in opp_team_val) or ("Neutral" in team_val)
+        is_def_off_reb = ("Off Reb" in opp_team_val) or ("Off Reb" in team_val)
 
         is_true_possession = False
         if row_type == "Offense":
             is_true_possession = not is_neutral and not is_off_reb
         elif row_type == "Defense":
-            is_true_possession = not is_opp_neutral and not (is_opp_off_reb and subtract_off_reb)
+            is_true_possession = not is_def_neutral and not (is_def_off_reb and subtract_off_reb)
 
         points_scored = 0
         events = []
@@ -738,9 +746,9 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
                     points_scored += 3
                 elif token == "FT+":
                     points_scored += 1
-            if is_opp_neutral:
+            if is_def_neutral:
                 events.append("Neutral")
-            if is_opp_off_reb:
+            if is_def_off_reb:
                 events.append("Off Reb")
 
         poss = {
