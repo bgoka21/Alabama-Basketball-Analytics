@@ -668,14 +668,24 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
         row_type = str(row.get("Row", "")).strip()
         team_val = str(row.get("TEAM", ""))
         opp_team_val = str(row.get("OPP TEAM", ""))
+        opp_stats_tokens = extract_tokens(row.get("OPP STATS", ""))
+        opp_stats_lookup = {tok.upper() for tok in opp_stats_tokens}
 
         is_off_neutral = "Neutral" in team_val
         is_off_reb = "Off Reb" in team_val
 
-        # Defense neutrals / Off Reb can be tagged in OPP TEAM or TEAM.
+        # Defense neutrals / Off Reb can be tagged in OPP TEAM, TEAM, or OPP STATS.
         # This mirrors the offensive logic but for the defensive side.
-        is_def_neutral = ("Neutral" in opp_team_val) or ("Neutral" in team_val)
-        is_def_off_reb = ("Off Reb" in opp_team_val) or ("Off Reb" in team_val)
+        is_def_neutral = (
+            ("Neutral" in opp_team_val)
+            or ("Neutral" in team_val)
+            or ("NEUTRAL" in opp_stats_lookup)
+        )
+        is_def_off_reb = (
+            ("Off Reb" in opp_team_val)
+            or ("Off Reb" in team_val)
+            or ("OFF REB" in opp_stats_lookup)
+        )
 
         if row_type == "Offense":
             if not is_off_neutral and not (is_off_reb and subtract_off_reb):
@@ -696,15 +706,25 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
 
         team_val = str(row.get("TEAM", ""))
         opp_team_val = str(row.get("OPP TEAM", ""))
+        opp_stats_tokens = extract_tokens(row.get("OPP STATS", ""))
+        opp_stats_lookup = {tok.upper() for tok in opp_stats_tokens}
 
         # Offense neutrals / Off Reb: already correct, stay based on TEAM.
         is_neutral = "Neutral" in team_val
         is_off_reb = "Off Reb" in team_val
 
-        # Defense neutrals / Off Reb: can be tagged in OPP TEAM or TEAM.
+        # Defense neutrals / Off Reb: can be tagged in OPP TEAM, TEAM, or OPP STATS.
         # We need this to mirror the true Sportscode run classification.
-        is_def_neutral = ("Neutral" in opp_team_val) or ("Neutral" in team_val)
-        is_def_off_reb = ("Off Reb" in opp_team_val) or ("Off Reb" in team_val)
+        is_def_neutral = (
+            ("Neutral" in opp_team_val)
+            or ("Neutral" in team_val)
+            or ("NEUTRAL" in opp_stats_lookup)
+        )
+        is_def_off_reb = (
+            ("Off Reb" in opp_team_val)
+            or ("Off Reb" in team_val)
+            or ("OFF REB" in opp_stats_lookup)
+        )
 
         is_true_possession = False
         if row_type == "Offense":
@@ -734,7 +754,7 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
             if is_off_reb:
                 events.append("TEAM Off Reb")
         elif row_type == "Defense":
-            tokens = extract_tokens(row.get("OPP STATS", ""))
+            tokens = opp_stats_tokens
             for token in tokens:
                 events.append(token)
                 token = token.upper()
