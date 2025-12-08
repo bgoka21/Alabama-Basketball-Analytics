@@ -97,8 +97,8 @@
           </div>
         </div>
       {% else %}
-        <div class="grid min-w-0 gap-4 lg:grid-cols-2">
-          <div class="space-y-2 min-w-0">
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-2">
             <h4 class="px-4 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ season_label }}</h4>
             {{ render_table(
               id=season.id,
@@ -112,7 +112,7 @@
               header_rows=season.header_rows if season.header_rows is defined else None
             ) }}
           </div>
-          <div class="space-y-2 min-w-0">
+          <div class="space-y-2">
             <h4 class="px-4 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ last_label }}</h4>
             {{ render_table(
               id=last.id,
