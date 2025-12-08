@@ -1614,7 +1614,7 @@ def build_dual_table(
             "label": "#",
             "align": "right",
             "sortable": True,
-            "width": "w-12",
+            "width": "w-8",
             "value_key": "rank_value",
             "cell_class": "pr-2",
         },
