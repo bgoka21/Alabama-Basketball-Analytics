@@ -1614,16 +1614,15 @@ def build_dual_table(
             "label": "#",
             "align": "right",
             "sortable": True,
-            "width": "w-8",
+            "width": "w-14",
             "value_key": "rank_value",
-            "cell_class": "pr-2",
         },
         {
             "key": "player",
             "label": "Player",
             "align": "left",
             "sortable": True,
-            "cell_class": "font-semibold pl-2",
+            "cell_class": "font-semibold",
         },
     ]
 
@@ -2243,16 +2242,15 @@ def build_leaderboard_table(
             "label": "#",
             "align": "right",
             "sortable": True,
-            "width": "w-12",
+            "width": "w-14",
             "value_key": "rank_value",
-            "cell_class": "pr-2",
         },
         {
             "key": "player",
             "label": "Player",
             "align": "left",
             "sortable": True,
-            "cell_class": "font-semibold pl-2",
+            "cell_class": "font-semibold",
         },
     ]
 
