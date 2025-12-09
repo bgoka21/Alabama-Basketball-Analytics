@@ -140,10 +140,14 @@ def get_all_game_ids_for_current_season(selected_game_types=None):
 
 def get_last_n_game_ids(n, selected_game_types=None):
     """Return the IDs of the last n games by date."""
+    season_id = get_current_season_id()
+    if not season_id:
+        return []
+
     if selected_game_types is None:
         selected_game_types = DEFAULT_GAME_TYPE_SELECTION
 
-    query = Game.query.order_by(Game.game_date.desc())
+    query = Game.query.filter_by(season_id=season_id).order_by(Game.game_date.desc())
     if selected_game_types:
         query = query.filter(
             Game.type_tags.any(GameTypeTag.tag.in_(selected_game_types))
@@ -281,6 +285,16 @@ def game_homepage():
             winning_game_ids.append(g.id)
         elif us_pts < opp_pts:
             losing_game_ids.append(g.id)
+
+    if not winning_game_ids and filter_opt == "season":
+        fallback_ids = get_all_game_ids_for_current_season(selected_game_types)
+        if fallback_ids:
+            fallback_games = Game.query.filter(Game.id.in_(fallback_ids)).all()
+            for g in fallback_games:
+                if _is_win(g.result):
+                    winning_game_ids.append(g.id)
+                elif _is_loss(g.result):
+                    losing_game_ids.append(g.id)
 
     # ─── 4B) Hard Hat Winners (only in wins) ──────────────────────────
     # 1) Sum each player’s BCP in each winning game
