@@ -41,43 +41,62 @@
 
 
 <!-- Filter Row -->
-<div class="flex flex-wrap gap-4 mb-6 items-start justify-between">
-  <div class="flex flex-wrap gap-4">
-    <a href="{{ url_for('public.game_homepage', filter='season',  view=view_opt, sort=sort_by, game_type=selected_game_types) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='season'  else 'bg-gray-200 text-black' }}">
-      Season
-    </a>
-    <a href="{{ url_for('public.game_homepage', filter='last5',  view=view_opt, sort=sort_by, game_type=selected_game_types) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='last5'  else 'bg-gray-200 text-black' }}">
-      Last 5 Games
-    </a>
-    <a href="{{ url_for('public.game_homepage', filter='true_data', view=view_opt, sort=sort_by, game_type=selected_game_types) }}"
-       class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='true_data' else 'bg-gray-200 text-black' }}">
-      True Data
-    </a>
-  </div>
-  <form method="get" class="flex flex-wrap gap-3 items-center">
-    <input type="hidden" name="filter" value="{{ filter_opt }}">
-    <input type="hidden" name="view" value="{{ view_opt }}">
-    <input type="hidden" name="sort" value="{{ sort_by }}">
-    <span class="text-sm font-semibold">Game Types:</span>
-    <div class="flex flex-wrap gap-2">
-      {% for option in game_type_options %}
-        <label class="inline-flex items-center gap-2 text-sm bg-gray-100 px-3 py-1 rounded">
-          <input
-            type="checkbox"
-            name="game_type"
-            value="{{ option }}"
-            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            {% if option in selected_game_types %}checked{% endif %}
-            onchange="this.form.submit()"
-          >
-          <span>{{ option }}</span>
-        </label>
-      {% endfor %}
+  <div class="flex flex-wrap gap-4 mb-6 items-start justify-between">
+    <div class="flex flex-wrap gap-4">
+      <a href="{{ url_for('public.game_homepage', filter='season',  view=view_opt, sort=sort_by, game_type=selected_game_types, season_id=selected_season_id) }}"
+         class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='season'  else 'bg-gray-200 text-black' }}">
+        Season
+      </a>
+      <a href="{{ url_for('public.game_homepage', filter='last5',  view=view_opt, sort=sort_by, game_type=selected_game_types, season_id=selected_season_id) }}"
+         class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='last5'  else 'bg-gray-200 text-black' }}">
+        Last 5 Games
+      </a>
+      <a href="{{ url_for('public.game_homepage', filter='true_data', view=view_opt, sort=sort_by, game_type=selected_game_types, season_id=selected_season_id) }}"
+         class="px-4 py-2 rounded {{ 'bg-[#9E1B32] text-white' if filter_opt=='true_data' else 'bg-gray-200 text-black' }}">
+        True Data
+      </a>
     </div>
-  </form>
-</div>
+    {% if seasons %}
+    <form method="get" class="flex flex-wrap gap-3 items-center">
+      <input type="hidden" name="filter" value="{{ filter_opt }}">
+      <input type="hidden" name="view" value="{{ view_opt }}">
+      <input type="hidden" name="sort" value="{{ sort_by }}">
+      {% for gt in selected_game_types %}
+        <input type="hidden" name="game_type" value="{{ gt }}">
+      {% endfor %}
+      <label for="season-select" class="text-sm font-semibold">Season:</label>
+      <select id="season-select" name="season_id" class="rounded border-gray-300 text-sm px-3 py-2" onchange="this.form.submit()">
+        {% for season in seasons %}
+          <option value="{{ season.id }}" {% if season.id == selected_season_id %}selected{% endif %}>
+            {{ season.season_name }}{% if season.id == current_season_id %} (Current){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    <form method="get" class="flex flex-wrap gap-3 items-center">
+      <input type="hidden" name="filter" value="{{ filter_opt }}">
+      <input type="hidden" name="view" value="{{ view_opt }}">
+      <input type="hidden" name="sort" value="{{ sort_by }}">
+      <input type="hidden" name="season_id" value="{{ selected_season_id }}">
+      <span class="text-sm font-semibold">Game Types:</span>
+      <div class="flex flex-wrap gap-2">
+        {% for option in game_type_options %}
+          <label class="inline-flex items-center gap-2 text-sm bg-gray-100 px-3 py-1 rounded">
+            <input
+              type="checkbox"
+              name="game_type"
+              value="{{ option }}"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              {% if option in selected_game_types %}checked{% endif %}
+              onchange="this.form.submit()"
+            >
+            <span>{{ option }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </form>
+  </div>
 
 <!-- 2x2 Grid Layout: 4 Equal Leaderboard Boxes -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
