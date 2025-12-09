@@ -286,6 +286,16 @@ def game_homepage():
         elif us_pts < opp_pts:
             losing_game_ids.append(g.id)
 
+    if not winning_game_ids and filter_opt == "season":
+        fallback_ids = get_all_game_ids_for_current_season(selected_game_types)
+        if fallback_ids:
+            fallback_games = Game.query.filter(Game.id.in_(fallback_ids)).all()
+            for g in fallback_games:
+                if _is_win(g.result):
+                    winning_game_ids.append(g.id)
+                elif _is_loss(g.result):
+                    losing_game_ids.append(g.id)
+
     # ─── 4B) Hard Hat Winners (only in wins) ──────────────────────────
     # 1) Sum each player’s BCP in each winning game
     player_bcp = (
