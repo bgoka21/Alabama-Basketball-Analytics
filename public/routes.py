@@ -140,10 +140,14 @@ def get_all_game_ids_for_current_season(selected_game_types=None):
 
 def get_last_n_game_ids(n, selected_game_types=None):
     """Return the IDs of the last n games by date."""
+    season_id = get_current_season_id()
+    if not season_id:
+        return []
+
     if selected_game_types is None:
         selected_game_types = DEFAULT_GAME_TYPE_SELECTION
 
-    query = Game.query.order_by(Game.game_date.desc())
+    query = Game.query.filter_by(season_id=season_id).order_by(Game.game_date.desc())
     if selected_game_types:
         query = query.filter(
             Game.type_tags.any(GameTypeTag.tag.in_(selected_game_types))
