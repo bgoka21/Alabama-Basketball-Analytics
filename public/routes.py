@@ -322,9 +322,11 @@ def game_homepage():
                 "bcp"
             ),
         )
+        .join(Roster, Roster.id == BlueCollarStats.player_id)
         .filter(
             BlueCollarStats.game_id.in_(winning_game_ids),
             BlueCollarStats.season_id == selected_season_id,
+            Roster.season_id == selected_season_id,
         )
         .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
         .subquery()
@@ -340,9 +342,12 @@ def game_homepage():
     )
 
     # 3) Count how many times each player hit that max in a winning game
-    hard_hats = (
-        db.session.query(Roster.player_name, func.count().label("hard_hat_count"))
-        .join(player_bcp, player_bcp.c.player_id == Roster.id)
+    hard_hat_winners = (
+        db.session.query(
+            player_bcp.c.game_id.label("game_id"),
+            Roster.player_name.label("player_name"),
+        )
+        .join(Roster, player_bcp.c.player_id == Roster.id)
         .join(
             max_bcp_sub,
             and_(
@@ -352,12 +357,21 @@ def game_homepage():
         )
         # only count games where someone actually scored >0 BCP
         .filter(
+            player_bcp.c.game_id.in_(winning_game_ids),
             max_bcp_sub.c.max_bcp > 0,
             Roster.season_id == selected_season_id,
         )
-        .group_by(Roster.player_name)
-        .order_by(desc("hard_hat_count"))
         .all()
+    )
+
+    hard_hat_counts: dict[str, int] = defaultdict(int)
+    for winner in hard_hat_winners:
+        hard_hat_counts[winner.player_name] += 1
+
+    hard_hats = sorted(
+        hard_hat_counts.items(),
+        key=lambda item: item[1],
+        reverse=True,
     )
 
     # ─── 4C) 3FG% Leaders ──────────────────────────────
