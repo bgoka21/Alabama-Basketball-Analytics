@@ -120,9 +120,10 @@ def _is_loss(result: str | None) -> bool:
     return sanitized.startswith("l")
 
 
-def get_all_game_ids_for_current_season(selected_game_types=None):
-    """Return a list of all game IDs in the current season."""
-    season_id = get_current_season_id()
+def get_all_game_ids_for_season(selected_game_types=None, season_id=None):
+    """Return a list of all game IDs in the chosen season (defaults to current)."""
+    if season_id is None:
+        season_id = get_current_season_id()
     if not season_id:
         return []
 
@@ -138,9 +139,10 @@ def get_all_game_ids_for_current_season(selected_game_types=None):
     return [g.id for g in query.all()]
 
 
-def get_last_n_game_ids(n, selected_game_types=None):
-    """Return the IDs of the last n games by date."""
-    season_id = get_current_season_id()
+def get_last_n_game_ids(n, selected_game_types=None, season_id=None):
+    """Return the IDs of the last n games by date in the given season."""
+    if season_id is None:
+        season_id = get_current_season_id()
     if not season_id:
         return []
 
@@ -197,12 +199,20 @@ def game_homepage():
     sort_by = request.args.get("sort", "bcp")  # 'bcp' or 'efficiency'
     selected_game_types = _parse_selected_game_types(request.args)
 
+    current_season_id = get_current_season_id()
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    season_ids = {s.id for s in seasons}
+    requested_season_id = request.args.get("season_id", type=int)
+    selected_season_id = (
+        requested_season_id if requested_season_id in season_ids else current_season_id
+    )
+
     # 2) Pick games to include
     if filter_opt == "last5":
-        game_ids = get_last_n_game_ids(5, selected_game_types)
+        game_ids = get_last_n_game_ids(5, selected_game_types, selected_season_id)
     else:
         # both 'season' and 'true_data' use the full season
-        game_ids = get_all_game_ids_for_current_season(selected_game_types)
+        game_ids = get_all_game_ids_for_season(selected_game_types, selected_season_id)
 
     games = Game.query.filter(Game.id.in_(game_ids)).all()
 
@@ -219,7 +229,11 @@ def game_homepage():
             ),
         )
         .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
-        .filter(BlueCollarStats.game_id.in_(game_ids))
+        .filter(
+            BlueCollarStats.game_id.in_(game_ids),
+            Roster.season_id == selected_season_id,
+            BlueCollarStats.season_id == selected_season_id,
+        )
         .group_by(Roster.player_name)
         .subquery()
     )
@@ -287,7 +301,9 @@ def game_homepage():
             losing_game_ids.append(g.id)
 
     if not winning_game_ids and filter_opt == "season":
-        fallback_ids = get_all_game_ids_for_current_season(selected_game_types)
+        fallback_ids = get_all_game_ids_for_season(
+            selected_game_types, selected_season_id
+        )
         if fallback_ids:
             fallback_games = Game.query.filter(Game.id.in_(fallback_ids)).all()
             for g in fallback_games:
@@ -306,7 +322,10 @@ def game_homepage():
                 "bcp"
             ),
         )
-        .filter(BlueCollarStats.game_id.in_(winning_game_ids))
+        .filter(
+            BlueCollarStats.game_id.in_(winning_game_ids),
+            BlueCollarStats.season_id == selected_season_id,
+        )
         .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
         .subquery()
     )
@@ -332,7 +351,10 @@ def game_homepage():
             ),
         )
         # only count games where someone actually scored >0 BCP
-        .filter(max_bcp_sub.c.max_bcp > 0)
+        .filter(
+            max_bcp_sub.c.max_bcp > 0,
+            Roster.season_id == selected_season_id,
+        )
         .group_by(Roster.player_name)
         .order_by(desc("hard_hat_count"))
         .all()
@@ -340,8 +362,8 @@ def game_homepage():
 
     # ─── 4C) 3FG% Leaders ──────────────────────────────
     q3 = (
-        PlayerStats.query.with_entities(
-            PlayerStats.player_name,
+        db.session.query(
+            Roster.player_name.label("player_name"),
             func.sum(PlayerStats.fg3_makes).label("fg3m"),
             func.sum(PlayerStats.fg3_attempts).label("fg3a"),
             (
@@ -350,8 +372,13 @@ def game_homepage():
                 * 100
             ).label("fg3_pct"),
         )
-        .filter(PlayerStats.game_id.in_(game_ids))
-        .group_by(PlayerStats.player_name)
+        .join(PlayerStats, PlayerStats.player_name == Roster.player_name)
+        .filter(
+            PlayerStats.game_id.in_(game_ids),
+            PlayerStats.season_id == selected_season_id,
+            Roster.season_id == selected_season_id,
+        )
+        .group_by(Roster.player_name)
     )
     if min_3fg:
         # only players whose **total** 3FG attempts ≥ threshold
@@ -360,8 +387,8 @@ def game_homepage():
 
     # ─── 4D) ATR% Leaders ──────────────────────────────
     qa = (
-        PlayerStats.query.with_entities(
-            PlayerStats.player_name,
+        db.session.query(
+            Roster.player_name.label("player_name"),
             func.sum(PlayerStats.atr_makes).label("atrm"),
             func.sum(PlayerStats.atr_attempts).label("atra"),
             (
@@ -370,8 +397,13 @@ def game_homepage():
                 * 100
             ).label("atr_pct"),
         )
-        .filter(PlayerStats.game_id.in_(game_ids))
-        .group_by(PlayerStats.player_name)
+        .join(PlayerStats, PlayerStats.player_name == Roster.player_name)
+        .filter(
+            PlayerStats.game_id.in_(game_ids),
+            PlayerStats.season_id == selected_season_id,
+            Roster.season_id == selected_season_id,
+        )
+        .group_by(Roster.player_name)
     )
     if min_atr:
         qa = qa.having(func.sum(PlayerStats.atr_attempts) >= min_atr)
@@ -389,7 +421,11 @@ def game_homepage():
         )
         .join(Roster, PlayerPossession.player_id == Roster.id)
         .join(Possession, PlayerPossession.possession_id == Possession.id)
-        .filter(Possession.game_id.in_(game_ids))
+        .filter(
+            Possession.game_id.in_(game_ids),
+            Roster.season_id == selected_season_id,
+            Possession.season_id == selected_season_id,
+        )
         .group_by(Roster.player_name)
         .subquery()
     )
@@ -551,6 +587,9 @@ def game_homepage():
         selected_game_types=selected_game_types,
         active_page="home",
         summary=summary,
+        seasons=seasons,
+        selected_season_id=selected_season_id,
+        current_season_id=current_season_id,
     )
 
 
