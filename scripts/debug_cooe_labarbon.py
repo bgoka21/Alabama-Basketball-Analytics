@@ -147,6 +147,28 @@ def _print_truth_and_app(label: str, game: Game, player: Roster):
     print("")
 
 
+def _print_multi_game_summary(label: str, game_ids: list[int], player: Roster):
+    """Show raw totals for a multi-game request using get_game_on_off_stats."""
+
+    onoff = get_game_on_off_stats(game_ids, player.id)
+    print(f"=== Multi-game ({label}) ===")
+    print(f"  game_ids            = {game_ids}")
+    if not onoff:
+        print("  onoff not available")
+        print("")
+        return
+
+    print(f"  team_off_poss       = {onoff.team_offensive_possessions}")
+    print(f"  poss_on             = {onoff.offensive_possessions_on}")
+    print(f"  poss_off            = {onoff.offensive_possessions_off}")
+    print(f"  points_on           = {onoff.points_on_offense}")
+    print(f"  points_off          = {onoff.points_off_offense}")
+    print(f"  PPP ON              = {_fmt(onoff.adv_ppp_on_offense)}")
+    print(f"  PPP OFF             = {_fmt(onoff.adv_ppp_off_offense)}")
+    print(f"  COOE (on-off)       = {_fmt(onoff.adv_offensive_leverage)}")
+    print("")
+
+
 def main():
     app = create_app()
     with app.app_context():
@@ -177,6 +199,12 @@ def main():
                 print(f"Skipping {label}: game not loaded")
                 continue
             _print_truth_and_app(label, game, player)
+
+        # Combined check for the two-game sample that should match Sportscode
+        # raw totals (possessions/points) without any per-game averaging.
+        game_ids = [g.id for g in games.values() if g]
+        if len(game_ids) >= 2:
+            _print_multi_game_summary("ND + St. Johns", game_ids, player)
 
 
 if __name__ == "__main__":

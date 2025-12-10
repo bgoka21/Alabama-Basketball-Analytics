@@ -122,29 +122,48 @@ def _summarize_game_possessions(possession_query) -> Tuple[int, float]:
 
 
 def get_game_on_off_stats(game_ids: Optional[Iterable[int]], player_id: int):
-    """Return COOE on/off metrics for the given player across game_ids."""
+    """Return COOE on/off metrics for the given player across game_ids.
 
-    normalized_game_ids = _normalize_game_ids(game_ids)
+    PPP ON  = total points scored on possessions where the player is ON offense
+              divided by offensive_possessions_on.
+    PPP OFF = total team points scored on possessions where the player is OFF
+              offense divided by offensive_possessions_off.
+    Offensive Leverage = PPP ON − PPP OFF.
+
+    All multi-game values are calculated from summed per-game totals (never by
+    averaging per-game PPP outputs).
+    """
+
+    normalized_game_ids = tuple(dict.fromkeys(_normalize_game_ids(game_ids)))
     if not normalized_game_ids:
         return None
 
-    team_off_poss, team_off_points = _summarize_game_possessions(
-        _build_game_possession_query(game_ids=normalized_game_ids, side="Offense")
-    )
-    team_def_poss, team_def_points = _summarize_game_possessions(
-        _build_game_possession_query(game_ids=normalized_game_ids, side="Defense")
-    )
+    def _accumulate(side: str, *, player: bool = False) -> Tuple[int, float]:
+        """Sum possessions/points per game to avoid any cross-game averaging.
 
-    player_off_poss, player_off_points = _summarize_game_possessions(
-        _build_game_possession_query(
-            game_ids=normalized_game_ids, side="Offense", player_id=player_id
-        )
-    )
-    player_def_poss, player_def_points = _summarize_game_possessions(
-        _build_game_possession_query(
-            game_ids=normalized_game_ids, side="Defense", player_id=player_id
-        )
-    )
+        The per-game summaries already mirror Sportscode, so adding them together
+        guarantees multi-game requests are pure totals (never averages of PPP).
+        """
+
+        total_possessions = 0
+        total_points = 0.0
+        for gid in normalized_game_ids:
+            poss, pts = _summarize_game_possessions(
+                _build_game_possession_query(
+                    game_ids=(gid,),
+                    side=side,
+                    player_id=player_id if player else None,
+                )
+            )
+            total_possessions += poss
+            total_points += pts
+        return total_possessions, total_points
+
+    team_off_poss, team_off_points = _accumulate("Offense")
+    team_def_poss, team_def_points = _accumulate("Defense")
+
+    player_off_poss, player_off_points = _accumulate("Offense", player=True)
+    player_def_poss, player_def_points = _accumulate("Defense", player=True)
 
     off_possessions_off = max(team_off_poss - player_off_poss, 0)
     def_possessions_off = max(team_def_poss - player_def_poss, 0)
