@@ -8,21 +8,6 @@
   --tbl-hover:     #F3F4F6;   /* gray-100 */
   --tbl-text:      #374151;   /* gray-700 */
 }
-.dark :root, .dark {
-  --tbl-header-bg: rgba(31,41,55,0.6); /* gray-800/60 */
-  --tbl-border:    #374151;            /* gray-700 */
-  --tbl-hover:     rgba(55,65,81,0.6); /* gray-700/60 */
-  --tbl-text:      #E5E7EB;            /* gray-200 */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --tbl-header-bg: rgba(31,41,55,0.6); /* gray-800/60 */
-    --tbl-border:    #374151;            /* gray-700 */
-    --tbl-hover:     rgba(55,65,81,0.6); /* gray-700/60 */
-    --tbl-text:      #E5E7EB;            /* gray-200 */
-  }
-}
 
 .table-card-accent {
   height: 0.375rem; /* ~6px strip */
@@ -33,16 +18,6 @@
   box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.08);
 }
 
-.dark .table-card-accent {
-  background: var(--brand, #9E1B32);
-  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.12);
-}
-
-@media (prefers-color-scheme: dark) {
-  .table-card-accent {
-    box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.12);
-  }
-}
 
 .table-card-accent + .table-card-body {
   margin-top: 0;
@@ -62,17 +37,8 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
 .unified-table tbody tr:nth-child(even) { /* stripe */
   background: #F9FAFB;
 }
-.dark .unified-table tbody tr:nth-child(even) {
-  background: #1F2937; /* gray-800 */
-}
 .unified-table tbody tr:hover {
   background: var(--tbl-hover);
-}
-
-@media (prefers-color-scheme: dark) {
-  .unified-table tbody tr:nth-child(even) {
-    background: #1F2937; /* gray-800 */
-  }
 }
 
 .unified-table tbody td,
@@ -165,11 +131,6 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
   text-align: center;
   color: #6B7280; /* gray-500 */
 }
-.dark .table-empty { color: #9CA3AF; /* gray-400 */ }
-
-@media (prefers-color-scheme: dark) {
-  .table-empty { color: #9CA3AF; /* gray-400 */ }
-}
 
 /* === Print-friendly tweaks =========================================== */
 @media print {
@@ -248,17 +209,8 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
 .table-wrap .table-leaderboard tbody tr:nth-child(even) {
   background: #F9FAFB;
 }
-.dark .table-wrap .table-leaderboard tbody tr:nth-child(even) {
-  background: #1F2937; /* gray-800 */
-}
 .table-wrap .table-leaderboard tbody tr:hover {
   background: var(--lb-hover);
-}
-
-@media (prefers-color-scheme: dark) {
-  .table-wrap .table-leaderboard tbody tr:nth-child(even) {
-    background: #1F2937; /* gray-800 */
-  }
 }
 
 /* Totals row emphasis (if present) */
@@ -277,9 +229,4 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
 }
 .table-wrap .table-leaderboard thead th:has(> *):not(:has(.sort-caret)) {
   /* no-op; reserved in case templates add caret containers later */
-}
-
-/* Dark mode alignment with unified tokens */
-.dark .table-wrap {
-  border-color: var(--lb-border);
 }
