@@ -1,3 +1,7 @@
+:root {
+  color-scheme: light;
+}
+
 /* Info card and mini-card styles */
 .info-card {
   border-radius: 12px;
