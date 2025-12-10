@@ -4,7 +4,8 @@ import csv
 import pytest
 from bs4 import BeautifulSoup
 
-from models.database import db, Season, Practice, Game, PlayerStats, BlueCollarStats, Roster
+from admin.routes import _build_game_table_dataset
+from models.database import db, Season, Practice, Game, PlayerStats, BlueCollarStats, Roster, Possession
 
 
 @pytest.fixture
@@ -276,3 +277,49 @@ def test_custom_stats_csv_export_includes_source(client, sample_custom_stats):
     assert game_rows[1][0] == '#1 Tester'
     assert game_rows[1][1] == '14'
     assert game_rows[1][2] == '3'
+
+
+def test_game_table_counts_off_possessions_for_dnp(app):
+    with app.app_context():
+        season = Season(id=1, season_name='DNP Season', start_date=date(2024, 1, 1))
+        db.session.add(season)
+
+        roster = Roster(id=10, season_id=1, player_name='#10 DNP')
+        db.session.add(roster)
+
+        game = Game(
+            id=1,
+            season_id=1,
+            game_date=date(2024, 2, 1),
+            opponent_name='Opponent DNP',
+            home_or_away='home',
+        )
+        db.session.add(game)
+
+        possession = Possession(
+            id=1,
+            game_id=1,
+            season_id=1,
+            time_segment='Offense',
+            possession_side='Crimson',
+            points_scored=2,
+        )
+        db.session.add(possession)
+
+        db.session.commit()
+
+        dataset = _build_game_table_dataset(
+            {
+                'player_ids': [roster.id],
+                'fields': ['adv_ppp_off_offense', 'adv_off_possession_pct'],
+                'mode': 'total',
+            }
+        )
+
+        assert dataset['rows'], 'Expected a dataset row for the roster entry'
+        row = dataset['rows'][0]
+
+        assert row['adv_ppp_off_offense']['data_value'] == 2.0
+        assert row['adv_ppp_off_offense']['display'] == '2.00'
+        assert row['adv_off_possession_pct']['data_value'] == 0
+        assert row['adv_off_possession_pct']['display'] == '0.0%'

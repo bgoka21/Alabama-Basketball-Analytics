@@ -3642,6 +3642,22 @@ def _build_game_table_dataset(request_data):
     selected_fields = [key for key in field_keys if key in catalog]
     possessions = request_data.get('possessions')
 
+    game_ids_by_season: dict[int, list[int]] = {}
+
+    def _get_game_ids_for_season(season_id: int) -> list[int]:
+        if season_id in game_ids_by_season:
+            return game_ids_by_season[season_id]
+
+        game_query = Game.query.filter(Game.season_id == season_id)
+
+        if date_from:
+            game_query = game_query.filter(Game.game_date >= date_from)
+        if date_to:
+            game_query = game_query.filter(Game.game_date <= date_to)
+
+        game_ids_by_season[season_id] = [game.id for game in game_query.all()]
+        return game_ids_by_season[season_id]
+
     roster_rows: list[Roster] = []
     if player_ids:
         roster_rows = Roster.query.filter(Roster.id.in_(player_ids)).all()
@@ -3678,8 +3694,8 @@ def _build_game_table_dataset(request_data):
             date_to=date_to,
         )
 
-        session_ids = aggregates.get('session_ids')
-        onoff = get_game_on_off_stats(session_ids, roster_entry.id)
+        game_ids = _get_game_ids_for_season(roster_entry.season_id)
+        onoff = get_game_on_off_stats(game_ids, roster_entry.id)
 
         totals = dict(aggregates.get('totals') or {})
         blue = dict(aggregates.get('blue') or {})
