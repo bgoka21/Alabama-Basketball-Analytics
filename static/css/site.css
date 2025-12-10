@@ -35,18 +35,6 @@ main {
   border-color: var(--border-muted);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --background-color: #0b1220;
-    --text-color: #e2e8f0;
-    --text-muted: #94a3b8;
-    --border-muted: #334155;
-    --card-bg: #111827;
-    --card-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
-  }
-}
-
 /* Info card and mini-card styles */
 .info-card {
   background: var(--card-bg);
