@@ -10,7 +10,7 @@
   header_rows=None,
   draggable_headers=False
 ) -%}
-  {%- set container_classes = 'rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden' -%}
+{%- set container_classes = 'rounded-lg border border-gray-200 shadow-sm overflow-hidden' -%}
   {%- set padding_class = 'px-4 py-2' if dense else 'px-4 py-3' -%}
   {%- set advanced_onoff_keys = [
     'adv_ppp_on_offense',
@@ -31,8 +31,8 @@
         {%- if caption %}
         <caption class="sr-only">{{ caption }}</caption>
         {%- endif %}
-        {%- set thead_classes = 'bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700' -%}
-        {%- set sticky_header_class = ' sticky top-0 z-10 bg-gray-50 dark:bg-gray-800/60' if sticky_header else '' -%}
+        {%- set thead_classes = 'bg-gray-50 border-b border-gray-200' -%}
+        {%- set sticky_header_class = ' sticky top-0 z-10 bg-gray-50' if sticky_header else '' -%}
         {%- set header_rows_data = header_rows or [] -%}
         {%- set has_custom_header = header_rows_data | length > 0 -%}
         <thead class="{{ thead_classes }}{% if sticky_header %} sticky top-0 z-10{% endif %}">
@@ -57,7 +57,7 @@
                       'center': 'justify-center'
                     }[align] -%}
                     {%- set width_class = col.width if col.width is defined and col.width else '' -%}
-                    {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                    {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
                     {%- if col.sortable -%}
                       {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
                     {%- endif -%}
@@ -88,7 +88,7 @@
                     {%- endif -%}
                     </th>
                   {%- else -%}
-                    {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
+                    {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
                     <th scope="col"
                         class="{{ group_th_classes }}"
                         {%- if cell_colspan | int > 1 %} colspan="{{ cell_colspan }}"{%- endif -%}
@@ -113,7 +113,7 @@
                   'center': 'justify-center'
                 }[align] -%}
                 {%- set width_class = col.width if col.width is defined and col.width else '' -%}
-                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
                 {%- if col.sortable -%}
                   {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
                 {%- endif -%}
@@ -176,7 +176,7 @@
             <tr{% if draggable_headers %} data-header-row="columns"{% endif %}>
               {%- for item in header_groups -%}
                 {%- if item.type == 'group' -%}
-                  {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
+                  {%- set group_th_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none text-center' ~ sticky_header_class -%}
                   <th scope="col" colspan="{{ item.span }}" class="{{ group_th_classes }}">
                     {{ item.label }}
                   </th>
@@ -194,7 +194,7 @@
                     'center': 'justify-center'
                   }[align] -%}
                   {%- set width_class = col.width if col.width is defined and col.width else '' -%}
-                  {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                  {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
                   {%- if col.sortable -%}
                     {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
                   {%- endif -%}
@@ -240,7 +240,7 @@
                   'center': 'justify-center'
                 }[align] -%}
                 {%- set width_class = col.width if col.width is defined and col.width else '' -%}
-                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
                 {%- if col.sortable -%}
                   {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
                 {%- endif -%}
@@ -285,7 +285,7 @@
                   'center': 'justify-center'
                 }[align] -%}
                 {%- set width_class = col.width if col.width is defined and col.width else '' -%}
-                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
+                {%- set th_base_classes = padding_class ~ ' font-semibold text-gray-700 whitespace-nowrap select-none ' ~ align_class ~ sticky_header_class -%}
                 {%- if col.sortable -%}
                   {%- set th_base_classes = th_base_classes ~ ' sortable' -%}
                 {%- endif -%}
@@ -320,7 +320,7 @@
         </thead>
         <tbody>
           {%- for row in rows %}
-          <tr class="odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors">
+          <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors">
             {%- for col in columns %}
               {%- set align = col.align | default('left') -%}
               {%- set align_class = {
@@ -376,7 +376,7 @@
         </tbody>
         {%- if totals %}
         <tfoot>
-          <tr class="bg-gray-50 dark:bg-gray-800/60 font-semibold border-t border-gray-200 dark:border-gray-700">
+          <tr class="bg-gray-50 font-semibold border-t border-gray-200">
             {%- for col in columns %}
               {%- set align = col.align | default('left') -%}
               {%- set align_class = {
