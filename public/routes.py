@@ -497,11 +497,9 @@ def game_homepage():
     team_total_bcp = sum(r.total_blue_collar or 0 for r in team_stats)
     avg_bcp = round(team_total_bcp / len(team_stats), 1) if team_stats else 0
 
-    # 3) Avg. 3FG% this season (skip any None values)
-    pct3s = [row.fg3_pct for row in fg3_leaders]
-    valid_pct3 = [p for p in pct3s if isinstance(p, (int, float))]
-    if valid_pct3:
-        avg_fg3 = f"{sum(valid_pct3) / len(valid_pct3):.1f}%"
+    # 3) Season-long team 3FG% using total makes/attempts
+    if team_fg3_attempts:
+        avg_fg3 = f"{(team_fg3_makes / team_fg3_attempts) * 100:.1f}%"
     else:
         avg_fg3 = "0%"
 
