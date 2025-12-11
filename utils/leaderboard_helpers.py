@@ -347,6 +347,7 @@ _DEFENSE_EVENT_COLUMNS: Tuple[str, ...] = (
     "opp_misses_on",
     "opp_team_off_reb_on",
     "opp_player_off_reb_on",
+    "player_def_reb_on",
     "team_def_reb_on",
 )
 
@@ -377,6 +378,10 @@ def _get_defense_events(
                 func.sum(case((ShotDetail.event_type == "Off Reb", 1), else_=0)),
                 0,
             ).label("opp_player_off_reb_on"),
+            func.coalesce(
+                func.sum(case((ShotDetail.event_type == "Def Reb", 1), else_=0)),
+                0,
+            ).label("player_def_reb_on"),
             func.coalesce(
                 func.sum(
                     case(
@@ -740,17 +745,12 @@ def get_rebound_rates_onfloor(
         player_id, roster, start_dt, end_dt, label_set
     )
     opp_misses = float(defense_events.get("opp_misses_on", 0) or 0)
-    opp_off_reb = float(defense_events.get("opp_team_off_reb_on", 0) or 0)
-    opp_player_off_reb = float(defense_events.get("opp_player_off_reb_on", 0) or 0)
-    team_def_reb = float(defense_events.get("team_def_reb_on", 0) or 0)
-
-    opp_off_total = opp_off_reb + opp_player_off_reb
-    if team_def_reb <= 0 and opp_misses:
-        team_def_reb = max(opp_misses - opp_off_total, 0.0)
-    def_den = team_def_reb + opp_off_total
+    player_def_reb = float(defense_events.get("player_def_reb_on", 0) or 0)
+    total_def_reb = float(defense_events.get("team_def_reb_on", 0) or 0)
+    defensive_rebounds = player_def_reb if player_def_reb > 0 else total_def_reb
     def_reb_rate = (
-        round(team_def_reb / def_den * 100, 1)
-        if def_den
+        round(defensive_rebounds / opp_misses * 100, 1)
+        if opp_misses
         else 0.0
     )
 
