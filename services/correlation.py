@@ -757,8 +757,29 @@ def _game_metric_specs() -> Dict[str, _MetricSpec]:
         ),
     }
 
+    rebound_specs: Dict[str, _MetricSpec] = {
+        "on_floor_indiv_oreb_pct": _MetricSpec(
+            ("off_reb", "team_misses_on"),
+            lambda row: _safe_div(row.get("off_reb"), row.get("team_misses_on")),
+        ),
+        "on_floor_team_oreb_pct": _MetricSpec(
+            ("team_off_reb_on", "team_misses_on"),
+            lambda row: _safe_div(row.get("team_off_reb_on"), row.get("team_misses_on")),
+        ),
+        "on_floor_indiv_dreb_pct": _MetricSpec(
+            ("def_reb", "opp_misses_on"),
+            lambda row: _safe_div(row.get("def_reb"), row.get("opp_misses_on")),
+        ),
+        "on_floor_team_dreb_pct": _MetricSpec(
+            ("team_def_reb_on", "opp_misses_on"),
+            lambda row: _safe_div(row.get("team_def_reb_on"), row.get("opp_misses_on")),
+        ),
+    }
+
     for key, spec in leaderboard_specs.items():
         specs.setdefault(key, spec)
+
+    specs.update({key: spec for key, spec in rebound_specs.items() if key not in specs})
 
     return specs
 
