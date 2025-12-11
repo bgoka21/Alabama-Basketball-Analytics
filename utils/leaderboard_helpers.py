@@ -718,7 +718,9 @@ def get_rebound_rates_onfloor(
     )
 
     team_misses = float(offense_events.get("team_misses_on", 0) or 0)
-    recorded_team_oreb = float(offense_events.get("team_off_reb_on", 0) or 0)
+    recorded_team_oreb = float(offense_events.get("off_reb_on", 0) or 0) + float(
+        offense_events.get("team_off_reb_on", 0) or 0
+    )
     if recorded_team_oreb > 0:
         team_oreb_on = recorded_team_oreb
     else:
