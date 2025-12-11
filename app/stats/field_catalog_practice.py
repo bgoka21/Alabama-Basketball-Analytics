@@ -82,8 +82,26 @@ PRACTICE_FIELD_GROUPS = {
         {"key": "adv_def_reb_rate", "label": "Def Rebounding Rate", "format": "percent"},
     ],
     "On-Floor Rates": [
-        {"key": "on_floor_oreb_pct", "label": "On-Floor OREB%", "format": "percent"},
-        {"key": "on_floor_dreb_pct", "label": "On-Floor DREB%", "format": "percent"},
+        {
+            "key": "on_floor_indiv_oreb_pct",
+            "label": "On-Floor OREB% — Individual",
+            "format": "percent",
+        },
+        {
+            "key": "on_floor_team_oreb_pct",
+            "label": "On-Floor OREB% — Team",
+            "format": "percent",
+        },
+        {
+            "key": "on_floor_indiv_dreb_pct",
+            "label": "On-Floor DREB% — Individual",
+            "format": "percent",
+        },
+        {
+            "key": "on_floor_team_dreb_pct",
+            "label": "On-Floor DREB% — Team",
+            "format": "percent",
+        },
     ],
     "Blue Collar": [
         {"key": "bcp_total", "label": "Total Blue Collar Points", "format": "count"},

@@ -175,6 +175,9 @@ from utils.leaderboard_helpers import (
     get_on_off_summary,
     get_turnover_rates_onfloor,
     get_rebound_rates_onfloor,
+    _get_offense_events,
+    _get_defense_events,
+    _normalize_labels,
 )
 from utils.player_stats_helpers.cooe import get_game_on_off_stats
 from utils.scope import resolve_scope
@@ -3641,6 +3644,7 @@ def _build_game_table_dataset(request_data):
     catalog = _build_game_field_catalog_map()
     selected_fields = [key for key in field_keys if key in catalog]
     possessions = request_data.get('possessions')
+    label_set = _normalize_labels(labels if labels else None)
 
     game_ids_by_season: dict[int, list[int]] = {}
 
@@ -3696,6 +3700,22 @@ def _build_game_table_dataset(request_data):
 
         game_ids = _get_game_ids_for_season(roster_entry.season_id)
         onoff = get_game_on_off_stats(game_ids, roster_entry.id)
+        reb_rates = get_rebound_rates_onfloor(
+            player_id=roster_entry.id,
+            date_from=date_from,
+            date_to=date_to,
+            labels=label_set,
+        ) or {}
+        offense_events = _get_offense_events(
+            roster_entry.id, roster_entry, date_from, date_to, label_set
+        )
+        defense_events = _get_defense_events(
+            roster_entry.id, roster_entry, date_from, date_to, label_set
+        )
+        team_off_reb_on = (
+            (offense_events.get('off_reb_on', 0) or 0)
+            + (offense_events.get('team_off_reb_on', 0) or 0)
+        )
 
         totals = dict(aggregates.get('totals') or {})
         blue = dict(aggregates.get('blue') or {})
@@ -3706,6 +3726,13 @@ def _build_game_table_dataset(request_data):
             **blue,
             'game_count': session_count,
             'session_count': session_count,
+            'team_misses_on': offense_events.get('team_misses_on', 0) or 0,
+            'team_off_reb_on': team_off_reb_on,
+            'opp_misses_on': defense_events.get('opp_misses_on', 0) or 0,
+            'team_def_reb_on': defense_events.get('team_def_reb_on', 0) or 0,
+            'off_reb_rate_on': reb_rates.get('off_reb_rate_on'),
+            'def_reb_rate_on': reb_rates.get('def_reb_rate_on'),
+            'def_reb_opportunities_on': reb_rates.get('def_reb_opportunities_on'),
         }
 
         if onoff:
@@ -3781,7 +3808,7 @@ def _build_game_table_dataset(request_data):
 
         total_sessions += aggregates.get('session_count', 0) or 0
         for key, value in aggregates.items():
-            if key in {'session_count', 'game_count'}:
+            if key in {'session_count', 'game_count', 'off_reb_rate_on', 'def_reb_rate_on'}:
                 continue
             if isinstance(value, (int, float)):
                 combined_agg[key] += value or 0

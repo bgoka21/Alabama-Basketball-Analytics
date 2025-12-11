@@ -5,7 +5,18 @@ import pytest
 from bs4 import BeautifulSoup
 
 from admin.routes import _build_game_table_dataset
-from models.database import db, Season, Practice, Game, PlayerStats, BlueCollarStats, Roster, Possession
+from models.database import (
+    db,
+    Season,
+    Practice,
+    Game,
+    PlayerStats,
+    BlueCollarStats,
+    Roster,
+    Possession,
+    PlayerPossession,
+    ShotDetail,
+)
 
 
 @pytest.fixture
@@ -40,6 +51,76 @@ def sample_custom_stats(app):
             ),
         ]
         db.session.add_all(games)
+
+        possessions = [
+            Possession(id=101, game_id=1, season_id=1, time_segment='Offense', possession_side='Crimson'),
+            Possession(id=102, game_id=1, season_id=1, time_segment='Defense', possession_side='Crimson'),
+            Possession(id=201, game_id=2, season_id=1, time_segment='Offense', possession_side='Crimson'),
+            Possession(id=202, game_id=2, season_id=1, time_segment='Defense', possession_side='Crimson'),
+        ]
+        db.session.add_all(possessions)
+
+        player_possessions = [
+            PlayerPossession(possession_id=pid, player_id=1)
+            for pid in (101, 102, 201, 202)
+        ]
+        db.session.add_all(player_possessions)
+
+        shot_details = []
+        offense_events_game1 = [
+            '2FG-',
+            '2FG-',
+            '3FG-',
+            '3FG-',
+            'ATR-',
+            'Off Reb',
+            'TEAM Off Reb',
+        ]
+        defense_events_game1 = [
+            '2FG-',
+            '2FG-',
+            '3FG-',
+            '3FG-',
+            'ATR-',
+            '2FG-',
+            'Def Reb',
+            'Def Reb',
+            'TEAM Def Reb',
+            'TEAM Def Reb',
+        ]
+        offense_events_game2 = [
+            '2FG-',
+            '2FG-',
+            '3FG-',
+            '3FG-',
+            'ATR-',
+            'Off Reb',
+            'Off Reb',
+            'TEAM Off Reb',
+        ]
+        defense_events_game2 = [
+            '2FG-',
+            '2FG-',
+            '3FG-',
+            '3FG-',
+            'ATR-',
+            '2FG-',
+            'Def Reb',
+            'Def Reb',
+            'TEAM Def Reb',
+            'TEAM Def Reb',
+        ]
+
+        for event in offense_events_game1:
+            shot_details.append(ShotDetail(possession_id=101, event_type=event))
+        for event in defense_events_game1:
+            shot_details.append(ShotDetail(possession_id=102, event_type=event))
+        for event in offense_events_game2:
+            shot_details.append(ShotDetail(possession_id=201, event_type=event))
+        for event in defense_events_game2:
+            shot_details.append(ShotDetail(possession_id=202, event_type=event))
+
+        db.session.add_all(shot_details)
 
         db.session.add_all(
             [
@@ -240,6 +321,30 @@ def test_custom_stats_table_partial_handles_practice_and_game(client, sample_cus
     assert game_row is not None
     assert game_row.select_one('td[data-key="pts"]').get_text(strip=True) == '14'
     assert game_row.select_one('td[data-key="play_to"]').get_text(strip=True) == '3'
+
+
+def test_custom_game_table_formats_on_floor_rebound_rates(client, sample_custom_stats):
+    with client.application.app_context():
+        dataset = _build_game_table_dataset(
+            {
+                'player_ids': [1],
+                'fields': [
+                    'on_floor_indiv_oreb_pct',
+                    'on_floor_team_oreb_pct',
+                    'on_floor_indiv_dreb_pct',
+                    'on_floor_team_dreb_pct',
+                ],
+                'mode': 'total',
+                'source': 'game',
+            }
+        )
+
+    row = dataset['rows'][0]
+
+    assert row['on_floor_indiv_oreb_pct']['data_value'] == pytest.approx(50.0)
+    assert row['on_floor_team_oreb_pct']['display'] == '50.0%'
+    assert row['on_floor_indiv_dreb_pct']['data_value'] == pytest.approx(75.0)
+    assert row['on_floor_team_dreb_pct']['display'] == '66.7%'
 
 
 def test_custom_stats_csv_export_includes_source(client, sample_custom_stats):
