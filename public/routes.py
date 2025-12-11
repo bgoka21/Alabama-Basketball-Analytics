@@ -497,9 +497,15 @@ def game_homepage():
     team_total_bcp = sum(r.total_blue_collar or 0 for r in team_stats)
     avg_bcp = round(team_total_bcp / len(team_stats), 1) if team_stats else 0
 
+    team_fg3_makes = sum(ts.total_fg3_makes or 0 for ts in team_stats)
+    team_fg3_attempts = sum(ts.total_fg3_attempts or 0 for ts in team_stats)
+    team_fg3_pct = (
+        team_fg3_makes / team_fg3_attempts if team_fg3_attempts else None
+    )
+
     # 3) Season-long team 3FG% using total makes/attempts
-    if team_fg3_attempts:
-        avg_fg3 = f"{(team_fg3_makes / team_fg3_attempts) * 100:.1f}%"
+    if team_fg3_pct is not None:
+        avg_fg3 = f"{team_fg3_pct * 100:.1f}%"
     else:
         avg_fg3 = "0%"
 
@@ -509,12 +515,6 @@ def game_homepage():
         avg_ppg = round(total_points / len(team_stats), 1)
     else:
         avg_ppg = 0
-
-    team_fg3_makes = sum(ts.total_fg3_makes or 0 for ts in team_stats)
-    team_fg3_attempts = sum(ts.total_fg3_attempts or 0 for ts in team_stats)
-    team_fg3_pct = (
-        team_fg3_makes / team_fg3_attempts if team_fg3_attempts else None
-    )
     fg3_totals = {
         "player": "Team Totals",
         "fg": f"{int(team_fg3_makes)}/{int(team_fg3_attempts)}",
