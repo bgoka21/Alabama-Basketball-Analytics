@@ -87,7 +87,21 @@ def _parse_scout_filters():
         if cleaned:
             selected_series.append(cleaned)
 
-    return teams, selected_team, games, selected_game_ids, min_runs, selected_series
+    selected_families: list[str] = []
+    for raw_family in request.args.getlist('family'):
+        cleaned = (raw_family or '').strip()
+        if cleaned:
+            selected_families.append(cleaned)
+
+    return (
+        teams,
+        selected_team,
+        games,
+        selected_game_ids,
+        min_runs,
+        selected_series,
+        selected_families,
+    )
 
 
 def _parse_int_set(raw_values):
@@ -301,6 +315,7 @@ def scout_playcalls():
         selected_game_ids,
         min_runs,
         selected_series,
+        selected_families,
     ) = _parse_scout_filters()
 
     selected_series_set = {value for value in selected_series}
@@ -311,6 +326,13 @@ def scout_playcalls():
 
     unique_playcalls = _collect_unique_playcalls(selected_game_ids)
     selectable_series = [option for option in series_options if option != 'ALL']
+    selectable_families = sorted(
+        {
+            row.get('family')
+            for row in unique_playcalls
+            if isinstance(row, dict) and (row.get('family') or '').strip()
+        }
+    )
 
     return render_template(
         'scout/scout_playcalls.html',
@@ -322,8 +344,10 @@ def scout_playcalls():
         report_rows=report_rows,
         series_options=series_options,
         selected_series=selected_series,
+        selected_families=selected_families,
         unique_playcalls=unique_playcalls,
         selectable_series=selectable_series,
+        selectable_families=selectable_families,
     )
 
 
@@ -337,6 +361,7 @@ def export_playcalls_csv():
         selected_game_ids,
         min_runs,
         selected_series,
+        selected_families,
     ) = _parse_scout_filters()
 
     selected_series_set = {value for value in selected_series}
@@ -365,6 +390,7 @@ def export_playcalls_csv():
                 min_runs=min_runs,
                 game_ids=','.join(str(game_id) for game_id in sorted(selected_game_ids)),
                 series=selected_series,
+                family=selected_families,
             )
         )
 
@@ -501,9 +527,17 @@ def update_playcall_series():
             or payload.get('existing_series')
             or ''
         ).strip()
+        new_family = (
+            payload.get('new_family')
+            or payload.get('existing_family')
+            or ''
+        ).strip()
         selected_game_ids = _parse_int_set(payload.get('game_ids') or [])
         min_runs = payload.get('min_runs') or 1
         selected_series = payload.get('series') or payload.get('selected_series') or []
+        selected_families = (
+            payload.get('family') or payload.get('families') or payload.get('selected_families') or []
+        )
         team_id = payload.get('team_id')
     else:
         playcall = (request.form.get('playcall') or '').strip()
@@ -512,9 +546,15 @@ def update_playcall_series():
             or request.form.get('existing_series')
             or ''
         ).strip()
+        new_family = (
+            request.form.get('new_family')
+            or request.form.get('existing_family')
+            or ''
+        ).strip()
         selected_game_ids = _parse_int_set(request.form.getlist('game_ids'))
         min_runs = request.form.get('min_runs', type=int) or 1
         selected_series = [value for value in request.form.getlist('series') if value]
+        selected_families = [value for value in request.form.getlist('family') if value]
         team_id = request.form.get('team_id', type=int)
 
     try:
@@ -522,8 +562,14 @@ def update_playcall_series():
     except (TypeError, ValueError):
         min_runs = 1
 
-    if not playcall or not new_series or not selected_game_ids:
-        message = 'Provide a playcall, series name, and at least one selected game.'
+    update_fields: dict[str, str] = {}
+    if new_series:
+        update_fields['series'] = new_series
+    if new_family:
+        update_fields['family'] = new_family
+
+    if not playcall or not selected_game_ids or not update_fields:
+        message = 'Provide a playcall, at least one selected game, and a series or family value.'
         if payload:
             return jsonify({'status': 'error', 'message': message}), 400
         flash(message, 'error')
@@ -533,13 +579,29 @@ def update_playcall_series():
         ScoutPossession.query.filter(
             ScoutPossession.scout_game_id.in_(selected_game_ids),
             ScoutPossession.playcall == playcall,
-        ).update({'series': new_series}, synchronize_session=False)
+        ).update(update_fields, synchronize_session=False)
     )
     db.session.commit()
 
-    success_message = f'Saved series "{new_series}" for {updated_count} possessions.'
+    saved_parts = []
+    if 'series' in update_fields:
+        saved_parts.append(f'series "{update_fields["series"]}"')
+    if 'family' in update_fields:
+        saved_parts.append(f'family "{update_fields["family"]}"')
+    saved_descriptor = ' and '.join(saved_parts) if saved_parts else 'updates'
+    success_message = f'Saved {saved_descriptor} for {updated_count} possessions.'
     if payload:
-        return jsonify({'status': 'ok', 'updated_count': updated_count, 'series': new_series}), 200
+        return (
+            jsonify(
+                {
+                    'status': 'ok',
+                    'updated_count': updated_count,
+                    'series': update_fields.get('series'),
+                    'family': update_fields.get('family'),
+                }
+            ),
+            200,
+        )
 
     flash(success_message, 'success')
 
@@ -550,6 +612,8 @@ def update_playcall_series():
         query_params['game_ids'] = ','.join(str(game_id) for game_id in sorted(selected_game_ids))
     if selected_series:
         query_params['series'] = selected_series
+    if selected_families:
+        query_params['family'] = selected_families
 
     return redirect(url_for('scout.scout_playcalls', **query_params))
 
