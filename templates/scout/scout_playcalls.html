@@ -141,6 +141,7 @@
   {% set all_rows = report_rows.get('all_rows', []) if report_rows is defined else [] %}
   {% set all_totals = report_rows.get('all_totals', {}) if report_rows is defined else {} %}
   {% set selected_series_values = selected_series if selected_series is defined else [] %}
+  {% set selected_family_values = selected_families if selected_families is defined else [] %}
 
   {% if selected_game_ids %}
     {% if unique_playcalls %}
@@ -160,7 +161,7 @@
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Current Series</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Family</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Times Run</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Assign Series</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Assign Series &amp; Family</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Save</th>
               </tr>
             </thead>
@@ -172,20 +173,37 @@
                   <td class="px-4 py-2 align-top">{{ playcall.family or '—' }}</td>
                   <td class="px-4 py-2 align-top">{{ playcall.times_run }}</td>
                   <td class="px-4 py-2 align-top">
-                    <div class="space-y-2">
-                      <select name="existing_series" form="series-form-{{ loop.index }}" class="w-full border border-gray-300 rounded px-3 py-2">
-                        <option value="">-- Select existing --</option>
-                        {% for option in selectable_series %}
-                          <option value="{{ option }}">{{ option }}</option>
-                        {% endfor %}
-                      </select>
-                      <input
-                        type="text"
-                        name="new_series"
-                        form="series-form-{{ loop.index }}"
-                        placeholder="Or type a new series"
-                        class="w-full border border-gray-300 rounded px-3 py-2"
-                      />
+                    <div class="grid md:grid-cols-2 gap-3">
+                      <div class="space-y-2">
+                        <select name="existing_series" form="series-form-{{ loop.index }}" class="w-full border border-gray-300 rounded px-3 py-2">
+                          <option value="">-- Select existing --</option>
+                          {% for option in selectable_series %}
+                            <option value="{{ option }}">{{ option }}</option>
+                          {% endfor %}
+                        </select>
+                        <input
+                          type="text"
+                          name="new_series"
+                          form="series-form-{{ loop.index }}"
+                          placeholder="Or type a new series"
+                          class="w-full border border-gray-300 rounded px-3 py-2"
+                        />
+                      </div>
+                      <div class="space-y-2">
+                        <select name="existing_family" form="series-form-{{ loop.index }}" class="w-full border border-gray-300 rounded px-3 py-2">
+                          <option value="">-- Select family --</option>
+                          {% for option in selectable_families %}
+                            <option value="{{ option }}">{{ option }}</option>
+                          {% endfor %}
+                        </select>
+                        <input
+                          type="text"
+                          name="new_family"
+                          form="series-form-{{ loop.index }}"
+                          placeholder="Or type a new family"
+                          class="w-full border border-gray-300 rounded px-3 py-2"
+                        />
+                      </div>
                     </div>
                   </td>
                   <td class="px-4 py-2 align-top">
@@ -205,6 +223,9 @@
                       {% endfor %}
                       {% for series_value in selected_series_values %}
                         <input type="hidden" name="series" value="{{ series_value }}" />
+                      {% endfor %}
+                      {% for family_value in selected_family_values %}
+                        <input type="hidden" name="family" value="{{ family_value }}" />
                       {% endfor %}
                       <button type="submit" class="w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save</button>
                     </form>
