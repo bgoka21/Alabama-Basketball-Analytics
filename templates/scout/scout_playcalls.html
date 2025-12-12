@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-bold mb-4">Scout Playcalls</h1>
+
+  <form
+    action="{{ url_for('scout.upload_playcalls_csv') }}"
+    method="post"
+    enctype="multipart/form-data"
+    class="space-y-4 border border-gray-200 rounded p-4 bg-white shadow-sm"
+  >
+    <h2 class="text-xl font-semibold">Upload Playcall CSV</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1" for="team_id">Existing Team</label>
+        <select
+          id="team_id"
+          name="team_id"
+          class="w-full border border-gray-300 rounded px-3 py-2"
+        >
+          <option value="">-- Select Team --</option>
+          {% for team in teams %}
+            <option value="{{ team.id }}" {% if selected_team and selected_team.id == team.id %}selected{% endif %}>
+              {{ team.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1" for="new_team_name">Add New Team</label>
+        <input
+          type="text"
+          id="new_team_name"
+          name="new_team_name"
+          placeholder="Enter new team name"
+          class="w-full border border-gray-300 rounded px-3 py-2"
+        />
+        <p class="text-xs text-gray-500 mt-1">If provided, a new scout team will be created and used.</p>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1" for="playcalls_file">CSV File</label>
+      <input
+        type="file"
+        id="playcalls_file"
+        name="file"
+        accept=".csv,text/csv"
+        class="w-full"
+        required
+      />
+    </div>
+
+    <button
+      type="submit"
+      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+    >
+      Upload Playcalls CSV
+    </button>
+  </form>
+</div>
+
+<div class="space-y-4">
+  <h2 class="text-xl font-semibold">Generate Scout Report</h2>
+  <form method="get" action="{{ url_for('scout.scout_playcalls') }}" class="space-y-4 border border-gray-200 rounded p-4 bg-white shadow-sm">
+    <div class="grid md:grid-cols-3 gap-4 items-end">
+      <div>
+        <label class="block text-sm font-medium mb-1" for="team_filter">Team</label>
+        <select
+          id="team_filter"
+          name="team_id"
+          class="w-full border border-gray-300 rounded px-3 py-2"
+          onchange="this.form.submit()"
+        >
+          <option value="">-- Select Team --</option>
+          {% for team in teams %}
+            <option value="{{ team.id }}" {% if selected_team and selected_team.id == team.id %}selected{% endif %}>
+              {{ team.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1" for="min_runs">Min Runs</label>
+        <input
+          type="number"
+          id="min_runs"
+          name="min_runs"
+          value="{{ min_runs or 1 }}"
+          min="1"
+          class="w-full border border-gray-300 rounded px-3 py-2"
+        />
+      </div>
+      <div class="self-start">
+        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          Generate Report
+        </button>
+      </div>
+    </div>
+
+    {% if selected_team %}
+      <div>
+        <h3 class="text-lg font-semibold mb-2">Available Scout Games</h3>
+        {% if games %}
+          <div class="border border-gray-200 rounded">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Select</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Filename</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stored Filename</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                {% for game in games %}
+                  <tr>
+                    <td class="px-4 py-2">
+                      <input
+                        type="checkbox"
+                        name="game_ids"
+                        value="{{ game.id }}"
+                        {% if game.id in selected_game_ids %}checked{% endif %}
+                      />
+                    </td>
+                    <td class="px-4 py-2">{{ game.uploaded_at|date('%Y-%m-%d %H:%M') }}</td>
+                    <td class="px-4 py-2">{{ game.original_filename }}</td>
+                    <td class="px-4 py-2">{{ game.stored_filename }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-sm text-gray-600">No scout games uploaded for this team yet.</p>
+        {% endif %}
+      </div>
+    {% else %}
+      <p class="text-sm text-gray-600">Select a team to view uploaded scout games.</p>
+    {% endif %}
+  </form>
+
+  <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded text-gray-700">
+    <p class="font-semibold">Report will appear here after parsing is implemented.</p>
+  </div>
+</div>
+{% endblock %}

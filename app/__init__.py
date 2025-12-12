@@ -117,6 +117,10 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = upload_folder
     os.makedirs(upload_folder, exist_ok=True)
 
+    scout_upload_folder = os.path.join(basedir, 'uploads', 'scout')
+    os.makedirs(scout_upload_folder, exist_ok=True)
+    app.config['SCOUT_UPLOAD_FOLDER'] = scout_upload_folder
+
     headshot_folder = os.path.join(app.static_folder, 'headshots')
     os.makedirs(headshot_folder, exist_ok=True)
 
@@ -240,6 +244,9 @@ def create_app():
 
     # Register merge tool blueprint under /merge
     app.register_blueprint(merge_bp, url_prefix='/merge')
+
+    from scout import scout_bp
+    app.register_blueprint(scout_bp, url_prefix='/scout')
 
     if scheduler.state == 0:
         scheduler.init_app(app)
