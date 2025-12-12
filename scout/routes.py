@@ -298,3 +298,33 @@ def upload_playcalls_csv():
         flash('Playcalls file uploaded, but parsing failed.', 'error')
 
     return redirect(url_for('scout.scout_playcalls', team_id=team.id))
+
+
+@scout_bp.route('/games/<int:game_id>/delete', methods=['POST'])
+@_staff_required
+def delete_scout_game(game_id: int):
+    game = ScoutGame.query.get_or_404(game_id)
+
+    selected_game_ids: set[int] = set()
+    for raw_id in request.form.getlist('game_ids'):
+        try:
+            parsed_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+
+        if parsed_id != game.id:
+            selected_game_ids.add(parsed_id)
+
+    min_runs = request.form.get('min_runs', type=int) or 1
+    team_id = request.form.get('team_id', type=int) or game.scout_team_id
+
+    db.session.delete(game)
+    db.session.commit()
+
+    flash('Scout game deleted along with its possessions.', 'success')
+
+    query_params = {'team_id': team_id, 'min_runs': min_runs}
+    if selected_game_ids:
+        query_params['game_ids'] = ','.join(str(game_id) for game_id in sorted(selected_game_ids))
+
+    return redirect(url_for('scout.scout_playcalls', **query_params))
