@@ -2,6 +2,12 @@ from datetime import datetime
 from models.database import db
 
 
+def normalize_playcall(playcall: str) -> str:
+    """Normalize a playcall for consistent lookups and storage."""
+
+    return (playcall or '').strip().lower()
+
+
 class ScoutTeam(db.Model):
     __tablename__ = 'scout_teams'
 
@@ -45,3 +51,27 @@ class ScoutPossession(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     game = db.relationship('ScoutGame', back_populates='possessions')
+
+
+class ScoutPlaycallMapping(db.Model):
+    __tablename__ = 'scout_playcall_mappings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    playcall = db.Column(db.String(255), nullable=False)
+    playcall_key = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    canonical_series = db.Column(db.String(255), nullable=True)
+    canonical_family = db.Column(db.String(255), nullable=True)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    @classmethod
+    def from_playcall(cls, playcall: str) -> 'ScoutPlaycallMapping':
+        normalized = normalize_playcall(playcall)
+        existing = cls.query.filter_by(playcall_key=normalized).first()
+        if existing:
+            return existing
+
+        instance = cls(playcall=playcall.strip(), playcall_key=normalized)
+        db.session.add(instance)
+        return instance

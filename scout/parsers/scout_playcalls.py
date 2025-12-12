@@ -4,7 +4,12 @@ from collections import OrderedDict
 from typing import Any, Dict, Iterable, List, Optional
 
 from models.database import db
-from models.scout import ScoutGame, ScoutPossession
+from models.scout import (
+    ScoutGame,
+    ScoutPlaycallMapping,
+    ScoutPossession,
+    normalize_playcall,
+)
 from scout.schema import ensure_scout_possession_schema
 
 
@@ -138,6 +143,14 @@ def store_scout_playcalls(file_path: str, scout_game: ScoutGame) -> int:
     if not parsed_possessions:
         return 0
 
+    playcall_keys = {normalize_playcall(item['playcall']) for item in parsed_possessions}
+    existing_mappings = {
+        mapping.playcall_key: mapping
+        for mapping in ScoutPlaycallMapping.query.filter(
+            ScoutPlaycallMapping.playcall_key.in_(playcall_keys)
+        ).all()
+    }
+
     existing_instances = {
         row.instance_number
         for row in ScoutPossession.query.with_entities(ScoutPossession.instance_number).filter_by(
@@ -150,13 +163,19 @@ def store_scout_playcalls(file_path: str, scout_game: ScoutGame) -> int:
         if possession["instance_number"] in existing_instances:
             continue
 
+        playcall_key = normalize_playcall(possession["playcall"])
+        mapping = existing_mappings.get(playcall_key)
+
+        mapped_series = (mapping.canonical_series or "") if mapping else ""
+        mapped_family = (mapping.canonical_family or "") if mapping else ""
+
         new_records.append(
             ScoutPossession(
                 scout_game_id=scout_game.id,
                 instance_number=possession["instance_number"],
                 playcall=possession["playcall"],
-                family=possession.get("family"),
-                series=possession.get("series"),
+                family=mapped_family or possession.get("family"),
+                series=mapped_series or possession.get("series"),
                 bucket=possession["bucket"],
                 points=possession["points"],
             )

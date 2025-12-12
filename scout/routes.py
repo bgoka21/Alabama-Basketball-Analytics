@@ -22,7 +22,13 @@ from werkzeug.utils import secure_filename
 
 from . import scout_bp
 from models.database import db
-from models.scout import ScoutGame, ScoutPossession, ScoutTeam
+from models.scout import (
+    ScoutGame,
+    ScoutPlaycallMapping,
+    ScoutPossession,
+    ScoutTeam,
+    normalize_playcall,
+)
 from scout.parsers import store_scout_playcalls
 from scout.schema import ensure_scout_possession_schema
 
@@ -145,6 +151,7 @@ def _collect_unique_playcalls(selected_game_ids: set[int]):
 
     excluded_prefixes = ('eog', 'ft', 'vs')
     unique_rows = []
+    discovered_playcalls: list[str] = []
     for row in query.all():
         playcall = (row.playcall or '').strip()
         if not playcall:
@@ -152,6 +159,8 @@ def _collect_unique_playcalls(selected_game_ids: set[int]):
         playcall_lower = playcall.lower()
         if any(playcall_lower.startswith(prefix) for prefix in excluded_prefixes):
             continue
+
+        discovered_playcalls.append(playcall)
 
         unique_rows.append(
             {
@@ -162,8 +171,59 @@ def _collect_unique_playcalls(selected_game_ids: set[int]):
             }
         )
 
+    if discovered_playcalls:
+        playcall_keys = {normalize_playcall(playcall) for playcall in discovered_playcalls}
+        mappings = {
+            mapping.playcall_key: mapping
+            for mapping in ScoutPlaycallMapping.query.filter(
+                ScoutPlaycallMapping.playcall_key.in_(playcall_keys)
+            ).all()
+        }
+
+        for row in unique_rows:
+            mapping = mappings.get(normalize_playcall(row['playcall']))
+            row['canonical_series'] = (mapping.canonical_series or '').strip() if mapping else ''
+            row['canonical_family'] = (mapping.canonical_family or '').strip() if mapping else ''
+            row['playcall_label'] = mapping.playcall if mapping else row['playcall']
+
     unique_rows.sort(key=lambda row: (row['playcall'].lower(), -row['times_run']))
     return unique_rows
+
+
+def _save_playcall_mapping(
+    playcall: str,
+    series: str,
+    family: str,
+    selected_game_ids: set[int],
+    apply_globally: bool,
+) -> int:
+    mapping = ScoutPlaycallMapping.from_playcall(playcall)
+    mapping.playcall = playcall.strip() or mapping.playcall
+    if series:
+        mapping.canonical_series = series
+    if family:
+        mapping.canonical_family = family
+
+    update_fields: dict[str, str] = {}
+    if series:
+        update_fields['series'] = series
+    if family:
+        update_fields['family'] = family
+
+    if not update_fields:
+        return 0
+
+    playcall_key = normalize_playcall(playcall)
+    possession_query = ScoutPossession.query.filter(
+        db.func.lower(db.func.trim(ScoutPossession.playcall)) == playcall_key
+    )
+    if not apply_globally:
+        possession_query = possession_query.filter(
+            ScoutPossession.scout_game_id.in_(selected_game_ids)
+        )
+
+    updated_count = possession_query.update(update_fields, synchronize_session=False)
+    return updated_count
 
 
 def _build_report_rows(
@@ -539,6 +599,7 @@ def update_playcall_series():
             payload.get('family') or payload.get('families') or payload.get('selected_families') or []
         )
         team_id = payload.get('team_id')
+        apply_globally_param = payload.get('apply_globally', True)
     else:
         playcall = (request.form.get('playcall') or '').strip()
         new_series = (
@@ -556,11 +617,14 @@ def update_playcall_series():
         selected_series = [value for value in request.form.getlist('series') if value]
         selected_families = [value for value in request.form.getlist('family') if value]
         team_id = request.form.get('team_id', type=int)
+        apply_globally_param = request.form.get('apply_globally', default='1')
 
     try:
         min_runs = int(min_runs)
     except (TypeError, ValueError):
         min_runs = 1
+
+    apply_globally = str(apply_globally_param).lower() not in {'false', '0', 'off', 'no'}
 
     update_fields: dict[str, str] = {}
     if new_series:
@@ -568,18 +632,26 @@ def update_playcall_series():
     if new_family:
         update_fields['family'] = new_family
 
-    if not playcall or not selected_game_ids or not update_fields:
-        message = 'Provide a playcall, at least one selected game, and a series or family value.'
+    if not playcall or not update_fields:
+        message = 'Provide a playcall and a series or family value to save.'
         if payload:
             return jsonify({'status': 'error', 'message': message}), 400
         flash(message, 'error')
         return redirect(url_for('scout.scout_playcalls'))
 
-    updated_count = (
-        ScoutPossession.query.filter(
-            ScoutPossession.scout_game_id.in_(selected_game_ids),
-            ScoutPossession.playcall == playcall,
-        ).update(update_fields, synchronize_session=False)
+    if not apply_globally and not selected_game_ids:
+        message = 'Select at least one game or choose to apply changes to all possessions.'
+        if payload:
+            return jsonify({'status': 'error', 'message': message}), 400
+        flash(message, 'error')
+        return redirect(url_for('scout.scout_playcalls'))
+
+    updated_count = _save_playcall_mapping(
+        playcall,
+        update_fields.get('series', ''),
+        update_fields.get('family', ''),
+        selected_game_ids,
+        apply_globally,
     )
     db.session.commit()
 
@@ -589,7 +661,8 @@ def update_playcall_series():
     if 'family' in update_fields:
         saved_parts.append(f'family "{update_fields["family"]}"')
     saved_descriptor = ' and '.join(saved_parts) if saved_parts else 'updates'
-    success_message = f'Saved {saved_descriptor} for {updated_count} possessions.'
+    scope_label = 'all possessions with this playcall' if apply_globally else 'selected games'
+    success_message = f'Saved {saved_descriptor} for {updated_count} possessions ({scope_label}).'
     if payload:
         return (
             jsonify(
@@ -598,6 +671,7 @@ def update_playcall_series():
                     'updated_count': updated_count,
                     'series': update_fields.get('series'),
                     'family': update_fields.get('family'),
+                    'apply_globally': apply_globally,
                 }
             ),
             200,
