@@ -58,6 +58,10 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
         instance_field = _resolve_field_name(reader.fieldnames, ["instance number", "instance", "instance_number"])
         playcall_field = _resolve_field_name(reader.fieldnames, ["playcall"])
         shot_field = _resolve_field_name(reader.fieldnames, ["shot"])
+        optional_fields = {
+            "series": _resolve_field_name(reader.fieldnames, ["series"]),
+            "family": _resolve_field_name(reader.fieldnames, ["family"]),
+        }
 
         if not instance_field or not playcall_field:
             raise ValueError(
@@ -73,11 +77,22 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
 
             if instance_number not in instance_data:
                 instance_data[instance_number] = {"playcall": None, "points": 0}
+                for field in optional_fields:
+                    if optional_fields[field]:
+                        instance_data[instance_number][field] = None
 
             anchored_playcall: Optional[str] = instance_data[instance_number]["playcall"]  # type: ignore[index]
             candidate_playcall = (row.get(playcall_field) or "").strip()
             if not anchored_playcall and candidate_playcall:
                 instance_data[instance_number]["playcall"] = candidate_playcall
+
+            for field, column in optional_fields.items():
+                if not column or field not in instance_data[instance_number]:
+                    continue
+                anchored_value: Optional[str] = instance_data[instance_number][field]  # type: ignore[index]
+                candidate_value = (row.get(column) or "").strip()
+                if not anchored_value and candidate_value:
+                    instance_data[instance_number][field] = candidate_value
 
             shot_value = row.get(shot_field) if shot_field else ""
             instance_data[instance_number]["points"] = int(
@@ -95,14 +110,18 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
             continue
 
         bucket = _determine_bucket(playcall_value)
-        possessions.append(
-            {
-                "instance_number": instance_number,
-                "playcall": playcall_value,
-                "bucket": bucket,
-                "points": int(data.get("points") or 0),
-            }
-        )
+        possession_payload = {
+            "instance_number": instance_number,
+            "playcall": playcall_value,
+            "bucket": bucket,
+            "points": int(data.get("points") or 0),
+        }
+
+        for field in optional_fields:
+            if field in data:
+                possession_payload[field] = data.get(field)
+
+        possessions.append(possession_payload)
 
     return possessions
 
@@ -136,6 +155,8 @@ def store_scout_playcalls(file_path: str, scout_game: ScoutGame) -> int:
                 scout_game_id=scout_game.id,
                 instance_number=possession["instance_number"],
                 playcall=possession["playcall"],
+                family=possession.get("family"),
+                series=possession.get("series"),
                 bucket=possession["bucket"],
                 points=possession["points"],
             )
