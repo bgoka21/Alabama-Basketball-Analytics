@@ -38,6 +38,8 @@ class ScoutPossession(db.Model):
     scout_game_id = db.Column(db.Integer, db.ForeignKey('scout_games.id'))
     instance_number = db.Column(db.String(255))
     playcall = db.Column(db.String(255))
+    family = db.Column(db.String(255), nullable=True, default=None)
+    series = db.Column(db.String(255), nullable=True, default=None)
     bucket = db.Column(db.String(32))
     points = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
