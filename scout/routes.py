@@ -105,6 +105,7 @@ def _build_report_rows(selected_game_ids: set[int], min_runs: int):
         .filter(ScoutPossession.scout_game_id.in_(selected_game_ids))
         .filter(ScoutPossession.playcall.isnot(None))
         .filter(ScoutPossession.playcall != '')
+        .filter(db.func.length(db.func.trim(ScoutPossession.playcall)) > 0)
         .group_by(ScoutPossession.bucket, ScoutPossession.playcall)
     )
 
@@ -115,6 +116,8 @@ def _build_report_rows(selected_game_ids: set[int], min_runs: int):
 
     for row in query.all():
         playcall = (row.playcall or '').strip()
+        if not playcall:
+            continue
         playcall_lower = playcall.lower()
         if any(playcall_lower.startswith(prefix) for prefix in excluded_prefixes):
             continue
@@ -130,7 +133,7 @@ def _build_report_rows(selected_game_ids: set[int], min_runs: int):
         report_rows[bucket_key].append(
             {
                 'bucket': bucket_key,
-                'playcall': playcall or '(Unknown)',
+                'playcall': playcall,
                 'times_run': times_run,
                 'total_points': total_points,
                 'ppc': ppc,
