@@ -15,7 +15,7 @@
 <div class="space-y-4">
   <h2 class="text-xl font-semibold">Generate Scout Report</h2>
   <form method="get" action="{{ url_for('scout.scout_playcalls') }}" class="space-y-4 border border-gray-200 rounded p-4 bg-white shadow-sm">
-    <div class="grid md:grid-cols-3 gap-4 items-end">
+    <div class="grid md:grid-cols-4 gap-4 items-end">
       <div>
         <label class="block text-sm font-medium mb-1" for="team_filter">Team</label>
         <select
@@ -42,6 +42,25 @@
           min="1"
           class="w-full border border-gray-300 rounded px-3 py-2"
         />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1" for="series_filter">Series</label>
+        <select
+          id="series_filter"
+          name="series"
+          multiple
+          size="5"
+          class="w-full border border-gray-300 rounded px-3 py-2 min-h-[10rem]"
+        >
+          {% if series_options %}
+            {% for series in series_options %}
+              <option value="{{ series }}" {% if selected_series and series in selected_series %}selected{% endif %}>{{ series }}</option>
+            {% endfor %}
+          {% else %}
+            <option disabled>(Generate a report to load series)</option>
+          {% endif %}
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Use Ctrl/Cmd to select multiple series. Include "ALL" to see combined totals.</p>
       </div>
       <div class="self-start flex gap-2">
         <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
@@ -117,92 +136,177 @@
     {% endif %}
   </form>
 
-  {% set standard_rows = report_rows.get('STANDARD', []) if report_rows is defined else [] %}
-  {% set bob_rows = report_rows.get('BOB', []) if report_rows is defined else [] %}
-  {% set sob_rows = report_rows.get('SOB', []) if report_rows is defined else [] %}
+  {% set series_rows = report_rows.get('series_rows', {}) if report_rows is defined else {} %}
+  {% set visible_series = report_rows.get('visible_series', []) if report_rows is defined else [] %}
+  {% set all_rows = report_rows.get('all_rows', []) if report_rows is defined else [] %}
+  {% set all_totals = report_rows.get('all_totals', {}) if report_rows is defined else {} %}
+  {% set selected_series_values = selected_series if selected_series is defined else [] %}
 
   {% if selected_game_ids %}
-    {% if standard_rows or bob_rows or sob_rows %}
+    {% if series_rows %}
       <div class="space-y-6">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold">Scout Playcall Report</h3>
-          <p class="text-sm text-gray-600">Minimum runs: {{ min_runs }}</p>
+          <div class="text-sm text-gray-600 space-x-2">
+            <span>Minimum runs: {{ min_runs }}</span>
+            {% if selected_series_values %}
+              <span>Series: {{ selected_series_values | join(', ') }}</span>
+            {% endif %}
+          </div>
         </div>
 
-        {% for bucket_label, rows in [('STANDARD', standard_rows), ('BOB', bob_rows), ('SOB', sob_rows)] %}
-          <div class="border border-gray-200 rounded bg-white shadow-sm">
+        {% if 'ALL' in selected_series_values and all_rows %}
+          <div class="border border-gray-200 rounded bg-white shadow-sm" data-playcall-card data-playcall-series="ALL">
             <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <h4 class="text-md font-semibold">{{ bucket_label }} Playcalls</h4>
-              <p class="text-sm text-gray-600">Sorted by Times Run then PPC</p>
+              <h4 class="text-md font-semibold">All Series</h4>
+              <p class="text-sm text-gray-600">Combined totals across selected series</p>
             </div>
-            {% if rows %}
-              <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="series" data-sort-type="text">
+                      <div class="flex items-center gap-1">
+                        Series
+                        <span class="sort-indicator text-gray-400">↕</span>
+                      </div>
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="bucket" data-sort-type="text">
+                      <div class="flex items-center gap-1">
+                        Bucket
+                        <span class="sort-indicator text-gray-400">↕</span>
+                      </div>
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="playcall" data-sort-type="text">
+                      <div class="flex items-center gap-1">
+                        Playcall
+                        <span class="sort-indicator text-gray-400">↕</span>
+                      </div>
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="times_run" data-sort-type="number" data-sort-direction="desc">
+                      <div class="flex items-center gap-1">
+                        Times Run
+                        <span class="sort-indicator text-gray-400">↓</span>
+                      </div>
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="total_points" data-sort-type="number">
+                      <div class="flex items-center gap-1">
+                        Total Points
+                        <span class="sort-indicator text-gray-400">↕</span>
+                      </div>
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="ppc" data-sort-type="number">
+                      <div class="flex items-center gap-1">
+                        PPC
+                        <span class="sort-indicator text-gray-400">↕</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  {% for row in all_rows %}
                     <tr>
-                      <th
-                        class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none"
-                        data-sort-key="playcall"
-                        data-sort-type="text"
-                      >
-                        <div class="flex items-center gap-1">
-                          Playcall
-                          <span class="sort-indicator text-gray-400">↕</span>
-                        </div>
-                      </th>
-                      <th
-                        class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none"
-                        data-sort-key="times_run"
-                        data-sort-type="number"
-                        data-sort-direction="desc"
-                      >
-                        <div class="flex items-center gap-1">
-                          Times Run
-                          <span class="sort-indicator text-gray-400">↓</span>
-                        </div>
-                      </th>
-                      <th
-                        class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none"
-                        data-sort-key="total_points"
-                        data-sort-type="number"
-                      >
-                        <div class="flex items-center gap-1">
-                          Total Points
-                          <span class="sort-indicator text-gray-400">↕</span>
-                        </div>
-                      </th>
-                      <th
-                        class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none"
-                        data-sort-key="ppc"
-                        data-sort-type="number"
-                      >
-                        <div class="flex items-center gap-1">
-                          PPC
-                          <span class="sort-indicator text-gray-400">↕</span>
-                        </div>
-                      </th>
+                      <td class="px-4 py-2">{{ row.series }}</td>
+                      <td class="px-4 py-2">{{ row.bucket }}</td>
+                      <td class="px-4 py-2">{{ row.playcall }}</td>
+                      <td class="px-4 py-2">{{ row.times_run }}</td>
+                      <td class="px-4 py-2">{{ row.total_points }}</td>
+                      <td class="px-4 py-2">{{ '%.2f'|format(row.ppc) }}</td>
                     </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200">
-                    {% for row in rows %}
-                      {% set playcall_lower = row.playcall|lower %}
-                      {% if not (playcall_lower.startswith('eog') or playcall_lower.startswith('ft') or playcall_lower.startswith('vs')) %}
+                  {% endfor %}
+                </tbody>
+                <tfoot class="bg-gray-50">
+                  <tr class="font-semibold">
+                    <td class="px-4 py-2">ALL</td>
+                    <td class="px-4 py-2">Totals</td>
+                    <td class="px-4 py-2">Totals</td>
+                    <td class="px-4 py-2">{{ all_totals.times_run or 0 }}</td>
+                    <td class="px-4 py-2">{{ all_totals.total_points or 0 }}</td>
+                    <td class="px-4 py-2">{{ '%.2f'|format(all_totals.ppc or 0) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if visible_series %}
+          {% for series_name in visible_series %}
+            {% set payload = series_rows.get(series_name) if series_rows is mapping else {} %}
+            <div class="border border-gray-200 rounded bg-white shadow-sm" data-playcall-card data-playcall-series="{{ series_name }}">
+              <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                <h4 class="text-md font-semibold">{{ series_name }} Playcalls</h4>
+                <p class="text-sm text-gray-600">Sorted by Times Run then PPC</p>
+              </div>
+              {% if payload and payload.rows %}
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="bucket" data-sort-type="text">
+                          <div class="flex items-center gap-1">
+                            Bucket
+                            <span class="sort-indicator text-gray-400">↕</span>
+                          </div>
+                        </th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="playcall" data-sort-type="text">
+                          <div class="flex items-center gap-1">
+                            Playcall
+                            <span class="sort-indicator text-gray-400">↕</span>
+                          </div>
+                        </th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="times_run" data-sort-type="number" data-sort-direction="desc">
+                          <div class="flex items-center gap-1">
+                            Times Run
+                            <span class="sort-indicator text-gray-400">↓</span>
+                          </div>
+                        </th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="total_points" data-sort-type="number">
+                          <div class="flex items-center gap-1">
+                            Total Points
+                            <span class="sort-indicator text-gray-400">↕</span>
+                          </div>
+                        </th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer select-none" data-sort-key="ppc" data-sort-type="number">
+                          <div class="flex items-center gap-1">
+                            PPC
+                            <span class="sort-indicator text-gray-400">↕</span>
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      {% for row in payload.rows %}
                         <tr>
+                          <td class="px-4 py-2">{{ row.bucket }}</td>
                           <td class="px-4 py-2">{{ row.playcall }}</td>
                           <td class="px-4 py-2">{{ row.times_run }}</td>
                           <td class="px-4 py-2">{{ row.total_points }}</td>
                           <td class="px-4 py-2">{{ '%.2f'|format(row.ppc) }}</td>
                         </tr>
-                      {% endif %}
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <p class="px-4 py-3 text-sm text-gray-600">No playcalls match the filters for this bucket.</p>
-            {% endif %}
+                      {% endfor %}
+                    </tbody>
+                    <tfoot class="bg-gray-50">
+                      <tr class="font-semibold">
+                        <td class="px-4 py-2">Totals</td>
+                        <td class="px-4 py-2">Totals</td>
+                        <td class="px-4 py-2">{{ payload.totals.times_run or 0 }}</td>
+                        <td class="px-4 py-2">{{ payload.totals.total_points or 0 }}</td>
+                        <td class="px-4 py-2">{{ '%.2f'|format(payload.totals.ppc or 0) }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              {% else %}
+                <p class="px-4 py-3 text-sm text-gray-600">No playcalls match the filters for this series.</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded text-gray-700">
+            <p class="font-semibold">No playcalls found for the selected series.</p>
           </div>
-        {% endfor %}
+        {% endif %}
       </div>
     {% else %}
       <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded text-gray-700">
