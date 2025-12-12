@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from . import scout_bp
 from models.database import db
 from models.scout import ScoutGame, ScoutTeam
+from scout.parsers import store_scout_playcalls
 
 
 def _staff_required(view_func):
@@ -114,5 +115,14 @@ def upload_playcalls_csv():
     db.session.add(game)
     db.session.commit()
 
-    flash('Playcalls file uploaded for scout team.', 'success')
+    try:
+        created_count = store_scout_playcalls(file_path, game)
+        flash(
+            f'Playcalls file uploaded for scout team. Parsed {created_count} possessions.',
+            'success',
+        )
+    except Exception:  # pragma: no cover - defensive logging
+        current_app.logger.exception('Failed to parse scout playcalls CSV')
+        flash('Playcalls file uploaded, but parsing failed.', 'error')
+
     return redirect(url_for('scout.scout_playcalls', team_id=team.id))

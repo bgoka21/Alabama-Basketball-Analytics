@@ -30,6 +30,9 @@ class ScoutGame(db.Model):
 
 class ScoutPossession(db.Model):
     __tablename__ = 'scout_possessions'
+    __table_args__ = (
+        db.UniqueConstraint('scout_game_id', 'instance_number', name='uq_scout_possessions_game_instance'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     scout_game_id = db.Column(db.Integer, db.ForeignKey('scout_games.id'))
