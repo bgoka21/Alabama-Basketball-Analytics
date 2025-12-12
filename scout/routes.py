@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 
 from . import scout_bp
 from models.database import db
-from models.scout import ScoutGame, ScoutTeam
+from models.scout import ScoutGame, ScoutPossession, ScoutTeam
 from scout.parsers import store_scout_playcalls
 
 
@@ -63,7 +63,58 @@ def scout_playcalls():
         except (TypeError, ValueError):
             continue
 
+    if games:
+        valid_game_ids = {game.id for game in games}
+        selected_game_ids = {game_id for game_id in selected_game_ids if game_id in valid_game_ids}
+
     min_runs = request.args.get('min_runs', default=1, type=int)
+
+    report_rows = {"STANDARD": [], "BOB": [], "SOB": []}
+    if selected_game_ids:
+        times_run_expr = db.func.count(
+            db.func.distinct(
+                db.func.concat(
+                    ScoutPossession.scout_game_id, db.literal('-'), ScoutPossession.instance_number
+                )
+            )
+        )
+        total_points_expr = db.func.coalesce(db.func.sum(ScoutPossession.points), 0)
+
+        query = (
+            db.session.query(
+                ScoutPossession.bucket,
+                ScoutPossession.playcall,
+                times_run_expr.label('times_run'),
+                total_points_expr.label('total_points'),
+            )
+            .filter(ScoutPossession.scout_game_id.in_(selected_game_ids))
+            .group_by(ScoutPossession.bucket, ScoutPossession.playcall)
+        )
+
+        if min_runs and min_runs > 1:
+            query = query.having(times_run_expr >= min_runs)
+
+        for row in query.all():
+            times_run = int(row.times_run or 0)
+            total_points = int(row.total_points or 0)
+            ppc = round(total_points / times_run, 2) if times_run else 0
+
+            bucket_key = (row.bucket or 'STANDARD').upper()
+            if bucket_key not in report_rows:
+                report_rows[bucket_key] = []
+
+            report_rows[bucket_key].append(
+                {
+                    'bucket': bucket_key,
+                    'playcall': row.playcall or '(Unknown)',
+                    'times_run': times_run,
+                    'total_points': total_points,
+                    'ppc': ppc,
+                }
+            )
+
+        for bucket_key, rows in report_rows.items():
+            rows.sort(key=lambda row: (-row['times_run'], -row['ppc']))
 
     return render_template(
         'scout/scout_playcalls.html',
@@ -72,6 +123,7 @@ def scout_playcalls():
         games=games,
         selected_game_ids=selected_game_ids,
         min_runs=min_runs,
+        report_rows=report_rows,
     )
 
 

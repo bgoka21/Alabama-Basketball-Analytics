@@ -141,8 +141,62 @@
     {% endif %}
   </form>
 
-  <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded text-gray-700">
-    <p class="font-semibold">Report will appear here after parsing is implemented.</p>
-  </div>
+  {% set standard_rows = report_rows.get('STANDARD', []) if report_rows is defined else [] %}
+  {% set bob_rows = report_rows.get('BOB', []) if report_rows is defined else [] %}
+  {% set sob_rows = report_rows.get('SOB', []) if report_rows is defined else [] %}
+
+  {% if selected_game_ids %}
+    {% if standard_rows or bob_rows or sob_rows %}
+      <div class="space-y-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Scout Playcall Report</h3>
+          <p class="text-sm text-gray-600">Minimum runs: {{ min_runs }}</p>
+        </div>
+
+        {% for bucket_label, rows in [('STANDARD', standard_rows), ('BOB', bob_rows), ('SOB', sob_rows)] %}
+          <div class="border border-gray-200 rounded bg-white shadow-sm">
+            <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <h4 class="text-md font-semibold">{{ bucket_label }} Playcalls</h4>
+              <p class="text-sm text-gray-600">Sorted by Times Run then PPC</p>
+            </div>
+            {% if rows %}
+              <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Playcall</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Times Run</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Points</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PPC</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    {% for row in rows %}
+                      <tr>
+                        <td class="px-4 py-2">{{ row.playcall }}</td>
+                        <td class="px-4 py-2">{{ row.times_run }}</td>
+                        <td class="px-4 py-2">{{ row.total_points }}</td>
+                        <td class="px-4 py-2">{{ '%.2f'|format(row.ppc) }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="px-4 py-3 text-sm text-gray-600">No playcalls match the filters for this bucket.</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded text-gray-700">
+        <p class="font-semibold">No playcalls found for the selected games with the current filters.</p>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded text-gray-700">
+      <p class="font-semibold">Select one or more scout games and generate the report to see results.</p>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}
