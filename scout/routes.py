@@ -137,6 +137,20 @@ def scout_playcalls():
     )
 
 
+@scout_bp.route('/playcalls/upload')
+@_staff_required
+def scout_playcalls_upload():
+    teams = ScoutTeam.query.order_by(ScoutTeam.name).all()
+    team_id = request.args.get('team_id', type=int)
+    selected_team = ScoutTeam.query.get(team_id) if team_id else None
+
+    return render_template(
+        'scout/scout_playcalls_upload.html',
+        teams=teams,
+        selected_team=selected_team,
+    )
+
+
 @scout_bp.route('/upload_playcalls_csv', methods=['POST'])
 @_staff_required
 def upload_playcalls_csv():
@@ -155,12 +169,17 @@ def upload_playcalls_csv():
 
     if not team:
         flash('Please select a team or add a new one.', 'error')
-        return redirect(url_for('scout.scout_playcalls'))
+        return redirect(url_for('scout.scout_playcalls_upload', team_id=team_id))
 
     file = request.files.get('file')
     if not file or not file.filename:
         flash('Please upload a CSV file.', 'error')
-        return redirect(url_for('scout.scout_playcalls', team_id=team.id))
+        return redirect(
+            url_for(
+                'scout.scout_playcalls_upload',
+                team_id=team.id if team else team_id,
+            )
+        )
 
     filename = secure_filename(file.filename) or 'playcalls.csv'
     upload_dir = _ensure_scout_upload_dir()
