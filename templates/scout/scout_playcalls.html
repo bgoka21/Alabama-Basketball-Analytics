@@ -42,9 +42,17 @@
           class="w-full border border-gray-300 rounded px-3 py-2"
         />
       </div>
-      <div class="self-start">
+      <div class="self-start flex gap-2">
         <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
           Generate Report
+        </button>
+        <button
+          type="submit"
+          formaction="{{ url_for('scout.export_playcalls_csv') }}"
+          formmethod="get"
+          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Export CSV
         </button>
       </div>
     </div>
