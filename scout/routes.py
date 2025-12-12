@@ -24,6 +24,7 @@ from . import scout_bp
 from models.database import db
 from models.scout import ScoutGame, ScoutPossession, ScoutTeam
 from scout.parsers import store_scout_playcalls
+from scout.schema import ensure_scout_possession_schema
 
 
 def _staff_required(view_func):
@@ -103,6 +104,8 @@ def _collect_unique_playcalls(selected_game_ids: set[int]):
     if not selected_game_ids:
         return []
 
+    ensure_scout_possession_schema(db.engine)
+
     possession_key_expr = (
         db.cast(ScoutPossession.scout_game_id, db.String)
         + db.literal('-')
@@ -160,6 +163,8 @@ def _build_report_rows(
         'all_rows': [],
         'all_totals': base_totals.copy(),
     }
+
+    ensure_scout_possession_schema(db.engine)
 
     if not selected_game_ids:
         return report_rows
