@@ -72,8 +72,9 @@ main {
   line-height: 1.1;
 }
 
-/* Recruit page wide container (scoped & centered) */
-.page--recruit.container--wide {
+/* Recruit & Scout Playcalls wide container (scoped & centered) */
+.page--recruit.container--wide,
+.page--scout-playcalls.container--wide {
   /* Increase the usable width only on this page */
   max-width: 1360px;
   margin-left: auto;
@@ -83,7 +84,8 @@ main {
 }
 
 /* Center within layouts that include a sidebar */
-.layout--with-sidebar .page--recruit.container--wide {
+.layout--with-sidebar .page--recruit.container--wide,
+.layout--with-sidebar .page--scout-playcalls.container--wide {
   margin-left: auto;
   margin-right: auto;
 }
@@ -91,18 +93,25 @@ main {
 /* Allow inner containers to span the full width */
 .page--recruit .content-inner,
 .page--recruit .main-content,
-.page--recruit .container {
+.page--recruit .container,
+.page--scout-playcalls .content-inner,
+.page--scout-playcalls .main-content,
+.page--scout-playcalls .container {
   width: 100%;
 }
 
 /* Prevent nested generic containers from shrinking the width */
-.page--recruit .container {
+.page--recruit .container,
+.page--scout-playcalls .container {
   max-width: 100%;
 }
 
-/* Tables/cards fill available width on recruit page */
+/* Tables/cards fill available width on recruit & scout playcalls pages */
 .page--recruit .table,
-.page--recruit .card {
+.page--recruit .card,
+.page--scout-playcalls .table,
+.page--scout-playcalls .card,
+.page--scout-playcalls table {
   max-width: 100%;
 }
 
