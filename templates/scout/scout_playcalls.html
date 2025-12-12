@@ -172,12 +172,15 @@
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
                     {% for row in rows %}
-                      <tr>
-                        <td class="px-4 py-2">{{ row.playcall }}</td>
-                        <td class="px-4 py-2">{{ row.times_run }}</td>
-                        <td class="px-4 py-2">{{ row.total_points }}</td>
-                        <td class="px-4 py-2">{{ '%.2f'|format(row.ppc) }}</td>
-                      </tr>
+                      {% set playcall_lower = row.playcall|lower %}
+                      {% if not (playcall_lower.startswith('eog') or playcall_lower.startswith('ft') or playcall_lower.startswith('vs')) %}
+                        <tr>
+                          <td class="px-4 py-2">{{ row.playcall }}</td>
+                          <td class="px-4 py-2">{{ row.times_run }}</td>
+                          <td class="px-4 py-2">{{ row.total_points }}</td>
+                          <td class="px-4 py-2">{{ '%.2f'|format(row.ppc) }}</td>
+                        </tr>
+                      {% endif %}
                     {% endfor %}
                   </tbody>
                 </table>

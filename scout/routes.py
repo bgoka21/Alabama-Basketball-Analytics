@@ -97,7 +97,14 @@ def scout_playcalls():
         if min_runs and min_runs > 1:
             query = query.having(times_run_expr >= min_runs)
 
+        excluded_prefixes = ('eog', 'ft', 'vs')
+
         for row in query.all():
+            playcall = (row.playcall or '').strip()
+            playcall_lower = playcall.lower()
+            if any(playcall_lower.startswith(prefix) for prefix in excluded_prefixes):
+                continue
+
             times_run = int(row.times_run or 0)
             total_points = int(row.total_points or 0)
             ppc = round(total_points / times_run, 2) if times_run else 0
@@ -109,7 +116,7 @@ def scout_playcalls():
             report_rows[bucket_key].append(
                 {
                     'bucket': bucket_key,
-                    'playcall': row.playcall or '(Unknown)',
+                    'playcall': playcall or '(Unknown)',
                     'times_run': times_run,
                     'total_points': total_points,
                     'ppc': ppc,
