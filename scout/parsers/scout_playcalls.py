@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from models.database import db
 from models.scout import ScoutGame, ScoutPossession
+from scout.schema import ensure_scout_possession_schema
 
 
 def _extract_points(shot_value: str) -> int:
@@ -58,8 +59,10 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
         playcall_field = _resolve_field_name(reader.fieldnames, ["playcall"])
         shot_field = _resolve_field_name(reader.fieldnames, ["shot"])
 
-        if not instance_field or not playcall_field or not shot_field:
-            raise ValueError("CSV is missing required columns for scout playcall parsing.")
+        if not instance_field or not playcall_field:
+            raise ValueError(
+                "CSV is missing required columns (instance number and playcall) for scout playcall parsing."
+            )
 
         instance_data: "OrderedDict[str, Dict[str, object]]" = OrderedDict()
 
@@ -76,8 +79,10 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
             if not anchored_playcall and candidate_playcall:
                 instance_data[instance_number]["playcall"] = candidate_playcall
 
-            shot_value = row.get(shot_field) or ""
-            instance_data[instance_number]["points"] = int(instance_data[instance_number]["points"]) + _extract_points(shot_value)  # type: ignore[index]
+            shot_value = row.get(shot_field) if shot_field else ""
+            instance_data[instance_number]["points"] = int(
+                instance_data[instance_number]["points"]
+            ) + _extract_points(shot_value)  # type: ignore[index]
 
     possessions: List[Dict[str, Any]] = []
     for instance_number, data in instance_data.items():
@@ -107,6 +112,8 @@ def store_scout_playcalls(file_path: str, scout_game: ScoutGame) -> int:
 
     Returns the count of new ScoutPossession rows inserted.
     """
+
+    ensure_scout_possession_schema(db.engine)
 
     parsed_possessions = parse_playcalls_csv(file_path)
     if not parsed_possessions:
