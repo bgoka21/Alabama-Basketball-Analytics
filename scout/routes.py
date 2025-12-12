@@ -89,6 +89,8 @@ def scout_playcalls():
                 total_points_expr.label('total_points'),
             )
             .filter(ScoutPossession.scout_game_id.in_(selected_game_ids))
+            .filter(ScoutPossession.playcall.isnot(None))
+            .filter(ScoutPossession.playcall != '')
             .group_by(ScoutPossession.bucket, ScoutPossession.playcall)
         )
 
