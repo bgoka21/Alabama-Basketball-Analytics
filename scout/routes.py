@@ -71,12 +71,13 @@ def scout_playcalls():
 
     report_rows = {"STANDARD": [], "BOB": [], "SOB": []}
     if selected_game_ids:
+        possession_key_expr = (
+            db.cast(ScoutPossession.scout_game_id, db.String)
+            + db.literal('-')
+            + db.cast(ScoutPossession.instance_number, db.String)
+        )
         times_run_expr = db.func.count(
-            db.func.distinct(
-                db.func.concat(
-                    ScoutPossession.scout_game_id, db.literal('-'), ScoutPossession.instance_number
-                )
-            )
+            db.func.distinct(possession_key_expr)
         )
         total_points_expr = db.func.coalesce(db.func.sum(ScoutPossession.points), 0)
 
