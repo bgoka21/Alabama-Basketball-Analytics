@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold mb-1">Upload Scout Playcalls</h1>
+    <p class="text-sm text-gray-600">Upload a CSV file for a scout team to include in reports.</p>
+  </div>
+  <a
+    href="{{ url_for('scout.scout_playcalls', team_id=selected_team.id if selected_team else None) }}"
+    class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
+  >
+    View Reports
+  </a>
+</div>
+
+<form
+  action="{{ url_for('scout.upload_playcalls_csv') }}"
+  method="post"
+  enctype="multipart/form-data"
+  class="space-y-4 border border-gray-200 rounded p-4 bg-white shadow-sm"
+>
+  <h2 class="text-xl font-semibold">Upload Playcall CSV</h2>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-1" for="team_id">Existing Team</label>
+      <select
+        id="team_id"
+        name="team_id"
+        class="w-full border border-gray-300 rounded px-3 py-2"
+      >
+        <option value="">-- Select Team --</option>
+        {% for team in teams %}
+          <option value="{{ team.id }}" {% if selected_team and selected_team.id == team.id %}selected{% endif %}>
+            {{ team.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1" for="new_team_name">Add New Team</label>
+      <input
+        type="text"
+        id="new_team_name"
+        name="new_team_name"
+        placeholder="Enter new team name"
+        class="w-full border border-gray-300 rounded px-3 py-2"
+      />
+      <p class="text-xs text-gray-500 mt-1">If provided, a new scout team will be created and used.</p>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1" for="playcalls_file">CSV File</label>
+    <input
+      type="file"
+      id="playcalls_file"
+      name="file"
+      accept=".csv,text/csv"
+      class="w-full"
+      required
+    />
+  </div>
+
+  <div class="flex items-center gap-3">
+    <button
+      type="submit"
+      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+    >
+      Upload Playcalls CSV
+    </button>
+    <a
+      href="{{ url_for('scout.scout_playcalls') }}"
+      class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+    >
+      Cancel
+    </a>
+  </div>
+</form>
+{% endblock %}
