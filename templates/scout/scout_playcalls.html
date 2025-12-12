@@ -62,7 +62,7 @@
       <div>
         <h3 class="text-lg font-semibold mb-2">Available Scout Games</h3>
         {% if games %}
-          <div class="border border-gray-200 rounded">
+          <div class="border border-gray-200 rounded overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
@@ -84,8 +84,12 @@
                       />
                     </td>
                     <td class="px-4 py-2">{{ game.uploaded_at|date('%Y-%m-%d %H:%M') }}</td>
-                    <td class="px-4 py-2">{{ game.original_filename }}</td>
-                    <td class="px-4 py-2">{{ game.stored_filename }}</td>
+                    <td class="px-4 py-2 align-top">
+                      <div class="max-w-xs truncate break-all" title="{{ game.original_filename }}">{{ game.original_filename }}</div>
+                    </td>
+                    <td class="px-4 py-2 align-top">
+                      <div class="max-w-xs truncate break-all" title="{{ game.stored_filename }}">{{ game.stored_filename }}</div>
+                    </td>
                   </tr>
                 {% endfor %}
               </tbody>

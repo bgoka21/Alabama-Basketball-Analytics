@@ -46,7 +46,9 @@
           {% for file in files %}
           <tr>
             <td class="px-4 py-3"><input type="checkbox" name="selected_files" value="{{ file.id }}"></td>
-            <td class="px-4 py-3">{{ file.filename }}</td>
+            <td class="px-4 py-3 align-top">
+              <div class="max-w-xs truncate break-all" title="{{ file.filename }}">{{ file.filename }}</div>
+            </td>
             <td class="px-4 py-3">{{ file.category or 'Uncategorized' }}</td>
             <td class="px-4 py-3">{{ file.parse_status }}</td>
             <td class="px-4 py-3">{{ file.last_parsed or '—' }}</td>
