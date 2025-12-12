@@ -143,6 +143,80 @@
   {% set selected_series_values = selected_series if selected_series is defined else [] %}
 
   {% if selected_game_ids %}
+    {% if unique_playcalls %}
+      <div class="space-y-4 border border-blue-100 bg-blue-50 rounded p-4 shadow-sm">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 class="text-lg font-semibold">Manage Playcall Series</h3>
+            <p class="text-sm text-gray-700">Assign or create a series for playcalls pulled from the selected games.</p>
+          </div>
+          <span class="text-sm text-gray-600">Playcalls found: {{ unique_playcalls | length }}</span>
+        </div>
+        <div class="border border-gray-200 rounded bg-white overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Playcall</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Current Series</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Family</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Times Run</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Assign Series</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Save</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for playcall in unique_playcalls %}
+                <tr>
+                  <td class="px-4 py-2 align-top">{{ playcall.playcall }}</td>
+                  <td class="px-4 py-2 align-top">{{ playcall.series or '—' }}</td>
+                  <td class="px-4 py-2 align-top">{{ playcall.family or '—' }}</td>
+                  <td class="px-4 py-2 align-top">{{ playcall.times_run }}</td>
+                  <td class="px-4 py-2 align-top">
+                    <div class="space-y-2">
+                      <select name="existing_series" form="series-form-{{ loop.index }}" class="w-full border border-gray-300 rounded px-3 py-2">
+                        <option value="">-- Select existing --</option>
+                        {% for option in selectable_series %}
+                          <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                      </select>
+                      <input
+                        type="text"
+                        name="new_series"
+                        form="series-form-{{ loop.index }}"
+                        placeholder="Or type a new series"
+                        class="w-full border border-gray-300 rounded px-3 py-2"
+                      />
+                    </div>
+                  </td>
+                  <td class="px-4 py-2 align-top">
+                    <form
+                      id="series-form-{{ loop.index }}"
+                      method="post"
+                      action="{{ url_for('scout.update_playcall_series') }}"
+                      class="space-y-2"
+                    >
+                      <input type="hidden" name="playcall" value="{{ playcall.playcall }}" />
+                      <input type="hidden" name="min_runs" value="{{ min_runs or 1 }}" />
+                      {% if selected_team %}
+                        <input type="hidden" name="team_id" value="{{ selected_team.id }}" />
+                      {% endif %}
+                      {% for game_id in selected_game_ids %}
+                        <input type="hidden" name="game_ids" value="{{ game_id }}" />
+                      {% endfor %}
+                      {% for series_value in selected_series_values %}
+                        <input type="hidden" name="series" value="{{ series_value }}" />
+                      {% endfor %}
+                      <button type="submit" class="w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
     {% if series_rows %}
       <div class="space-y-6">
         <div class="flex items-center justify-between">

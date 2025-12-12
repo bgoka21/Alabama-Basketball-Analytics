@@ -11,6 +11,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -86,6 +87,66 @@ def _parse_scout_filters():
             selected_series.append(cleaned)
 
     return teams, selected_team, games, selected_game_ids, min_runs, selected_series
+
+
+def _parse_int_set(raw_values):
+    parsed_values: set[int] = set()
+    for value in raw_values:
+        try:
+            parsed_values.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    return parsed_values
+
+
+def _collect_unique_playcalls(selected_game_ids: set[int]):
+    if not selected_game_ids:
+        return []
+
+    possession_key_expr = (
+        db.cast(ScoutPossession.scout_game_id, db.String)
+        + db.literal('-')
+        + db.cast(ScoutPossession.instance_number, db.String)
+    )
+    times_run_expr = db.func.count(db.func.distinct(possession_key_expr))
+    series_expr = db.func.nullif(db.func.trim(ScoutPossession.series), '')
+    family_expr = db.func.nullif(db.func.trim(ScoutPossession.family), '')
+
+    query = (
+        db.session.query(
+            db.func.trim(ScoutPossession.playcall).label('playcall'),
+            times_run_expr.label('times_run'),
+            db.func.max(series_expr).label('series'),
+            db.func.max(family_expr).label('family'),
+        )
+        .filter(ScoutPossession.scout_game_id.in_(selected_game_ids))
+        .filter(ScoutPossession.playcall.isnot(None))
+        .filter(ScoutPossession.playcall != '')
+        .filter(db.func.length(db.func.trim(ScoutPossession.playcall)) > 0)
+        .group_by(db.func.trim(ScoutPossession.playcall))
+    )
+
+    excluded_prefixes = ('eog', 'ft', 'vs')
+    unique_rows = []
+    for row in query.all():
+        playcall = (row.playcall or '').strip()
+        if not playcall:
+            continue
+        playcall_lower = playcall.lower()
+        if any(playcall_lower.startswith(prefix) for prefix in excluded_prefixes):
+            continue
+
+        unique_rows.append(
+            {
+                'playcall': playcall,
+                'series': (row.series or '').strip(),
+                'family': (row.family or '').strip(),
+                'times_run': int(row.times_run or 0),
+            }
+        )
+
+    unique_rows.sort(key=lambda row: (row['playcall'].lower(), -row['times_run']))
+    return unique_rows
 
 
 def _build_report_rows(
@@ -243,6 +304,9 @@ def scout_playcalls():
     if not selected_series and series_options:
         selected_series = series_options
 
+    unique_playcalls = _collect_unique_playcalls(selected_game_ids)
+    selectable_series = [option for option in series_options if option != 'ALL']
+
     return render_template(
         'scout/scout_playcalls.html',
         teams=teams,
@@ -253,6 +317,8 @@ def scout_playcalls():
         report_rows=report_rows,
         series_options=series_options,
         selected_series=selected_series,
+        unique_playcalls=unique_playcalls,
+        selectable_series=selectable_series,
     )
 
 
@@ -416,6 +482,71 @@ def upload_playcalls_csv():
         flash('Playcalls file uploaded, but parsing failed.', 'error')
 
     return redirect(url_for('scout.scout_playcalls', team_id=team.id))
+
+
+@scout_bp.route('/playcalls/series', methods=['POST', 'PUT'])
+@_staff_required
+def update_playcall_series():
+    payload = request.get_json(silent=True) if request.is_json else None
+
+    if payload:
+        playcall = (payload.get('playcall') or '').strip()
+        new_series = (
+            payload.get('new_series')
+            or payload.get('existing_series')
+            or ''
+        ).strip()
+        selected_game_ids = _parse_int_set(payload.get('game_ids') or [])
+        min_runs = payload.get('min_runs') or 1
+        selected_series = payload.get('series') or payload.get('selected_series') or []
+        team_id = payload.get('team_id')
+    else:
+        playcall = (request.form.get('playcall') or '').strip()
+        new_series = (
+            request.form.get('new_series')
+            or request.form.get('existing_series')
+            or ''
+        ).strip()
+        selected_game_ids = _parse_int_set(request.form.getlist('game_ids'))
+        min_runs = request.form.get('min_runs', type=int) or 1
+        selected_series = [value for value in request.form.getlist('series') if value]
+        team_id = request.form.get('team_id', type=int)
+
+    try:
+        min_runs = int(min_runs)
+    except (TypeError, ValueError):
+        min_runs = 1
+
+    if not playcall or not new_series or not selected_game_ids:
+        message = 'Provide a playcall, series name, and at least one selected game.'
+        if payload:
+            return jsonify({'status': 'error', 'message': message}), 400
+        flash(message, 'error')
+        return redirect(url_for('scout.scout_playcalls'))
+
+    updated_count = (
+        ScoutPossession.query.filter(
+            ScoutPossession.scout_game_id.in_(selected_game_ids),
+            ScoutPossession.playcall == playcall,
+        ).update({'series': new_series}, synchronize_session=False)
+    )
+    db.session.commit()
+
+    success_message = f'Saved series "{new_series}" for {updated_count} possessions.'
+    if payload:
+        return jsonify({'status': 'ok', 'updated_count': updated_count, 'series': new_series}), 200
+
+    flash(success_message, 'success')
+
+    query_params = {'min_runs': min_runs}
+    if team_id:
+        query_params['team_id'] = team_id
+    if selected_game_ids:
+        query_params['game_ids'] = ','.join(str(game_id) for game_id in sorted(selected_game_ids))
+    if selected_series:
+        query_params['series'] = selected_series
+
+    return redirect(url_for('scout.scout_playcalls', **query_params))
 
 
 @scout_bp.route('/games/<int:game_id>/delete', methods=['POST'])
