@@ -118,6 +118,9 @@ def _build_report_rows(selected_game_ids: set[int], min_runs: int):
         playcall = (row.playcall or '').strip()
         if not playcall:
             continue
+        if playcall.lower() == '(unknown)':
+            # Ignore placeholder values from previous imports.
+            continue
         playcall_lower = playcall.lower()
         if any(playcall_lower.startswith(prefix) for prefix in excluded_prefixes):
             continue

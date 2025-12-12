@@ -81,7 +81,11 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
 
     possessions: List[Dict[str, Any]] = []
     for instance_number, data in instance_data.items():
-        playcall_value = data.get("playcall") or "(Unknown)"
+        playcall_value = (data.get("playcall") or "").strip()
+        if not playcall_value:
+            # Skip instances that never received a playcall value.
+            continue
+
         if _should_exclude(playcall_value):
             continue
 
