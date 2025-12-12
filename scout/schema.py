@@ -24,10 +24,9 @@ def ensure_scout_possession_schema(engine: Engine) -> Set[str]:
     """
 
     engine_key = str(engine.url)
-    if engine_key in _verified_engines:
-        return _table_columns(engine, "scout_possessions")
-
     existing_columns = _table_columns(engine, "scout_possessions")
+    if engine_key in _verified_engines and {"family", "series"}.issubset(existing_columns):
+        return existing_columns
     missing_statements: list[str] = []
 
     if "family" not in existing_columns:
