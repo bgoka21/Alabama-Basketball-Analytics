@@ -167,9 +167,13 @@
       statGroups: document.getElementById('stat-groups'),
       dateFrom: document.getElementById('custom-date-from'),
       dateTo: document.getElementById('custom-date-to'),
-      gameSelect: document.getElementById('custom-game-select'),
+      gameSearch: document.getElementById('custom-game-search'),
+      gameDropdown: document.getElementById('custom-game-dropdown'),
+      gameChips: document.getElementById('custom-game-chips'),
+      gameClear: document.getElementById('custom-game-clear'),
       gameHelp: document.getElementById('custom-game-help'),
       gameRow: document.getElementById('custom-game-row'),
+      gamePicker: document.getElementById('custom-game-picker'),
       modeToggle: document.getElementById('custom-mode-toggle'),
       autoRefresh: document.getElementById('custom-auto-refresh'),
       tableContainer: document.getElementById('custom-table-container'),
@@ -297,13 +301,6 @@
         to: elements.dateTo ? nextTo : currentDates.to
       });
 
-      if (elements.gameSelect) {
-        const selectedGames = Array.from(elements.gameSelect.selectedOptions)
-          .map((opt) => Number(opt.value))
-          .filter((value) => Number.isFinite(value));
-        setGameSelection(state, previousSource, selectedGames);
-      }
-
       if (!force && normalized === previousSource) {
         if (Array.isArray(options.presetFields)) {
           state.selectedFields = options.presetFields.slice();
@@ -371,13 +368,6 @@
       }
       const nextGameSelection = getGameSelection(state, normalized);
       setGameSelection(state, normalized, nextGameSelection);
-      if (elements.gameSelect) {
-        const selectionSet = new Set(nextGameSelection);
-        Array.from(elements.gameSelect.options).forEach((opt) => {
-          const value = Number(opt.value);
-          opt.selected = Number.isFinite(value) && selectionSet.has(value);
-        });
-      }
       state.lastPayload = null;
 
       if (elements.statSearch) {
@@ -1057,12 +1047,19 @@
   }
 
   function hydrateGames(elements, state, config, queueRefresh) {
-    const select = elements.gameSelect;
-    if (!select) {
+    const searchInput = elements.gameSearch;
+    const dropdown = elements.gameDropdown;
+    const chips = elements.gameChips;
+    const clearButton = elements.gameClear;
+    const helper = elements.gameHelp;
+
+    if (!searchInput || !dropdown || !chips) {
       return;
     }
 
-    const helper = elements.gameHelp;
+    let activeIndex = -1;
+    let filteredGames = [];
+    let loading = false;
 
     function updateHelpMessage(text) {
       if (helper) {
@@ -1070,58 +1067,226 @@
       }
     }
 
-    function applySelectionFromState(source) {
-      const selection = new Set(getGameSelection(state, source));
-      Array.from(select.options).forEach((opt) => {
-        const value = Number(opt.value);
-        opt.selected = Number.isFinite(value) && selection.has(value);
-      });
-      if (selection.size === 0 && state.gameOptions.length) {
-        updateHelpMessage('Select one or more games to refine the Game view.');
-      }
+    function closeDropdown() {
+      dropdown.classList.add('hidden');
+      activeIndex = -1;
     }
 
-    function renderOptions(games) {
-      select.innerHTML = '';
-      state.gameOptions = Array.isArray(games) ? games : [];
+    function formatGameLabel(game) {
+      if (!game) return '';
+      const label = String(game.label || '').trim();
+      if (label) return label;
+      if (game.date && game.opponent) {
+        return `${game.date} vs ${game.opponent}`;
+      }
+      if (game.date) return String(game.date);
+      return `Game #${game.id}`;
+    }
 
-      if (!state.gameOptions.length) {
-        select.disabled = true;
-        updateHelpMessage('No games are available yet. Upload or tag games to enable this filter.');
+    function renderChips() {
+      const selection = getGameSelection(state, state.source);
+      chips.innerHTML = '';
+
+      if (!selection.length) {
+        chips.textContent = 'No games selected (optional).';
+        chips.classList.add('text-gray-500');
+        if (clearButton) {
+          clearButton.classList.add('hidden');
+        }
         return;
       }
 
-      select.disabled = false;
+      chips.classList.remove('text-gray-500');
       const fragment = document.createDocumentFragment();
-      state.gameOptions.forEach((game) => {
-        const option = document.createElement('option');
-        option.value = game.id;
-        option.textContent = game.label || `Game #${game.id}`;
-        fragment.appendChild(option);
-      });
-      select.appendChild(fragment);
-      applySelectionFromState(state.source);
-      updateHelpMessage('Choose specific games (optional). Leave empty to include all games in the date window.');
-      if (state.autoRefresh && state.source === 'game') {
-        queueRefresh('games-loaded');
+      const selectionSet = new Set(selection);
+      state.gameOptions
+        .filter((game) => selectionSet.has(Number(game.id)))
+        .forEach((game) => {
+          const chip = document.createElement('span');
+          chip.className =
+            'inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-800 border border-gray-200';
+          chip.textContent = formatGameLabel(game);
+
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'text-gray-500 hover:text-gray-700 focus:outline-none';
+          removeBtn.innerHTML = '&times;';
+          removeBtn.addEventListener('click', () => {
+            const nextSelection = selection.filter((id) => id !== Number(game.id));
+            setGameSelection(state, state.source, nextSelection);
+            state.lastPayload = null;
+            renderChips();
+            if (state.autoRefresh && state.source === 'game') {
+              queueRefresh('games-remove');
+            }
+          });
+          chip.appendChild(removeBtn);
+          fragment.appendChild(chip);
+        });
+
+      chips.appendChild(fragment);
+      if (clearButton) {
+        clearButton.classList.toggle('hidden', selection.length === 0);
       }
     }
 
-    select.addEventListener('change', () => {
-      const selected = Array.from(select.selectedOptions)
-        .map((opt) => Number(opt.value))
-        .filter((value) => Number.isFinite(value));
-      setGameSelection(state, state.source, selected);
+    function handleSelection(gameId) {
+      const parsedId = Number(gameId);
+      if (!Number.isFinite(parsedId)) {
+        return;
+      }
+      const current = getGameSelection(state, state.source);
+      if (current.includes(parsedId)) {
+        closeDropdown();
+        return;
+      }
+      const next = current.concat(parsedId);
+      setGameSelection(state, state.source, next);
       state.lastPayload = null;
-      queueRefresh('games');
+      renderChips();
+      if (state.autoRefresh && state.source === 'game') {
+        queueRefresh('games');
+      }
+      closeDropdown();
+      searchInput.value = '';
+      filteredGames = state.gameOptions.slice();
+      renderDropdown();
+    }
+
+    function renderDropdown() {
+      dropdown.innerHTML = '';
+      const selection = new Set(getGameSelection(state, state.source));
+
+      if (loading) {
+        updateHelpMessage('Loading games…');
+        const loadingItem = document.createElement('div');
+        loadingItem.className = 'px-3 py-2 text-sm text-gray-500';
+        loadingItem.textContent = 'Loading games…';
+        dropdown.appendChild(loadingItem);
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      if (!state.gameOptions.length) {
+        updateHelpMessage('No games are available yet. Upload or tag games to enable this filter.');
+        const empty = document.createElement('div');
+        empty.className = 'px-3 py-2 text-sm text-gray-500';
+        empty.textContent = 'No games available';
+        dropdown.appendChild(empty);
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      if (!filteredGames.length) {
+        updateHelpMessage('No matches. Try a different search or adjust your dates.');
+        const empty = document.createElement('div');
+        empty.className = 'px-3 py-2 text-sm text-gray-500';
+        empty.textContent = 'No games match your search.';
+        dropdown.appendChild(empty);
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      updateHelpMessage('Choose specific games (optional). Leave empty to include all games in the date window.');
+
+      const list = document.createElement('div');
+      list.setAttribute('role', 'listbox');
+      filteredGames.forEach((game, index) => {
+        const item = document.createElement('button');
+        const isActive = index === activeIndex;
+        const isSelected = selection.has(Number(game.id));
+        item.type = 'button';
+        item.className = `flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+          isActive ? 'bg-gray-100' : ''
+        } ${isSelected ? 'font-semibold text-[#9E1B32]' : 'text-gray-800'}`;
+        item.dataset.gameId = game.id;
+        item.innerHTML = `<span>${formatGameLabel(game)}</span>${isSelected ? '<span class="text-xs">Selected</span>' : ''}`;
+        item.addEventListener('click', () => handleSelection(game.id));
+        list.appendChild(item);
+      });
+
+      dropdown.appendChild(list);
+      dropdown.classList.remove('hidden');
+    }
+
+    function filterGames(query) {
+      const term = String(query || '').toLowerCase().trim();
+      if (!term) {
+        filteredGames = state.gameOptions.slice();
+        activeIndex = -1;
+        renderDropdown();
+        return;
+      }
+      filteredGames = state.gameOptions.filter((game) => formatGameLabel(game).toLowerCase().includes(term));
+      activeIndex = filteredGames.length ? 0 : -1;
+      renderDropdown();
+    }
+
+    function handleKeydown(event) {
+      if (dropdown.classList.contains('hidden')) {
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (filteredGames.length) {
+          activeIndex = (activeIndex + 1) % filteredGames.length;
+          renderDropdown();
+        }
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (filteredGames.length) {
+          activeIndex = activeIndex <= 0 ? filteredGames.length - 1 : activeIndex - 1;
+          renderDropdown();
+        }
+      } else if (event.key === 'Enter') {
+        if (activeIndex >= 0 && filteredGames[activeIndex]) {
+          event.preventDefault();
+          handleSelection(filteredGames[activeIndex].id);
+        }
+      } else if (event.key === 'Escape') {
+        closeDropdown();
+      }
+    }
+
+    searchInput.addEventListener('focus', () => {
+      dropdown.classList.remove('hidden');
+      renderDropdown();
+    });
+
+    searchInput.addEventListener('input', (event) => {
+      filterGames(event.target.value || '');
+    });
+
+    searchInput.addEventListener('keydown', handleKeydown);
+
+    if (clearButton) {
+      clearButton.addEventListener('click', () => {
+        setGameSelection(state, state.source, []);
+        state.lastPayload = null;
+        renderChips();
+        if (state.autoRefresh && state.source === 'game') {
+          queueRefresh('games-clear');
+        }
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!elements.gamePicker || elements.gamePicker.contains(event.target)) {
+        return;
+      }
+      closeDropdown();
     });
 
     async function loadGames() {
       const url = config && config.gamesUrl ? config.gamesUrl : null;
       if (!url) {
-        renderOptions([]);
+        state.gameOptions = [];
+        filteredGames = [];
+        renderDropdown();
         return;
       }
+      loading = true;
+      renderDropdown();
       try {
         const res = await fetch(url, { credentials: 'same-origin' });
         if (!res.ok) {
@@ -1129,14 +1294,29 @@
         }
         const payload = await res.json();
         const games = Array.isArray(payload.games) ? payload.games : Array.isArray(payload) ? payload : [];
-        renderOptions(games);
+        state.gameOptions = games;
+        filteredGames = games.slice();
+        loading = false;
+        renderChips();
+        renderDropdown();
+        if (state.autoRefresh && state.source === 'game') {
+          queueRefresh('games-loaded');
+        }
       } catch (error) {
         console.error('[custom-stats] Unable to load games', error);
+        loading = false;
+        state.gameOptions = [];
+        filteredGames = [];
         updateHelpMessage('Unable to load games. Please refresh or check your connection.');
-        renderOptions([]);
+        renderDropdown();
       }
     }
 
+    elements.renderGameSelection = renderChips;
+    elements.closeGameDropdown = closeDropdown;
+
+    renderDropdown();
+    renderChips();
     loadGames();
   }
 
@@ -1211,13 +1391,11 @@
     }
     const isGame = state.source === 'game';
     elements.gameRow.classList.toggle('hidden', !isGame);
-    if (isGame && elements.gameSelect) {
-      const selection = getGameSelection(state, 'game');
-      const selectedSet = new Set(selection);
-      Array.from(elements.gameSelect.options).forEach((opt) => {
-        const value = Number(opt.value);
-        opt.selected = Number.isFinite(value) && selectedSet.has(value);
-      });
+    if (isGame && typeof elements.renderGameSelection === 'function') {
+      elements.renderGameSelection();
+    }
+    if (!isGame && typeof elements.closeGameDropdown === 'function') {
+      elements.closeGameDropdown();
     }
   }
 
@@ -1777,12 +1955,8 @@
     const storedGames = getGameSelection(state);
     const gamesChanged =
       previousGames.length !== storedGames.length || previousGames.some((value, idx) => value !== storedGames[idx]);
-    if (elements.gameSelect) {
-      const selectionSet = new Set(storedGames);
-      Array.from(elements.gameSelect.options).forEach((opt) => {
-        const value = Number(opt.value);
-        opt.selected = Number.isFinite(value) && selectionSet.has(value);
-      });
+    if (typeof elements.renderGameSelection === 'function') {
+      elements.renderGameSelection();
     }
     if (gamesChanged) {
       changed = true;
@@ -1876,12 +2050,8 @@
     const storedGames = getGameSelection(state);
     const gamesChanged =
       previousGames.length !== storedGames.length || previousGames.some((value, idx) => value !== storedGames[idx]);
-    if (elements && elements.gameSelect) {
-      const selectionSet = new Set(storedGames);
-      Array.from(elements.gameSelect.options).forEach((opt) => {
-        const value = Number(opt.value);
-        opt.selected = Number.isFinite(value) && selectionSet.has(value);
-      });
+    if (elements && typeof elements.renderGameSelection === 'function') {
+      elements.renderGameSelection();
     }
     if (gamesChanged) {
       changed = true;
