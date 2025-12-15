@@ -167,6 +167,9 @@
       statGroups: document.getElementById('stat-groups'),
       dateFrom: document.getElementById('custom-date-from'),
       dateTo: document.getElementById('custom-date-to'),
+      gameSelect: document.getElementById('custom-game-select'),
+      gameHelp: document.getElementById('custom-game-help'),
+      gameRow: document.getElementById('custom-game-row'),
       modeToggle: document.getElementById('custom-mode-toggle'),
       autoRefresh: document.getElementById('custom-auto-refresh'),
       tableContainer: document.getElementById('custom-table-container'),
@@ -219,6 +222,8 @@
         practice: { from: null, to: null },
         game: { from: null, to: null }
       },
+      gameSelections: { practice: [], game: [] },
+      gameOptions: [],
       fieldCheckboxes: [],
       refreshTimer: null,
       activeRequest: null,
@@ -239,6 +244,7 @@
     hydrateSourceToggle(elements, state, config, queueRefresh, playerUI, setSource);
 
     hydrateDates(elements, state, queueRefresh);
+    hydrateGames(elements, state, config, queueRefresh);
     hydrateModeToggle(elements.modeToggle, state, queueRefresh, elements);
     hydrateAutoRefresh(elements.autoRefresh, state);
     hydratePresets(config, elements, state, queueRefresh, playerUI, setSource);
@@ -247,6 +253,7 @@
     updateSourceHeadline(state, elements);
     updateSourceButtons(state, elements);
     updateModeToggleLabels(state, elements);
+    updateGameSelectorVisibility(state, elements);
 
     setSource(state.source, { force: true, queueRefresh: false }).then(() => {
       if (state.autoRefresh) {
@@ -290,6 +297,13 @@
         to: elements.dateTo ? nextTo : currentDates.to
       });
 
+      if (elements.gameSelect) {
+        const selectedGames = Array.from(elements.gameSelect.selectedOptions)
+          .map((opt) => Number(opt.value))
+          .filter((value) => Number.isFinite(value));
+        setGameSelection(state, previousSource, selectedGames);
+      }
+
       if (!force && normalized === previousSource) {
         if (Array.isArray(options.presetFields)) {
           state.selectedFields = options.presetFields.slice();
@@ -317,6 +331,7 @@
         if (elements.dateTo) {
           elements.dateTo.value = activeDates.to || '';
         }
+        updateGameSelectorVisibility(state, elements);
         syncFieldCheckboxes(state);
         if (options.queueRefresh !== false) {
           queueRefresh('source');
@@ -354,6 +369,15 @@
       if (elements.dateTo) {
         elements.dateTo.value = activeDates.to || '';
       }
+      const nextGameSelection = getGameSelection(state, normalized);
+      setGameSelection(state, normalized, nextGameSelection);
+      if (elements.gameSelect) {
+        const selectionSet = new Set(nextGameSelection);
+        Array.from(elements.gameSelect.options).forEach((opt) => {
+          const value = Number(opt.value);
+          opt.selected = Number.isFinite(value) && selectionSet.has(value);
+        });
+      }
       state.lastPayload = null;
 
       if (elements.statSearch) {
@@ -369,6 +393,7 @@
       state.fieldOrder = rebuildFieldOrder(state.selectedFields, state.fieldOrder);
       state.selectedFieldsBySource[normalized] = state.selectedFields.slice();
       syncFieldCheckboxes(state);
+      updateGameSelectorVisibility(state, elements);
 
       if (options.queueRefresh !== false) {
         queueRefresh('source');
@@ -973,6 +998,34 @@
     state.dateSelections[normalized].to = to || null;
   }
 
+  function getGameSelection(state, source) {
+    if (!state || !state.gameSelections) {
+      return [];
+    }
+    const normalized = normalizeSource(source || state.source);
+    const selection = Array.isArray(state.gameSelections[normalized]) ? state.gameSelections[normalized] : [];
+    state.gameSelections[normalized] = selection;
+    return selection.slice();
+  }
+
+  function setGameSelection(state, source, gameIds = []) {
+    if (!state.gameSelections) {
+      state.gameSelections = { practice: [], game: [] };
+    }
+    const normalized = normalizeSource(source || state.source);
+    const normalizedIds = [];
+    const seen = new Set();
+    (Array.isArray(gameIds) ? gameIds : []).forEach((value) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || seen.has(parsed)) {
+        return;
+      }
+      seen.add(parsed);
+      normalizedIds.push(parsed);
+    });
+    state.gameSelections[normalized] = normalizedIds;
+  }
+
   function hydrateDates(elements, state, queueRefresh) {
     const activeDates = getDateSelection(state);
 
@@ -1001,6 +1054,90 @@
         }
       });
     }
+  }
+
+  function hydrateGames(elements, state, config, queueRefresh) {
+    const select = elements.gameSelect;
+    if (!select) {
+      return;
+    }
+
+    const helper = elements.gameHelp;
+
+    function updateHelpMessage(text) {
+      if (helper) {
+        helper.textContent = text || '';
+      }
+    }
+
+    function applySelectionFromState(source) {
+      const selection = new Set(getGameSelection(state, source));
+      Array.from(select.options).forEach((opt) => {
+        const value = Number(opt.value);
+        opt.selected = Number.isFinite(value) && selection.has(value);
+      });
+      if (selection.size === 0 && state.gameOptions.length) {
+        updateHelpMessage('Select one or more games to refine the Game view.');
+      }
+    }
+
+    function renderOptions(games) {
+      select.innerHTML = '';
+      state.gameOptions = Array.isArray(games) ? games : [];
+
+      if (!state.gameOptions.length) {
+        select.disabled = true;
+        updateHelpMessage('No games are available yet. Upload or tag games to enable this filter.');
+        return;
+      }
+
+      select.disabled = false;
+      const fragment = document.createDocumentFragment();
+      state.gameOptions.forEach((game) => {
+        const option = document.createElement('option');
+        option.value = game.id;
+        option.textContent = game.label || `Game #${game.id}`;
+        fragment.appendChild(option);
+      });
+      select.appendChild(fragment);
+      applySelectionFromState(state.source);
+      updateHelpMessage('Choose specific games (optional). Leave empty to include all games in the date window.');
+      if (state.autoRefresh && state.source === 'game') {
+        queueRefresh('games-loaded');
+      }
+    }
+
+    select.addEventListener('change', () => {
+      const selected = Array.from(select.selectedOptions)
+        .map((opt) => Number(opt.value))
+        .filter((value) => Number.isFinite(value));
+      setGameSelection(state, state.source, selected);
+      state.lastPayload = null;
+      queueRefresh('games');
+    });
+
+    async function loadGames() {
+      const url = config && config.gamesUrl ? config.gamesUrl : null;
+      if (!url) {
+        renderOptions([]);
+        return;
+      }
+      try {
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) {
+          throw new Error(`Failed to load games (${res.status})`);
+        }
+        const payload = await res.json();
+        const games = Array.isArray(payload.games) ? payload.games : Array.isArray(payload) ? payload : [];
+        renderOptions(games);
+      } catch (error) {
+        console.error('[custom-stats] Unable to load games', error);
+        updateHelpMessage('Unable to load games. Please refresh or check your connection.');
+        renderOptions([]);
+      }
+    }
+
+    loadGames();
   }
 
   function hydrateModeToggle(container, state, queueRefresh, elements) {
@@ -1066,6 +1203,22 @@
       button.classList.toggle('text-white', isActive);
       button.classList.toggle('text-gray-700', !isActive);
     });
+  }
+
+  function updateGameSelectorVisibility(state, elements) {
+    if (!elements.gameRow) {
+      return;
+    }
+    const isGame = state.source === 'game';
+    elements.gameRow.classList.toggle('hidden', !isGame);
+    if (isGame && elements.gameSelect) {
+      const selection = getGameSelection(state, 'game');
+      const selectedSet = new Set(selection);
+      Array.from(elements.gameSelect.options).forEach((opt) => {
+        const value = Number(opt.value);
+        opt.selected = Number.isFinite(value) && selectedSet.has(value);
+      });
+    }
   }
 
   function updateModeToggleLabels(state, elements) {
@@ -1362,6 +1515,7 @@
         const currentTo = elements.dateTo ? elements.dateTo.value || activeDates.to : activeDates.to;
         const from = currentFrom ? currentFrom : null;
         const to = currentTo ? currentTo : null;
+        const gameIds = getGameSelection(state, state.source);
         if (!from && !to) {
           notify('error', 'Select at least one date to save this preset.');
           return;
@@ -1377,6 +1531,7 @@
           fields: [],
           date_from: from,
           date_to: to,
+          game_ids: gameIds,
           mode_default: state.mode,
           source_default: state.source || 'practice',
           visibility: 'team'
@@ -1608,7 +1763,7 @@
     const from = preset && preset.date_from ? preset.date_from : null;
     const to = preset && preset.date_to ? preset.date_to : null;
     const previous = getDateSelection(state);
-    const changed = previous.from !== from || previous.to !== to;
+    let changed = previous.from !== from || previous.to !== to;
     setDateSelection(state, state.source, { from, to });
     if (elements.dateFrom) {
       elements.dateFrom.value = from || '';
@@ -1616,6 +1771,23 @@
     if (elements.dateTo) {
       elements.dateTo.value = to || '';
     }
+    const nextGames = Array.isArray(preset && preset.game_ids) ? preset.game_ids : [];
+    const previousGames = getGameSelection(state);
+    setGameSelection(state, state.source, nextGames);
+    const storedGames = getGameSelection(state);
+    const gamesChanged =
+      previousGames.length !== storedGames.length || previousGames.some((value, idx) => value !== storedGames[idx]);
+    if (elements.gameSelect) {
+      const selectionSet = new Set(storedGames);
+      Array.from(elements.gameSelect.options).forEach((opt) => {
+        const value = Number(opt.value);
+        opt.selected = Number.isFinite(value) && selectionSet.has(value);
+      });
+    }
+    if (gamesChanged) {
+      changed = true;
+    }
+    updateGameSelectorVisibility(state, elements);
     return changed;
   }
 
@@ -1697,6 +1869,24 @@
       }
       changed = true;
     }
+
+    const nextGames = Array.isArray(preset && preset.game_ids) ? preset.game_ids : [];
+    const previousGames = getGameSelection(state);
+    setGameSelection(state, state.source, nextGames);
+    const storedGames = getGameSelection(state);
+    const gamesChanged =
+      previousGames.length !== storedGames.length || previousGames.some((value, idx) => value !== storedGames[idx]);
+    if (elements && elements.gameSelect) {
+      const selectionSet = new Set(storedGames);
+      Array.from(elements.gameSelect.options).forEach((opt) => {
+        const value = Number(opt.value);
+        opt.selected = Number.isFinite(value) && selectionSet.has(value);
+      });
+    }
+    if (gamesChanged) {
+      changed = true;
+    }
+    updateGameSelectorVisibility(state, elements);
 
     return changed;
   }
@@ -2009,6 +2199,16 @@
     const payload = buildPayload(state, elements);
     state.lastPayload = payload;
 
+    if (payload.source === 'game' && (!state.gameOptions || state.gameOptions.length === 0)) {
+      if (elements.gameHelp) {
+        elements.gameHelp.textContent = 'No games are available for filtering. Please add game data to continue.';
+      }
+      if (elements.tableContainer) {
+        elements.tableContainer.innerHTML = '<div class="rounded-xl border border-dashed border-gray-300 px-6 py-12 text-center text-sm text-gray-500">No games are available for the current filters.</div>';
+      }
+      return;
+    }
+
     if (!config.dataUrl) {
       console.error('[custom-stats] Missing data URL');
       return;
@@ -2081,6 +2281,12 @@
     }
     if (activeDates.to) {
       payload.date_to = activeDates.to;
+    }
+    if (source === 'game') {
+      const selectedGames = getGameSelection(state, source);
+      if (selectedGames.length) {
+        payload.game_ids = selectedGames.slice();
+      }
     }
     return payload;
   }

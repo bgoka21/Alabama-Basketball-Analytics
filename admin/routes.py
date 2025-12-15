@@ -2441,6 +2441,36 @@ def _serialize_saved_stat_profile(profile: SavedStatProfile) -> dict:
     }
 
 
+@admin_bp.get('/api/games')
+@admin_required
+def list_games_api():
+    games = Game.query.order_by(Game.game_date.desc(), Game.id.desc()).all()
+
+    def _label_for(game: Game) -> str:
+        date_text = game.game_date.isoformat() if game.game_date else "Unknown date"
+        loc = (game.home_or_away or "").strip().lower()
+        if loc in {"home", "h", "vs", "vs."}:
+            prefix = "vs."
+        elif loc in {"neutral", "n"}:
+            prefix = "vs."
+        else:
+            prefix = "@"
+        opponent = (game.opponent_name or "Opponent").strip() or "Opponent"
+        return f"{date_text} {prefix} {opponent}"
+
+    payload = [
+        {
+            'id': game.id,
+            'label': _label_for(game),
+            'season_id': game.season_id,
+            'date': game.game_date.isoformat() if game.game_date else None,
+        }
+        for game in games
+    ]
+
+    return jsonify({'games': payload})
+
+
 @admin_bp.route('/api/practice/fields', methods=['GET'])
 @admin_required
 def get_practice_field_catalog():
@@ -2823,11 +2853,12 @@ def _format_shooting_split(makes, attempts, mode, session_count):
     }
 
 
-def _collect_player_session_stats(roster_entry, source='practice', date_from=None, date_to=None):
+def _collect_player_session_stats(roster_entry, source='practice', date_from=None, date_to=None, game_ids=None):
     """Return aggregated PlayerStats/BlueCollar totals for a roster entry."""
 
     source_value = (source or 'practice').strip().lower()
     is_game = source_value == 'game'
+    normalized_game_ids = [gid for gid in _parse_int_list(game_ids)] if is_game else []
 
     ps_query = (
         PlayerStats.query
@@ -2837,6 +2868,9 @@ def _collect_player_session_stats(roster_entry, source='practice', date_from=Non
             (PlayerStats.game_id != None) if is_game else (PlayerStats.practice_id != None),
         )
     )
+
+    if is_game and normalized_game_ids:
+        ps_query = ps_query.filter(PlayerStats.game_id.in_(normalized_game_ids))
 
     if date_from or date_to:
         if is_game:
@@ -2911,6 +2945,9 @@ def _collect_player_session_stats(roster_entry, source='practice', date_from=Non
             (BlueCollarStats.game_id != None) if is_game else (BlueCollarStats.practice_id != None),
         )
     )
+
+    if is_game and normalized_game_ids:
+        bc_query = bc_query.filter(BlueCollarStats.game_id.in_(normalized_game_ids))
 
     if date_from or date_to:
         if is_game:
@@ -3633,6 +3670,9 @@ def _build_game_table_dataset(request_data):
     date_from = _parse_iso_date(request_data.get('date_from'))
     date_to = _parse_iso_date(request_data.get('date_to'))
 
+    selected_game_ids = _parse_int_list(request_data.get('game_ids'))
+    selected_game_ids_set = set(selected_game_ids)
+
     raw_labels = request_data.get('labels')
     if isinstance(raw_labels, str):
         labels = [lbl.strip() for lbl in raw_labels.split(',') if lbl.strip()]
@@ -3653,6 +3693,9 @@ def _build_game_table_dataset(request_data):
             return game_ids_by_season[season_id]
 
         game_query = Game.query.filter(Game.season_id == season_id)
+
+        if selected_game_ids_set:
+            game_query = game_query.filter(Game.id.in_(selected_game_ids_set))
 
         if date_from:
             game_query = game_query.filter(Game.game_date >= date_from)
@@ -3691,26 +3734,28 @@ def _build_game_table_dataset(request_data):
     team_def_total = None
 
     for roster_entry in roster_rows:
+        game_ids = _get_game_ids_for_season(roster_entry.season_id)
         aggregates = _collect_player_session_stats(
             roster_entry,
             source='game',
             date_from=date_from,
             date_to=date_to,
+            game_ids=game_ids,
         )
 
-        game_ids = _get_game_ids_for_season(roster_entry.season_id)
         onoff = get_game_on_off_stats(game_ids, roster_entry.id)
         reb_rates = get_rebound_rates_onfloor(
             player_id=roster_entry.id,
             date_from=date_from,
             date_to=date_to,
             labels=label_set,
+            game_ids=game_ids,
         ) or {}
         offense_events = _get_offense_events(
-            roster_entry.id, roster_entry, date_from, date_to, label_set
+            roster_entry.id, roster_entry, date_from, date_to, label_set, game_ids
         )
         defense_events = _get_defense_events(
-            roster_entry.id, roster_entry, date_from, date_to, label_set
+            roster_entry.id, roster_entry, date_from, date_to, label_set, game_ids
         )
         team_off_reb_on = (
             (offense_events.get('off_reb_on', 0) or 0)
@@ -4202,6 +4247,8 @@ def export_custom_stats_csv():
     date_from = _ensure_scalar(_extract_payload_value(payload, 'date_from'))
     date_to = _ensure_scalar(_extract_payload_value(payload, 'date_to'))
 
+    game_ids = _parse_int_list(_extract_payload_value(payload, 'game_ids'))
+
     raw_source = _ensure_scalar(_extract_payload_value(payload, 'source'))
     source = _normalize_custom_stats_source(raw_source)
 
@@ -4217,6 +4264,8 @@ def export_custom_stats_csv():
         'date_to': date_to,
         'mode': mode,
     }
+    if game_ids:
+        dataset_payload['game_ids'] = game_ids
     if labels not in (None, ''):
         dataset_payload['labels'] = labels
 
