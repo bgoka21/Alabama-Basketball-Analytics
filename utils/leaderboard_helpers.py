@@ -73,10 +73,25 @@ def _apply_possession_filters(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Query:
+    normalized_game_ids = None
+    if game_ids is not None:
+        normalized_game_ids = []
+        for value in game_ids:
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                continue
+            normalized_game_ids.append(parsed)
+        if not normalized_game_ids:
+            return query.filter(False)
+
     if label_set:
         clauses = [Possession.drill_labels.ilike(f"%{lbl}%") for lbl in label_set]
         query = query.filter(or_(*clauses))
+    if normalized_game_ids is not None:
+        query = query.filter(Possession.game_id.in_(normalized_game_ids))
     if start_dt or end_dt:
         query = (
             query.outerjoin(Game, Possession.game_id == Game.id)
@@ -110,6 +125,7 @@ def _apply_playerstats_filters(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Query:
     if label_set:
         clauses = []
@@ -118,6 +134,17 @@ def _apply_playerstats_filters(
             clauses.append(PlayerStats.shot_type_details.ilike(pattern))
             clauses.append(PlayerStats.stat_details.ilike(pattern))
         query = query.filter(or_(*clauses))
+    if game_ids is not None:
+        normalized_game_ids: list[int] = []
+        for value in game_ids:
+            try:
+                normalized_game_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        if normalized_game_ids:
+            query = query.filter(PlayerStats.game_id.in_(normalized_game_ids))
+        else:
+            return query.filter(False)
     if start_dt or end_dt:
         query = (
             query.outerjoin(Game, PlayerStats.game_id == Game.id)
@@ -171,6 +198,7 @@ def _get_player_possession_totals(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Tuple[int, float]:
     poss_q = _build_possession_id_query(
         season_id=roster.season_id,
@@ -179,6 +207,7 @@ def _get_player_possession_totals(
         end_dt=end_dt,
         label_set=label_set,
         player_id=player_id,
+        game_ids=game_ids,
     )
     return _summarize_possessions(poss_q)
 
@@ -189,6 +218,7 @@ def _get_team_possession_totals(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Tuple[int, float]:
     poss_q = _build_possession_id_query(
         season_id=season_id,
@@ -197,6 +227,7 @@ def _get_team_possession_totals(
         end_dt=end_dt,
         label_set=label_set,
         player_id=None,
+        game_ids=game_ids,
     )
     return _summarize_possessions(poss_q)
 
@@ -209,13 +240,14 @@ def _build_possession_id_query(
     end_dt: Optional[date],
     label_set: Set[str],
     player_id: Optional[int],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Query:
     base = db.session.query(Possession.id).filter(Possession.season_id == season_id)
     if player_id is not None:
         base = base.join(PlayerPossession, PlayerPossession.possession_id == Possession.id)
         base = base.filter(PlayerPossession.player_id == player_id)
     base = _apply_side_filter(base, side)
-    base = _apply_possession_filters(base, start_dt, end_dt, label_set)
+    base = _apply_possession_filters(base, start_dt, end_dt, label_set, game_ids)
     return base.distinct()
 
 
@@ -273,16 +305,17 @@ def _get_possession_ids(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Tuple[List[int], List[int]]:
     q = db.session.query(Possession.practice_id, Possession.game_id).filter(
         Possession.season_id == season_id,
     )
     q = _apply_side_filter(q, side)
-    q = _apply_possession_filters(q, start_dt, end_dt, label_set)
+    q = _apply_possession_filters(q, start_dt, end_dt, label_set, game_ids)
     rows = q.distinct().all()
     practice_ids = [pid for pid, gid in rows if pid]
-    game_ids = [gid for pid, gid in rows if gid]
-    return practice_ids, game_ids
+    found_game_ids = [gid for pid, gid in rows if gid]
+    return practice_ids, found_game_ids
 
 
 _OFFENSE_EVENT_COLUMNS: Tuple[str, ...] = (
@@ -300,6 +333,7 @@ def _get_offense_events(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Dict[str, float]:
     events_q = (
         db.session.query(
@@ -338,7 +372,7 @@ def _get_offense_events(
         )
     )
     events_q = _apply_side_filter(events_q, "Offense")
-    events_q = _apply_possession_filters(events_q, start_dt, end_dt, label_set)
+    events_q = _apply_possession_filters(events_q, start_dt, end_dt, label_set, game_ids)
     row = events_q.one_or_none()
     return _row_to_dict(row, _OFFENSE_EVENT_COLUMNS)
 
@@ -358,6 +392,7 @@ def _get_defense_events(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Dict[str, float]:
     events_q = (
         db.session.query(
@@ -404,7 +439,7 @@ def _get_defense_events(
         )
     )
     events_q = _apply_side_filter(events_q, "Defense")
-    events_q = _apply_possession_filters(events_q, start_dt, end_dt, label_set)
+    events_q = _apply_possession_filters(events_q, start_dt, end_dt, label_set, game_ids)
     row = events_q.one_or_none()
     return _row_to_dict(row, _DEFENSE_EVENT_COLUMNS)
 
@@ -414,12 +449,13 @@ def _get_player_stats_totals(
     start_dt: Optional[date],
     end_dt: Optional[date],
     label_set: Set[str],
+    game_ids: Optional[Sequence[int]] = None,
 ) -> SimpleNamespace:
     stats_query = PlayerStats.query.filter(
         PlayerStats.player_name == roster.player_name,
         PlayerStats.season_id == roster.season_id,
     )
-    stats_query = _apply_playerstats_filters(stats_query, start_dt, end_dt, label_set)
+    stats_query = _apply_playerstats_filters(stats_query, start_dt, end_dt, label_set, game_ids)
     records = stats_query.all()
     if not records:
         return SimpleNamespace(
@@ -634,6 +670,7 @@ def get_turnover_rates_onfloor(
     date_from: Optional[object] = None,
     date_to: Optional[object] = None,
     labels: Optional[object] = None,
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Dict[str, Optional[float]]:
     roster = db.session.get(Roster, player_id)
     if not roster:
@@ -649,16 +686,16 @@ def get_turnover_rates_onfloor(
     label_set = _normalize_labels(labels)
 
     on_poss, _ = _get_player_possession_totals(
-        player_id, roster, "Offense", start_dt, end_dt, label_set
+        player_id, roster, "Offense", start_dt, end_dt, label_set, game_ids
     )
     offense_events = _get_offense_events(
-        player_id, roster, start_dt, end_dt, label_set
+        player_id, roster, start_dt, end_dt, label_set, game_ids
     )
-    practice_ids, game_ids = _get_possession_ids(
-        roster.season_id, "Offense", start_dt, end_dt, label_set
+    practice_ids, filtered_game_ids = _get_possession_ids(
+        roster.season_id, "Offense", start_dt, end_dt, label_set, game_ids
     )
-    personal_turnovers = _fetch_personal_turnovers(roster, practice_ids, game_ids)
-    totals = _get_player_stats_totals(roster, start_dt, end_dt, label_set)
+    personal_turnovers = _fetch_personal_turnovers(roster, practice_ids, filtered_game_ids)
+    totals = _get_player_stats_totals(roster, start_dt, end_dt, label_set, game_ids)
 
     player_turnovers = float(getattr(totals, "turnovers", 0) or 0)
     total_fga = float(
@@ -699,6 +736,7 @@ def get_rebound_rates_onfloor(
     date_from: Optional[object] = None,
     date_to: Optional[object] = None,
     labels: Optional[object] = None,
+    game_ids: Optional[Sequence[int]] = None,
 ) -> Dict[str, Optional[float]]:
     roster = db.session.get(Roster, player_id)
     if not roster:
@@ -713,13 +751,13 @@ def get_rebound_rates_onfloor(
     label_set = _normalize_labels(labels)
 
     on_poss, _ = _get_player_possession_totals(
-        player_id, roster, "Offense", start_dt, end_dt, label_set
+        player_id, roster, "Offense", start_dt, end_dt, label_set, game_ids
     )
     team_off_poss, _ = _get_team_possession_totals(
-        roster.season_id, "Offense", start_dt, end_dt, label_set
+        roster.season_id, "Offense", start_dt, end_dt, label_set, game_ids
     )
     offense_events = _get_offense_events(
-        player_id, roster, start_dt, end_dt, label_set
+        player_id, roster, start_dt, end_dt, label_set, game_ids
     )
 
     team_misses = float(offense_events.get("team_misses_on", 0) or 0)
@@ -742,7 +780,7 @@ def get_rebound_rates_onfloor(
     )
 
     defense_events = _get_defense_events(
-        player_id, roster, start_dt, end_dt, label_set
+        player_id, roster, start_dt, end_dt, label_set, game_ids
     )
     opp_misses = float(defense_events.get("opp_misses_on", 0) or 0)
     player_def_reb = float(defense_events.get("player_def_reb_on", 0) or 0)
