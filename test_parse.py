@@ -320,14 +320,25 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
     # 2) Scan entire row for EXACT "Assist" or "Pot. Assist" once a shooter is known
     if shooter_col and shooter_type:
         for other_col in df_columns:
+            if not str(other_col).startswith("#"):
+                continue
+
             other_tokens = extract_tokens(row.get(other_col, ""))
+            if not other_tokens:
+                continue
+
+            if other_col not in player_stats_dict:
+                player_stats_dict[other_col] = initialize_player_stats(
+                    other_col, game_id, season_id, stat_mapping, blue_collar_values
+                )
+
             if "Assist" in other_tokens:
                 assisted_flag = True
-                player_stats_dict[shooter_col]["assists"] += 1
+                player_stats_dict[other_col]["assists"] += 1
                 break
             elif "Pot. Assist" in other_tokens:
                 assisted_flag = True
-                player_stats_dict[shooter_col]["pot_assists"] += 1
+                player_stats_dict[other_col]["pot_assists"] += 1
                 break
 
     # 3) Free Throws (FT+ / FT-) always counted, even if no shooter_col
@@ -1556,6 +1567,40 @@ def _build_test_row(row_type, game_split, team="Team", opp_stats="", possession_
         "POSSESSION TYPE": possession_type,
         "#1": event_token,
     }
+
+
+def test_assist_recorded_for_assister_column():
+    stat_mapping = {"Assist": "assists", "Pot. Assist": "pot_assists", "Turnover": "turnovers"}
+    blue_collar_values = {}
+
+    row = {
+        "POSSESSION TYPE": "Half Court",
+        "Shot Location": "Right Wing",
+        "#Shooter": "2FG+",
+        "#Assister": "Assist",
+    }
+
+    player_stats_dict = {}
+    columns = ["#Shooter", "#Assister", "POSSESSION TYPE", "Shot Location"]
+
+    process_offense_row(
+        row,
+        columns,
+        player_stats_dict,
+        game_id=1,
+        season_id=2024,
+        stat_mapping=stat_mapping,
+        blue_collar_values=blue_collar_values,
+    )
+
+    shooter_stats = player_stats_dict["#Shooter"]
+    assister_stats = player_stats_dict["#Assister"]
+
+    assert shooter_stats["fg2_makes"] == 1
+    assert shooter_stats["assists"] == 0
+    assert assister_stats["assists"] == 1
+    assert shooter_stats["shot_type_details"][0]["Assisted"] == "Assisted"
+    assert shooter_stats["shot_type_details"][0]["Non-Assisted"] == ""
 
 
 def test_period_normalization_matches_totals():
