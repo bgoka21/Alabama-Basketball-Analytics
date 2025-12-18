@@ -49,6 +49,26 @@ table.table-exempt, table.table-exempt * { all: revert-layer; } /* guardrail */
   line-height: 1.35;    /* readable body copy */
 }
 
+/* Make all table links use the brand crimson */
+table:not(.table-exempt) a,
+.unified-table a,
+.table-wrap .table-leaderboard a {
+  color: var(--brand, #9E1B32);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--brand, #9E1B32) 85%, #6B7280 15%);
+  text-decoration-thickness: 1.5px;
+}
+
+table:not(.table-exempt) a:hover,
+table:not(.table-exempt) a:focus-visible,
+.unified-table a:hover,
+.unified-table a:focus-visible,
+.table-wrap .table-leaderboard a:hover,
+.table-wrap .table-leaderboard a:focus-visible {
+  color: color-mix(in srgb, var(--brand, #9E1B32) 85%, #4C0519 15%);
+  text-decoration-color: currentColor;
+}
+
 /* Numeric helpers (extra safety even if Tailwind classes are present) */
 .unified-table td[data-align="right"],
 .unified-table th[data-align="right"],
