@@ -125,7 +125,10 @@
   {'key': 'hard_hats', 'label': 'Hard Hats Won', 'sortable': True, 'align': 'right'},
 ] %}
 <div class="space-y-4">
-  <h2 class="text-xl font-semibold">Hard Hats</h2>
+  {% set hard_hat_url = url_for('public.hard_hat_detail', filter=filter_opt, game_type=selected_game_types, season_id=selected_season_id) %}
+  <h2 class="text-xl font-semibold">
+    <a href="{{ hard_hat_url }}" class="text-[#9E1B32] hover:underline">Hard Hats</a>
+  </h2>
   {{ render_table(
       id='home-hard-hats',
       columns=hard_hat_cols,
