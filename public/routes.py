@@ -120,6 +120,81 @@ def _is_loss(result: str | None) -> bool:
     return sanitized.startswith("l")
 
 
+def _compute_wins_and_losses(
+    game_ids: list[int],
+    games: list[Game],
+    filter_opt: str,
+    selected_game_types: list[str],
+    selected_season_id: int | None,
+) -> tuple[list[int], list[int]]:
+    if not game_ids:
+        return [], []
+
+    team_scores = (
+        db.session.query(
+            TeamStats.game_id,
+            TeamStats.is_opponent,
+            TeamStats.total_points,
+            TeamStats.wins,
+            TeamStats.losses,
+        )
+        .filter(TeamStats.game_id.in_(game_ids))
+        .all()
+    )
+
+    scores_by_game: dict[int, dict[str, int | None]] = {}
+    win_loss_flags: dict[int, str] = {}
+    for game_id, is_opponent, total_points, wins, losses in team_scores:
+        scores_by_game.setdefault(game_id, {"us": None, "opp": None})[
+            "opp" if is_opponent else "us"
+        ] = total_points
+
+        if not is_opponent:
+            if wins and wins > 0:
+                win_loss_flags[game_id] = "win"
+            elif losses and losses > 0:
+                win_loss_flags[game_id] = "loss"
+
+    winning_game_ids: list[int] = []
+    losing_game_ids: list[int] = []
+    for g in games:
+        if _is_win(g.result):
+            winning_game_ids.append(g.id)
+            continue
+        if _is_loss(g.result):
+            losing_game_ids.append(g.id)
+            continue
+
+        flagged_result = win_loss_flags.get(g.id)
+        if flagged_result == "win":
+            winning_game_ids.append(g.id)
+            continue
+        if flagged_result == "loss":
+            losing_game_ids.append(g.id)
+            continue
+
+        score_line = scores_by_game.get(g.id, {})
+        us_pts, opp_pts = score_line.get("us"), score_line.get("opp")
+        if us_pts is None or opp_pts is None:
+            continue
+        if us_pts > opp_pts:
+            winning_game_ids.append(g.id)
+        elif us_pts < opp_pts:
+            losing_game_ids.append(g.id)
+
+    if not winning_game_ids and filter_opt == "season":
+        fallback_ids = get_all_game_ids_for_season(selected_game_types, selected_season_id)
+        if fallback_ids:
+            fallback_games = Game.query.filter(Game.id.in_(fallback_ids)).all()
+            for g in fallback_games:
+                if _is_win(g.result):
+                    winning_game_ids.append(g.id)
+                elif _is_loss(g.result):
+                    losing_game_ids.append(g.id)
+
+    return winning_game_ids, losing_game_ids
+
+
 def get_all_game_ids_for_season(selected_game_types=None, season_id=None):
     """Return a list of all game IDs in the chosen season (defaults to current)."""
     if season_id is None:
@@ -247,70 +322,9 @@ def game_homepage():
     #  ───────────────────────────────────────────
     #  Determine winning games among our selection
     #  ───────────────────────────────────────────
-    team_scores = (
-        db.session.query(
-            TeamStats.game_id,
-            TeamStats.is_opponent,
-            TeamStats.total_points,
-            TeamStats.wins,
-            TeamStats.losses,
-        )
-        .filter(TeamStats.game_id.in_(game_ids))
-        .all()
+    winning_game_ids, losing_game_ids = _compute_wins_and_losses(
+        game_ids, games, filter_opt, selected_game_types, selected_season_id
     )
-
-    scores_by_game: dict[int, dict[str, int | None]] = {}
-    win_loss_flags: dict[int, str] = {}
-    for game_id, is_opponent, total_points, wins, losses in team_scores:
-        scores_by_game.setdefault(game_id, {"us": None, "opp": None})[
-            "opp" if is_opponent else "us"
-        ] = total_points
-
-        # Keep a fallback record flag if the CSV score is missing but wins/losses are set.
-        if not is_opponent:
-            if wins and wins > 0:
-                win_loss_flags[game_id] = "win"
-            elif losses and losses > 0:
-                win_loss_flags[game_id] = "loss"
-
-    winning_game_ids: list[int] = []
-    losing_game_ids: list[int] = []
-    for g in games:
-        if _is_win(g.result):
-            winning_game_ids.append(g.id)
-            continue
-        if _is_loss(g.result):
-            losing_game_ids.append(g.id)
-            continue
-
-        flagged_result = win_loss_flags.get(g.id)
-        if flagged_result == "win":
-            winning_game_ids.append(g.id)
-            continue
-        if flagged_result == "loss":
-            losing_game_ids.append(g.id)
-            continue
-
-        score_line = scores_by_game.get(g.id, {})
-        us_pts, opp_pts = score_line.get("us"), score_line.get("opp")
-        if us_pts is None or opp_pts is None:
-            continue
-        if us_pts > opp_pts:
-            winning_game_ids.append(g.id)
-        elif us_pts < opp_pts:
-            losing_game_ids.append(g.id)
-
-    if not winning_game_ids and filter_opt == "season":
-        fallback_ids = get_all_game_ids_for_season(
-            selected_game_types, selected_season_id
-        )
-        if fallback_ids:
-            fallback_games = Game.query.filter(Game.id.in_(fallback_ids)).all()
-            for g in fallback_games:
-                if _is_win(g.result):
-                    winning_game_ids.append(g.id)
-                elif _is_loss(g.result):
-                    losing_game_ids.append(g.id)
 
     # ─── 4B) Hard Hat Winners (only in wins) ──────────────────────────
     # 1) Sum each player’s BCP in each winning game
@@ -602,6 +616,170 @@ def game_homepage():
         seasons=seasons,
         selected_season_id=selected_season_id,
         current_season_id=current_season_id,
+    )
+
+
+@public_bp.route("/hard_hats", methods=["GET"])
+@login_required
+def hard_hat_detail():
+    filter_opt = request.args.get("filter", "season")
+    selected_game_types = _parse_selected_game_types(request.args)
+
+    current_season_id = get_current_season_id()
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    season_ids = {s.id for s in seasons}
+    requested_season_id = request.args.get("season_id", type=int)
+    selected_season_id = (
+        requested_season_id if requested_season_id in season_ids else current_season_id
+    )
+
+    if not selected_season_id:
+        return render_template(
+            "hard_hats.html",
+            hard_hat_rows=[],
+            filter_opt=filter_opt,
+            game_type_options=GAME_TYPE_OPTIONS,
+            selected_game_types=selected_game_types,
+            seasons=seasons,
+            selected_season_id=selected_season_id,
+            current_season_id=current_season_id,
+            active_page="home",
+        )
+
+    if filter_opt == "last5":
+        game_ids = get_last_n_game_ids(5, selected_game_types, selected_season_id)
+    else:
+        game_ids = get_all_game_ids_for_season(selected_game_types, selected_season_id)
+
+    games = (
+        Game.query.filter(Game.id.in_(game_ids))
+        .order_by(Game.game_date.desc())
+        .all()
+        if game_ids
+        else []
+    )
+
+    winning_game_ids, _ = _compute_wins_and_losses(
+        game_ids, games, filter_opt, selected_game_types, selected_season_id
+    )
+
+    hard_hat_rows: list[dict[str, object]] = []
+    if winning_game_ids:
+        player_bcp = (
+            db.session.query(
+                BlueCollarStats.player_id.label("player_id"),
+                BlueCollarStats.game_id.label("game_id"),
+                func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
+                    "bcp"
+                ),
+            )
+            .join(Roster, Roster.id == BlueCollarStats.player_id)
+            .filter(
+                BlueCollarStats.game_id.in_(winning_game_ids),
+                BlueCollarStats.season_id == selected_season_id,
+                Roster.season_id == selected_season_id,
+            )
+            .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
+            .subquery()
+        )
+
+        max_bcp_sub = (
+            db.session.query(
+                player_bcp.c.game_id, func.max(player_bcp.c.bcp).label("max_bcp")
+            )
+            .group_by(player_bcp.c.game_id)
+            .subquery()
+        )
+
+        winners_query = (
+            db.session.query(
+                player_bcp.c.game_id.label("game_id"),
+                Roster.player_name.label("player_name"),
+                player_bcp.c.bcp.label("bcp"),
+            )
+            .join(Roster, player_bcp.c.player_id == Roster.id)
+            .join(
+                max_bcp_sub,
+                and_(
+                    player_bcp.c.game_id == max_bcp_sub.c.game_id,
+                    player_bcp.c.bcp == max_bcp_sub.c.max_bcp,
+                ),
+            )
+            .filter(
+                player_bcp.c.game_id.in_(winning_game_ids),
+                max_bcp_sub.c.max_bcp > 0,
+                Roster.season_id == selected_season_id,
+            )
+            .all()
+        )
+
+        winners_by_game: dict[int, list[str]] = defaultdict(list)
+        bcp_by_game: dict[int, float] = {}
+        for row in winners_query:
+            winners_by_game[row.game_id].append(row.player_name)
+            bcp_by_game[row.game_id] = float(row.bcp or 0)
+
+        winning_games = Game.query.filter(Game.id.in_(winning_game_ids)).all()
+        game_lookup = {g.id: g for g in winning_games}
+
+        def _sort_key(gid: int):
+            game = game_lookup.get(gid)
+            return (
+                game.game_date if game and game.game_date else date.min,
+                gid,
+            )
+
+        for gid in sorted(winners_by_game.keys(), key=_sort_key, reverse=True):
+            game = game_lookup.get(gid)
+            date_display = (
+                game.game_date.strftime("%b %d, %Y")
+                if game and game.game_date
+                else "Date TBD"
+            )
+            date_sort = (
+                game.game_date.strftime("%Y%m%d") if game and game.game_date else "0"
+            )
+            opponent = game.opponent_name if game and game.opponent_name else "Unknown"
+
+            game_url = url_for("admin.game_stats", game_id=gid) if game else None
+            game_label = f"Game {gid}"
+            game_display = (
+                Markup(
+                    f'<a href="{game_url}" class="text-blue-600 hover:underline">{game_label}</a>'
+                )
+                if game_url
+                else game_label
+            )
+
+            winner_links = [_player_cell(name)["display"] for name in winners_by_game[gid]]
+            winners_display = (
+                Markup(", ".join(str(link) for link in winner_links))
+                if winner_links
+                else "—"
+            )
+
+            hard_hat_rows.append(
+                {
+                    "game": {"display": game_display, "data_value": gid},
+                    "date": {"display": date_display, "data_value": date_sort},
+                    "date_sort": date_sort,
+                    "opponent": opponent,
+                    "winner": {"display": winners_display, "data_value": ", ".join(winners_by_game[gid])},
+                    "winner_sort": ", ".join(winners_by_game[gid]),
+                    "bcp": num(bcp_by_game.get(gid, 0)),
+                }
+            )
+
+    return render_template(
+        "hard_hats.html",
+        hard_hat_rows=hard_hat_rows,
+        filter_opt=filter_opt,
+        game_type_options=GAME_TYPE_OPTIONS,
+        selected_game_types=selected_game_types,
+        seasons=seasons,
+        selected_season_id=selected_season_id,
+        current_season_id=current_season_id,
+        active_page="home",
     )
 
 
