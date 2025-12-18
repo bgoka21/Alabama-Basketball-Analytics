@@ -54,9 +54,7 @@ table:not(.table-exempt) a,
 .unified-table a,
 .table-wrap .table-leaderboard a {
   color: var(--brand, #9E1B32);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--brand, #9E1B32) 85%, #6B7280 15%);
-  text-decoration-thickness: 1.5px;
+  text-decoration: none;
 }
 
 table:not(.table-exempt) a:hover,
@@ -66,7 +64,7 @@ table:not(.table-exempt) a:focus-visible,
 .table-wrap .table-leaderboard a:hover,
 .table-wrap .table-leaderboard a:focus-visible {
   color: color-mix(in srgb, var(--brand, #9E1B32) 85%, #4C0519 15%);
-  text-decoration-color: currentColor;
+  text-decoration: none;
 }
 
 /* Numeric helpers (extra safety even if Tailwind classes are present) */
