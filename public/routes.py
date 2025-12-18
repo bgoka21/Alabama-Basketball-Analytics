@@ -739,16 +739,17 @@ def hard_hat_detail():
             date_sort = (
                 game.game_date.strftime("%Y%m%d") if game and game.game_date else "0"
             )
-            opponent = game.opponent_name if game and game.opponent_name else "Unknown"
+            opponent_name = (
+                game.opponent_name if game and game.opponent_name else "Unknown"
+            )
 
             game_url = url_for("admin.game_stats", game_id=gid) if game else None
-            game_label = f"Game {gid}"
-            game_display = (
+            opponent_display = (
                 Markup(
-                    f'<a href="{game_url}" class="text-blue-600 hover:underline">{game_label}</a>'
+                    f'<a href="{game_url}" class="text-[#9E1B32] hover:underline">{opponent_name}</a>'
                 )
                 if game_url
-                else game_label
+                else opponent_name
             )
 
             winner_links = [_player_cell(name)["display"] for name in winners_by_game[gid]]
@@ -760,10 +761,9 @@ def hard_hat_detail():
 
             hard_hat_rows.append(
                 {
-                    "game": {"display": game_display, "data_value": gid},
                     "date": {"display": date_display, "data_value": date_sort},
                     "date_sort": date_sort,
-                    "opponent": opponent,
+                    "opponent": {"display": opponent_display, "data_value": opponent_name},
                     "winner": {"display": winners_display, "data_value": ", ".join(winners_by_game[gid])},
                     "winner_sort": ", ".join(winners_by_game[gid]),
                     "bcp": num(bcp_by_game.get(gid, 0)),
