@@ -744,6 +744,10 @@ def get_rebound_rates_onfloor(
             "off_reb_rate_on": None,
             "def_reb_rate_on": None,
             "def_reb_opportunities_on": None,
+            "indiv_off_reb_rate_on": None,
+            "team_off_reb_rate_on": None,
+            "indiv_def_reb_rate_on": None,
+            "team_def_reb_rate_on": None,
         }
 
     start_dt = _coerce_date(date_from)
@@ -773,30 +777,90 @@ def get_rebound_rates_onfloor(
             if team_off_poss and total_team_oreb
             else 0.0
         )
-    off_reb_rate = (
+    team_off_reb_rate = (
         round(team_oreb_on / team_misses * 100, 1)
         if team_misses
         else 0.0
     )
+    player_off_reb = 0.0
 
     defense_events = _get_defense_events(
         player_id, roster, start_dt, end_dt, label_set, game_ids
     )
     opp_misses = float(defense_events.get("opp_misses_on", 0) or 0)
-    player_def_reb = float(defense_events.get("player_def_reb_on", 0) or 0)
+    player_def_reb = 0.0
     total_def_reb = float(defense_events.get("team_def_reb_on", 0) or 0)
-    defensive_rebounds = player_def_reb if player_def_reb > 0 else total_def_reb
-    def_reb_rate = (
-        round(defensive_rebounds / opp_misses * 100, 1)
+    team_def_reb_rate = (
+        round(total_def_reb / opp_misses * 100, 1)
+        if opp_misses
+        else 0.0
+    )
+
+    bc_q = BlueCollarStats.query.filter(
+        BlueCollarStats.player_id == player_id,
+        BlueCollarStats.season_id == roster.season_id,
+    )
+    if start_dt or end_dt:
+        bc_q = bc_q.outerjoin(Game, BlueCollarStats.game_id == Game.id)
+        bc_q = bc_q.outerjoin(Practice, BlueCollarStats.practice_id == Practice.id)
+        if start_dt:
+            bc_q = bc_q.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date >= start_dt),
+                    and_(BlueCollarStats.practice_id != None, Practice.date >= start_dt),
+                )
+            )
+        if end_dt:
+            bc_q = bc_q.filter(
+                or_(
+                    and_(BlueCollarStats.game_id != None, Game.game_date <= end_dt),
+                    and_(BlueCollarStats.practice_id != None, Practice.date <= end_dt),
+                )
+            )
+    if label_set:
+        bc_q = bc_q.join(
+            PlayerStats,
+            and_(
+                PlayerStats.season_id == BlueCollarStats.season_id,
+                PlayerStats.player_name == roster.player_name,
+                PlayerStats.practice_id == BlueCollarStats.practice_id,
+                PlayerStats.game_id == BlueCollarStats.game_id,
+            ),
+        )
+        clauses = [
+            PlayerStats.shot_type_details.ilike(f"%{lbl}%")
+            | PlayerStats.stat_details.ilike(f"%{lbl}%")
+            for lbl in label_set
+        ]
+        bc_q = bc_q.filter(or_(*clauses))
+
+    rebound_row = bc_q.with_entities(
+        func.coalesce(func.sum(BlueCollarStats.off_reb), 0).label("off_reb"),
+        func.coalesce(func.sum(BlueCollarStats.def_reb), 0).label("def_reb"),
+    ).one()
+    player_off_reb = float(getattr(rebound_row, "off_reb", 0) or 0)
+    player_def_reb = float(getattr(rebound_row, "def_reb", 0) or 0)
+
+    indiv_off_reb_rate = (
+        round(player_off_reb / team_misses * 100, 1)
+        if team_misses
+        else 0.0
+    )
+    indiv_def_reb_rate = (
+        round(player_def_reb / opp_misses * 100, 1)
         if opp_misses
         else 0.0
     )
 
     # Example sanity key set: {'off_reb_rate_on', 'def_reb_rate_on'}
     return {
-        "off_reb_rate_on": off_reb_rate,
-        "def_reb_rate_on": def_reb_rate,
+        "off_reb_rate_on": team_off_reb_rate,
+        "def_reb_rate_on": team_def_reb_rate,
         "def_reb_opportunities_on": opp_misses,
+        "indiv_off_reb_rate_on": indiv_off_reb_rate,
+        "team_off_reb_rate_on": team_off_reb_rate,
+        "indiv_def_reb_rate_on": indiv_def_reb_rate,
+        "team_def_reb_rate_on": team_def_reb_rate,
     }
 
 
