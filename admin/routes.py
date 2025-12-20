@@ -3209,6 +3209,18 @@ def _build_practice_cells(
     cells['adv_def_reb_rate'] = _cell_pct(reb_rates.get('def_reb_rate_on'))
     cells['on_floor_oreb_pct'] = _cell_pct(reb_rates.get('off_reb_rate_on'))
     cells['on_floor_dreb_pct'] = _cell_pct(reb_rates.get('def_reb_rate_on'))
+    cells['on_floor_indiv_oreb_pct'] = _cell_pct(
+        reb_rates.get('indiv_off_reb_rate_on')
+    )
+    cells['on_floor_team_oreb_pct'] = _cell_pct(
+        reb_rates.get('team_off_reb_rate_on')
+    )
+    cells['on_floor_indiv_dreb_pct'] = _cell_pct(
+        reb_rates.get('indiv_def_reb_rate_on')
+    )
+    cells['on_floor_team_dreb_pct'] = _cell_pct(
+        reb_rates.get('team_def_reb_rate_on')
+    )
 
     cells['fg'] = _format_shooting_split(
         total_fg_makes, total_fg_attempts, mode, session_count
@@ -11730,4 +11742,3 @@ def _ft_daily_data(*args, **kwargs):
             "atr_fg_last_totals": normalized.get("last_team_totals") or {},
             "last_practice_date": normalized.get("last_practice_date"),
         }
-
