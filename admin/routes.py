@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import math
 import os, json
 from collections import defaultdict
@@ -181,8 +182,13 @@ from utils.leaderboard_helpers import (
     _get_defense_events,
     _normalize_labels,
 )
-from utils.records.stat_keys import STAT_KEYS
-from utils.records.candidate_builder import build_game_candidates
+from utils.records.stat_keys import (
+    canonicalize_stat_key,
+    get_all_stat_keys,
+    get_grouped_options,
+    get_label_for_key,
+)
+from utils.records.candidate_builder import build_game_candidates, get_missing_stat_keys
 from utils.records.evaluator import evaluate_candidates
 from utils.player_stats_helpers.cooe import get_game_on_off_stats
 from utils.scope import resolve_scope
@@ -2283,65 +2289,24 @@ RECORD_DEFINITION_CATEGORY_LABELS = {
     "blue_collar": "Blue Collar",
 }
 
-STAT_KEY_PREFIX_LABELS = {
-    "team": "Team",
-    "player": "Player",
-    "opponent": "Opponent",
-    "blue_collar": "Blue Collar",
-}
-STAT_KEY_TOKEN_OVERRIDES = {
-    "fg2": "FG2",
-    "fg3": "FG3",
-    "fg": "FG",
-    "fga": "FGA",
-    "ftm": "FTM",
-    "fta": "FTA",
-    "3pa": "3PA",
-    "2pa": "2PA",
-    "3p": "3P",
-    "2p": "2P",
-    "pct": "Pct",
-}
+logger = logging.getLogger(__name__)
+
+STAT_KEY_GROUPS = get_grouped_options()
+ALL_STAT_KEYS = get_all_stat_keys()
+_STAT_KEY_WARNED = False
 
 
-def _format_stat_key_label(stat_key: str) -> str:
-    prefix, _, metric = stat_key.partition(".")
-    prefix_label = STAT_KEY_PREFIX_LABELS.get(prefix, prefix.title())
-    tokens = []
-    for token in metric.split("_"):
-        if token in STAT_KEY_TOKEN_OVERRIDES:
-            tokens.append(STAT_KEY_TOKEN_OVERRIDES[token])
-        elif any(char.isdigit() for char in token):
-            tokens.append(token.upper())
-        else:
-            tokens.append(token.replace("-", " ").title())
-    metric_label = " ".join(token for token in tokens if token)
-    return f"{prefix_label} {metric_label}".strip()
-
-
-def _build_stat_key_groups():
-    groups = []
-    for category in RECORD_DEFINITION_CATEGORIES:
-        entity_map = STAT_KEYS.get(category, {})
-        seen = set()
-        options = []
-        for entity_keys in entity_map.values():
-            for key in entity_keys:
-                if key in seen:
-                    continue
-                seen.add(key)
-                options.append({"value": key, "label": _format_stat_key_label(key)})
-        groups.append(
-            {
-                "label": f"{RECORD_DEFINITION_CATEGORY_LABELS.get(category, category.title())} stats",
-                "options": options,
-            }
+def _warn_missing_stat_key_mappings() -> None:
+    global _STAT_KEY_WARNED
+    if _STAT_KEY_WARNED:
+        return
+    missing = get_missing_stat_keys(ALL_STAT_KEYS)
+    if missing:
+        logger.warning(
+            "Stat key registry contains keys missing candidate mappings: %s",
+            ", ".join(missing),
         )
-    return groups
-
-
-STAT_KEY_GROUPS = _build_stat_key_groups()
-ALL_STAT_KEYS = {option["value"] for group in STAT_KEY_GROUPS for option in group["options"]}
+    _STAT_KEY_WARNED = True
 
 
 def _coerce_player_id(value):
@@ -5202,10 +5167,10 @@ def _record_definition_form_payload(definition: Optional[RecordDefinition] = Non
         "category": definition.category or "",
         "entity_type": definition.entity_type or "",
         "scope": definition.scope or "",
-        "stat_key": definition.stat_key or "",
+        "stat_key": canonicalize_stat_key(definition.stat_key or ""),
         "compare": definition.compare or "MAX",
         "is_active": bool(definition.is_active),
-        "qualifier_stat_key": definition.qualifier_stat_key or "",
+        "qualifier_stat_key": canonicalize_stat_key(definition.qualifier_stat_key or ""),
         "qualifier_threshold_override": (
             "" if definition.qualifier_threshold_override is None else definition.qualifier_threshold_override
         ),
@@ -5225,6 +5190,8 @@ def _validate_record_definition_form(form: Mapping[str, str]) -> tuple[dict[str,
     qualifier_stat_key = (form.get("qualifier_stat_key") or "").strip()
     qualifier_threshold_raw = (form.get("qualifier_threshold_override") or "").strip()
     admin_notes = (form.get("admin_notes") or "").strip()
+    canonical_stat_key = canonicalize_stat_key(stat_key) if stat_key else ""
+    canonical_qualifier_key = canonicalize_stat_key(qualifier_stat_key) if qualifier_stat_key else ""
 
     if not name:
         errors["name"] = "Name is required."
@@ -5236,9 +5203,9 @@ def _validate_record_definition_form(form: Mapping[str, str]) -> tuple[dict[str,
         errors["scope"] = "Select a valid scope."
     if compare != "MAX":
         errors["compare"] = "Compare type must be MAX."
-    if stat_key not in ALL_STAT_KEYS:
+    if not canonical_stat_key or canonical_stat_key not in ALL_STAT_KEYS:
         errors["stat_key"] = "Select a valid stat key."
-    if qualifier_stat_key and qualifier_stat_key not in ALL_STAT_KEYS:
+    if canonical_qualifier_key and canonical_qualifier_key not in ALL_STAT_KEYS:
         errors["qualifier_stat_key"] = "Select a valid qualifier stat key."
 
     if category in RECORD_DEFINITION_CATEGORY_RULES and entity_type:
@@ -5259,10 +5226,10 @@ def _validate_record_definition_form(form: Mapping[str, str]) -> tuple[dict[str,
         "category": category,
         "entity_type": entity_type,
         "scope": scope,
-        "stat_key": stat_key,
+        "stat_key": canonical_stat_key,
         "compare": "MAX",
         "is_active": is_active,
-        "qualifier_stat_key": qualifier_stat_key,
+        "qualifier_stat_key": canonical_qualifier_key,
         "qualifier_threshold_override": qualifier_threshold_override,
         "admin_notes": admin_notes,
     }
@@ -5273,6 +5240,7 @@ def _validate_record_definition_form(form: Mapping[str, str]) -> tuple[dict[str,
 @admin_bp.get('/records/definitions')
 @admin_required
 def record_definitions_list():
+    _warn_missing_stat_key_mappings()
     definitions = (
         RecordDefinition.query.order_by(
             RecordDefinition.category.asc(),
@@ -5281,7 +5249,9 @@ def record_definitions_list():
             RecordDefinition.name.asc(),
         ).all()
     )
-    stat_key_labels = {key: _format_stat_key_label(key) for key in ALL_STAT_KEYS}
+    stat_key_labels = {
+        definition.stat_key: get_label_for_key(definition.stat_key) for definition in definitions
+    }
     return render_template(
         'admin/record_definitions.html',
         definitions=definitions,
@@ -5293,6 +5263,7 @@ def record_definitions_list():
 @admin_bp.get('/records/definitions/new')
 @admin_required
 def record_definitions_new():
+    _warn_missing_stat_key_mappings()
     return render_template(
         'admin/record_definition_form.html',
         form_data=_record_definition_form_payload(),
@@ -5312,6 +5283,7 @@ def record_definitions_new():
 def record_definitions_create():
     payload, errors = _validate_record_definition_form(request.form)
     if errors:
+        _warn_missing_stat_key_mappings()
         return render_template(
             'admin/record_definition_form.html',
             form_data=payload,
@@ -5346,6 +5318,7 @@ def record_definitions_create():
 @admin_bp.get('/records/definitions/<int:definition_id>/edit')
 @admin_required
 def record_definitions_edit(definition_id: int):
+    _warn_missing_stat_key_mappings()
     definition = RecordDefinition.query.get_or_404(definition_id)
     return render_template(
         'admin/record_definition_form.html',
@@ -5367,6 +5340,7 @@ def record_definitions_update(definition_id: int):
     definition = RecordDefinition.query.get_or_404(definition_id)
     payload, errors = _validate_record_definition_form(request.form)
     if errors:
+        _warn_missing_stat_key_mappings()
         return render_template(
             'admin/record_definition_form.html',
             form_data=payload,
