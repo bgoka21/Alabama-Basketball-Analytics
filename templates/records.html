@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="space-y-6">
+    <div class="flex flex-col gap-2">
+      <h1 class="text-2xl font-bold text-gray-900">Record Book</h1>
+      <p class="text-sm text-gray-600">Current record holders and recent history.</p>
+    </div>
+
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div class="inline-flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+        {% for key, label in tab_options.items() %}
+          <a href="{{ url_for('records_page', tab=key, scope=selected_scope) }}"
+             class="rounded-md px-4 py-2 text-sm font-medium transition {% if selected_tab == key %}bg-[#9E1B32] text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+            {{ label }}
+          </a>
+        {% endfor %}
+      </div>
+
+      <div class="inline-flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+        {% for key, label in scope_options.items() %}
+          <a href="{{ url_for('records_page', tab=selected_tab, scope=key) }}"
+             class="rounded-md px-4 py-2 text-sm font-medium transition {% if selected_scope == key %}bg-gray-900 text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+            {{ label }}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if sections and sections[0].definitions %}
+      {% for section in sections %}
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-gray-800">{{ section.title }}</h2>
+
+          <div class="space-y-4">
+            {% for record in section.definitions %}
+              <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-lg font-semibold text-gray-900">{{ record.name }}</h3>
+                    {% if record.qualifier_tooltip %}
+                      <span class="inline-flex items-center gap-1 text-xs text-gray-500" title="{{ record.qualifier_tooltip }}">
+                        <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px]">i</span>
+                        Qualified
+                      </span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="mt-4">
+                  {% if record.current_entries %}
+                    <div class="divide-y divide-gray-100">
+                      {% for entry in record.current_entries %}
+                        <div class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="text-2xl font-semibold text-gray-900">{{ entry.value_display }}</div>
+                          <div class="text-sm text-gray-600 sm:text-right">
+                            <div class="font-medium text-gray-900">{{ entry.holder }}</div>
+                            <div class="text-xs text-gray-500">
+                              {% if selected_scope == 'GAME' %}
+                                {% if entry.game_url %}
+                                  <a href="{{ entry.game_url }}" class="text-blue-600 hover:underline">{{ entry.occurred_on_display }}</a>
+                                {% else %}
+                                  {{ entry.occurred_on_display }}
+                                {% endif %}
+                                {% if entry.opponent %} • vs {{ entry.opponent }}{% endif %}
+                              {% elif selected_scope == 'SEASON' %}
+                                Season {{ entry.season_year or 'TBD' }}
+                              {% else %}
+                                Career
+                              {% endif %}
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <p class="text-sm text-gray-500">No current record yet.</p>
+                  {% endif %}
+                </div>
+
+                {% if record.history_entries %}
+                  <details class="mt-4">
+                    <summary class="cursor-pointer text-sm text-[#9E1B32] hover:underline">
+                      View history
+                    </summary>
+                    <div class="mt-3 space-y-2">
+                      {% for entry in record.history_entries %}
+                        <div class="flex flex-col gap-2 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="font-semibold text-gray-900">{{ entry.value_display }}</div>
+                          <div class="flex flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                            <span class="text-gray-800">{{ entry.holder }}</span>
+                            <span class="text-gray-500">
+                              {% if selected_scope == 'GAME' %}
+                                {% if entry.game_url %}
+                                  <a href="{{ entry.game_url }}" class="text-blue-600 hover:underline">{{ entry.occurred_on_display }}</a>
+                                {% else %}
+                                  {{ entry.occurred_on_display }}
+                                {% endif %}
+                                {% if entry.opponent %} • vs {{ entry.opponent }}{% endif %}
+                              {% elif selected_scope == 'SEASON' %}
+                                Season {{ entry.season_year or 'TBD' }}
+                              {% else %}
+                                Career
+                              {% endif %}
+                            </span>
+                            <span class="flex items-center gap-2">
+                              {% if entry.is_forced %}
+                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Forced</span>
+                              {% endif %}
+                              {% if entry.is_current %}
+                                <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Current</span>
+                              {% endif %}
+                            </span>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </details>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    {% else %}
+      <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600">
+        No records available for this selection yet.
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

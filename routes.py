@@ -17,7 +17,16 @@ from admin.routes import (
     aggregate_stats,
     compute_team_shot_details,
 )
-from models.database import PlayerStats, Practice, BlueCollarStats, Game, Season
+from models.database import (
+    PlayerStats,
+    Practice,
+    BlueCollarStats,
+    Game,
+    Season,
+    RecordDefinition,
+    RecordEntry,
+    Roster,
+)
 from datetime import date
 from types import SimpleNamespace
 from flask_login import login_required
@@ -32,6 +41,7 @@ from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
 from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 from app.utils.table_cells import num, pct
+from utils.records.evaluator import get_threshold
 # BEGIN Advanced Possession
 from services.reports.advanced_possession import (
     cache_get_or_compute_adv_poss_game,
@@ -182,6 +192,200 @@ def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, 
     )
 
     return {"rows": rows, "totals": totals}
+
+
+RECORD_TAB_LABELS = {
+    "team": "Team",
+    "player": "Player",
+    "opponent": "Opponent",
+    "blue_collar": "Blue Collar",
+}
+RECORD_SCOPE_LABELS = {
+    "GAME": "Single Game",
+    "SEASON": "Single Season",
+    "CAREER": "Career",
+}
+
+
+def _parse_record_tab(raw_tab: str | None) -> str:
+    if not raw_tab:
+        return "team"
+    normalized = raw_tab.strip().lower()
+    return normalized if normalized in RECORD_TAB_LABELS else "team"
+
+
+def _parse_record_scope(raw_scope: str | None) -> str:
+    if not raw_scope:
+        return "GAME"
+    normalized = raw_scope.strip().upper()
+    return normalized if normalized in RECORD_SCOPE_LABELS else "GAME"
+
+
+def _format_record_value(value: float | None) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def _format_record_date(value: date | None) -> str:
+    if not value:
+        return "Date TBD"
+    return value.strftime("%b %d, %Y")
+
+
+def _build_record_entry_payload(
+    entry: RecordEntry,
+    *,
+    scope: str,
+    roster_lookup: dict[int, str],
+    game_lookup: dict[int, Game],
+) -> dict[str, object]:
+    game = game_lookup.get(entry.game_id) if entry.game_id else None
+    if entry.holder_entity_type == "PLAYER":
+        holder = roster_lookup.get(entry.holder_player_id, "Unknown Player")
+    elif entry.holder_entity_type == "OPPONENT":
+        holder = entry.holder_opponent_name or (game.opponent_name if game else "Unknown Opponent")
+    else:
+        holder = "Alabama"
+
+    occurred_on = entry.occurred_on or (game.game_date if game else None)
+    opponent_name = entry.holder_opponent_name or (game.opponent_name if game else None)
+    game_url = url_for("admin.game_stats", game_id=entry.game_id) if game else None
+
+    return {
+        "id": entry.id,
+        "holder": holder,
+        "value_display": _format_record_value(entry.value),
+        "scope": scope,
+        "season_year": entry.season_year,
+        "occurred_on": occurred_on,
+        "occurred_on_display": _format_record_date(occurred_on),
+        "opponent": opponent_name,
+        "game_url": game_url,
+        "is_current": bool(entry.is_current),
+        "is_forced": bool(entry.is_forced_current),
+        "source_type": entry.source_type,
+    }
+
+
+def _load_record_book(category: str, scope: str) -> dict[str, object]:
+    definitions = (
+        RecordDefinition.query.filter_by(
+            is_active=True,
+            category=category,
+            scope=scope,
+        )
+        .order_by(RecordDefinition.name.asc())
+        .all()
+    )
+    if not definitions:
+        return {"sections": []}
+
+    definition_ids = [definition.id for definition in definitions]
+    entries = (
+        RecordEntry.query.filter(
+            RecordEntry.record_definition_id.in_(definition_ids),
+            RecordEntry.is_active.is_(True),
+        )
+        .order_by(
+            RecordEntry.record_definition_id.asc(),
+            RecordEntry.value.desc(),
+            RecordEntry.occurred_on.desc(),
+        )
+        .all()
+    )
+
+    entries_by_definition: dict[int, list[RecordEntry]] = {}
+    player_ids = {entry.holder_player_id for entry in entries if entry.holder_player_id}
+    game_ids = {entry.game_id for entry in entries if entry.game_id}
+
+    roster_lookup = {
+        player.id: player.player_name
+        for player in (
+            Roster.query.filter(Roster.id.in_(player_ids)).all() if player_ids else []
+        )
+    }
+    game_lookup = {
+        game.id: game for game in (Game.query.filter(Game.id.in_(game_ids)).all() if game_ids else [])
+    }
+
+    for entry in entries:
+        entries_by_definition.setdefault(entry.record_definition_id, []).append(entry)
+
+    sections = [
+        {
+            "title": "Records",
+            "definitions": [],
+        }
+    ]
+
+    for definition in definitions:
+        definition_entries = entries_by_definition.get(definition.id, [])
+        forced_entries = [entry for entry in definition_entries if entry.is_forced_current]
+        if forced_entries:
+            current_entries = forced_entries
+        else:
+            current_entries = [entry for entry in definition_entries if entry.is_current]
+
+        current_payloads = [
+            _build_record_entry_payload(
+                entry,
+                scope=scope,
+                roster_lookup=roster_lookup,
+                game_lookup=game_lookup,
+            )
+            for entry in sorted(
+                current_entries,
+                key=lambda record: (
+                    record.value if record.value is not None else float("-inf"),
+                    record.occurred_on or date.min,
+                ),
+                reverse=True,
+            )
+        ]
+
+        history_entries = sorted(
+            definition_entries,
+            key=lambda record: (
+                record.value if record.value is not None else float("-inf"),
+                record.occurred_on or date.min,
+            ),
+            reverse=True,
+        )[:10]
+        history_payloads = [
+            _build_record_entry_payload(
+                entry,
+                scope=scope,
+                roster_lookup=roster_lookup,
+                game_lookup=game_lookup,
+            )
+            for entry in history_entries
+        ]
+
+        qualifier_threshold = get_threshold(definition)
+        qualifier_tooltip = None
+        if definition.qualifier_stat_key and qualifier_threshold is not None:
+            qualifier_tooltip = (
+                f"Qualified when {definition.qualifier_stat_key} ≥ {qualifier_threshold:g}"
+            )
+
+        sections[0]["definitions"].append(
+            {
+                "id": definition.id,
+                "name": definition.name,
+                "scope": definition.scope,
+                "stat_key": definition.stat_key,
+                "qualifier_tooltip": qualifier_tooltip,
+                "current_entries": current_payloads,
+                "history_entries": history_payloads,
+            }
+        )
+
+    return {"sections": sections}
 
 
 
@@ -1403,6 +1607,22 @@ def draft_net():
     return jsonify({'alabama_net': int(al_net), 'rival_net': int(rival_net)})
 
 
+@app.get('/records')
+def records_page():
+    selected_tab = _parse_record_tab(request.args.get("tab"))
+    selected_scope = _parse_record_scope(request.args.get("scope"))
+    record_data = _load_record_book(selected_tab, selected_scope)
+
+    return render_template(
+        "records.html",
+        tab_options=RECORD_TAB_LABELS,
+        scope_options=RECORD_SCOPE_LABELS,
+        selected_tab=selected_tab,
+        selected_scope=selected_scope,
+        sections=record_data["sections"],
+    )
+
+
 def _dev_tables_enabled() -> bool:
     """Return True when dev-only routes should be registered."""
     return app.debug or os.environ.get('FLASK_ENV') == 'development'
@@ -1414,5 +1634,3 @@ if _dev_tables_enabled():
     def dev_tables_smoke():
         """Render the unified tables smoke test sandbox."""
         return render_template('dev/tables_smoketest.html')
-
-
