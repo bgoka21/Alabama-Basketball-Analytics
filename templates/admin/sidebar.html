@@ -160,7 +160,9 @@
                         'admin.custom_stats_index', 'admin.draft_upload',
                         'admin.eybl_import', 'admin.eybl_identity', 'admin.eybl_synonyms',
                         'admin.record_definitions_list', 'admin.record_definitions_new',
-                        'admin.record_definitions_edit', 'admin.record_definitions_update'] %}
+                        'admin.record_definitions_edit', 'admin.record_definitions_update',
+                        'admin.record_entries_list', 'admin.record_entries_new',
+                        'admin.record_entries_edit', 'admin.record_entries_update'] %}
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
       <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
@@ -200,6 +202,10 @@
         <a class="{{ link_base_classes }}{% if request.endpoint and request.endpoint.startswith('admin.record_definitions') %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.record_definitions_list') }}">
           {{ icons.render('clipboard') }}
           <span class="flex-1 text-left">Record Definitions</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint and request.endpoint.startswith('admin.record_entries') %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.record_entries_list') }}">
+          {{ icons.render('clipboard') }}
+          <span class="flex-1 text-left">Record Entries</span>
         </a>
         {% set usage_url = url_for('admin.usage_report') if view_exists('admin.usage_report') else '#' %}
         <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.usage_report' %} {{ active_classes }}{% endif %}" href="{{ usage_url }}">

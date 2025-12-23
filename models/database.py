@@ -485,6 +485,7 @@ class RecordEntry(db.Model):
     notes = db.Column(db.Text, nullable=True)
     is_current = db.Column(db.Boolean, nullable=False, default=False)
     is_forced_current = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
     auto_key = db.Column(db.String(128), nullable=True, unique=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
