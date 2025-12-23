@@ -451,6 +451,7 @@ class RecordDefinition(db.Model):
     compare = db.Column(db.String(8), nullable=False, default="MAX")
     qualifier_stat_key = db.Column(db.String(64), nullable=True)
     qualifier_threshold_override = db.Column(db.Float, nullable=True)
+    admin_notes = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
