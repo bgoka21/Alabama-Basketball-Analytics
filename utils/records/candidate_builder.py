@@ -5,6 +5,8 @@ import logging
 from datetime import date
 from typing import Any, Dict, Iterable, List, Optional
 
+from sqlalchemy import or_
+
 from models.database import (
     BlueCollarStats,
     Game,
@@ -21,8 +23,11 @@ _WARNED_STAT_KEYS: set[str] = set()
 
 TEAM_STAT_ATTRS = {
     "team.points": "total_points",
+    "team.total_points": "total_points",
     "team.assists": "total_assists",
+    "team.total_assists": "total_assists",
     "team.turnovers": "total_turnovers",
+    "team.total_turnovers": "total_turnovers",
     "team.fg2_makes": "total_fg2_makes",
     "team.fg2_attempts": "total_fg2_attempts",
     "team.fg3_makes": "total_fg3_makes",
@@ -30,6 +35,7 @@ TEAM_STAT_ATTRS = {
     "team.ftm": "total_ftm",
     "team.fta": "total_fta",
     "team.possessions": "total_possessions",
+    "team.total_possessions": "total_possessions",
     "team.blue_collar": "total_blue_collar",
 }
 
@@ -187,7 +193,12 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
     definitions = RecordDefinition.query.filter_by(scope="GAME", is_active=True).all()
     occurred_on = game.game_date or date.today()
 
-    team_stats = TeamStats.query.filter_by(game_id=game_id, is_opponent=False).first()
+    team_stats = (
+        TeamStats.query.filter(
+            TeamStats.game_id == game_id,
+            or_(TeamStats.is_opponent.is_(False), TeamStats.is_opponent.is_(None)),
+        ).first()
+    )
     opponent_stats = TeamStats.query.filter_by(game_id=game_id, is_opponent=True).first()
     player_stats_rows = PlayerStats.query.filter_by(game_id=game_id).all()
 
