@@ -182,6 +182,8 @@ from utils.leaderboard_helpers import (
     _normalize_labels,
 )
 from utils.records.stat_keys import STAT_KEYS
+from utils.records.candidate_builder import build_game_candidates
+from utils.records.evaluator import evaluate_candidates
 from utils.player_stats_helpers.cooe import get_game_on_off_stats
 from utils.scope import resolve_scope
 from services.eybl_ingest import (
@@ -6074,6 +6076,17 @@ def parse_file(file_id):
                 )
                 return redirect(url_for('admin.dashboard'))
 
+            try:
+                candidates = build_game_candidates(game.id)
+                evaluate_candidates(game.id, candidates)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception(
+                    "Failed to update game records after parse for game %s",
+                    game.id,
+                )
+
             flash(
                 f"File '{filename}' parsed successfully! You can now edit the game.",
                 "success"
@@ -6178,6 +6191,17 @@ def _reparse_uploaded_game(uploaded_file, upload_path):
     })
     uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
     db.session.commit()
+
+    try:
+        candidates = build_game_candidates(game.id)
+        evaluate_candidates(game.id, candidates)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Failed to update game records after reparse for game %s",
+            game.id,
+        )
 
     return game.id, season_id
 

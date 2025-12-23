@@ -1,11 +1,13 @@
 """Scaffolding for record evaluation and auto entry upserts."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Iterable, List, Optional
 
 from models.database import RecordDefinition, RecordEntry, db
 from utils.records.stat_keys import DEFAULT_QUALIFIER_THRESHOLDS
 
+logger = logging.getLogger(__name__)
 
 def get_threshold(definition: RecordDefinition) -> Optional[float]:
     """Return the qualifier threshold for a definition (override > default > None)."""
@@ -44,7 +46,10 @@ def _build_auto_key(definition: RecordDefinition, candidate: Dict[str, Any]) -> 
     )
 
 
-def upsert_auto_entry(definition: RecordDefinition, candidate: Dict[str, Any]) -> RecordEntry:
+def upsert_auto_entry(
+    definition: RecordDefinition,
+    candidate: Dict[str, Any],
+) -> tuple[RecordEntry, bool]:
     """Create or update an AUTO record entry for a game/holder combo.
 
     Example candidate:
@@ -76,6 +81,7 @@ def upsert_auto_entry(definition: RecordDefinition, candidate: Dict[str, Any]) -
             auto_key=auto_key,
         )
         db.session.add(entry)
+        was_created = True
     else:
         entry.value = float(candidate["value"])
         entry.scope = definition.scope
@@ -85,8 +91,9 @@ def upsert_auto_entry(definition: RecordDefinition, candidate: Dict[str, Any]) -
         entry.holder_player_id = candidate.get("holder_player_id")
         entry.holder_opponent_name = candidate.get("holder_opponent_name")
         entry.season_year = candidate.get("season_year")
+        was_created = False
 
-    return entry
+    return entry, was_created
 
 
 def evaluate_candidates(game_id: int, candidates: Iterable[Dict[str, Any]]) -> List[RecordEntry]:
@@ -94,38 +101,78 @@ def evaluate_candidates(game_id: int, candidates: Iterable[Dict[str, Any]]) -> L
 
     Forced current entries are respected and never demoted automatically.
     """
-    definitions = {
-        definition.stat_key: definition
-        for definition in RecordDefinition.query.filter_by(scope="GAME", is_active=True)
-    }
+    candidate_list = list(candidates)
+    definitions = RecordDefinition.query.filter_by(scope="GAME", is_active=True).all()
+    definitions_by_id = {definition.id: definition for definition in definitions}
+    definitions_by_stat = {definition.stat_key: definition for definition in definitions}
     touched_definition_ids = set()
     updated_entries: List[RecordEntry] = []
+    auto_created = 0
+    auto_updated = 0
 
-    for candidate in candidates:
-        definition = definitions.get(candidate.get("definition_stat_key"))
+    logger.info(
+        "Evaluating %s definitions against %s candidates for game %s",
+        len(definitions),
+        len(candidate_list),
+        game_id,
+    )
+
+    for candidate in candidate_list:
+        definition = None
+        definition_id = candidate.get("definition_id")
+        if definition_id is not None:
+            definition = definitions_by_id.get(definition_id)
+        if definition is None:
+            definition = definitions_by_stat.get(candidate.get("definition_stat_key"))
         if not definition:
             continue
         if not qualifies(definition, candidate["value"], candidate):
             continue
-        entry = upsert_auto_entry(definition, candidate)
+        entry, was_created = upsert_auto_entry(definition, candidate)
         touched_definition_ids.add(definition.id)
         updated_entries.append(entry)
+        if was_created:
+            auto_created += 1
+        else:
+            auto_updated += 1
 
+    logger.info(
+        "Auto record entries created=%s updated=%s for game %s",
+        auto_created,
+        auto_updated,
+        game_id,
+    )
+
+    current_changed = 0
     for definition_id in touched_definition_ids:
         forced_entries = RecordEntry.query.filter_by(
             record_definition_id=definition_id,
             is_forced_current=True,
+            is_active=True,
         ).all()
         if forced_entries:
             for entry in forced_entries:
                 entry.is_current = True
             continue
 
-        entries = RecordEntry.query.filter_by(record_definition_id=definition_id).all()
+        entries = RecordEntry.query.filter_by(
+            record_definition_id=definition_id,
+            is_active=True,
+        ).all()
         if not entries:
             continue
+        previous_current = {entry.id for entry in entries if entry.is_current}
         max_value = max(entry.value for entry in entries)
         for entry in entries:
             entry.is_current = entry.value == max_value
+        current_entries = {entry.id for entry in entries if entry.is_current}
+        if previous_current != current_entries:
+            current_changed += 1
+
+    logger.info(
+        "Record definitions with current holder changes=%s for game %s",
+        current_changed,
+        game_id,
+    )
 
     return updated_entries
