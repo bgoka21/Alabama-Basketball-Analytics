@@ -17,6 +17,8 @@ from models.database import (
     db,
 )
 from models.uploaded_file import UploadedFile
+from utils.records.candidate_builder import build_game_candidates
+from utils.records.evaluator import evaluate_candidates
 
 
 def _format_lineup_efficiencies(raw_lineups: dict) -> dict:
@@ -46,6 +48,8 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
 
     result: Optional[dict] = None
 
+    game_id: Optional[int] = None
+
     if file.category == "Game":
         game = Game.query.filter_by(
             season_id=file.season_id, csv_filename=file.filename
@@ -73,6 +77,7 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
         result = admin_routes.parse_csv(
             filepath, game_id=None, season_id=file.season_id
         )
+        game_id = game.id
 
     elif file.category in {"Official Practice", "Fall Workouts", "Summer Workouts", "Pickup"}:
         from app.utils.category_normalization import normalize_category
@@ -177,5 +182,17 @@ def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
     file.parse_status = "Parsed Successfully"
     file.last_parsed = datetime.utcnow()
     db.session.commit()
+
+    if game_id is not None:
+        try:
+            candidates = build_game_candidates(game_id)
+            evaluate_candidates(game_id, candidates)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception(
+                "Failed to update game records after reparse for game %s",
+                game_id,
+            )
 
     return result
