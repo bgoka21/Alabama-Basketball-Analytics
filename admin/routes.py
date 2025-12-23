@@ -65,6 +65,7 @@ from models.database import (
     PlayerDevelopmentPlan,
     Setting,
     SavedStatProfile,
+    RecordDefinition,
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -179,6 +180,7 @@ from utils.leaderboard_helpers import (
     _get_defense_events,
     _normalize_labels,
 )
+from utils.records.stat_keys import STAT_KEYS
 from utils.player_stats_helpers.cooe import get_game_on_off_stats
 from utils.scope import resolve_scope
 from services.eybl_ingest import (
@@ -2260,6 +2262,82 @@ admin_bp.add_app_template_global(game_sort_default_for, name="sort_default_for")
 admin_bp.add_app_template_global(game_percent_specs_for, name="percent_specs_for")
 admin_bp.add_app_template_global(game_helptext_for, name="helptext_for")
 admin_bp.add_app_template_global(game_guards_for, name="guards_for")
+
+RECORD_DEFINITION_CATEGORIES = ["team", "player", "opponent", "blue_collar"]
+RECORD_DEFINITION_ENTITY_TYPES = ["TEAM", "PLAYER", "OPPONENT"]
+RECORD_DEFINITION_SCOPES = ["GAME", "SEASON", "CAREER"]
+RECORD_DEFINITION_CATEGORY_RULES = {
+    "team": {"TEAM"},
+    "player": {"PLAYER"},
+    "opponent": {"OPPONENT"},
+    "blue_collar": {"TEAM", "PLAYER", "OPPONENT"},
+}
+RECORD_DEFINITION_CATEGORY_LABELS = {
+    "team": "Team",
+    "player": "Player",
+    "opponent": "Opponent",
+    "blue_collar": "Blue Collar",
+}
+
+STAT_KEY_PREFIX_LABELS = {
+    "team": "Team",
+    "player": "Player",
+    "opponent": "Opponent",
+    "blue_collar": "Blue Collar",
+}
+STAT_KEY_TOKEN_OVERRIDES = {
+    "fg2": "FG2",
+    "fg3": "FG3",
+    "fg": "FG",
+    "fga": "FGA",
+    "ftm": "FTM",
+    "fta": "FTA",
+    "3pa": "3PA",
+    "2pa": "2PA",
+    "3p": "3P",
+    "2p": "2P",
+    "pct": "Pct",
+}
+
+
+def _format_stat_key_label(stat_key: str) -> str:
+    prefix, _, metric = stat_key.partition(".")
+    prefix_label = STAT_KEY_PREFIX_LABELS.get(prefix, prefix.title())
+    tokens = []
+    for token in metric.split("_"):
+        if token in STAT_KEY_TOKEN_OVERRIDES:
+            tokens.append(STAT_KEY_TOKEN_OVERRIDES[token])
+        elif any(char.isdigit() for char in token):
+            tokens.append(token.upper())
+        else:
+            tokens.append(token.replace("-", " ").title())
+    metric_label = " ".join(token for token in tokens if token)
+    return f"{prefix_label} {metric_label}".strip()
+
+
+def _build_stat_key_groups():
+    groups = []
+    for category in RECORD_DEFINITION_CATEGORIES:
+        entity_map = STAT_KEYS.get(category, {})
+        seen = set()
+        options = []
+        for entity_keys in entity_map.values():
+            for key in entity_keys:
+                if key in seen:
+                    continue
+                seen.add(key)
+                options.append({"value": key, "label": _format_stat_key_label(key)})
+        groups.append(
+            {
+                "label": f"{RECORD_DEFINITION_CATEGORY_LABELS.get(category, category.title())} stats",
+                "options": options,
+            }
+        )
+    return groups
+
+
+STAT_KEY_GROUPS = _build_stat_key_groups()
+ALL_STAT_KEYS = {option["value"] for group in STAT_KEY_GROUPS for option in group["options"]}
 
 
 def _coerce_player_id(value):
@@ -5099,6 +5177,229 @@ def dashboard():
         recruits        = recruits,
         active_page     = 'dashboard'
     )
+
+
+def _record_definition_form_payload(definition: Optional[RecordDefinition] = None) -> dict[str, Any]:
+    if definition is None:
+        return {
+            "name": "",
+            "category": "",
+            "entity_type": "",
+            "scope": "",
+            "stat_key": "",
+            "compare": "MAX",
+            "is_active": True,
+            "qualifier_stat_key": "",
+            "qualifier_threshold_override": "",
+            "admin_notes": "",
+        }
+    return {
+        "name": definition.name or "",
+        "category": definition.category or "",
+        "entity_type": definition.entity_type or "",
+        "scope": definition.scope or "",
+        "stat_key": definition.stat_key or "",
+        "compare": definition.compare or "MAX",
+        "is_active": bool(definition.is_active),
+        "qualifier_stat_key": definition.qualifier_stat_key or "",
+        "qualifier_threshold_override": (
+            "" if definition.qualifier_threshold_override is None else definition.qualifier_threshold_override
+        ),
+        "admin_notes": definition.admin_notes or "",
+    }
+
+
+def _validate_record_definition_form(form: Mapping[str, str]) -> tuple[dict[str, Any], dict[str, str]]:
+    errors: dict[str, str] = {}
+    name = (form.get("name") or "").strip()
+    category = (form.get("category") or "").strip()
+    entity_type = (form.get("entity_type") or "").strip()
+    scope = (form.get("scope") or "").strip()
+    stat_key = (form.get("stat_key") or "").strip()
+    compare = (form.get("compare") or "").strip() or "MAX"
+    is_active = bool(form.get("is_active"))
+    qualifier_stat_key = (form.get("qualifier_stat_key") or "").strip()
+    qualifier_threshold_raw = (form.get("qualifier_threshold_override") or "").strip()
+    admin_notes = (form.get("admin_notes") or "").strip()
+
+    if not name:
+        errors["name"] = "Name is required."
+    if category not in RECORD_DEFINITION_CATEGORIES:
+        errors["category"] = "Select a valid category."
+    if entity_type not in RECORD_DEFINITION_ENTITY_TYPES:
+        errors["entity_type"] = "Select a valid entity type."
+    if scope not in RECORD_DEFINITION_SCOPES:
+        errors["scope"] = "Select a valid scope."
+    if compare != "MAX":
+        errors["compare"] = "Compare type must be MAX."
+    if stat_key not in ALL_STAT_KEYS:
+        errors["stat_key"] = "Select a valid stat key."
+    if qualifier_stat_key and qualifier_stat_key not in ALL_STAT_KEYS:
+        errors["qualifier_stat_key"] = "Select a valid qualifier stat key."
+
+    if category in RECORD_DEFINITION_CATEGORY_RULES and entity_type:
+        allowed_entities = RECORD_DEFINITION_CATEGORY_RULES[category]
+        if entity_type not in allowed_entities:
+            allowed_text = ", ".join(sorted(allowed_entities))
+            errors["entity_type"] = f"Entity type must be {allowed_text} for {category} records."
+
+    qualifier_threshold_override = None
+    if qualifier_threshold_raw:
+        try:
+            qualifier_threshold_override = float(qualifier_threshold_raw)
+        except ValueError:
+            errors["qualifier_threshold_override"] = "Enter a valid number."
+
+    payload = {
+        "name": name,
+        "category": category,
+        "entity_type": entity_type,
+        "scope": scope,
+        "stat_key": stat_key,
+        "compare": "MAX",
+        "is_active": is_active,
+        "qualifier_stat_key": qualifier_stat_key,
+        "qualifier_threshold_override": qualifier_threshold_override,
+        "admin_notes": admin_notes,
+    }
+
+    return payload, errors
+
+
+@admin_bp.get('/records/definitions')
+@admin_required
+def record_definitions_list():
+    definitions = (
+        RecordDefinition.query.order_by(
+            RecordDefinition.category.asc(),
+            RecordDefinition.entity_type.asc(),
+            RecordDefinition.scope.asc(),
+            RecordDefinition.name.asc(),
+        ).all()
+    )
+    stat_key_labels = {key: _format_stat_key_label(key) for key in ALL_STAT_KEYS}
+    return render_template(
+        'admin/record_definitions.html',
+        definitions=definitions,
+        stat_key_labels=stat_key_labels,
+        category_labels=RECORD_DEFINITION_CATEGORY_LABELS,
+    )
+
+
+@admin_bp.get('/records/definitions/new')
+@admin_required
+def record_definitions_new():
+    return render_template(
+        'admin/record_definition_form.html',
+        form_data=_record_definition_form_payload(),
+        errors={},
+        form_action=url_for('admin.record_definitions_create'),
+        form_title="New Record Definition",
+        stat_key_groups=STAT_KEY_GROUPS,
+        category_labels=RECORD_DEFINITION_CATEGORY_LABELS,
+        category_options=RECORD_DEFINITION_CATEGORIES,
+        entity_type_options=RECORD_DEFINITION_ENTITY_TYPES,
+        scope_options=RECORD_DEFINITION_SCOPES,
+    )
+
+
+@admin_bp.post('/records/definitions')
+@admin_required
+def record_definitions_create():
+    payload, errors = _validate_record_definition_form(request.form)
+    if errors:
+        return render_template(
+            'admin/record_definition_form.html',
+            form_data=payload,
+            errors=errors,
+            form_action=url_for('admin.record_definitions_create'),
+            form_title="New Record Definition",
+            stat_key_groups=STAT_KEY_GROUPS,
+            category_labels=RECORD_DEFINITION_CATEGORY_LABELS,
+            category_options=RECORD_DEFINITION_CATEGORIES,
+            entity_type_options=RECORD_DEFINITION_ENTITY_TYPES,
+            scope_options=RECORD_DEFINITION_SCOPES,
+        )
+
+    definition = RecordDefinition(
+        name=payload["name"],
+        category=payload["category"],
+        entity_type=payload["entity_type"],
+        scope=payload["scope"],
+        stat_key=payload["stat_key"],
+        compare="MAX",
+        is_active=payload["is_active"],
+        qualifier_stat_key=payload["qualifier_stat_key"] or None,
+        qualifier_threshold_override=payload["qualifier_threshold_override"],
+        admin_notes=payload["admin_notes"] or None,
+    )
+    db.session.add(definition)
+    db.session.commit()
+    flash(f'Record definition "{definition.name}" created.', 'success')
+    return redirect(url_for('admin.record_definitions_list'))
+
+
+@admin_bp.get('/records/definitions/<int:definition_id>/edit')
+@admin_required
+def record_definitions_edit(definition_id: int):
+    definition = RecordDefinition.query.get_or_404(definition_id)
+    return render_template(
+        'admin/record_definition_form.html',
+        form_data=_record_definition_form_payload(definition),
+        errors={},
+        form_action=url_for('admin.record_definitions_update', definition_id=definition.id),
+        form_title=f"Edit Record Definition: {definition.name}",
+        stat_key_groups=STAT_KEY_GROUPS,
+        category_labels=RECORD_DEFINITION_CATEGORY_LABELS,
+        category_options=RECORD_DEFINITION_CATEGORIES,
+        entity_type_options=RECORD_DEFINITION_ENTITY_TYPES,
+        scope_options=RECORD_DEFINITION_SCOPES,
+    )
+
+
+@admin_bp.post('/records/definitions/<int:definition_id>/edit')
+@admin_required
+def record_definitions_update(definition_id: int):
+    definition = RecordDefinition.query.get_or_404(definition_id)
+    payload, errors = _validate_record_definition_form(request.form)
+    if errors:
+        return render_template(
+            'admin/record_definition_form.html',
+            form_data=payload,
+            errors=errors,
+            form_action=url_for('admin.record_definitions_update', definition_id=definition.id),
+            form_title=f"Edit Record Definition: {definition.name}",
+            stat_key_groups=STAT_KEY_GROUPS,
+            category_labels=RECORD_DEFINITION_CATEGORY_LABELS,
+            category_options=RECORD_DEFINITION_CATEGORIES,
+            entity_type_options=RECORD_DEFINITION_ENTITY_TYPES,
+            scope_options=RECORD_DEFINITION_SCOPES,
+        )
+
+    definition.name = payload["name"]
+    definition.category = payload["category"]
+    definition.entity_type = payload["entity_type"]
+    definition.scope = payload["scope"]
+    definition.stat_key = payload["stat_key"]
+    definition.compare = "MAX"
+    definition.is_active = payload["is_active"]
+    definition.qualifier_stat_key = payload["qualifier_stat_key"] or None
+    definition.qualifier_threshold_override = payload["qualifier_threshold_override"]
+    definition.admin_notes = payload["admin_notes"] or None
+    db.session.commit()
+    flash(f'Record definition "{definition.name}" updated.', 'success')
+    return redirect(url_for('admin.record_definitions_list'))
+
+
+@admin_bp.post('/records/definitions/<int:definition_id>/toggle-active')
+@admin_required
+def record_definitions_toggle_active(definition_id: int):
+    definition = RecordDefinition.query.get_or_404(definition_id)
+    definition.is_active = not definition.is_active
+    db.session.commit()
+    state = "activated" if definition.is_active else "deactivated"
+    flash(f'Record definition "{definition.name}" {state}.', 'success')
+    return redirect(url_for('admin.record_definitions_list'))
 
 
 @admin_bp.route('/users', methods=['GET'])

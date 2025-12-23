@@ -1,0 +1,155 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold">{{ form_title }}</h1>
+    <p class="text-sm text-gray-600">Definitions are required before any record entries can be created.</p>
+  </div>
+
+  <form method="POST" action="{{ form_action }}" class="max-w-3xl space-y-6 bg-white p-6 rounded shadow">
+    {% if errors.get('compare') %}
+      <div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        {{ errors.get('compare') }}
+      </div>
+    {% endif %}
+    <input type="hidden" name="compare" value="MAX">
+
+    <div>
+      <label class="block mb-1 font-medium">Name</label>
+      <input name="name" type="text" value="{{ form_data.name }}"
+             class="w-full border rounded px-3 py-2{% if errors.get('name') %} border-red-400{% endif %}"
+             required>
+      {% if errors.get('name') %}
+        <p class="text-sm text-red-600 mt-1">{{ errors.get('name') }}</p>
+      {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block mb-1 font-medium">Category</label>
+        <select name="category"
+                class="w-full border rounded px-3 py-2{% if errors.get('category') %} border-red-400{% endif %}"
+                required>
+          <option value="" disabled{% if not form_data.category %} selected{% endif %}>Select a category</option>
+          {% for option in category_options %}
+            <option value="{{ option }}" {% if form_data.category == option %}selected{% endif %}>
+              {{ category_labels.get(option, option.title()) }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.get('category') %}
+          <p class="text-sm text-red-600 mt-1">{{ errors.get('category') }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="block mb-1 font-medium">Entity Type</label>
+        <select name="entity_type"
+                class="w-full border rounded px-3 py-2{% if errors.get('entity_type') %} border-red-400{% endif %}"
+                required>
+          <option value="" disabled{% if not form_data.entity_type %} selected{% endif %}>Select an entity type</option>
+          {% for option in entity_type_options %}
+            <option value="{{ option }}" {% if form_data.entity_type == option %}selected{% endif %}>
+              {{ option }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.get('entity_type') %}
+          <p class="text-sm text-red-600 mt-1">{{ errors.get('entity_type') }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block mb-1 font-medium">Scope</label>
+        <select name="scope"
+                class="w-full border rounded px-3 py-2{% if errors.get('scope') %} border-red-400{% endif %}"
+                required>
+          <option value="" disabled{% if not form_data.scope %} selected{% endif %}>Select a scope</option>
+          {% for option in scope_options %}
+            <option value="{{ option }}" {% if form_data.scope == option %}selected{% endif %}>
+              {{ option }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.get('scope') %}
+          <p class="text-sm text-red-600 mt-1">{{ errors.get('scope') }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="block mb-1 font-medium">Stat Key</label>
+        <select name="stat_key"
+                class="w-full border rounded px-3 py-2{% if errors.get('stat_key') %} border-red-400{% endif %}"
+                required>
+          <option value="" disabled{% if not form_data.stat_key %} selected{% endif %}>Select a stat key</option>
+          {% for group in stat_key_groups %}
+            <optgroup label="{{ group.label }}">
+              {% for option in group.options %}
+                <option value="{{ option.value }}" {% if form_data.stat_key == option.value %}selected{% endif %}>
+                  {{ option.label }}
+                </option>
+              {% endfor %}
+            </optgroup>
+          {% endfor %}
+        </select>
+        {% if errors.get('stat_key') %}
+          <p class="text-sm text-red-600 mt-1">{{ errors.get('stat_key') }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <input id="is_active" name="is_active" type="checkbox" class="h-4 w-4" {% if form_data.is_active %}checked{% endif %}>
+      <label for="is_active" class="text-sm font-medium">Active</label>
+    </div>
+
+    <details class="rounded border border-gray-200 bg-gray-50 p-4">
+      <summary class="cursor-pointer text-sm font-semibold text-gray-600">Advanced Options</summary>
+      <div class="mt-4 space-y-4 text-sm text-gray-600">
+        <p>Qualifiers are optional and will only be used during record evaluation.</p>
+        <div>
+          <label class="block mb-1 font-medium text-gray-700">Qualifier Stat Key</label>
+          <select name="qualifier_stat_key"
+                  class="w-full border rounded px-3 py-2{% if errors.get('qualifier_stat_key') %} border-red-400{% endif %}">
+            <option value="" {% if not form_data.qualifier_stat_key %}selected{% endif %}>None</option>
+            {% for group in stat_key_groups %}
+              <optgroup label="{{ group.label }}">
+                {% for option in group.options %}
+                  <option value="{{ option.value }}" {% if form_data.qualifier_stat_key == option.value %}selected{% endif %}>
+                    {{ option.label }}
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% endfor %}
+          </select>
+          {% if errors.get('qualifier_stat_key') %}
+            <p class="text-sm text-red-600 mt-1">{{ errors.get('qualifier_stat_key') }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block mb-1 font-medium text-gray-700">Qualifier Threshold Override</label>
+          <input name="qualifier_threshold_override" type="number" step="0.01"
+                 value="{{ form_data.qualifier_threshold_override }}"
+                 class="w-full border rounded px-3 py-2{% if errors.get('qualifier_threshold_override') %} border-red-400{% endif %}">
+          {% if errors.get('qualifier_threshold_override') %}
+            <p class="text-sm text-red-600 mt-1">{{ errors.get('qualifier_threshold_override') }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block mb-1 font-medium text-gray-700">Admin Notes</label>
+          <textarea name="admin_notes" rows="3"
+                    class="w-full border rounded px-3 py-2">{{ form_data.admin_notes }}</textarea>
+        </div>
+      </div>
+    </details>
+
+    <div class="flex items-center space-x-4">
+      <button type="submit"
+              class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
+        Save Definition
+      </button>
+      <a href="{{ url_for('admin.record_definitions_list') }}"
+         class="text-gray-600 hover:underline">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

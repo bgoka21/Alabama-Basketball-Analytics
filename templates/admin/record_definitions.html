@@ -1,0 +1,67 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Record Definitions</h1>
+      <p class="text-sm text-gray-600">Definitions must exist before any record entries can be added.</p>
+    </div>
+    <a href="{{ url_for('admin.record_definitions_new') }}"
+       class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
+      New Definition
+    </a>
+  </div>
+
+  <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead class="bg-gray-50">
+        <tr class="text-left text-gray-700">
+          <th class="px-4 py-3 font-semibold">Name</th>
+          <th class="px-4 py-3 font-semibold">Category</th>
+          <th class="px-4 py-3 font-semibold">Entity Type</th>
+          <th class="px-4 py-3 font-semibold">Scope</th>
+          <th class="px-4 py-3 font-semibold">Stat Key</th>
+          <th class="px-4 py-3 font-semibold">Active</th>
+          <th class="px-4 py-3 font-semibold">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for definition in definitions %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium text-gray-900">{{ definition.name }}</td>
+          <td class="px-4 py-3">{{ category_labels.get(definition.category, definition.category) }}</td>
+          <td class="px-4 py-3">{{ definition.entity_type }}</td>
+          <td class="px-4 py-3">{{ definition.scope }}</td>
+          <td class="px-4 py-3">
+            {{ stat_key_labels.get(definition.stat_key, definition.stat_key) }}
+          </td>
+          <td class="px-4 py-3">
+            {% if definition.is_active %}
+              <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">Yes</span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">No</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              <a href="{{ url_for('admin.record_definitions_edit', definition_id=definition.id) }}"
+                 class="text-[#9E1B32] font-semibold hover:underline">Edit</a>
+              <form method="POST" action="{{ url_for('admin.record_definitions_toggle_active', definition_id=definition.id) }}">
+                <button type="submit" class="text-sm text-gray-700 hover:text-[#9E1B32]">
+                  {% if definition.is_active %}Deactivate{% else %}Activate{% endif %}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td class="px-4 py-6 text-center text-gray-500" colspan="7">
+            No record definitions have been created yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
