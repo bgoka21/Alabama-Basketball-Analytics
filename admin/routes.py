@@ -66,6 +66,7 @@ from models.database import (
     Setting,
     SavedStatProfile,
     RecordDefinition,
+    RecordEntry,
 )
 from models.database import PageView
 from models.uploaded_file import UploadedFile
@@ -2266,6 +2267,7 @@ admin_bp.add_app_template_global(game_guards_for, name="guards_for")
 RECORD_DEFINITION_CATEGORIES = ["team", "player", "opponent", "blue_collar"]
 RECORD_DEFINITION_ENTITY_TYPES = ["TEAM", "PLAYER", "OPPONENT"]
 RECORD_DEFINITION_SCOPES = ["GAME", "SEASON", "CAREER"]
+RECORD_ENTRY_SOURCE_TYPES = ["MANUAL", "AUTO"]
 RECORD_DEFINITION_CATEGORY_RULES = {
     "team": {"TEAM"},
     "player": {"PLAYER"},
@@ -5400,6 +5402,374 @@ def record_definitions_toggle_active(definition_id: int):
     state = "activated" if definition.is_active else "deactivated"
     flash(f'Record definition "{definition.name}" {state}.', 'success')
     return redirect(url_for('admin.record_definitions_list'))
+
+
+def _record_entry_form_payload(entry: RecordEntry | None = None) -> dict[str, Any]:
+    if not entry:
+        return {
+            "record_definition_id": "",
+            "value": "",
+            "source_type": "MANUAL",
+            "holder_player_id": "",
+            "holder_opponent_name": "",
+            "season_year": "",
+            "game_id": "",
+            "occurred_on": "",
+            "notes": "",
+            "is_current": False,
+            "is_forced_current": False,
+        }
+
+    return {
+        "record_definition_id": entry.record_definition_id,
+        "value": entry.value,
+        "source_type": entry.source_type,
+        "holder_player_id": entry.holder_player_id or "",
+        "holder_opponent_name": entry.holder_opponent_name or "",
+        "season_year": entry.season_year or "",
+        "game_id": entry.game_id or "",
+        "occurred_on": entry.occurred_on.isoformat() if entry.occurred_on else "",
+        "notes": entry.notes or "",
+        "is_current": bool(entry.is_current),
+        "is_forced_current": bool(entry.is_forced_current),
+    }
+
+
+def _parse_optional_int(raw_value: str | None, errors: dict[str, str], field: str) -> Optional[int]:
+    if raw_value is None:
+        return None
+    text = raw_value.strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        errors[field] = "Enter a valid number."
+        return None
+
+
+def _parse_optional_float(raw_value: str | None, errors: dict[str, str], field: str) -> Optional[float]:
+    if raw_value is None:
+        return None
+    text = raw_value.strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        errors[field] = "Enter a valid number."
+        return None
+
+
+def _validate_record_entry_form(
+    form: Mapping[str, str],
+    *,
+    allow_source_choice: bool,
+) -> tuple[dict[str, Any], dict[str, str], Optional[RecordDefinition]]:
+    errors: dict[str, str] = {}
+    record_definition_raw = (form.get("record_definition_id") or "").strip()
+    definition_id = _parse_optional_int(record_definition_raw, errors, "record_definition_id")
+    definition = RecordDefinition.query.get(definition_id) if definition_id else None
+    if not definition:
+        errors["record_definition_id"] = "Select a valid record definition."
+
+    value_raw = (form.get("value") or "").strip()
+    value = _parse_optional_float(value_raw, errors, "value")
+    if value is None:
+        errors["value"] = errors.get("value") or "Value is required."
+
+    source_type = (form.get("source_type") or "MANUAL").strip().upper()
+    if not allow_source_choice:
+        source_type = "MANUAL"
+    if source_type not in RECORD_ENTRY_SOURCE_TYPES:
+        errors["source_type"] = "Select a valid source type."
+
+    holder_player_raw = (form.get("holder_player_id") or "").strip()
+    holder_player_id = _parse_optional_int(holder_player_raw, errors, "holder_player_id")
+    holder_opponent_name = (form.get("holder_opponent_name") or "").strip()
+
+    game_raw = (form.get("game_id") or "").strip()
+    game_id = _parse_optional_int(game_raw, errors, "game_id")
+    game = Game.query.get(game_id) if game_id else None
+    if game_id and not game:
+        errors["game_id"] = "Select a valid game."
+
+    occurred_on_raw = (form.get("occurred_on") or "").strip()
+    occurred_on = None
+    if occurred_on_raw:
+        try:
+            occurred_on = date.fromisoformat(occurred_on_raw)
+        except ValueError:
+            errors["occurred_on"] = "Enter a valid date."
+
+    season_year_raw = (form.get("season_year") or "").strip()
+    season_year = _parse_optional_int(season_year_raw, errors, "season_year")
+
+    if definition:
+        if definition.entity_type == "PLAYER":
+            if not holder_player_id and "holder_player_id" not in errors:
+                errors["holder_player_id"] = "Select a player."
+        if definition.entity_type == "OPPONENT":
+            if not holder_opponent_name and not game:
+                errors["holder_opponent_name"] = "Opponent name is required."
+        if definition.scope == "GAME":
+            if not game and not occurred_on and "occurred_on" not in errors:
+                errors["occurred_on"] = "Occurred on is required when no game is selected."
+        if definition.scope == "SEASON" and season_year is None and "season_year" not in errors:
+            errors["season_year"] = "Season year is required."
+
+    if game and not holder_opponent_name and definition and definition.entity_type == "OPPONENT":
+        holder_opponent_name = game.opponent_name
+
+    is_current = bool(form.get("is_current"))
+    is_forced_current = bool(form.get("is_forced_current"))
+    if is_forced_current:
+        is_current = True
+
+    payload = {
+        "record_definition_id": record_definition_raw,
+        "value": value_raw,
+        "source_type": source_type,
+        "holder_player_id": holder_player_raw,
+        "holder_opponent_name": holder_opponent_name,
+        "season_year": season_year_raw,
+        "game_id": game_raw,
+        "occurred_on": occurred_on_raw,
+        "notes": (form.get("notes") or "").strip(),
+        "is_current": is_current,
+        "is_forced_current": is_forced_current,
+    }
+
+    return payload, errors, definition
+
+
+@admin_bp.get('/records/entries')
+@admin_required
+def record_entries_list():
+    definition_id = request.args.get('definition_id', type=int)
+    source_type = (request.args.get('source_type') or "").strip().upper()
+    scope = (request.args.get('scope') or "").strip().upper()
+    current_only = bool(request.args.get('current_only'))
+    forced_only = bool(request.args.get('forced_only'))
+    active_only = bool(request.args.get('active_only'))
+
+    query = RecordEntry.query.options(selectinload(RecordEntry.definition)).join(RecordDefinition)
+    if definition_id:
+        query = query.filter(RecordEntry.record_definition_id == definition_id)
+    if source_type in RECORD_ENTRY_SOURCE_TYPES:
+        query = query.filter(RecordEntry.source_type == source_type)
+    if scope in RECORD_DEFINITION_SCOPES:
+        query = query.filter(RecordEntry.scope == scope)
+    if current_only:
+        query = query.filter(RecordEntry.is_current.is_(True))
+    if forced_only:
+        query = query.filter(RecordEntry.is_forced_current.is_(True))
+    if active_only:
+        query = query.filter(RecordEntry.is_active.is_(True))
+
+    entries = query.order_by(
+        RecordDefinition.name.asc(),
+        RecordEntry.value.desc(),
+        RecordEntry.occurred_on.desc(),
+    ).all()
+
+    roster_lookup = {player.id: player.player_name for player in Roster.query.order_by(Roster.player_name.asc()).all()}
+    game_ids = [entry.game_id for entry in entries if entry.game_id]
+    game_lookup = {}
+    if game_ids:
+        games = Game.query.filter(Game.id.in_(game_ids)).all()
+        game_lookup = {game.id: game for game in games}
+
+    definitions = RecordDefinition.query.order_by(RecordDefinition.name.asc()).all()
+
+    return render_template(
+        'admin/record_entries.html',
+        entries=entries,
+        definitions=definitions,
+        roster_lookup=roster_lookup,
+        game_lookup=game_lookup,
+        filters={
+            "definition_id": definition_id,
+            "source_type": source_type,
+            "scope": scope,
+            "current_only": current_only,
+            "forced_only": forced_only,
+            "active_only": active_only,
+        },
+        source_type_options=RECORD_ENTRY_SOURCE_TYPES,
+        scope_options=RECORD_DEFINITION_SCOPES,
+    )
+
+
+@admin_bp.get('/records/entries/new')
+@admin_required
+def record_entries_new():
+    definitions = RecordDefinition.query.order_by(RecordDefinition.name.asc()).all()
+    players = Roster.query.order_by(Roster.player_name.asc()).all()
+    games = Game.query.order_by(Game.game_date.desc()).all()
+    return render_template(
+        'admin/record_entry_form.html',
+        form_data=_record_entry_form_payload(),
+        errors={},
+        form_action=url_for('admin.record_entries_create'),
+        form_title="New Record Entry",
+        definitions=definitions,
+        players=players,
+        games=games,
+        allow_source_choice=False,
+    )
+
+
+@admin_bp.post('/records/entries')
+@admin_required
+def record_entries_create():
+    payload, errors, definition = _validate_record_entry_form(request.form, allow_source_choice=False)
+    definitions = RecordDefinition.query.order_by(RecordDefinition.name.asc()).all()
+    players = Roster.query.order_by(Roster.player_name.asc()).all()
+    games = Game.query.order_by(Game.game_date.desc()).all()
+    if errors or not definition:
+        return render_template(
+            'admin/record_entry_form.html',
+            form_data=payload,
+            errors=errors,
+            form_action=url_for('admin.record_entries_create'),
+            form_title="New Record Entry",
+            definitions=definitions,
+            players=players,
+            games=games,
+            allow_source_choice=False,
+        )
+
+    entry = RecordEntry(
+        record_definition_id=definition.id,
+        holder_entity_type=definition.entity_type,
+        holder_player_id=(
+            int(payload["holder_player_id"]) if payload["holder_player_id"] and definition.entity_type == "PLAYER" else None
+        ),
+        holder_opponent_name=payload["holder_opponent_name"] or None,
+        value=float(payload["value"]),
+        scope=definition.scope,
+        season_year=(
+            int(payload["season_year"]) if payload["season_year"] and definition.scope == "SEASON" else None
+        ),
+        game_id=int(payload["game_id"]) if payload["game_id"] and definition.scope == "GAME" else None,
+        occurred_on=(
+            date.fromisoformat(payload["occurred_on"]) if payload["occurred_on"] and definition.scope == "GAME" else None
+        ),
+        source_type=payload["source_type"],
+        notes=payload["notes"] or None,
+        is_current=bool(payload["is_current"]),
+        is_forced_current=bool(payload["is_forced_current"]),
+        is_active=True,
+    )
+    db.session.add(entry)
+    db.session.commit()
+    flash("Record entry created.", "success")
+    return redirect(url_for('admin.record_entries_list'))
+
+
+@admin_bp.get('/records/entries/<int:entry_id>/edit')
+@admin_required
+def record_entries_edit(entry_id: int):
+    entry = RecordEntry.query.get_or_404(entry_id)
+    definitions = RecordDefinition.query.order_by(RecordDefinition.name.asc()).all()
+    players = Roster.query.order_by(Roster.player_name.asc()).all()
+    games = Game.query.order_by(Game.game_date.desc()).all()
+    return render_template(
+        'admin/record_entry_form.html',
+        form_data=_record_entry_form_payload(entry),
+        errors={},
+        form_action=url_for('admin.record_entries_update', entry_id=entry.id),
+        form_title=f"Edit Record Entry: {entry.definition.name}",
+        definitions=definitions,
+        players=players,
+        games=games,
+        allow_source_choice=True,
+        entry=entry,
+    )
+
+
+@admin_bp.post('/records/entries/<int:entry_id>/edit')
+@admin_required
+def record_entries_update(entry_id: int):
+    entry = RecordEntry.query.get_or_404(entry_id)
+    payload, errors, definition = _validate_record_entry_form(request.form, allow_source_choice=True)
+    definitions = RecordDefinition.query.order_by(RecordDefinition.name.asc()).all()
+    players = Roster.query.order_by(Roster.player_name.asc()).all()
+    games = Game.query.order_by(Game.game_date.desc()).all()
+    if errors or not definition:
+        return render_template(
+            'admin/record_entry_form.html',
+            form_data=payload,
+            errors=errors,
+            form_action=url_for('admin.record_entries_update', entry_id=entry.id),
+            form_title=f"Edit Record Entry: {entry.definition.name}",
+            definitions=definitions,
+            players=players,
+            games=games,
+            allow_source_choice=True,
+            entry=entry,
+        )
+
+    entry.record_definition_id = definition.id
+    entry.holder_entity_type = definition.entity_type
+    entry.holder_player_id = (
+        int(payload["holder_player_id"]) if payload["holder_player_id"] and definition.entity_type == "PLAYER" else None
+    )
+    entry.holder_opponent_name = payload["holder_opponent_name"] or None
+    entry.value = float(payload["value"])
+    entry.scope = definition.scope
+    entry.season_year = (
+        int(payload["season_year"]) if payload["season_year"] and definition.scope == "SEASON" else None
+    )
+    entry.game_id = int(payload["game_id"]) if payload["game_id"] and definition.scope == "GAME" else None
+    entry.occurred_on = (
+        date.fromisoformat(payload["occurred_on"]) if payload["occurred_on"] and definition.scope == "GAME" else None
+    )
+    entry.source_type = payload["source_type"]
+    entry.notes = payload["notes"] or None
+    entry.is_current = bool(payload["is_current"])
+    entry.is_forced_current = bool(payload["is_forced_current"])
+    if entry.is_forced_current:
+        entry.is_current = True
+    db.session.commit()
+    flash("Record entry updated.", "success")
+    return redirect(url_for('admin.record_entries_list'))
+
+
+@admin_bp.post('/records/entries/<int:entry_id>/toggle-current')
+@admin_required
+def record_entries_toggle_current(entry_id: int):
+    entry = RecordEntry.query.get_or_404(entry_id)
+    entry.is_current = not entry.is_current
+    db.session.commit()
+    state = "current" if entry.is_current else "not current"
+    flash(f'Record entry set to {state}.', 'success')
+    return redirect(url_for('admin.record_entries_list'))
+
+
+@admin_bp.post('/records/entries/<int:entry_id>/toggle-forced')
+@admin_required
+def record_entries_toggle_forced(entry_id: int):
+    entry = RecordEntry.query.get_or_404(entry_id)
+    entry.is_forced_current = not entry.is_forced_current
+    if entry.is_forced_current:
+        entry.is_current = True
+    db.session.commit()
+    state = "forced current" if entry.is_forced_current else "not forced"
+    flash(f'Record entry set to {state}.', 'success')
+    return redirect(url_for('admin.record_entries_list'))
+
+
+@admin_bp.post('/records/entries/<int:entry_id>/deactivate')
+@admin_required
+def record_entries_toggle_active(entry_id: int):
+    entry = RecordEntry.query.get_or_404(entry_id)
+    entry.is_active = not entry.is_active
+    db.session.commit()
+    state = "activated" if entry.is_active else "deactivated"
+    flash(f"Record entry {state}.", "success")
+    return redirect(url_for('admin.record_entries_list'))
 
 
 @admin_bp.route('/users', methods=['GET'])
