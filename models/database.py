@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlalchemy.sql import func
 
 # Initialize SQLAlchemy
@@ -437,6 +437,56 @@ class PlayerDevelopmentPlan(db.Model):
     note_1 = db.Column(db.Text)
     note_2 = db.Column(db.Text)
     note_3 = db.Column(db.Text)
+
+
+class RecordDefinition(db.Model):
+    __tablename__ = 'record_definition'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(32), nullable=False)
+    entity_type = db.Column(db.String(16), nullable=False)
+    scope = db.Column(db.String(16), nullable=False)
+    stat_key = db.Column(db.String(64), nullable=False, index=True)
+    compare = db.Column(db.String(8), nullable=False, default="MAX")
+    qualifier_stat_key = db.Column(db.String(64), nullable=True)
+    qualifier_threshold_override = db.Column(db.Float, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    entries = db.relationship('RecordEntry', backref='definition', lazy=True)
+
+    __table_args__ = (
+        CheckConstraint("compare = 'MAX'", name='ck_record_definition_compare_max'),
+    )
+
+
+class RecordEntry(db.Model):
+    __tablename__ = 'record_entry'
+
+    id = db.Column(db.Integer, primary_key=True)
+    record_definition_id = db.Column(
+        db.Integer,
+        db.ForeignKey('record_definition.id'),
+        nullable=False,
+        index=True,
+    )
+    holder_entity_type = db.Column(db.String(16), nullable=False)
+    holder_player_id = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=True)
+    holder_opponent_name = db.Column(db.String(128), nullable=True)
+    value = db.Column(db.Float, nullable=False)
+    scope = db.Column(db.String(16), nullable=False)
+    season_year = db.Column(db.Integer, nullable=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True, index=True)
+    occurred_on = db.Column(db.Date, nullable=True)
+    source_type = db.Column(db.String(16), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    is_current = db.Column(db.Boolean, nullable=False, default=False)
+    is_forced_current = db.Column(db.Boolean, nullable=False, default=False)
+    auto_key = db.Column(db.String(128), nullable=True, unique=True)
+    created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class SavedStatProfile(db.Model):
