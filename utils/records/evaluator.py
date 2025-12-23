@@ -5,7 +5,7 @@ import logging
 from typing import Any, Dict, Iterable, List, Optional
 
 from models.database import RecordDefinition, RecordEntry, db
-from utils.records.stat_keys import DEFAULT_QUALIFIER_THRESHOLDS
+from utils.records.stat_keys import DEFAULT_QUALIFIER_THRESHOLDS, canonicalize_stat_key
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,8 @@ def get_threshold(definition: RecordDefinition) -> Optional[float]:
     if definition.qualifier_threshold_override is not None:
         return float(definition.qualifier_threshold_override)
     if definition.qualifier_stat_key:
-        default = DEFAULT_QUALIFIER_THRESHOLDS.get(definition.qualifier_stat_key)
+        canonical_key = canonicalize_stat_key(definition.qualifier_stat_key)
+        default = DEFAULT_QUALIFIER_THRESHOLDS.get(canonical_key)
         return float(default) if default is not None else None
     return None
 
@@ -104,7 +105,9 @@ def evaluate_candidates(game_id: int, candidates: Iterable[Dict[str, Any]]) -> L
     candidate_list = list(candidates)
     definitions = RecordDefinition.query.filter_by(scope="GAME", is_active=True).all()
     definitions_by_id = {definition.id: definition for definition in definitions}
-    definitions_by_stat = {definition.stat_key: definition for definition in definitions}
+    definitions_by_stat = {
+        canonicalize_stat_key(definition.stat_key): definition for definition in definitions
+    }
     touched_definition_ids = set()
     updated_entries: List[RecordEntry] = []
     auto_created = 0
@@ -123,7 +126,9 @@ def evaluate_candidates(game_id: int, candidates: Iterable[Dict[str, Any]]) -> L
         if definition_id is not None:
             definition = definitions_by_id.get(definition_id)
         if definition is None:
-            definition = definitions_by_stat.get(candidate.get("definition_stat_key"))
+            definition = definitions_by_stat.get(
+                canonicalize_stat_key(candidate.get("definition_stat_key", ""))
+            )
         if not definition:
             continue
         if not qualifies(definition, candidate["value"], candidate):

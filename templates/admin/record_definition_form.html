@@ -82,11 +82,11 @@
                 class="w-full border rounded px-3 py-2{% if errors.get('stat_key') %} border-red-400{% endif %}"
                 required>
           <option value="" disabled{% if not form_data.stat_key %} selected{% endif %}>Select a stat key</option>
-          {% for group in stat_key_groups %}
-            <optgroup label="{{ group.label }}">
-              {% for option in group.options %}
-                <option value="{{ option.value }}" {% if form_data.stat_key == option.value %}selected{% endif %}>
-                  {{ option.label }}
+          {% for group_name, options in stat_key_groups %}
+            <optgroup label="{{ group_name }}">
+              {% for key, label in options %}
+                <option value="{{ key }}" {% if form_data.stat_key == key %}selected{% endif %}>
+                  {{ label }}
                 </option>
               {% endfor %}
             </optgroup>
@@ -112,11 +112,11 @@
           <select name="qualifier_stat_key"
                   class="w-full border rounded px-3 py-2{% if errors.get('qualifier_stat_key') %} border-red-400{% endif %}">
             <option value="" {% if not form_data.qualifier_stat_key %}selected{% endif %}>None</option>
-            {% for group in stat_key_groups %}
-              <optgroup label="{{ group.label }}">
-                {% for option in group.options %}
-                  <option value="{{ option.value }}" {% if form_data.qualifier_stat_key == option.value %}selected{% endif %}>
-                    {{ option.label }}
+            {% for group_name, options in stat_key_groups %}
+              <optgroup label="{{ group_name }}">
+                {% for key, label in options %}
+                  <option value="{{ key }}" {% if form_data.qualifier_stat_key == key %}selected{% endif %}>
+                    {{ label }}
                   </option>
                 {% endfor %}
               </optgroup>

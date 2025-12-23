@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import or_
 
@@ -16,89 +16,96 @@ from models.database import (
     Roster,
     TeamStats,
 )
+from utils.records.stat_keys import canonicalize_stat_key
 
 
 logger = logging.getLogger(__name__)
-_WARNED_STAT_KEYS: set[str] = set()
+_WARNED_STAT_KEYS: set[tuple[str, str]] = set()
 
-TEAM_STAT_ATTRS = {
-    "team.points": "total_points",
-    "team.total_points": "total_points",
-    "team.assists": "total_assists",
-    "team.total_assists": "total_assists",
-    "team.turnovers": "total_turnovers",
-    "team.total_turnovers": "total_turnovers",
-    "team.fg2_makes": "total_fg2_makes",
-    "team.fg2_attempts": "total_fg2_attempts",
-    "team.fg3_makes": "total_fg3_makes",
-    "team.fg3_attempts": "total_fg3_attempts",
-    "team.ftm": "total_ftm",
-    "team.fta": "total_fta",
-    "team.possessions": "total_possessions",
-    "team.total_possessions": "total_possessions",
-    "team.blue_collar": "total_blue_collar",
+RowFilter = Callable[[Any], Any]
+StatMapping = Tuple[type, str, Optional[RowFilter]]
+
+
+def _team_stats_filter(query):
+    return query.filter(or_(TeamStats.is_opponent.is_(False), TeamStats.is_opponent.is_(None)))
+
+
+def _opponent_stats_filter(query):
+    return query.filter(TeamStats.is_opponent.is_(True))
+
+
+TEAM_STAT_MAP: Dict[str, StatMapping] = {
+    "team.total_points": (TeamStats, "total_points", _team_stats_filter),
+    "team.total_possessions": (TeamStats, "total_possessions", _team_stats_filter),
+    "team.total_assists": (TeamStats, "total_assists", _team_stats_filter),
+    "team.total_turnovers": (TeamStats, "total_turnovers", _team_stats_filter),
+    "team.total_atr_makes": (TeamStats, "total_atr_makes", _team_stats_filter),
+    "team.total_atr_attempts": (TeamStats, "total_atr_attempts", _team_stats_filter),
+    "team.total_fg2_makes": (TeamStats, "total_fg2_makes", _team_stats_filter),
+    "team.total_fg2_attempts": (TeamStats, "total_fg2_attempts", _team_stats_filter),
+    "team.total_fg3_makes": (TeamStats, "total_fg3_makes", _team_stats_filter),
+    "team.total_fg3_attempts": (TeamStats, "total_fg3_attempts", _team_stats_filter),
+    "team.total_ftm": (TeamStats, "total_ftm", _team_stats_filter),
+    "team.total_fta": (TeamStats, "total_fta", _team_stats_filter),
 }
 
-OPPONENT_STAT_ATTRS = {
-    "opponent.points": "total_points",
-    "opponent.assists": "total_assists",
-    "opponent.turnovers": "total_turnovers",
-    "opponent.fg2_makes": "total_fg2_makes",
-    "opponent.fg2_attempts": "total_fg2_attempts",
-    "opponent.fg3_makes": "total_fg3_makes",
-    "opponent.fg3_attempts": "total_fg3_attempts",
-    "opponent.ftm": "total_ftm",
-    "opponent.fta": "total_fta",
-    "opponent.possessions": "total_possessions",
-    "opp.points": "total_points",
-    "opp.assists": "total_assists",
-    "opp.turnovers": "total_turnovers",
-    "opp.fg2_makes": "total_fg2_makes",
-    "opp.fg2_attempts": "total_fg2_attempts",
-    "opp.fg3_makes": "total_fg3_makes",
-    "opp.fg3_attempts": "total_fg3_attempts",
-    "opp.ftm": "total_ftm",
-    "opp.fta": "total_fta",
-    "opp.possessions": "total_possessions",
+OPPONENT_STAT_MAP: Dict[str, StatMapping] = {
+    "opp.total_points": (TeamStats, "total_points", _opponent_stats_filter),
+    "opp.total_possessions": (TeamStats, "total_possessions", _opponent_stats_filter),
+    "opp.total_assists": (TeamStats, "total_assists", _opponent_stats_filter),
+    "opp.total_turnovers": (TeamStats, "total_turnovers", _opponent_stats_filter),
+    "opp.total_atr_makes": (TeamStats, "total_atr_makes", _opponent_stats_filter),
+    "opp.total_atr_attempts": (TeamStats, "total_atr_attempts", _opponent_stats_filter),
+    "opp.total_fg2_makes": (TeamStats, "total_fg2_makes", _opponent_stats_filter),
+    "opp.total_fg2_attempts": (TeamStats, "total_fg2_attempts", _opponent_stats_filter),
+    "opp.total_fg3_makes": (TeamStats, "total_fg3_makes", _opponent_stats_filter),
+    "opp.total_fg3_attempts": (TeamStats, "total_fg3_attempts", _opponent_stats_filter),
+    "opp.total_ftm": (TeamStats, "total_ftm", _opponent_stats_filter),
+    "opp.total_fta": (TeamStats, "total_fta", _opponent_stats_filter),
 }
 
-PLAYER_STAT_ATTRS = {
-    "player.points": "points",
-    "player.assists": "assists",
-    "player.turnovers": "turnovers",
-    "player.fg2_makes": "fg2_makes",
-    "player.fg2_attempts": "fg2_attempts",
-    "player.fg3_makes": "fg3_makes",
-    "player.fg3_attempts": "fg3_attempts",
-    "player.ftm": "ftm",
-    "player.fta": "fta",
+PLAYER_STAT_MAP: Dict[str, Tuple[type, str]] = {
+    "player.points": (PlayerStats, "points"),
+    "player.assists": (PlayerStats, "assists"),
+    "player.turnovers": (PlayerStats, "turnovers"),
+    "player.fg2_makes": (PlayerStats, "fg2_makes"),
+    "player.fg2_attempts": (PlayerStats, "fg2_attempts"),
+    "player.fg3_makes": (PlayerStats, "fg3_makes"),
+    "player.fg3_attempts": (PlayerStats, "fg3_attempts"),
+    "player.ftm": (PlayerStats, "ftm"),
+    "player.fta": (PlayerStats, "fta"),
 }
 
-BLUE_COLLAR_STAT_ATTRS = {
-    "blue_collar.total": "total_blue_collar",
-    "blue_collar.rebounds": None,
-    "blue_collar.deflections": "deflection",
-    "blue_collar.loose_balls": "floor_dive",
-    "blue_collar.charges": "charge_taken",
-    "bc.total": "total_blue_collar",
-    "bc.rebounds": None,
-    "bc.deflections": "deflection",
-    "bc.loose_balls": "floor_dive",
-    "bc.charges": "charge_taken",
+BLUE_COLLAR_MAP: Dict[str, Tuple[type, str]] = {
+    "bc.team.total_blue_collar": (BlueCollarStats, "total_blue_collar"),
+    "bc.player.total_blue_collar": (BlueCollarStats, "total_blue_collar"),
 }
 
 
-def _resolve_stat_attr(stat_key: str, mapping: Dict[str, Optional[str]]) -> Optional[str]:
-    attr = mapping.get(stat_key)
+def get_supported_stat_keys() -> set[str]:
+    return {
+        *TEAM_STAT_MAP.keys(),
+        *OPPONENT_STAT_MAP.keys(),
+        *PLAYER_STAT_MAP.keys(),
+        *BLUE_COLLAR_MAP.keys(),
+    }
+
+
+def get_missing_stat_keys(registry_keys: Iterable[str]) -> List[str]:
+    return sorted(set(registry_keys) - get_supported_stat_keys())
+
+
+def _resolve_stat_attr(stat_key: str, mapping: Dict[str, StatMapping]) -> Optional[str]:
+    entry = mapping.get(stat_key)
+    if not entry:
+        return None
+    _, attr, _ = entry
     if not attr:
-        if stat_key not in _WARNED_STAT_KEYS:
-            logger.warning("No stat mapping found for stat_key '%s'", stat_key)
-            _WARNED_STAT_KEYS.add(stat_key)
         return None
     return attr
 
 
-def _extract_value(stat_key: str, row: Any, mapping: Dict[str, Optional[str]]) -> Optional[float]:
+def _extract_value(stat_key: str, row: Any, mapping: Dict[str, StatMapping]) -> Optional[float]:
     attr = _resolve_stat_attr(stat_key, mapping)
     if not attr:
         return None
@@ -112,29 +119,30 @@ def _extract_value(stat_key: str, row: Any, mapping: Dict[str, Optional[str]]) -
 
 
 def _is_blue_collar(stat_key: str) -> bool:
-    return stat_key.startswith("blue_collar.") or stat_key.startswith("bc.")
+    return stat_key.startswith("bc.")
 
 
-def _select_mapping(entity_type: str, stat_key: str) -> Optional[Dict[str, Optional[str]]]:
+def _select_mapping(entity_type: str, stat_key: str) -> Optional[Dict[str, StatMapping]]:
     if _is_blue_collar(stat_key):
-        return BLUE_COLLAR_STAT_ATTRS
+        return {key: (model, attr, None) for key, (model, attr) in BLUE_COLLAR_MAP.items()}
     if entity_type == "TEAM":
-        return TEAM_STAT_ATTRS
+        return TEAM_STAT_MAP
     if entity_type == "OPPONENT":
-        return OPPONENT_STAT_ATTRS
+        return OPPONENT_STAT_MAP
     if entity_type == "PLAYER":
-        return PLAYER_STAT_ATTRS
+        return {key: (model, attr, None) for key, (model, attr) in PLAYER_STAT_MAP.items()}
     return None
 
 
 def _qualifier_value(
     definition: RecordDefinition,
     row: Any,
-    mapping: Dict[str, Optional[str]],
+    mapping: Dict[str, StatMapping],
+    qualifier_key: str,
 ) -> Optional[float]:
-    if not definition.qualifier_stat_key:
+    if not qualifier_key:
         return None
-    value = _extract_value(definition.qualifier_stat_key, row, mapping)
+    value = _extract_value(qualifier_key, row, mapping)
     if value is None:
         logger.warning(
             "Qualifier stat_key '%s' unresolved for definition %s",
@@ -148,26 +156,28 @@ def _build_candidate(
     *,
     definition: RecordDefinition,
     row: Any,
-    mapping: Dict[str, Optional[str]],
+    mapping: Dict[str, StatMapping],
     holder_entity_type: str,
     holder_player_id: Optional[int],
     holder_opponent_name: Optional[str],
     game_id: int,
     occurred_on: date,
+    stat_key: str,
+    qualifier_stat_key: str,
 ) -> Optional[Dict[str, Any]]:
-    value = _extract_value(definition.stat_key, row, mapping)
+    value = _extract_value(stat_key, row, mapping)
     if value is None:
         return None
 
     qualifier_value = None
-    if definition.qualifier_stat_key:
-        qualifier_value = _qualifier_value(definition, row, mapping)
+    if qualifier_stat_key:
+        qualifier_value = _qualifier_value(definition, row, mapping, qualifier_stat_key)
         if qualifier_value is None:
             return None
 
     return {
         "definition_id": definition.id,
-        "definition_stat_key": definition.stat_key,
+        "definition_stat_key": stat_key,
         "holder_entity_type": holder_entity_type,
         "holder_player_id": holder_player_id,
         "holder_opponent_name": holder_opponent_name,
@@ -219,18 +229,34 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
     candidates: List[Dict[str, Any]] = []
 
     for definition in definitions:
-        mapping = _select_mapping(definition.entity_type, definition.stat_key)
+        original_stat_key = definition.stat_key or ""
+        canonical_stat_key = canonicalize_stat_key(original_stat_key)
+        original_qualifier_key = definition.qualifier_stat_key or ""
+        canonical_qualifier_key = canonicalize_stat_key(original_qualifier_key)
+
+        mapping = _select_mapping(definition.entity_type, canonical_stat_key)
         if not mapping:
             logger.warning(
-                "No mapping for definition %s (entity_type=%s stat_key=%s)",
+                "No mapping for definition %s (entity_type=%s stat_key=%s canonical=%s)",
                 definition.id,
                 definition.entity_type,
-                definition.stat_key,
+                original_stat_key,
+                canonical_stat_key,
             )
+            continue
+        if canonical_stat_key not in mapping:
+            warning_key = (original_stat_key, canonical_stat_key)
+            if warning_key not in _WARNED_STAT_KEYS:
+                logger.warning(
+                    "No stat mapping found for stat_key '%s' (canonical '%s')",
+                    original_stat_key,
+                    canonical_stat_key,
+                )
+                _WARNED_STAT_KEYS.add(warning_key)
             continue
 
         if definition.entity_type == "TEAM":
-            row = blue_collar_team if _is_blue_collar(definition.stat_key) else team_stats
+            row = blue_collar_team if _is_blue_collar(canonical_stat_key) else team_stats
             if not row:
                 logger.warning("Missing team stats row for game %s", game_id)
                 continue
@@ -243,6 +269,8 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
                 holder_opponent_name=None,
                 game_id=game_id,
                 occurred_on=occurred_on,
+                stat_key=canonical_stat_key,
+                qualifier_stat_key=canonical_qualifier_key,
             )
             if candidate:
                 candidates.append(candidate)
@@ -250,7 +278,7 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
         elif definition.entity_type == "OPPONENT":
             row = (
                 opp_blue_collar_team
-                if _is_blue_collar(definition.stat_key)
+                if _is_blue_collar(canonical_stat_key)
                 else opponent_stats
             )
             if not row:
@@ -265,12 +293,14 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
                 holder_opponent_name=game.opponent_name,
                 game_id=game_id,
                 occurred_on=occurred_on,
+                stat_key=canonical_stat_key,
+                qualifier_stat_key=canonical_qualifier_key,
             )
             if candidate:
                 candidates.append(candidate)
 
         elif definition.entity_type == "PLAYER":
-            if _is_blue_collar(definition.stat_key):
+            if _is_blue_collar(canonical_stat_key):
                 for row in blue_collar_players:
                     if not row.player_id:
                         continue
@@ -283,6 +313,8 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
                         holder_opponent_name=None,
                         game_id=game_id,
                         occurred_on=occurred_on,
+                        stat_key=canonical_stat_key,
+                        qualifier_stat_key=canonical_qualifier_key,
                     )
                     if candidate:
                         candidates.append(candidate)
@@ -306,6 +338,8 @@ def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
                         holder_opponent_name=None,
                         game_id=game_id,
                         occurred_on=occurred_on,
+                        stat_key=canonical_stat_key,
+                        qualifier_stat_key=canonical_qualifier_key,
                     )
                     if candidate:
                         candidates.append(candidate)
