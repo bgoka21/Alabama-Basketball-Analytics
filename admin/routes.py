@@ -5387,6 +5387,7 @@ def _record_entry_form_payload(entry: RecordEntry | None = None) -> dict[str, An
             "value": "",
             "source_type": "MANUAL",
             "holder_player_id": "",
+            "holder_player_name": "",
             "holder_opponent_name": "",
             "season_year": "",
             "game_id": "",
@@ -5401,6 +5402,7 @@ def _record_entry_form_payload(entry: RecordEntry | None = None) -> dict[str, An
         "value": entry.value,
         "source_type": entry.source_type,
         "holder_player_id": entry.holder_player_id or "",
+        "holder_player_name": entry.holder_player_name or "",
         "holder_opponent_name": entry.holder_opponent_name or "",
         "season_year": entry.season_year or "",
         "game_id": entry.game_id or "",
@@ -5462,6 +5464,7 @@ def _validate_record_entry_form(
 
     holder_player_raw = (form.get("holder_player_id") or "").strip()
     holder_player_id = _parse_optional_int(holder_player_raw, errors, "holder_player_id")
+    holder_player_name = (form.get("holder_player_name") or "").strip()
     holder_opponent_name = (form.get("holder_opponent_name") or "").strip()
 
     game_raw = (form.get("game_id") or "").strip()
@@ -5483,8 +5486,10 @@ def _validate_record_entry_form(
 
     if definition:
         if definition.entity_type == "PLAYER":
-            if not holder_player_id and "holder_player_id" not in errors:
-                errors["holder_player_id"] = "Select a player."
+            if not holder_player_id and not holder_player_name:
+                if "holder_player_id" not in errors:
+                    errors["holder_player_id"] = "Select a player or enter a name."
+                errors.setdefault("holder_player_name", "Enter a player name or select one.")
         if definition.entity_type == "OPPONENT":
             if not holder_opponent_name and not game:
                 errors["holder_opponent_name"] = "Opponent name is required."
@@ -5507,6 +5512,7 @@ def _validate_record_entry_form(
         "value": value_raw,
         "source_type": source_type,
         "holder_player_id": holder_player_raw,
+        "holder_player_name": holder_player_name,
         "holder_opponent_name": holder_opponent_name,
         "season_year": season_year_raw,
         "game_id": game_raw,
@@ -5622,6 +5628,9 @@ def record_entries_create():
         holder_player_id=(
             int(payload["holder_player_id"]) if payload["holder_player_id"] and definition.entity_type == "PLAYER" else None
         ),
+        holder_player_name=(
+            payload["holder_player_name"] or None if definition.entity_type == "PLAYER" else None
+        ),
         holder_opponent_name=payload["holder_opponent_name"] or None,
         value=float(payload["value"]),
         scope=definition.scope,
@@ -5691,6 +5700,9 @@ def record_entries_update(entry_id: int):
     entry.holder_entity_type = definition.entity_type
     entry.holder_player_id = (
         int(payload["holder_player_id"]) if payload["holder_player_id"] and definition.entity_type == "PLAYER" else None
+    )
+    entry.holder_player_name = (
+        payload["holder_player_name"] or None if definition.entity_type == "PLAYER" else None
     )
     entry.holder_opponent_name = payload["holder_opponent_name"] or None
     entry.value = float(payload["value"])

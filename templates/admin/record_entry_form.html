@@ -67,19 +67,34 @@
 
     <div id="player-section" class="hidden">
       <label class="block mb-1 font-medium">Player Holder</label>
-      <select name="holder_player_id"
-              class="w-full border rounded px-3 py-2{% if errors.get('holder_player_id') %} border-red-400{% endif %}">
-        <option value="">Select a player</option>
-        {% set selected_player_id = form_data.holder_player_id | string %}
-        {% for player in players %}
-          <option value="{{ player.id }}" {% if selected_player_id == player.id | string %}selected{% endif %}>
-            {{ player.player_name }}
-          </option>
-        {% endfor %}
-      </select>
-      {% if errors.get('holder_player_id') %}
-        <p class="text-sm text-red-600 mt-1">{{ errors.get('holder_player_id') }}</p>
-      {% endif %}
+      {% set manual_player_checked = (form_data.holder_player_name or errors.get('holder_player_name')) and not form_data.holder_player_id %}
+      <div id="player-select-wrapper" {% if manual_player_checked %}class="hidden"{% endif %}>
+        <select id="holder_player_id" name="holder_player_id"
+                class="w-full border rounded px-3 py-2{% if errors.get('holder_player_id') %} border-red-400{% endif %}">
+          <option value="">Select a player</option>
+          {% set selected_player_id = form_data.holder_player_id | string %}
+          {% for player in players %}
+            <option value="{{ player.id }}" {% if selected_player_id == player.id | string %}selected{% endif %}>
+              {{ player.player_name }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.get('holder_player_id') %}
+          <p class="text-sm text-red-600 mt-1">{{ errors.get('holder_player_id') }}</p>
+        {% endif %}
+      </div>
+      <div class="mt-2 flex items-center gap-2 text-sm text-gray-600">
+        <input id="player-manual-toggle" type="checkbox" class="h-4 w-4" {% if manual_player_checked %}checked{% endif %}>
+        <label for="player-manual-toggle">Player not in roster</label>
+      </div>
+      <div id="player-manual-section" class="mt-3{% if not manual_player_checked %} hidden{% endif %}">
+        <label class="block mb-1 text-sm font-medium text-gray-700">Player Name (manual)</label>
+        <input id="holder_player_name" name="holder_player_name" type="text" value="{{ form_data.holder_player_name }}"
+               class="w-full border rounded px-3 py-2{% if errors.get('holder_player_name') %} border-red-400{% endif %}">
+        {% if errors.get('holder_player_name') %}
+          <p class="text-sm text-red-600 mt-1">{{ errors.get('holder_player_name') }}</p>
+        {% endif %}
+      </div>
     </div>
 
     <div id="opponent-section" class="hidden">
@@ -159,6 +174,10 @@
   const definitionScope = document.getElementById('definition-scope');
   const definitionEntity = document.getElementById('definition-entity');
   const playerSection = document.getElementById('player-section');
+  const playerManualToggle = document.getElementById('player-manual-toggle');
+  const playerSelect = document.getElementById('holder_player_id');
+  const playerSelectWrapper = document.getElementById('player-select-wrapper');
+  const playerManualSection = document.getElementById('player-manual-section');
   const opponentSection = document.getElementById('opponent-section');
   const opponentLabel = document.getElementById('opponent-label');
   const opponentHelp = document.getElementById('opponent-help');
@@ -167,6 +186,20 @@
   const seasonSection = document.getElementById('season-section');
   const gameSelect = document.getElementById('game_id');
   const opponentNameInput = document.getElementById('holder_opponent_name');
+
+  function updatePlayerManualState() {
+    if (!playerManualToggle) return;
+    const manualEnabled = playerManualToggle.checked;
+    if (playerSelect) {
+      playerSelect.disabled = manualEnabled;
+    }
+    if (playerSelectWrapper) {
+      playerSelectWrapper.classList.toggle('hidden', manualEnabled);
+    }
+    if (playerManualSection) {
+      playerManualSection.classList.toggle('hidden', !manualEnabled);
+    }
+  }
 
   function updateDefinitionDetails() {
     const selectedOption = definitionSelect.options[definitionSelect.selectedIndex];
@@ -199,6 +232,8 @@
         opponentHelp.textContent = '';
       }
     }
+
+    updatePlayerManualState();
   }
 
   function maybeFillOpponent() {
@@ -221,6 +256,11 @@
       maybeFillOpponent();
     });
     updateDefinitionDetails();
+  }
+
+  if (playerManualToggle) {
+    playerManualToggle.addEventListener('change', updatePlayerManualState);
+    updatePlayerManualState();
   }
 
   if (gameSelect) {
