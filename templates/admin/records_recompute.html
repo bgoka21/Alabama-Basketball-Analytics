@@ -1,0 +1,172 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+  <div class="flex items-start justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Recompute Game Records</h1>
+      <p class="text-sm text-gray-600">Backfill auto record entries for a date range of games.</p>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('admin.records_recompute') }}" class="space-y-6">
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="block text-sm font-semibold text-gray-700" for="start_date">Start date</label>
+        <input
+          class="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          type="date"
+          id="start_date"
+          name="start_date"
+          value="{{ form_data.start_date }}"
+          required
+        />
+        {% if errors.start_date %}
+          <p class="mt-1 text-sm text-red-600">{{ errors.start_date }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700" for="end_date">End date</label>
+        <input
+          class="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          type="date"
+          id="end_date"
+          name="end_date"
+          value="{{ form_data.end_date }}"
+          required
+        />
+        {% if errors.end_date %}
+          <p class="mt-1 text-sm text-red-600">{{ errors.end_date }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700" for="limit_games">Limit games</label>
+        <input
+          class="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          type="number"
+          min="1"
+          id="limit_games"
+          name="limit_games"
+          value="{{ form_data.limit_games }}"
+          placeholder="Optional"
+        />
+        {% if errors.limit_games %}
+          <p class="mt-1 text-sm text-red-600">{{ errors.limit_games }}</p>
+        {% endif %}
+      </div>
+      <div class="space-y-2">
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <input
+            type="checkbox"
+            name="include_inactive_definitions"
+            {% if form_data.include_inactive_definitions %}checked{% endif %}
+          />
+          Include inactive definitions
+        </label>
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <input type="checkbox" name="dry_run" {% if form_data.dry_run %}checked{% endif %} />
+          Dry run (no database writes)
+        </label>
+      </div>
+    </div>
+
+    <button type="submit" class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
+      Run recompute
+    </button>
+  </form>
+
+  {% if results %}
+    <div class="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-6">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Results summary</h2>
+        <p class="text-sm text-gray-600">
+          Date range: {{ results.start_date }} to {{ results.end_date }}
+        </p>
+        <p class="text-sm text-gray-600">
+          Games found: {{ results.games_found }} · Games processed: {{ results.games_processed }}
+        </p>
+        <p class="text-sm text-gray-600">
+          Dry run: {{ "Yes" if results.dry_run else "No" }}
+          {% if results.include_inactive_definitions %}
+            · Included inactive definitions
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="rounded border border-gray-200 p-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Totals</h3>
+          <ul class="space-y-1 text-sm text-gray-600">
+            <li>Definitions evaluated: {{ results.totals.total_definitions_evaluated }}</li>
+            <li>Candidates built: {{ results.totals.total_candidates_built }}</li>
+            <li>Auto entries created: {{ results.totals.total_auto_entries_created }}</li>
+            <li>Auto entries updated: {{ results.totals.total_auto_entries_updated }}</li>
+            <li>Definitions with current changes: {{ results.totals.total_definitions_with_current_changes }}</li>
+          </ul>
+        </div>
+        <div class="rounded border border-gray-200 p-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">
+            Failures ({{ results.failures | length }})
+          </h3>
+          {% if results.failures %}
+            <ul class="space-y-2 text-sm text-red-600">
+              {% for failure in results.failures %}
+                <li>
+                  Game {{ failure.game_id }} vs {{ failure.opponent_name or "Unknown" }}:
+                  {{ failure.error }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-sm text-gray-600">No failures.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <details class="rounded border border-gray-200">
+        <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-700">
+          Per-game details
+        </summary>
+        <div class="overflow-x-auto px-4 pb-4">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-gray-700">
+                <th class="px-3 py-2 font-semibold">Game date</th>
+                <th class="px-3 py-2 font-semibold">Opponent</th>
+                <th class="px-3 py-2 font-semibold">Candidates</th>
+                <th class="px-3 py-2 font-semibold">Created</th>
+                <th class="px-3 py-2 font-semibold">Updated</th>
+                <th class="px-3 py-2 font-semibold">Changed definitions</th>
+                <th class="px-3 py-2 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              {% for game in results.per_game %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-3 py-2">{{ game.game_date or "—" }}</td>
+                  <td class="px-3 py-2">{{ game.opponent_name or "Unknown" }}</td>
+                  <td class="px-3 py-2">{{ game.candidates_built }}</td>
+                  <td class="px-3 py-2">{{ game.created }}</td>
+                  <td class="px-3 py-2">{{ game.updated }}</td>
+                  <td class="px-3 py-2">{{ game.changed_definitions }}</td>
+                  <td class="px-3 py-2">
+                    {% if game.status == "OK" %}
+                      <span class="text-green-700 font-semibold">OK</span>
+                    {% else %}
+                      <span class="text-red-700 font-semibold">FAILED</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="7" class="px-3 py-4 text-center text-gray-500">
+                    No games processed.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  {% endif %}
+{% endblock %}
