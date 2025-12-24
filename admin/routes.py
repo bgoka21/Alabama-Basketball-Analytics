@@ -5220,6 +5220,9 @@ def _validate_record_definition_form(form: Mapping[str, str]) -> tuple[dict[str,
             qualifier_threshold_override = float(qualifier_threshold_raw)
         except ValueError:
             errors["qualifier_threshold_override"] = "Enter a valid number."
+    if canonical_qualifier_key and qualifier_threshold_override is not None:
+        if qualifier_threshold_override < 0:
+            errors["qualifier_threshold_override"] = "Override must be 0 or greater."
 
     payload = {
         "name": name,

@@ -1,4 +1,4 @@
-"""Registry of record stat keys and qualification defaults."""
+"""Registry of record stat keys."""
 
 from __future__ import annotations
 
@@ -122,17 +122,3 @@ def get_label_for_key(key: str) -> str:
             if entry["key"] == canonical_key:
                 return entry["label"]
     return key
-
-
-DEFAULT_QUALIFIER_THRESHOLDS = {
-    "team.total_possessions": 50,
-    "opp.total_possessions": 50,
-    "team.possessions": 50,
-    "opponent.possessions": 50,
-    "team.fga": 30,
-    "team.3pa": 10,
-    "team.fta": 10,
-    "player.fga": 10,
-    "player.3pa": 5,
-    "player.fta": 5,
-}

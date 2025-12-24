@@ -5,38 +5,10 @@ import logging
 from typing import Any, Dict, Iterable, List, Optional
 
 from models.database import RecordDefinition, RecordEntry, db
-from utils.records.stat_keys import DEFAULT_QUALIFIER_THRESHOLDS, canonicalize_stat_key
+from utils.records.qualifications import qualifies
+from utils.records.stat_keys import canonicalize_stat_key
 
 logger = logging.getLogger(__name__)
-
-def get_threshold(definition: RecordDefinition) -> Optional[float]:
-    """Return the qualifier threshold for a definition (override > default > None)."""
-    if definition.qualifier_threshold_override is not None:
-        return float(definition.qualifier_threshold_override)
-    if definition.qualifier_stat_key:
-        canonical_key = canonicalize_stat_key(definition.qualifier_stat_key)
-        default = DEFAULT_QUALIFIER_THRESHOLDS.get(canonical_key)
-        return float(default) if default is not None else None
-    return None
-
-
-def qualifies(
-    definition: RecordDefinition,
-    candidate_value: float,
-    candidate_context: Dict[str, Any],
-) -> bool:
-    """Return True if a candidate meets the qualifier rules for a definition."""
-    if not definition.qualifier_stat_key:
-        return True
-
-    qualifier_value = candidate_context.get("qualifier_value")
-    threshold = get_threshold(definition)
-
-    if qualifier_value is None:
-        return False
-    if threshold is None:
-        return True
-    return qualifier_value >= threshold
 
 
 def _build_auto_key(definition: RecordDefinition, candidate: Dict[str, Any]) -> str:
@@ -121,6 +93,7 @@ def evaluate_candidates(
     definitions_by_stat = {
         canonicalize_stat_key(definition.stat_key): definition for definition in definitions
     }
+    candidates_by_definition: Dict[int, List[Dict[str, Any]]] = {definition.id: [] for definition in definitions}
     touched_definition_ids = set()
     updated_entries: List[RecordEntry] = []
     auto_created = 0
@@ -144,15 +117,41 @@ def evaluate_candidates(
             )
         if not definition:
             continue
-        if not qualifies(definition, candidate["value"], candidate):
+        candidates_by_definition.setdefault(definition.id, []).append(candidate)
+
+    for definition in definitions:
+        definition_candidates = candidates_by_definition.get(definition.id, [])
+        if not definition_candidates:
             continue
-        entry, was_created = upsert_auto_entry(definition, candidate)
-        touched_definition_ids.add(definition.id)
-        updated_entries.append(entry)
-        if was_created:
-            auto_created += 1
+        filtered_out = 0
+        qualified_candidates: List[Dict[str, Any]] = []
+        if definition.qualifier_stat_key:
+            for candidate in definition_candidates:
+                if qualifies(definition, candidate.get("qualifier_value")):
+                    qualified_candidates.append(candidate)
+                else:
+                    filtered_out += 1
+            if filtered_out:
+                logger.debug(
+                    "Filtered %s candidates for definition %s (%s) due to qualification",
+                    filtered_out,
+                    definition.id,
+                    definition.name,
+                )
         else:
-            auto_updated += 1
+            qualified_candidates = definition_candidates
+
+        if not qualified_candidates:
+            continue
+
+        for candidate in qualified_candidates:
+            entry, was_created = upsert_auto_entry(definition, candidate)
+            touched_definition_ids.add(definition.id)
+            updated_entries.append(entry)
+            if was_created:
+                auto_created += 1
+            else:
+                auto_updated += 1
 
     logger.info(
         "Auto record entries created=%s updated=%s for game %s",
