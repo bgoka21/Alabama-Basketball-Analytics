@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import or_
@@ -76,9 +77,28 @@ PLAYER_STAT_MAP: Dict[str, Tuple[type, str]] = {
     "player.fta": (PlayerStats, "fta"),
 }
 
+BLUE_COLLAR_COLUMNS = (
+    "def_reb",
+    "off_reb",
+    "misc",
+    "deflection",
+    "steal",
+    "block",
+    "floor_dive",
+    "charge_taken",
+    "reb_tip",
+    "total_blue_collar",
+)
+
 BLUE_COLLAR_MAP: Dict[str, Tuple[type, str]] = {
-    "bc.team.total_blue_collar": (BlueCollarStats, "total_blue_collar"),
-    "bc.player.total_blue_collar": (BlueCollarStats, "total_blue_collar"),
+    **{
+        f"bc.team.{column}": (BlueCollarStats, column)
+        for column in BLUE_COLLAR_COLUMNS
+    },
+    **{
+        f"bc.player.{column}": (BlueCollarStats, column)
+        for column in BLUE_COLLAR_COLUMNS
+    },
 }
 
 
@@ -192,6 +212,22 @@ def _roster_name_lookup(game: Game) -> Dict[str, int]:
     return {player.player_name.strip().lower(): player.id for player in roster_entries}
 
 
+def _blue_collar_team_row(
+    team_row: Optional[BlueCollarStats],
+    player_rows: Iterable[BlueCollarStats],
+) -> Optional[Any]:
+    if team_row:
+        return team_row
+    player_rows = list(player_rows)
+    if not player_rows:
+        return None
+    totals = {
+        column: sum(getattr(row, column) or 0 for row in player_rows)
+        for column in BLUE_COLLAR_COLUMNS
+    }
+    return SimpleNamespace(**totals)
+
+
 def build_game_candidates(
     game_id: int,
     *,
@@ -230,6 +266,7 @@ def build_game_candidates(
         BlueCollarStats.game_id == game_id,
         BlueCollarStats.player_id.isnot(None),
     ).all()
+    blue_collar_team_row = _blue_collar_team_row(blue_collar_team, blue_collar_players)
 
     opp_blue_collar_team = OpponentBlueCollarStats.query.filter_by(
         game_id=game_id,
@@ -266,10 +303,16 @@ def build_game_candidates(
             continue
 
         if definition.entity_type == "TEAM":
-            row = blue_collar_team if _is_blue_collar(canonical_stat_key) else team_stats
-            if not row:
-                logger.warning("Missing team stats row for game %s", game_id)
-                continue
+            if _is_blue_collar(canonical_stat_key):
+                row = blue_collar_team_row
+                if not row:
+                    logger.warning("Missing blue collar team stats for game %s", game_id)
+                    continue
+            else:
+                row = team_stats
+                if not row:
+                    logger.warning("Missing team stats row for game %s", game_id)
+                    continue
             candidate = _build_candidate(
                 definition=definition,
                 row=row,
