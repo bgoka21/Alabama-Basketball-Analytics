@@ -143,12 +143,6 @@ def _qualifier_value(
     if not qualifier_key:
         return None
     value = _extract_value(qualifier_key, row, mapping)
-    if value is None:
-        logger.warning(
-            "Qualifier stat_key '%s' unresolved for definition %s",
-            definition.qualifier_stat_key,
-            definition.id,
-        )
     return value
 
 
@@ -173,6 +167,11 @@ def _build_candidate(
     if qualifier_stat_key:
         qualifier_value = _qualifier_value(definition, row, mapping, qualifier_stat_key)
         if qualifier_value is None:
+            logger.debug(
+                "Skipping candidate for definition %s: qualifier stat '%s' missing",
+                definition.id,
+                qualifier_stat_key,
+            )
             return None
 
     return {

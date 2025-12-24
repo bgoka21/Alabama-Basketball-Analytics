@@ -41,7 +41,8 @@ from public.routes import game_homepage, season_leaderboard
 from admin.routes import player_detail
 from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 from app.utils.table_cells import num, pct
-from utils.records.evaluator import get_threshold
+from utils.records.qualifications import get_threshold
+from utils.records.stat_keys import get_label_for_key
 # BEGIN Advanced Possession
 from services.reports.advanced_possession import (
     cache_get_or_compute_adv_poss_game,
@@ -366,12 +367,12 @@ def _load_record_book(category: str, scope: str) -> dict[str, object]:
             for entry in history_entries
         ]
 
-        qualifier_threshold = get_threshold(definition)
         qualifier_tooltip = None
-        if definition.qualifier_stat_key and qualifier_threshold is not None:
-            qualifier_tooltip = (
-                f"Qualified when {definition.qualifier_stat_key} ≥ {qualifier_threshold:g}"
-            )
+        if definition.qualifier_stat_key:
+            qualifier_threshold = get_threshold(definition)
+            qualifier_label = get_label_for_key(definition.qualifier_stat_key)
+            threshold_text = "N/A" if qualifier_threshold is None else f"{qualifier_threshold:g}"
+            qualifier_tooltip = f"Min: {threshold_text} ({qualifier_label})"
 
         sections[0]["definitions"].append(
             {
