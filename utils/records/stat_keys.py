@@ -42,11 +42,29 @@ STAT_KEY_GROUPS = {
         {"key": "player.ftm", "label": "FT Made"},
         {"key": "player.fta", "label": "FT Attempted"},
     ],
-    "Blue Collar — Team": [
-        {"key": "bc.team.total_blue_collar", "label": "Team Blue Collar Total"},
+    "Blue Collar — Team (Game)": [
+        {"key": "bc.team.def_reb", "label": "Defensive Rebounds"},
+        {"key": "bc.team.off_reb", "label": "Offensive Rebounds"},
+        {"key": "bc.team.misc", "label": "Misc"},
+        {"key": "bc.team.deflection", "label": "Deflections"},
+        {"key": "bc.team.steal", "label": "Steals"},
+        {"key": "bc.team.block", "label": "Blocks"},
+        {"key": "bc.team.floor_dive", "label": "Floor Dives"},
+        {"key": "bc.team.charge_taken", "label": "Charges Taken"},
+        {"key": "bc.team.reb_tip", "label": "Rebound Tips"},
+        {"key": "bc.team.total_blue_collar", "label": "Blue Collar Total"},
     ],
-    "Blue Collar — Player": [
-        {"key": "bc.player.total_blue_collar", "label": "Player Blue Collar Total"},
+    "Blue Collar — Player (Game)": [
+        {"key": "bc.player.def_reb", "label": "Defensive Rebounds"},
+        {"key": "bc.player.off_reb", "label": "Offensive Rebounds"},
+        {"key": "bc.player.misc", "label": "Misc"},
+        {"key": "bc.player.deflection", "label": "Deflections"},
+        {"key": "bc.player.steal", "label": "Steals"},
+        {"key": "bc.player.block", "label": "Blocks"},
+        {"key": "bc.player.floor_dive", "label": "Floor Dives"},
+        {"key": "bc.player.charge_taken", "label": "Charges Taken"},
+        {"key": "bc.player.reb_tip", "label": "Rebound Tips"},
+        {"key": "bc.player.total_blue_collar", "label": "Blue Collar Total"},
     ],
 }
 

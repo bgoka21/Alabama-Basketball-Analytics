@@ -6,10 +6,18 @@
       <h1 class="text-2xl font-bold">Record Definitions</h1>
       <p class="text-sm text-gray-600">Definitions must exist before any record entries can be added.</p>
     </div>
-    <a href="{{ url_for('admin.record_definitions_new') }}"
-       class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
-      New Definition
-    </a>
+    <div class="flex items-center gap-3">
+      <form method="POST" action="{{ url_for('admin.record_definitions_seed_blue_collar') }}">
+        <button type="submit"
+                class="px-4 py-2 bg-gray-100 text-gray-800 rounded border border-gray-300 hover:bg-gray-200">
+          Seed Blue Collar Records
+        </button>
+      </form>
+      <a href="{{ url_for('admin.record_definitions_new') }}"
+         class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
+        New Definition
+      </a>
+    </div>
   </div>
 
   <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">

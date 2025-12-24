@@ -5263,6 +5263,82 @@ def record_definitions_list():
     )
 
 
+@admin_bp.post('/records/seed-blue-collar')
+@admin_required
+def record_definitions_seed_blue_collar():
+    blue_collar_columns = [
+        "def_reb",
+        "off_reb",
+        "misc",
+        "deflection",
+        "steal",
+        "block",
+        "floor_dive",
+        "charge_taken",
+        "reb_tip",
+        "total_blue_collar",
+    ]
+    definitions_to_seed = []
+    for column in blue_collar_columns:
+        team_key = f"bc.team.{column}"
+        player_key = f"bc.player.{column}"
+        team_label = get_label_for_key(team_key)
+        player_label = get_label_for_key(player_key)
+        definitions_to_seed.append(
+            {
+                "name": f"Most Team {team_label} (Game)",
+                "stat_key": team_key,
+                "entity_type": "TEAM",
+            }
+        )
+        definitions_to_seed.append(
+            {
+                "name": f"Most {player_label} (Player, Game)",
+                "stat_key": player_key,
+                "entity_type": "PLAYER",
+            }
+        )
+
+    stat_keys = [definition["stat_key"] for definition in definitions_to_seed]
+    existing_definitions = RecordDefinition.query.filter(
+        RecordDefinition.scope == "GAME",
+        RecordDefinition.stat_key.in_(stat_keys),
+        RecordDefinition.entity_type.in_(["TEAM", "PLAYER"]),
+    ).all()
+    existing_keys = {
+        (definition.stat_key, definition.scope, definition.entity_type)
+        for definition in existing_definitions
+    }
+
+    created = 0
+    skipped = 0
+    for definition in definitions_to_seed:
+        identity = (definition["stat_key"], "GAME", definition["entity_type"])
+        if identity in existing_keys:
+            skipped += 1
+            continue
+        db.session.add(
+            RecordDefinition(
+                name=definition["name"],
+                category="blue_collar",
+                entity_type=definition["entity_type"],
+                scope="GAME",
+                stat_key=definition["stat_key"],
+                compare="MAX",
+                is_active=True,
+            )
+        )
+        created += 1
+
+    if created:
+        db.session.commit()
+    flash(
+        f"Blue collar record definitions seeded. Created {created}, skipped {skipped}.",
+        "success",
+    )
+    return redirect(url_for('admin.record_definitions_list'))
+
+
 @admin_bp.get('/records/definitions/new')
 @admin_required
 def record_definitions_new():
