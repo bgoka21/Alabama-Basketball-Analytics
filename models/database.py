@@ -475,6 +475,7 @@ class RecordEntry(db.Model):
     )
     holder_entity_type = db.Column(db.String(16), nullable=False)
     holder_player_id = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=True)
+    holder_player_name = db.Column(db.String(128), nullable=True)
     holder_opponent_name = db.Column(db.String(128), nullable=True)
     value = db.Column(db.Float, nullable=False)
     scope = db.Column(db.String(16), nullable=False)

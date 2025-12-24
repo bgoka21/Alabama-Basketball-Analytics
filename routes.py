@@ -246,7 +246,7 @@ def _build_record_entry_payload(
 ) -> dict[str, object]:
     game = game_lookup.get(entry.game_id) if entry.game_id else None
     if entry.holder_entity_type == "PLAYER":
-        holder = roster_lookup.get(entry.holder_player_id, "Unknown Player")
+        holder = roster_lookup.get(entry.holder_player_id) or entry.holder_player_name or "—"
     elif entry.holder_entity_type == "OPPONENT":
         holder = entry.holder_opponent_name or (game.opponent_name if game else "Unknown Opponent")
     else:

@@ -95,7 +95,7 @@
           <td class="px-4 py-3">{{ entry.scope }}</td>
           <td class="px-4 py-3">
             {% if entry.holder_entity_type == 'PLAYER' %}
-              {{ roster_lookup.get(entry.holder_player_id, 'Unknown Player') }}
+              {{ roster_lookup.get(entry.holder_player_id) or entry.holder_player_name or '—' }}
             {% elif entry.holder_entity_type == 'OPPONENT' %}
               {{ entry.holder_opponent_name or (game_lookup.get(entry.game_id).opponent_name if game_lookup.get(entry.game_id) else 'Unknown Opponent') }}
             {% else %}
