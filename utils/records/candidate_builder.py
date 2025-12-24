@@ -193,14 +193,25 @@ def _roster_name_lookup(game: Game) -> Dict[str, int]:
     return {player.player_name.strip().lower(): player.id for player in roster_entries}
 
 
-def build_game_candidates(game_id: int) -> List[Dict[str, Any]]:
+def build_game_candidates(
+    game_id: int,
+    *,
+    include_inactive: bool = False,
+    scope: str = "GAME",
+    definitions: Optional[Iterable[RecordDefinition]] = None,
+) -> List[Dict[str, Any]]:
     """Build record candidates for a game using stored aggregate rows."""
     game = Game.query.get(game_id)
     if not game:
         logger.warning("Game %s not found; skipping candidate build", game_id)
         return []
 
-    definitions = RecordDefinition.query.filter_by(scope="GAME", is_active=True).all()
+    if definitions is None:
+        definition_query = RecordDefinition.query.filter_by(scope=scope)
+        if not include_inactive:
+            definition_query = definition_query.filter_by(is_active=True)
+        definitions = definition_query.all()
+    definitions = list(definitions)
     occurred_on = game.game_date or date.today()
 
     team_stats = (

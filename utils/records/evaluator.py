@@ -97,13 +97,26 @@ def upsert_auto_entry(
     return entry, was_created
 
 
-def evaluate_candidates(game_id: int, candidates: Iterable[Dict[str, Any]]) -> List[RecordEntry]:
+def evaluate_candidates(
+    game_id: int,
+    candidates: Iterable[Dict[str, Any]],
+    *,
+    scope: str = "GAME",
+    include_inactive: bool = False,
+    definitions: Optional[Iterable[RecordDefinition]] = None,
+    stats: Optional[Dict[str, int]] = None,
+) -> List[RecordEntry]:
     """Evaluate candidates, upsert AUTO entries, and update current flags.
 
     Forced current entries are respected and never demoted automatically.
     """
     candidate_list = list(candidates)
-    definitions = RecordDefinition.query.filter_by(scope="GAME", is_active=True).all()
+    if definitions is None:
+        definition_query = RecordDefinition.query.filter_by(scope=scope)
+        if not include_inactive:
+            definition_query = definition_query.filter_by(is_active=True)
+        definitions = definition_query.all()
+    definitions = list(definitions)
     definitions_by_id = {definition.id: definition for definition in definitions}
     definitions_by_stat = {
         canonicalize_stat_key(definition.stat_key): definition for definition in definitions
@@ -179,5 +192,12 @@ def evaluate_candidates(game_id: int, candidates: Iterable[Dict[str, Any]]) -> L
         current_changed,
         game_id,
     )
+
+    if stats is not None:
+        stats["definitions_evaluated"] = len(definitions)
+        stats["candidates_evaluated"] = len(candidate_list)
+        stats["auto_created"] = auto_created
+        stats["auto_updated"] = auto_updated
+        stats["definitions_with_current_changes"] = current_changed
 
     return updated_entries

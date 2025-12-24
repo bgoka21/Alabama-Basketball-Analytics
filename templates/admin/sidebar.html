@@ -163,6 +163,7 @@
                         'admin.record_definitions_edit', 'admin.record_definitions_update',
                         'admin.record_entries_list', 'admin.record_entries_new',
                         'admin.record_entries_edit', 'admin.record_entries_update',
+                        'admin.records_recompute',
                         'records_page'] %}
   <li class="nav-item">
     <details class="group" {% if mgmt_active %}open{% endif %}>
@@ -207,6 +208,10 @@
         <a class="{{ link_base_classes }}{% if request.endpoint and request.endpoint.startswith('admin.record_entries') %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.record_entries_list') }}">
           {{ icons.render('clipboard') }}
           <span class="flex-1 text-left">Record Entries</span>
+        </a>
+        <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.records_recompute' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.records_recompute') }}">
+          {{ icons.render('clipboard') }}
+          <span class="flex-1 text-left">Recompute Records</span>
         </a>
         {% set records_url = url_for('records_page') if view_exists('records_page') else '#' %}
         <a class="{{ link_base_classes }}{% if request.endpoint == 'records_page' %} {{ active_classes }}{% endif %}" href="{{ records_url }}">

@@ -5748,6 +5748,180 @@ def record_entries_toggle_active(entry_id: int):
     return redirect(url_for('admin.record_entries_list'))
 
 
+@admin_bp.route('/records/recompute', methods=['GET', 'POST'])
+@admin_required
+def records_recompute():
+    form_data = {
+        "start_date": "",
+        "end_date": "",
+        "include_inactive_definitions": False,
+        "dry_run": False,
+        "limit_games": "",
+    }
+    errors: dict[str, str] = {}
+    results = None
+
+    if request.method == 'POST':
+        form_data["start_date"] = (request.form.get("start_date") or "").strip()
+        form_data["end_date"] = (request.form.get("end_date") or "").strip()
+        form_data["include_inactive_definitions"] = bool(request.form.get("include_inactive_definitions"))
+        form_data["dry_run"] = bool(request.form.get("dry_run"))
+        form_data["limit_games"] = (request.form.get("limit_games") or "").strip()
+
+        start_date = None
+        end_date = None
+        if not form_data["start_date"]:
+            errors["start_date"] = "Start date is required."
+        else:
+            try:
+                start_date = date.fromisoformat(form_data["start_date"])
+            except ValueError:
+                errors["start_date"] = "Enter a valid date."
+
+        if not form_data["end_date"]:
+            errors["end_date"] = "End date is required."
+        else:
+            try:
+                end_date = date.fromisoformat(form_data["end_date"])
+            except ValueError:
+                errors["end_date"] = "Enter a valid date."
+
+        if start_date and end_date and start_date > end_date:
+            errors["end_date"] = "End date must be on or after the start date."
+
+        limit_games = _parse_optional_int(form_data["limit_games"], errors, "limit_games")
+
+        if not errors and start_date and end_date:
+            include_inactive = form_data["include_inactive_definitions"]
+            dry_run = form_data["dry_run"]
+
+            game_query = (
+                Game.query.filter(Game.game_date.between(start_date, end_date))
+                .order_by(Game.game_date.asc(), Game.id.asc())
+            )
+            if limit_games:
+                game_query = game_query.limit(limit_games)
+            games = game_query.all()
+
+            definition_query = RecordDefinition.query.filter_by(scope="GAME")
+            if not include_inactive:
+                definition_query = definition_query.filter_by(is_active=True)
+            definitions = definition_query.all()
+
+            failures = []
+            per_game = []
+            totals = {
+                "total_definitions_evaluated": 0,
+                "total_candidates_built": 0,
+                "total_auto_entries_created": 0,
+                "total_auto_entries_updated": 0,
+                "total_definitions_with_current_changes": 0,
+            }
+
+            for game in games:
+                game_result = {
+                    "game_date": game.game_date,
+                    "opponent_name": game.opponent_name,
+                    "candidates_built": 0,
+                    "created": 0,
+                    "updated": 0,
+                    "changed_definitions": 0,
+                    "status": "OK",
+                }
+                try:
+                    candidates = build_game_candidates(
+                        game.id,
+                        include_inactive=include_inactive,
+                        scope="GAME",
+                        definitions=definitions,
+                    )
+                    game_result["candidates_built"] = len(candidates)
+                    stats: dict[str, int] = {}
+
+                    if dry_run:
+                        nested = db.session.begin_nested()
+                        try:
+                            evaluate_candidates(
+                                game_id=game.id,
+                                candidates=candidates,
+                                scope="GAME",
+                                include_inactive=include_inactive,
+                                definitions=definitions,
+                                stats=stats,
+                            )
+                            db.session.flush()
+                        finally:
+                            if nested.is_active:
+                                nested.rollback()
+                    else:
+                        evaluate_candidates(
+                            game_id=game.id,
+                            candidates=candidates,
+                            scope="GAME",
+                            include_inactive=include_inactive,
+                            definitions=definitions,
+                            stats=stats,
+                        )
+                        db.session.commit()
+
+                    game_result["created"] = stats.get("auto_created", 0)
+                    game_result["updated"] = stats.get("auto_updated", 0)
+                    game_result["changed_definitions"] = stats.get("definitions_with_current_changes", 0)
+
+                    totals["total_definitions_evaluated"] += stats.get("definitions_evaluated", 0)
+                    totals["total_candidates_built"] += game_result["candidates_built"]
+                    totals["total_auto_entries_created"] += game_result["created"]
+                    totals["total_auto_entries_updated"] += game_result["updated"]
+                    totals["total_definitions_with_current_changes"] += game_result["changed_definitions"]
+                except Exception as exc:
+                    db.session.rollback()
+                    logger.exception("Failed to recompute records for game %s", game.id)
+                    game_result["status"] = "FAILED"
+                    failures.append(
+                        {
+                            "game_id": game.id,
+                            "opponent_name": game.opponent_name,
+                            "error": str(exc),
+                        }
+                    )
+
+                per_game.append(game_result)
+
+            logger.info(
+                "Recomputed records for %s games (%s failures)",
+                len(games),
+                len(failures),
+            )
+            logger.info(
+                "Totals: definitions=%s candidates=%s created=%s updated=%s current_changes=%s",
+                totals["total_definitions_evaluated"],
+                totals["total_candidates_built"],
+                totals["total_auto_entries_created"],
+                totals["total_auto_entries_updated"],
+                totals["total_definitions_with_current_changes"],
+            )
+
+            results = {
+                "start_date": start_date,
+                "end_date": end_date,
+                "games_found": len(games),
+                "games_processed": len(per_game),
+                "failures": failures,
+                "totals": totals,
+                "per_game": per_game,
+                "include_inactive_definitions": include_inactive,
+                "dry_run": dry_run,
+                "limit_games": limit_games,
+            }
+
+    return render_template(
+        'admin/records_recompute.html',
+        form_data=form_data,
+        errors=errors,
+        results=results,
+    )
+
+
 @admin_bp.route('/users', methods=['GET'])
 @admin_required
 def users_list():
