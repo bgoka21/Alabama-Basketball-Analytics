@@ -13,6 +13,12 @@
           Seed Blue Collar Records
         </button>
       </form>
+      <form method="POST" action="{{ url_for('admin.record_definitions_seed_team_opponent') }}">
+        <button type="submit"
+                class="px-4 py-2 bg-gray-100 text-gray-800 rounded border border-gray-300 hover:bg-gray-200">
+          Seed Team/Opponent Records
+        </button>
+      </form>
       <a href="{{ url_for('admin.record_definitions_new') }}"
          class="px-4 py-2 bg-[#9E1B32] text-white rounded hover:bg-[#7a1524]">
         New Definition

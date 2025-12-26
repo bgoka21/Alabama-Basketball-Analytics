@@ -39,6 +39,8 @@ TEAM_STAT_MAP: Dict[str, StatMapping] = {
     "team.total_points": (TeamStats, "total_points", _team_stats_filter),
     "team.total_possessions": (TeamStats, "total_possessions", _team_stats_filter),
     "team.total_assists": (TeamStats, "total_assists", _team_stats_filter),
+    "team.total_second_assists": (TeamStats, "total_second_assists", _team_stats_filter),
+    "team.total_pot_assists": (TeamStats, "total_pot_assists", _team_stats_filter),
     "team.total_turnovers": (TeamStats, "total_turnovers", _team_stats_filter),
     "team.total_atr_makes": (TeamStats, "total_atr_makes", _team_stats_filter),
     "team.total_atr_attempts": (TeamStats, "total_atr_attempts", _team_stats_filter),
@@ -48,6 +50,8 @@ TEAM_STAT_MAP: Dict[str, StatMapping] = {
     "team.total_fg3_attempts": (TeamStats, "total_fg3_attempts", _team_stats_filter),
     "team.total_ftm": (TeamStats, "total_ftm", _team_stats_filter),
     "team.total_fta": (TeamStats, "total_fta", _team_stats_filter),
+    "team.total_blue_collar": (TeamStats, "total_blue_collar", _team_stats_filter),
+    "team.total_fouls_drawn": (TeamStats, "total_fouls_drawn", _team_stats_filter),
 }
 
 OPPONENT_STAT_MAP: Dict[str, StatMapping] = {
@@ -63,6 +67,8 @@ OPPONENT_STAT_MAP: Dict[str, StatMapping] = {
     "opp.total_fg3_attempts": (TeamStats, "total_fg3_attempts", _opponent_stats_filter),
     "opp.total_ftm": (TeamStats, "total_ftm", _opponent_stats_filter),
     "opp.total_fta": (TeamStats, "total_fta", _opponent_stats_filter),
+    "opp.total_blue_collar": (TeamStats, "total_blue_collar", _opponent_stats_filter),
+    "opp.total_fouls_drawn": (TeamStats, "total_fouls_drawn", _opponent_stats_filter),
 }
 
 PLAYER_STAT_MAP: Dict[str, Tuple[type, str]] = {
