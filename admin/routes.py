@@ -189,7 +189,8 @@ from utils.records.stat_keys import (
     get_label_for_key,
 )
 from utils.records.candidate_builder import build_game_candidates, get_missing_stat_keys
-from utils.records.evaluator import evaluate_candidates
+from utils.records.evaluator import evaluate_candidates, evaluate_season_candidates
+from utils.records.season_candidate_builder import build_season_candidates
 from utils.player_stats_helpers.cooe import get_game_on_off_stats
 from utils.scope import resolve_scope
 from services.eybl_ingest import (
@@ -5339,6 +5340,112 @@ def record_definitions_seed_blue_collar():
     return redirect(url_for('admin.record_definitions_list'))
 
 
+@admin_bp.post('/records/seed-team-opponent')
+@admin_required
+def record_definitions_seed_team_opponent():
+    team_stat_keys = [
+        "team.total_points",
+        "team.total_assists",
+        "team.total_second_assists",
+        "team.total_pot_assists",
+        "team.total_turnovers",
+        "team.total_atr_makes",
+        "team.total_atr_attempts",
+        "team.total_fg2_makes",
+        "team.total_fg2_attempts",
+        "team.total_fg3_makes",
+        "team.total_fg3_attempts",
+        "team.total_ftm",
+        "team.total_fta",
+        "team.total_possessions",
+        "team.total_blue_collar",
+        "team.total_fouls_drawn",
+    ]
+    opponent_stat_keys = [
+        "opp.total_points",
+        "opp.total_assists",
+        "opp.total_turnovers",
+        "opp.total_atr_makes",
+        "opp.total_atr_attempts",
+        "opp.total_fg2_makes",
+        "opp.total_fg2_attempts",
+        "opp.total_fg3_makes",
+        "opp.total_fg3_attempts",
+        "opp.total_ftm",
+        "opp.total_fta",
+        "opp.total_possessions",
+        "opp.total_blue_collar",
+        "opp.total_fouls_drawn",
+    ]
+
+    definitions_to_seed = []
+    for scope in ["GAME", "SEASON"]:
+        scope_label = "Game" if scope == "GAME" else "Season"
+        for stat_key in team_stat_keys:
+            label = get_label_for_key(stat_key)
+            definitions_to_seed.append(
+                {
+                    "name": f"Most Team {label} ({scope_label})",
+                    "stat_key": stat_key,
+                    "entity_type": "TEAM",
+                    "category": "team",
+                    "scope": scope,
+                }
+            )
+        for stat_key in opponent_stat_keys:
+            label = get_label_for_key(stat_key)
+            if label.startswith("Opponent "):
+                label = f"Total {label[len('Opponent '):]}"
+            definitions_to_seed.append(
+                {
+                    "name": f"Most Opponent {label} ({scope_label})",
+                    "stat_key": stat_key,
+                    "entity_type": "OPPONENT",
+                    "category": "opponent",
+                    "scope": scope,
+                }
+            )
+
+    stat_keys = [definition["stat_key"] for definition in definitions_to_seed]
+    existing_definitions = RecordDefinition.query.filter(
+        RecordDefinition.stat_key.in_(stat_keys),
+        RecordDefinition.entity_type.in_(["TEAM", "OPPONENT"]),
+        RecordDefinition.scope.in_(["GAME", "SEASON"]),
+    ).all()
+    existing_keys = {
+        (definition.stat_key, definition.scope, definition.entity_type)
+        for definition in existing_definitions
+    }
+
+    created = 0
+    skipped = 0
+    for definition in definitions_to_seed:
+        identity = (definition["stat_key"], definition["scope"], definition["entity_type"])
+        if identity in existing_keys:
+            skipped += 1
+            continue
+        db.session.add(
+            RecordDefinition(
+                name=definition["name"],
+                category=definition["category"],
+                entity_type=definition["entity_type"],
+                scope=definition["scope"],
+                stat_key=definition["stat_key"],
+                compare="MAX",
+                is_active=True,
+            )
+        )
+        created += 1
+
+    if created:
+        db.session.commit()
+    flash(
+        f"Team/opponent record definitions seeded. Created {created}, skipped {skipped}.",
+        "success",
+    )
+    return redirect(url_for('admin.record_definitions_list'))
+
+
 @admin_bp.get('/records/definitions/new')
 @admin_required
 def record_definitions_new():
@@ -6010,6 +6117,99 @@ def records_recompute():
         form_data=form_data,
         errors=errors,
         results=results,
+    )
+
+
+@admin_bp.route('/records/recompute-seasons', methods=['GET', 'POST'])
+@admin_required
+def records_recompute_seasons():
+    form_data = {
+        "season_id": "",
+        "include_inactive_definitions": False,
+        "dry_run": False,
+    }
+    errors: dict[str, str] = {}
+    results = None
+
+    seasons = Season.query.order_by(Season.id.desc()).all()
+
+    if request.method == 'POST':
+        form_data["season_id"] = (request.form.get("season_id") or "").strip()
+        form_data["include_inactive_definitions"] = bool(request.form.get("include_inactive_definitions"))
+        form_data["dry_run"] = bool(request.form.get("dry_run"))
+
+        season_id = _parse_optional_int(form_data["season_id"], errors, "season_id")
+        if season_id is None:
+            errors["season_id"] = "Season is required."
+
+        season = Season.query.get(season_id) if season_id else None
+        if season_id and not season:
+            errors["season_id"] = "Season not found."
+
+        if not errors and season_id:
+            include_inactive = form_data["include_inactive_definitions"]
+            dry_run = form_data["dry_run"]
+
+            definition_query = RecordDefinition.query.filter_by(scope="SEASON").filter(
+                RecordDefinition.entity_type.in_(["TEAM", "OPPONENT"])
+            )
+            if not include_inactive:
+                definition_query = definition_query.filter_by(is_active=True)
+            definitions = definition_query.all()
+
+            candidates = build_season_candidates(
+                season_id,
+                include_inactive_definitions=include_inactive,
+            )
+            stats: dict[str, int] = {}
+
+            if dry_run:
+                nested = db.session.begin_nested()
+                try:
+                    evaluate_season_candidates(
+                        season_id=season_id,
+                        candidates=candidates,
+                        scope="SEASON",
+                        include_inactive=include_inactive,
+                        definitions=definitions,
+                        stats=stats,
+                    )
+                    db.session.flush()
+                finally:
+                    if nested.is_active:
+                        nested.rollback()
+            else:
+                evaluate_season_candidates(
+                    season_id=season_id,
+                    candidates=candidates,
+                    scope="SEASON",
+                    include_inactive=include_inactive,
+                    definitions=definitions,
+                    stats=stats,
+                )
+                db.session.commit()
+
+            results = {
+                "season": season,
+                "season_id": season_id,
+                "candidates_built": len(candidates),
+                "include_inactive_definitions": include_inactive,
+                "dry_run": dry_run,
+                "totals": {
+                    "definitions_evaluated": stats.get("definitions_evaluated", 0),
+                    "candidates_evaluated": stats.get("candidates_evaluated", 0),
+                    "auto_created": stats.get("auto_created", 0),
+                    "auto_updated": stats.get("auto_updated", 0),
+                    "definitions_with_current_changes": stats.get("definitions_with_current_changes", 0),
+                },
+            }
+
+    return render_template(
+        'admin/records_recompute_seasons.html',
+        form_data=form_data,
+        errors=errors,
+        results=results,
+        seasons=seasons,
     )
 
 
