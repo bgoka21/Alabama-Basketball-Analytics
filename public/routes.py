@@ -296,19 +296,24 @@ def game_homepage():
     min_atr = None if filter_opt == "true_data" else 10
 
     # ─── 4A) Blue Collar Points Leaders ──────────────
+    roster_name_sub = db.session.query(
+        Roster.id.label("player_id"),
+        Roster.player_name.label("player_name"),
+    ).subquery()
+
     bcp_sub = (
         db.session.query(
-            Roster.player_name.label("player_name"),
+            roster_name_sub.c.player_name.label("player_name"),
             func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
                 "total_bcp"
             ),
         )
-        .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
+        .join(BlueCollarStats, BlueCollarStats.player_id == roster_name_sub.c.player_id)
         .filter(
             BlueCollarStats.game_id.in_(game_ids),
             BlueCollarStats.season_id == selected_season_id,
         )
-        .group_by(Roster.player_name)
+        .group_by(roster_name_sub.c.player_name)
         .subquery()
     )
 
@@ -335,7 +340,6 @@ def game_homepage():
                 "bcp"
             ),
         )
-        .join(Roster, Roster.id == BlueCollarStats.player_id)
         .filter(
             BlueCollarStats.game_id.in_(winning_game_ids),
             BlueCollarStats.season_id == selected_season_id,
@@ -357,9 +361,11 @@ def game_homepage():
     hard_hat_winners = (
         db.session.query(
             player_bcp.c.game_id.label("game_id"),
-            Roster.player_name.label("player_name"),
+            roster_name_sub.c.player_name.label("player_name"),
         )
-        .join(Roster, player_bcp.c.player_id == Roster.id)
+        .join(
+            roster_name_sub, player_bcp.c.player_id == roster_name_sub.c.player_id
+        )
         .join(
             max_bcp_sub,
             and_(
@@ -441,16 +447,18 @@ def game_homepage():
     # b) Count each player’s total possessions **across all games** by name
     pps_sub = (
         db.session.query(
-            Roster.player_name.label("player_name"),
+            roster_name_sub.c.player_name.label("player_name"),
             func.count(PlayerPossession.id).label("possessions"),
         )
-        .join(Roster, PlayerPossession.player_id == Roster.id)
+        .join(
+            roster_name_sub, PlayerPossession.player_id == roster_name_sub.c.player_id
+        )
         .join(Possession, PlayerPossession.possession_id == Possession.id)
         .filter(
             Possession.game_id.in_(game_ids),
             Possession.season_id == selected_season_id,
         )
-        .group_by(Roster.player_name)
+        .group_by(roster_name_sub.c.player_name)
         .subquery()
     )
 
@@ -661,6 +669,11 @@ def hard_hat_detail():
 
     hard_hat_rows: list[dict[str, object]] = []
     if winning_game_ids:
+        roster_name_sub = db.session.query(
+            Roster.id.label("player_id"),
+            Roster.player_name.label("player_name"),
+        ).subquery()
+
         player_bcp = (
             db.session.query(
                 BlueCollarStats.player_id.label("player_id"),
@@ -669,7 +682,6 @@ def hard_hat_detail():
                     "bcp"
                 ),
             )
-            .join(Roster, Roster.id == BlueCollarStats.player_id)
             .filter(
                 BlueCollarStats.game_id.in_(winning_game_ids),
                 BlueCollarStats.season_id == selected_season_id,
@@ -689,10 +701,12 @@ def hard_hat_detail():
         winners_query = (
             db.session.query(
                 player_bcp.c.game_id.label("game_id"),
-                Roster.player_name.label("player_name"),
+                roster_name_sub.c.player_name.label("player_name"),
                 player_bcp.c.bcp.label("bcp"),
             )
-            .join(Roster, player_bcp.c.player_id == Roster.id)
+            .join(
+                roster_name_sub, player_bcp.c.player_id == roster_name_sub.c.player_id
+            )
             .join(
                 max_bcp_sub,
                 and_(
