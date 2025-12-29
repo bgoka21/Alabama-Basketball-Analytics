@@ -296,10 +296,14 @@ def game_homepage():
     min_atr = None if filter_opt == "true_data" else 10
 
     # ─── 4A) Blue Collar Points Leaders ──────────────
-    roster_name_sub = db.session.query(
-        Roster.id.label("player_id"),
-        Roster.player_name.label("player_name"),
-    ).subquery()
+    roster_name_sub = (
+        db.session.query(
+            Roster.id.label("player_id"),
+            Roster.player_name.label("player_name"),
+        )
+        .filter(Roster.season_id == selected_season_id)
+        .subquery()
+    )
 
     bcp_sub = (
         db.session.query(
@@ -308,10 +312,13 @@ def game_homepage():
                 "total_bcp"
             ),
         )
-        .join(BlueCollarStats, BlueCollarStats.player_id == roster_name_sub.c.player_id)
-        .filter(
-            BlueCollarStats.game_id.in_(game_ids),
-            BlueCollarStats.season_id == selected_season_id,
+        .outerjoin(
+            BlueCollarStats,
+            and_(
+                BlueCollarStats.player_id == roster_name_sub.c.player_id,
+                BlueCollarStats.game_id.in_(game_ids),
+                BlueCollarStats.season_id == selected_season_id,
+            ),
         )
         .group_by(roster_name_sub.c.player_name)
         .subquery()
@@ -450,8 +457,9 @@ def game_homepage():
             roster_name_sub.c.player_name.label("player_name"),
             func.count(PlayerPossession.id).label("possessions"),
         )
+        .select_from(roster_name_sub)
         .join(
-            roster_name_sub, PlayerPossession.player_id == roster_name_sub.c.player_id
+            PlayerPossession, PlayerPossession.player_id == roster_name_sub.c.player_id
         )
         .join(Possession, PlayerPossession.possession_id == Possession.id)
         .filter(
