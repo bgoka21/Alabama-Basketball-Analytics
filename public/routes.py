@@ -306,7 +306,6 @@ def game_homepage():
         .join(BlueCollarStats, BlueCollarStats.player_id == Roster.id)
         .filter(
             BlueCollarStats.game_id.in_(game_ids),
-            Roster.season_id == selected_season_id,
             BlueCollarStats.season_id == selected_season_id,
         )
         .group_by(Roster.player_name)
@@ -340,7 +339,6 @@ def game_homepage():
         .filter(
             BlueCollarStats.game_id.in_(winning_game_ids),
             BlueCollarStats.season_id == selected_season_id,
-            Roster.season_id == selected_season_id,
         )
         .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
         .subquery()
@@ -373,7 +371,6 @@ def game_homepage():
         .filter(
             player_bcp.c.game_id.in_(winning_game_ids),
             max_bcp_sub.c.max_bcp > 0,
-            Roster.season_id == selected_season_id,
         )
         .all()
     )
@@ -451,7 +448,6 @@ def game_homepage():
         .join(Possession, PlayerPossession.possession_id == Possession.id)
         .filter(
             Possession.game_id.in_(game_ids),
-            Roster.season_id == selected_season_id,
             Possession.season_id == selected_season_id,
         )
         .group_by(Roster.player_name)
@@ -677,7 +673,6 @@ def hard_hat_detail():
             .filter(
                 BlueCollarStats.game_id.in_(winning_game_ids),
                 BlueCollarStats.season_id == selected_season_id,
-                Roster.season_id == selected_season_id,
             )
             .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
             .subquery()
@@ -708,7 +703,6 @@ def hard_hat_detail():
             .filter(
                 player_bcp.c.game_id.in_(winning_game_ids),
                 max_bcp_sub.c.max_bcp > 0,
-                Roster.season_id == selected_season_id,
             )
             .all()
         )
