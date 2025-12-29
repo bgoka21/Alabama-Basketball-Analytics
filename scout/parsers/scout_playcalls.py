@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from models.database import db
 from models.scout import (
+    UNKNOWN_SERIES,
     ScoutGame,
     ScoutPlaycallMapping,
     ScoutPossession,
@@ -54,6 +55,7 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
 
     Returns a list of dictionaries with instance_number, playcall, bucket, and points.
     """
+    unknown_series = UNKNOWN_SERIES
 
     with open(file_path, newline="", encoding="utf-8-sig") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -123,8 +125,13 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
         }
 
         for field in optional_fields:
-            if field in data:
-                possession_payload[field] = data.get(field)
+            if field not in data:
+                continue
+            if field == "series":
+                series_value = (data.get(field) or "").strip()
+                possession_payload[field] = series_value or unknown_series
+                continue
+            possession_payload[field] = data.get(field)
 
         possessions.append(possession_payload)
 
