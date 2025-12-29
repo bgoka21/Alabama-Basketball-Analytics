@@ -305,22 +305,32 @@ def game_homepage():
         .subquery()
     )
 
-    bcp_sub = (
+    bcp_totals_sub = (
         db.session.query(
-            roster_name_sub.c.player_name.label("player_name"),
+            Roster.player_name.label("player_name"),
             func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
                 "total_bcp"
             ),
         )
-        .outerjoin(
-            BlueCollarStats,
-            and_(
-                BlueCollarStats.player_id == roster_name_sub.c.player_id,
-                BlueCollarStats.game_id.in_(game_ids),
-                BlueCollarStats.season_id == selected_season_id,
-            ),
+        .select_from(BlueCollarStats)
+        .join(Roster, Roster.id == BlueCollarStats.player_id)
+        .filter(
+            BlueCollarStats.game_id.in_(game_ids),
+            BlueCollarStats.season_id == selected_season_id,
         )
-        .group_by(roster_name_sub.c.player_name)
+        .group_by(Roster.player_name)
+        .subquery()
+    )
+
+    bcp_sub = (
+        db.session.query(
+            roster_name_sub.c.player_name.label("player_name"),
+            func.coalesce(bcp_totals_sub.c.total_bcp, 0).label("total_bcp"),
+        )
+        .outerjoin(
+            bcp_totals_sub,
+            bcp_totals_sub.c.player_name == roster_name_sub.c.player_name,
+        )
         .subquery()
     )
 
@@ -341,17 +351,19 @@ def game_homepage():
     # 1) Sum each player’s BCP in each winning game
     player_bcp = (
         db.session.query(
-            BlueCollarStats.player_id.label("player_id"),
+            Roster.player_name.label("player_name"),
             BlueCollarStats.game_id.label("game_id"),
             func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
                 "bcp"
             ),
         )
+        .select_from(BlueCollarStats)
+        .join(Roster, Roster.id == BlueCollarStats.player_id)
         .filter(
             BlueCollarStats.game_id.in_(winning_game_ids),
             BlueCollarStats.season_id == selected_season_id,
         )
-        .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
+        .group_by(BlueCollarStats.game_id, Roster.player_name)
         .subquery()
     )
 
@@ -371,7 +383,8 @@ def game_homepage():
             roster_name_sub.c.player_name.label("player_name"),
         )
         .join(
-            roster_name_sub, player_bcp.c.player_id == roster_name_sub.c.player_id
+            roster_name_sub,
+            player_bcp.c.player_name == roster_name_sub.c.player_name,
         )
         .join(
             max_bcp_sub,
@@ -688,17 +701,19 @@ def hard_hat_detail():
 
         player_bcp = (
             db.session.query(
-                BlueCollarStats.player_id.label("player_id"),
+                Roster.player_name.label("player_name"),
                 BlueCollarStats.game_id.label("game_id"),
                 func.coalesce(func.sum(BlueCollarStats.total_blue_collar), 0).label(
                     "bcp"
                 ),
             )
+            .select_from(BlueCollarStats)
+            .join(Roster, Roster.id == BlueCollarStats.player_id)
             .filter(
                 BlueCollarStats.game_id.in_(winning_game_ids),
                 BlueCollarStats.season_id == selected_season_id,
             )
-            .group_by(BlueCollarStats.game_id, BlueCollarStats.player_id)
+            .group_by(BlueCollarStats.game_id, Roster.player_name)
             .subquery()
         )
 
@@ -717,7 +732,8 @@ def hard_hat_detail():
                 player_bcp.c.bcp.label("bcp"),
             )
             .join(
-                roster_name_sub, player_bcp.c.player_id == roster_name_sub.c.player_id
+                roster_name_sub,
+                player_bcp.c.player_name == roster_name_sub.c.player_name,
             )
             .join(
                 max_bcp_sub,
