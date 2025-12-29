@@ -677,10 +677,14 @@ def hard_hat_detail():
 
     hard_hat_rows: list[dict[str, object]] = []
     if winning_game_ids:
-        roster_name_sub = db.session.query(
-            Roster.id.label("player_id"),
-            Roster.player_name.label("player_name"),
-        ).subquery()
+        roster_name_sub = (
+            db.session.query(
+                Roster.id.label("player_id"),
+                Roster.player_name.label("player_name"),
+            )
+            .filter(Roster.season_id == selected_season_id)
+            .subquery()
+        )
 
         player_bcp = (
             db.session.query(
