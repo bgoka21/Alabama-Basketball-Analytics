@@ -1,6 +1,8 @@
 from datetime import datetime
 from models.database import db
 
+UNKNOWN_SERIES = "(Unknown Series)"
+
 
 def normalize_playcall(playcall: str) -> str:
     """Normalize a playcall for consistent lookups and storage."""
@@ -45,7 +47,7 @@ class ScoutPossession(db.Model):
     instance_number = db.Column(db.String(255))
     playcall = db.Column(db.String(255))
     family = db.Column(db.String(255), nullable=True, default=None)
-    series = db.Column(db.String(255), nullable=True, default=None)
+    series = db.Column(db.String(255), nullable=True)
     bucket = db.Column(db.String(32))
     points = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

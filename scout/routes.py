@@ -21,7 +21,7 @@ from werkzeug.utils import secure_filename
 
 from . import scout_bp
 from models.database import db
-from models.scout import ScoutGame, ScoutPossession, ScoutTeam
+from models.scout import UNKNOWN_SERIES, ScoutGame, ScoutPossession, ScoutTeam
 from scout.parsers import store_scout_playcalls
 from scout.schema import ensure_scout_possession_schema
 
@@ -80,6 +80,9 @@ def _parse_scout_filters():
     min_runs = request.args.get('min_runs', default=1, type=int) or 1
     min_runs = max(1, min_runs)
 
+    requested_group_by = (request.args.get('group_by') or 'playcall').strip().lower()
+    group_by = requested_group_by if requested_group_by in {'playcall', 'series'} else 'playcall'
+
     selected_series: list[str] = []
     for raw_series in request.args.getlist('series'):
         cleaned = (raw_series or '').strip()
@@ -92,12 +95,16 @@ def _parse_scout_filters():
         games,
         selected_game_ids,
         min_runs,
+        group_by,
         selected_series,
     )
 
 
 def _build_report_rows(
-    selected_game_ids: set[int], min_runs: int, selected_series: Optional[set[str]] = None
+    selected_game_ids: set[int],
+    min_runs: int,
+    selected_series: Optional[set[str]] = None,
+    group_by: str = 'playcall',
 ):
     base_totals = {'times_run': 0, 'total_points': 0, 'ppc': 0.0}
     report_rows: dict[str, object] = {
@@ -106,6 +113,7 @@ def _build_report_rows(
         'visible_series': [],
         'all_rows': [],
         'all_totals': base_totals.copy(),
+        'bucket_rows': {},
     }
 
     ensure_scout_possession_schema(db.engine)
@@ -122,9 +130,84 @@ def _build_report_rows(
     total_points_expr = db.func.coalesce(db.func.sum(ScoutPossession.points), 0)
     series_label_expr = db.func.coalesce(
         db.func.nullif(db.func.trim(ScoutPossession.series), ''),
-        db.func.nullif(db.func.trim(ScoutPossession.family), ''),
-        db.literal('Unknown'),
+        db.literal(UNKNOWN_SERIES),
     )
+
+    if group_by == 'series':
+        query = (
+            db.session.query(
+                series_label_expr.label('series'),
+                ScoutPossession.bucket,
+                times_run_expr.label('times_run'),
+                total_points_expr.label('total_points'),
+            )
+            .filter(ScoutPossession.scout_game_id.in_(selected_game_ids))
+            .filter(ScoutPossession.playcall.isnot(None))
+            .filter(ScoutPossession.playcall != '')
+            .filter(db.func.length(db.func.trim(ScoutPossession.playcall)) > 0)
+            .group_by(series_label_expr, ScoutPossession.bucket)
+        )
+
+        if min_runs and min_runs > 1:
+            query = query.having(times_run_expr >= min_runs)
+
+        bucket_rows: dict[str, dict[str, object]] = {}
+        series_options: set[str] = set()
+        for row in query.all():
+            series_name = (row.series or UNKNOWN_SERIES).strip() or UNKNOWN_SERIES
+            series_options.add(series_name)
+
+            times_run = int(row.times_run or 0)
+            total_points = int(row.total_points or 0)
+            ppc = round(total_points / times_run, 2) if times_run else 0.0
+
+            bucket_key = (row.bucket or 'STANDARD').upper()
+            bucket_rows.setdefault(bucket_key, {'rows': [], 'totals': base_totals.copy()})
+            bucket_rows[bucket_key]['rows'].append(
+                {
+                    'series': series_name,
+                    'bucket': bucket_key,
+                    'times_run': times_run,
+                    'total_points': total_points,
+                    'ppc': ppc,
+                }
+            )
+            bucket_rows[bucket_key]['totals']['times_run'] += times_run
+            bucket_rows[bucket_key]['totals']['total_points'] += total_points
+
+        if not series_options:
+            return report_rows
+
+        selected_set = {value for value in (selected_series or set()) if value}
+        include_all_series = not selected_set or 'ALL' in selected_set
+        ordered_series = sorted(series_options)
+        report_rows['visible_series'] = (
+            ordered_series
+            if include_all_series
+            else [series for series in ordered_series if series in selected_set]
+        )
+        report_rows['series_options'] = ['ALL'] + ordered_series
+
+        for bucket_key, payload in bucket_rows.items():
+            rows = payload.get('rows', [])
+            if isinstance(rows, list):
+                filtered_rows = [
+                    row for row in rows if row['series'] in report_rows['visible_series']
+                ] if report_rows['visible_series'] else []
+                filtered_rows.sort(key=lambda row: (-row['times_run'], -row['ppc'], row['series']))
+                payload['rows'] = filtered_rows
+            totals_payload = payload.get('totals')
+            if isinstance(totals_payload, dict):
+                total_runs = sum(row['times_run'] for row in payload.get('rows', []))
+                total_points = sum(row['total_points'] for row in payload.get('rows', []))
+                totals_payload['times_run'] = total_runs
+                totals_payload['total_points'] = total_points
+                totals_payload['ppc'] = round(
+                    total_points / total_runs, 2
+                ) if total_runs else 0.0
+
+        report_rows['bucket_rows'] = bucket_rows
+        return report_rows
 
     query = (
         db.session.query(
@@ -158,7 +241,7 @@ def _build_report_rows(
         if any(playcall_lower.startswith(prefix) for prefix in excluded_prefixes):
             continue
 
-        series_name = (row.series or 'Unknown').strip() or 'Unknown'
+        series_name = (row.series or UNKNOWN_SERIES).strip() or UNKNOWN_SERIES
         series_options.add(series_name)
 
         times_run = int(row.times_run or 0)
@@ -244,11 +327,17 @@ def scout_playcalls():
         games,
         selected_game_ids,
         min_runs,
+        group_by,
         selected_series,
     ) = _parse_scout_filters()
 
     selected_series_set = {value for value in selected_series}
-    report_rows = _build_report_rows(selected_game_ids, min_runs, selected_series_set)
+    report_rows = _build_report_rows(
+        selected_game_ids,
+        min_runs,
+        selected_series_set,
+        group_by,
+    )
     series_options = report_rows.get('series_options', []) if isinstance(report_rows, dict) else []
     if not selected_series and series_options:
         selected_series = series_options
@@ -260,6 +349,7 @@ def scout_playcalls():
         games=games,
         selected_game_ids=selected_game_ids,
         min_runs=min_runs,
+        group_by=group_by,
         report_rows=report_rows,
         series_options=series_options,
         selected_series=selected_series,
@@ -275,6 +365,7 @@ def export_playcalls_csv():
         _,
         selected_game_ids,
         min_runs,
+        group_by,
         selected_series,
     ) = _parse_scout_filters()
 
@@ -294,14 +385,28 @@ def export_playcalls_csv():
             )
         )
 
-    report_rows = _build_report_rows(selected_game_ids, min_runs, selected_series_set)
-    if not report_rows.get('all_rows'):
+    report_rows = _build_report_rows(
+        selected_game_ids,
+        min_runs,
+        selected_series_set,
+        group_by,
+    )
+    if group_by == 'series':
+        has_rows = any(
+            payload.get('rows')
+            for payload in (report_rows.get('bucket_rows', {}) or {}).values()
+            if isinstance(payload, dict)
+        )
+    else:
+        has_rows = bool(report_rows.get('all_rows'))
+    if not has_rows:
         flash('No playcalls match the selected games and filters to export.', 'info')
         return redirect(
             url_for(
                 'scout.scout_playcalls',
                 team_id=selected_team.id,
                 min_runs=min_runs,
+                group_by=group_by,
                 game_ids=','.join(str(game_id) for game_id in sorted(selected_game_ids)),
                 series=selected_series,
             )
@@ -309,43 +414,72 @@ def export_playcalls_csv():
 
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Series', 'Bucket', 'Playcall', 'Times Run', 'Total Points', 'PPC'])
+    if group_by == 'series':
+        writer.writerow(['Bucket', 'Series', 'Times Run', 'Total Points', 'PPC'])
+        bucket_rows = report_rows.get('bucket_rows', {}) if isinstance(report_rows, dict) else {}
+        for bucket_name in ('STANDARD', 'BOB', 'SOB'):
+            payload = bucket_rows.get(bucket_name) if isinstance(bucket_rows, dict) else None
+            if not isinstance(payload, dict):
+                continue
+            for row in payload.get('rows', []):
+                writer.writerow(
+                    [
+                        row['bucket'],
+                        row['series'],
+                        row['times_run'],
+                        row['total_points'],
+                        f"{row['ppc']:.2f}",
+                    ]
+                )
+            totals_payload = payload.get('totals') if isinstance(payload, dict) else None
+            if isinstance(totals_payload, dict):
+                writer.writerow(
+                    [
+                        bucket_name,
+                        'Totals',
+                        totals_payload.get('times_run', 0),
+                        totals_payload.get('total_points', 0),
+                        f"{(totals_payload.get('ppc') or 0):.2f}",
+                    ]
+                )
+    else:
+        writer.writerow(['Series', 'Bucket', 'Playcall', 'Times Run', 'Total Points', 'PPC'])
 
-    series_order = report_rows.get('visible_series', []) if isinstance(report_rows, dict) else []
-    series_rows = report_rows.get('series_rows', {}) if isinstance(report_rows, dict) else {}
+        series_order = report_rows.get('visible_series', []) if isinstance(report_rows, dict) else []
+        series_rows = report_rows.get('series_rows', {}) if isinstance(report_rows, dict) else {}
 
-    for series_name in series_order:
-        payload = series_rows.get(series_name) if isinstance(series_rows, dict) else None
-        if not isinstance(payload, dict):
-            continue
-        for row in payload.get('rows', []):
-            writer.writerow(
-                [
-                    row['series'],
-                    row['bucket'],
-                    row['playcall'],
-                    row['times_run'],
-                    row['total_points'],
-                    f"{row['ppc']:.2f}",
-                ]
-            )
-        totals_payload = payload.get('totals') if isinstance(payload, dict) else None
-        if isinstance(totals_payload, dict):
-            writer.writerow(
-                [
-                    series_name,
-                    'Totals',
-                    'Totals',
-                    totals_payload.get('times_run', 0),
-                    totals_payload.get('total_points', 0),
-                    f"{(totals_payload.get('ppc') or 0):.2f}",
-                ]
-            )
+        for series_name in series_order:
+            payload = series_rows.get(series_name) if isinstance(series_rows, dict) else None
+            if not isinstance(payload, dict):
+                continue
+            for row in payload.get('rows', []):
+                writer.writerow(
+                    [
+                        row['series'],
+                        row['bucket'],
+                        row['playcall'],
+                        row['times_run'],
+                        row['total_points'],
+                        f"{row['ppc']:.2f}",
+                    ]
+                )
+            totals_payload = payload.get('totals') if isinstance(payload, dict) else None
+            if isinstance(totals_payload, dict):
+                writer.writerow(
+                    [
+                        series_name,
+                        'Totals',
+                        'Totals',
+                        totals_payload.get('times_run', 0),
+                        totals_payload.get('total_points', 0),
+                        f"{(totals_payload.get('ppc') or 0):.2f}",
+                    ]
+                )
 
-    all_totals = report_rows.get('all_totals', {}) if isinstance(report_rows, dict) else {}
-    if report_rows.get('all_rows'):
-        writer.writerow([])
-        writer.writerow(['ALL', '', 'Totals', all_totals.get('times_run', 0), all_totals.get('total_points', 0), f"{(all_totals.get('ppc') or 0):.2f}"])
+        all_totals = report_rows.get('all_totals', {}) if isinstance(report_rows, dict) else {}
+        if report_rows.get('all_rows'):
+            writer.writerow([])
+            writer.writerow(['ALL', '', 'Totals', all_totals.get('times_run', 0), all_totals.get('total_points', 0), f"{(all_totals.get('ppc') or 0):.2f}"])
 
     output.seek(0)
     filename = f"scout_playcalls_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -445,6 +579,9 @@ def delete_scout_game(game_id: int):
 
     min_runs = request.form.get('min_runs', type=int) or 1
     selected_series = [value for value in request.form.getlist('series') if value]
+    group_by = (request.form.get('group_by') or 'playcall').strip().lower()
+    if group_by not in {'playcall', 'series'}:
+        group_by = 'playcall'
     team_id = request.form.get('team_id', type=int) or game.scout_team_id
 
     db.session.delete(game)
@@ -452,7 +589,7 @@ def delete_scout_game(game_id: int):
 
     flash('Scout game deleted along with its possessions.', 'success')
 
-    query_params = {'team_id': team_id, 'min_runs': min_runs}
+    query_params = {'team_id': team_id, 'min_runs': min_runs, 'group_by': group_by}
     if selected_game_ids:
         query_params['game_ids'] = ','.join(str(game_id) for game_id in sorted(selected_game_ids))
     if selected_series:
