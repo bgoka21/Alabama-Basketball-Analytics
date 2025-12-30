@@ -1,5 +1,39 @@
 from collections import defaultdict
 from itertools import combinations
+import math
+
+
+def _split_player_tokens(cell_value):
+    """Split player possession cell into normalized tokens."""
+    if cell_value is None:
+        return []
+    if isinstance(cell_value, float) and math.isnan(cell_value):
+        return []
+    if isinstance(cell_value, str) and cell_value.strip().lower() in {"nan", "<na>", "none"}:
+        return []
+    if not isinstance(cell_value, str):
+        cell_value = str(cell_value)
+    normalized = cell_value.replace("–", "-")
+    for sep in (";", "\n", "\r", "\t"):
+        normalized = normalized.replace(sep, ",")
+    return [token.strip() for token in normalized.split(",") if token.strip()]
+
+
+def _resolve_player_possessions_column(df_columns):
+    if "PLAYER POSSESSIONS" in df_columns:
+        return "PLAYER POSSESSIONS"
+    for col in df_columns:
+        if isinstance(col, str) and col.strip() == "PLAYER POSSESSIONS":
+            return col
+    return None
+
+
+def get_players_on_floor(row, df_columns):
+    """Return player tokens using the same column leverage uses."""
+    col = _resolve_player_possessions_column(df_columns)
+    if col is None:
+        return []
+    return _split_player_tokens(row.get(col, ""))
 
 
 def compute_lineup_efficiencies(possession_data, group_sizes=(2, 3, 4, 5), min_poss=5):
