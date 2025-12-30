@@ -16,7 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover
         ndarray = type('ndarray', (), {})
     np = _DummyNP()
 import sqlite3
-from utils.lineup import compute_lineup_efficiencies
+from utils.lineup import compute_lineup_efficiencies, get_players_on_floor
 from utils.shottype import persist_player_shot_details
 # BEGIN Advanced Possession
 from services.reports.advanced_possession import (
@@ -791,7 +791,7 @@ def process_possessions(df, game_id, season_id, subtract_off_reb=True):
             "paint_touches": safe_str(row.get("PAINT TOUCHES", "")),
             "shot_clock": safe_str(row.get("SHOT CLOCK", "")),
             "shot_clock_pt": safe_str(row.get("SHOT CLOCK PT", "")),
-            "players_on_floor": extract_tokens(row.get("PLAYER POSSESSIONS", "")),
+            "players_on_floor": get_players_on_floor(row, df.columns),
             "points_scored": points_scored,
             "is_neutral": is_neutral,
             "events": events,
