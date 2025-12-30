@@ -67,7 +67,7 @@ def test_lineup_and_on_off(client, app):
         lineups = json.loads(uf.lineup_efficiencies)
         on_off = json.loads(uf.player_on_off)
 
-    lineup_ppp = lineups['2']['Crimson']['#1 A,#2 B']
+    lineup_ppp = lineups['2']['crimson']['#1 A,#2 B']
     assert pytest.approx(lineup_ppp, 0.01) == 2.0
 
     b_stats = on_off['#2 B']['Crimson']

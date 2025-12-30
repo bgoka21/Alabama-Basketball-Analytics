@@ -223,6 +223,7 @@ from services.leaderboard_game import (
 )
 from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 from utils.reparse_uploaded_file import reparse_uploaded_file
+from utils.lineup import format_lineup_efficiencies
 
 try:  # Optional CSRF protection – not every deployment wires this up
     from app.extensions import csrf  # type: ignore[attr-defined]
@@ -6431,13 +6432,7 @@ def parse_file(file_id):
             )
 
             raw_lineups = results.get('lineup_efficiencies', {})
-            json_lineups = {
-                size: {
-                    side: {",".join(combo): ppp for combo, ppp in sides.items()}
-                    for side, sides in raw_lineups[size].items()
-                }
-                for size in raw_lineups
-            }
+            json_lineups = format_lineup_efficiencies(raw_lineups)
 
             uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
             uploaded_file.player_on_off = json.dumps(results.get('player_on_off', {}))
@@ -6475,14 +6470,7 @@ def parse_file(file_id):
 
             # 2d) JSON-ify the lineup efficiencies
             raw_lineups = results.get('lineup_efficiencies', {})
-            json_lineups = {
-                size: {
-                    side: { ",".join(combo): ppp
-                            for combo, ppp in sides.items() }
-                    for side, sides in raw_lineups[size].items()
-                }
-                for size in raw_lineups
-            }
+            json_lineups = format_lineup_efficiencies(raw_lineups)
 
             # 3) update UploadedFile with breakdowns + status
             uploaded_file.parse_status        = 'Parsed Successfully'
@@ -6600,13 +6588,7 @@ def _reparse_uploaded_game(uploaded_file, upload_path):
         results = parse_csv(upload_path, None, season_id)
 
     raw_lineups = results.get("lineup_efficiencies", {})
-    json_lineups = {
-        size: {
-            side: {",".join(combo): ppp for combo, ppp in sides.items()}
-            for side, sides in raw_lineups[size].items()
-        }
-        for size in raw_lineups
-    }
+    json_lineups = format_lineup_efficiencies(raw_lineups)
 
     uploaded_file.parse_status = "Parsed Successfully"
     uploaded_file.last_parsed = datetime.utcnow()
@@ -6699,13 +6681,7 @@ def _reparse_uploaded_practice(uploaded_file, upload_path):
     )
 
     raw_lineups = results.get("lineup_efficiencies", {})
-    json_lineups = {
-        size: {
-            side: {",".join(combo): ppp for combo, ppp in sides.items()}
-            for side, sides in raw_lineups[size].items()
-        }
-        for size in raw_lineups
-    }
+    json_lineups = format_lineup_efficiencies(raw_lineups)
 
     uploaded_file.lineup_efficiencies = json.dumps(json_lineups)
     uploaded_file.player_on_off = json.dumps(results.get("player_on_off", {}))
