@@ -414,37 +414,28 @@ def export_playcalls_csv():
 
     output = StringIO()
     writer = csv.writer(output)
+    writer.writerow(['Bucket', 'Series', 'Playcall', 'Times Run', 'Total Points', 'PPC'])
+    seen_rows = set()
     if group_by == 'series':
-        writer.writerow(['Bucket', 'Series', 'Times Run', 'Total Points', 'PPC'])
         bucket_rows = report_rows.get('bucket_rows', {}) if isinstance(report_rows, dict) else {}
         for bucket_name in ('STANDARD', 'BOB', 'SOB'):
             payload = bucket_rows.get(bucket_name) if isinstance(bucket_rows, dict) else None
             if not isinstance(payload, dict):
                 continue
             for row in payload.get('rows', []):
-                writer.writerow(
-                    [
-                        row['bucket'],
-                        row['series'],
-                        row['times_run'],
-                        row['total_points'],
-                        f"{row['ppc']:.2f}",
-                    ]
+                entry = (
+                    row['bucket'],
+                    row['series'],
+                    row['playcall'],
+                    row['times_run'],
+                    row['total_points'],
+                    f"{row['ppc']:.2f}",
                 )
-            totals_payload = payload.get('totals') if isinstance(payload, dict) else None
-            if isinstance(totals_payload, dict):
-                writer.writerow(
-                    [
-                        bucket_name,
-                        'Totals',
-                        totals_payload.get('times_run', 0),
-                        totals_payload.get('total_points', 0),
-                        f"{(totals_payload.get('ppc') or 0):.2f}",
-                    ]
-                )
+                if entry in seen_rows:
+                    continue
+                seen_rows.add(entry)
+                writer.writerow(entry)
     else:
-        writer.writerow(['Series', 'Bucket', 'Playcall', 'Times Run', 'Total Points', 'PPC'])
-
         series_order = report_rows.get('visible_series', []) if isinstance(report_rows, dict) else []
         series_rows = report_rows.get('series_rows', {}) if isinstance(report_rows, dict) else {}
 
@@ -453,33 +444,18 @@ def export_playcalls_csv():
             if not isinstance(payload, dict):
                 continue
             for row in payload.get('rows', []):
-                writer.writerow(
-                    [
-                        row['series'],
-                        row['bucket'],
-                        row['playcall'],
-                        row['times_run'],
-                        row['total_points'],
-                        f"{row['ppc']:.2f}",
-                    ]
+                entry = (
+                    row['bucket'],
+                    row['series'],
+                    row['playcall'],
+                    row['times_run'],
+                    row['total_points'],
+                    f"{row['ppc']:.2f}",
                 )
-            totals_payload = payload.get('totals') if isinstance(payload, dict) else None
-            if isinstance(totals_payload, dict):
-                writer.writerow(
-                    [
-                        series_name,
-                        'Totals',
-                        'Totals',
-                        totals_payload.get('times_run', 0),
-                        totals_payload.get('total_points', 0),
-                        f"{(totals_payload.get('ppc') or 0):.2f}",
-                    ]
-                )
-
-        all_totals = report_rows.get('all_totals', {}) if isinstance(report_rows, dict) else {}
-        if report_rows.get('all_rows'):
-            writer.writerow([])
-            writer.writerow(['ALL', '', 'Totals', all_totals.get('times_run', 0), all_totals.get('total_points', 0), f"{(all_totals.get('ppc') or 0):.2f}"])
+                if entry in seen_rows:
+                    continue
+                seen_rows.add(entry)
+                writer.writerow(entry)
 
     output.seek(0)
     filename = f"scout_playcalls_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
