@@ -414,41 +414,48 @@ def export_playcalls_csv():
 
     output = StringIO()
     writer = csv.writer(output)
+    writer.writerow(['Bucket', 'Series', 'Playcall', 'Times Run', 'Total Points', 'PPC'])
+    seen_rows = set()
     if group_by == 'series':
-        writer.writerow(['Series', 'Playcall'])
         bucket_rows = report_rows.get('bucket_rows', {}) if isinstance(report_rows, dict) else {}
-        seen_pairs = set()
         for bucket_name in ('STANDARD', 'BOB', 'SOB'):
             payload = bucket_rows.get(bucket_name) if isinstance(bucket_rows, dict) else None
             if not isinstance(payload, dict):
                 continue
             for row in payload.get('rows', []):
-                series = row['series']
-                playcall = row['playcall']
-                pair = (series, playcall)
-                if pair in seen_pairs:
+                entry = (
+                    row['bucket'],
+                    row['series'],
+                    row['playcall'],
+                    row['times_run'],
+                    row['total_points'],
+                    f"{row['ppc']:.2f}",
+                )
+                if entry in seen_rows:
                     continue
-                seen_pairs.add(pair)
-                writer.writerow([series, playcall])
+                seen_rows.add(entry)
+                writer.writerow(entry)
     else:
-        writer.writerow(['Series', 'Playcall'])
-
         series_order = report_rows.get('visible_series', []) if isinstance(report_rows, dict) else []
         series_rows = report_rows.get('series_rows', {}) if isinstance(report_rows, dict) else {}
-        seen_pairs = set()
 
         for series_name in series_order:
             payload = series_rows.get(series_name) if isinstance(series_rows, dict) else None
             if not isinstance(payload, dict):
                 continue
             for row in payload.get('rows', []):
-                series = row['series']
-                playcall = row['playcall']
-                pair = (series, playcall)
-                if pair in seen_pairs:
+                entry = (
+                    row['bucket'],
+                    row['series'],
+                    row['playcall'],
+                    row['times_run'],
+                    row['total_points'],
+                    f"{row['ppc']:.2f}",
+                )
+                if entry in seen_rows:
                     continue
-                seen_pairs.add(pair)
-                writer.writerow([series, playcall])
+                seen_rows.add(entry)
+                writer.writerow(entry)
 
     output.seek(0)
     filename = f"scout_playcalls_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
