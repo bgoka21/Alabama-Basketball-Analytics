@@ -553,6 +553,108 @@
         </table>
       </div>
 
+      {% if mode == 'game' %}
+        <div class="mt-10">
+          <h2 class="text-lg sm:text-xl font-semibold mb-4">Lineup Efficiency</h2>
+          <div class="space-y-8">
+            <div>
+              <h3 class="text-base font-semibold mb-3">Offense</h3>
+              <div class="flex flex-wrap gap-2 mb-4">
+                {% for size in best_offense.keys()|sort %}
+                  <button type="button" class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+                    {{ size }}-Man
+                  </button>
+                {% endfor %}
+              </div>
+              {% for size in best_offense.keys()|sort %}
+              <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
+                <h4 class="text-base font-semibold mb-3">{{ size }}-Man Offense</h4>
+                {% if not best_offense[size] and not worst_offense[size] %}
+                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+                {% else %}
+                <h5 class="font-semibold mb-2">Best Offense</h5>
+                <table class="w-full table-auto border-collapse mb-4">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp in best_offense[size] %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <h5 class="font-semibold mb-2">Worst Offense</h5>
+                <table class="w-full table-auto border-collapse">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp in worst_offense[size] %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <h3 class="text-base font-semibold mb-3">Defense</h3>
+              <div class="flex flex-wrap gap-2 mb-4">
+                {% for size in best_defense.keys()|sort %}
+                  <button type="button" class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+                    {{ size }}-Man
+                  </button>
+                {% endfor %}
+              </div>
+              {% for size in best_defense.keys()|sort %}
+              <div id="def-lineup-{{ size }}" class="def-lineup-tab hidden">
+                <h4 class="text-base font-semibold mb-3">{{ size }}-Man Defense</h4>
+                {% if not best_defense[size] and not worst_defense[size] %}
+                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+                {% else %}
+                <h5 class="font-semibold mb-2">Best Defense</h5>
+                <table class="w-full table-auto border-collapse mb-4">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP Allowed</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp in best_defense[size] %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <h5 class="font-semibold mb-2">Worst Defense</h5>
+                <table class="w-full table-auto border-collapse">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr><th class="px-4 py-2 text-left">Lineup</th><th class="px-4 py-2 text-right">PPP Allowed</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp in worst_defense[size] %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
       {% if blue_totals %}
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
           <h3 class="text-base font-semibold mb-3">Season Blue Collar Summary</h3>
@@ -1083,6 +1185,40 @@ document.addEventListener('DOMContentLoaded',()=>{
     const base=link.href.split('#')[0];
     link.href=base+window.location.hash;
   });
+  const offBtns = document.querySelectorAll('.off-lineup-btn');
+  const offTabs = document.querySelectorAll('.off-lineup-tab');
+  offBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      offBtns.forEach(b => {
+        b.classList.remove('bg-[#9E1B32]','text-white');
+        b.classList.add('bg-gray-100','text-gray-700');
+      });
+      offTabs.forEach(t => t.classList.add('hidden'));
+      const sz = btn.dataset.size;
+      btn.classList.remove('bg-gray-100','text-gray-700');
+      btn.classList.add('bg-[#9E1B32]','text-white');
+      const target = document.getElementById(`off-lineup-${sz}`);
+      if (target) target.classList.remove('hidden');
+    });
+  });
+  if (offBtns.length) offBtns[0].click();
+  const defBtns = document.querySelectorAll('.def-lineup-btn');
+  const defTabs = document.querySelectorAll('.def-lineup-tab');
+  defBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      defBtns.forEach(b => {
+        b.classList.remove('bg-[#9E1B32]','text-white');
+        b.classList.add('bg-gray-100','text-gray-700');
+      });
+      defTabs.forEach(t => t.classList.add('hidden'));
+      const sz = btn.dataset.size;
+      btn.classList.remove('bg-gray-100','text-gray-700');
+      btn.classList.add('bg-[#9E1B32]','text-white');
+      const target = document.getElementById(`def-lineup-${sz}`);
+      if (target) target.classList.remove('hidden');
+    });
+  });
+  if (defBtns.length) defBtns[0].click();
   if(window.Chart && document.getElementById('trendChart')){
     const labels = trendData.map(d => {
       const [y,m,day] = d.date.split('-').map(Number);

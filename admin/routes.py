@@ -223,7 +223,7 @@ from services.leaderboard_game import (
 )
 from models.eybl import ExternalIdentityMap, IdentitySynonym, UnifiedStats
 from utils.reparse_uploaded_file import reparse_uploaded_file
-from utils.lineup import format_lineup_efficiencies
+from utils.lineup import compute_lineup_totals, format_lineup_efficiencies
 
 try:  # Optional CSRF protection – not every deployment wires this up
     from app.extensions import csrf  # type: ignore[attr-defined]
@@ -10038,6 +10038,12 @@ def team_totals():
     team_defense_rows: list[dict[str, Any]] = []
     team_defense_totals: Optional[dict[str, Any]] = None
     team_defense_possessions: dict[int, int] = {}
+    lineup_group_sizes = (2, 3, 4, 5)
+    lineup_min_poss = 10
+    best_offense = {size: [] for size in lineup_group_sizes}
+    worst_offense = {size: [] for size in lineup_group_sizes}
+    best_defense = {size: [] for size in lineup_group_sizes}
+    worst_defense = {size: [] for size in lineup_group_sizes}
 
     if mode == 'practice':
         q = PlayerStats.query.filter(PlayerStats.practice_id != None)
@@ -10137,6 +10143,64 @@ def team_totals():
         game_ids_for_totals = build_game_id_query(
             season_id, start_dt, end_dt, selected_game_types
         )
+
+        lineup_possessions_query = (
+            db.session.query(
+                Possession.id.label('possession_id'),
+                Possession.points_scored,
+                Possession.time_segment,
+                Possession.possession_side,
+                Roster.player_name,
+            )
+            .join(PlayerPossession, PlayerPossession.possession_id == Possession.id)
+            .join(Roster, Roster.id == PlayerPossession.player_id)
+            .filter(Possession.game_id != None)
+            .filter(Possession.game_id.in_(game_ids_for_totals))
+        )
+        if season_id:
+            lineup_possessions_query = lineup_possessions_query.filter(Possession.season_id == season_id)
+
+        lineup_possession_map: dict[int, dict[str, Any]] = {}
+        for row in lineup_possessions_query.all():
+            entry = lineup_possession_map.setdefault(
+                row.possession_id,
+                {
+                    "side": row.time_segment or row.possession_side or "",
+                    "points_scored": row.points_scored or 0,
+                    "players_on_floor": set(),
+                },
+            )
+            entry["players_on_floor"].add(row.player_name)
+
+        lineup_possession_data = [
+            {
+                "side": entry["side"],
+                "points_scored": entry["points_scored"],
+                "players_on_floor": sorted(entry["players_on_floor"]),
+            }
+            for entry in lineup_possession_map.values()
+        ]
+        lineup_totals = compute_lineup_totals(
+            lineup_possession_data,
+            group_sizes=lineup_group_sizes,
+        )
+
+        for size in lineup_group_sizes:
+            sides = lineup_totals.get(size, {})
+            off_ppp = {
+                ",".join(lineup): stats["pts"] / stats["poss"]
+                for lineup, stats in sides.get("offense", {}).items()
+                if stats["poss"] >= lineup_min_poss
+            }
+            def_ppp = {
+                ",".join(lineup): stats["pts"] / stats["poss"]
+                for lineup, stats in sides.get("defense", {}).items()
+                if stats["poss"] >= lineup_min_poss
+            }
+            best_offense[size] = sorted(off_ppp.items(), key=lambda x: x[1], reverse=True)[:5]
+            worst_offense[size] = sorted(off_ppp.items(), key=lambda x: x[1])[:5]
+            best_defense[size] = sorted(def_ppp.items(), key=lambda x: x[1])[:5]
+            worst_defense[size] = sorted(def_ppp.items(), key=lambda x: x[1], reverse=True)[:5]
 
         q = (
             PlayerStats.query.join(Game, PlayerStats.game_id == Game.id)
@@ -11225,6 +11289,10 @@ def team_totals():
         team_defense_rows=team_defense_rows,
         team_defense_totals=team_defense_totals,
         team_defense_possessions=team_defense_possessions,
+        best_offense=best_offense,
+        worst_offense=worst_offense,
+        best_defense=best_defense,
+        worst_defense=worst_defense,
         # >>> TEMPLATE CONTEXT SESSION START
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
         sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
