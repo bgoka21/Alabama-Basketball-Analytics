@@ -415,71 +415,40 @@ def export_playcalls_csv():
     output = StringIO()
     writer = csv.writer(output)
     if group_by == 'series':
-        writer.writerow(['Bucket', 'Series', 'Times Run', 'Total Points', 'PPC'])
+        writer.writerow(['Series', 'Playcall'])
         bucket_rows = report_rows.get('bucket_rows', {}) if isinstance(report_rows, dict) else {}
+        seen_pairs = set()
         for bucket_name in ('STANDARD', 'BOB', 'SOB'):
             payload = bucket_rows.get(bucket_name) if isinstance(bucket_rows, dict) else None
             if not isinstance(payload, dict):
                 continue
             for row in payload.get('rows', []):
-                writer.writerow(
-                    [
-                        row['bucket'],
-                        row['series'],
-                        row['times_run'],
-                        row['total_points'],
-                        f"{row['ppc']:.2f}",
-                    ]
-                )
-            totals_payload = payload.get('totals') if isinstance(payload, dict) else None
-            if isinstance(totals_payload, dict):
-                writer.writerow(
-                    [
-                        bucket_name,
-                        'Totals',
-                        totals_payload.get('times_run', 0),
-                        totals_payload.get('total_points', 0),
-                        f"{(totals_payload.get('ppc') or 0):.2f}",
-                    ]
-                )
+                series = row['series']
+                playcall = row['playcall']
+                pair = (series, playcall)
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                writer.writerow([series, playcall])
     else:
-        writer.writerow(['Series', 'Bucket', 'Playcall', 'Times Run', 'Total Points', 'PPC'])
+        writer.writerow(['Series', 'Playcall'])
 
         series_order = report_rows.get('visible_series', []) if isinstance(report_rows, dict) else []
         series_rows = report_rows.get('series_rows', {}) if isinstance(report_rows, dict) else {}
+        seen_pairs = set()
 
         for series_name in series_order:
             payload = series_rows.get(series_name) if isinstance(series_rows, dict) else None
             if not isinstance(payload, dict):
                 continue
             for row in payload.get('rows', []):
-                writer.writerow(
-                    [
-                        row['series'],
-                        row['bucket'],
-                        row['playcall'],
-                        row['times_run'],
-                        row['total_points'],
-                        f"{row['ppc']:.2f}",
-                    ]
-                )
-            totals_payload = payload.get('totals') if isinstance(payload, dict) else None
-            if isinstance(totals_payload, dict):
-                writer.writerow(
-                    [
-                        series_name,
-                        'Totals',
-                        'Totals',
-                        totals_payload.get('times_run', 0),
-                        totals_payload.get('total_points', 0),
-                        f"{(totals_payload.get('ppc') or 0):.2f}",
-                    ]
-                )
-
-        all_totals = report_rows.get('all_totals', {}) if isinstance(report_rows, dict) else {}
-        if report_rows.get('all_rows'):
-            writer.writerow([])
-            writer.writerow(['ALL', '', 'Totals', all_totals.get('times_run', 0), all_totals.get('total_points', 0), f"{(all_totals.get('ppc') or 0):.2f}"])
+                series = row['series']
+                playcall = row['playcall']
+                pair = (series, playcall)
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                writer.writerow([series, playcall])
 
     output.seek(0)
     filename = f"scout_playcalls_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
