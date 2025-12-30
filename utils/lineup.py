@@ -17,6 +17,30 @@ def _split_player_tokens(cell_value):
     return [token.strip() for token in normalized.split(",") if token.strip()]
 
 
+def normalize_lineup_side(side):
+    """Normalize lineup side labels to a consistent lowercase schema."""
+    if side is None:
+        return ""
+    if not isinstance(side, str):
+        side = str(side)
+    return side.strip().lower()
+
+
+def format_lineup_efficiencies(raw_lineups):
+    """Format lineup efficiencies for JSON serialization with normalized sides."""
+    formatted = {}
+    for size, sides in raw_lineups.items():
+        formatted[size] = {}
+        for side, side_data in sides.items():
+            normalized = normalize_lineup_side(side)
+            if not normalized:
+                continue
+            formatted[size][normalized] = {
+                ",".join(combo): ppp for combo, ppp in side_data.items()
+            }
+    return formatted
+
+
 def get_players_on_floor(row, df_columns):
     """Return player tokens using the same column leverage uses."""
     if "PLAYER POSSESSIONS" not in df_columns:
@@ -26,15 +50,22 @@ def get_players_on_floor(row, df_columns):
 
 def compute_lineup_efficiencies(possession_data, group_sizes=(2, 3, 4, 5), min_poss=5):
     """Compute PPP for each lineup size and side."""
+    normalized_sides = {
+        normalize_lineup_side(p.get("side"))
+        for p in possession_data
+    }
+    normalized_sides.discard("")
     raw = {
         size: {
             side: defaultdict(lambda: {"poss": 0, "pts": 0})
-            for side in set(p.get("side") for p in possession_data)
+            for side in normalized_sides
         }
         for size in group_sizes
     }
     for poss in possession_data:
-        side = poss.get("side")
+        side = normalize_lineup_side(poss.get("side"))
+        if not side:
+            continue
         players = poss.get("players_on_floor", [])
         pts = poss.get("points_scored", 0)
         for size in group_sizes:

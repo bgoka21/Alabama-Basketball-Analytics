@@ -19,16 +19,11 @@ from models.database import (
 from models.uploaded_file import UploadedFile
 from utils.records.candidate_builder import build_game_candidates
 from utils.records.evaluator import evaluate_candidates
+from utils.lineup import format_lineup_efficiencies
 
 
 def _format_lineup_efficiencies(raw_lineups: dict) -> dict:
-    formatted = {}
-    for size, sides in raw_lineups.items():
-        formatted[size] = {
-            side: {",".join(combo): ppp for combo, ppp in side_data.items()}
-            for side, side_data in sides.items()
-        }
-    return formatted
+    return format_lineup_efficiencies(raw_lineups)
 
 
 def reparse_uploaded_file(file: UploadedFile) -> Optional[dict]:
