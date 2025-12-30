@@ -63,6 +63,8 @@ def compute_lineup_efficiencies(possession_data, group_sizes=(2, 3, 4, 5), min_p
         for size in group_sizes
     }
     for poss in possession_data:
+        if not poss.get("is_true_possession", True):
+            continue
         side = normalize_lineup_side(poss.get("side"))
         if not side:
             continue
