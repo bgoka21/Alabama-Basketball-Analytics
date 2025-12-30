@@ -48,8 +48,8 @@ def get_players_on_floor(row, df_columns):
     return _split_player_tokens(row.get("PLAYER POSSESSIONS", ""))
 
 
-def compute_lineup_efficiencies(possession_data, group_sizes=(2, 3, 4, 5), min_poss=5):
-    """Compute PPP for each lineup size and side."""
+def compute_lineup_totals(possession_data, group_sizes=(2, 3, 4, 5)):
+    """Compute total points/possessions for each lineup size and side."""
     normalized_sides = {
         normalize_lineup_side(p.get("side"))
         for p in possession_data
@@ -77,6 +77,12 @@ def compute_lineup_efficiencies(possession_data, group_sizes=(2, 3, 4, 5), min_p
                 key = tuple(sorted(combo))
                 raw[size][side][key]["poss"] += 1
                 raw[size][side][key]["pts"] += pts
+    return raw
+
+
+def compute_lineup_efficiencies(possession_data, group_sizes=(2, 3, 4, 5), min_poss=5):
+    """Compute PPP for each lineup size and side."""
+    raw = compute_lineup_totals(possession_data, group_sizes=group_sizes)
     efficiencies = {size: {side: {} for side in raw[size]} for size in group_sizes}
     for size in group_sizes:
         for side in raw[size]:
