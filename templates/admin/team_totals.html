@@ -40,7 +40,7 @@
     <form id="gameTypeFilterForm" method="get" class="no-print border rounded p-3 bg-gray-50 flex flex-col gap-3">
       <input type="hidden" name="mode" value="game">
       {% for key, values in request.args.lists() %}
-        {% if key not in ['mode', 'game_type'] %}
+        {% if key not in ['mode', 'game_type', 'lineup_min_poss'] %}
           {% for v in values %}
             <input type="hidden" name="{{ key }}" value="{{ v }}">
           {% endfor %}
@@ -54,6 +54,17 @@
             <span class="ml-1">{{ option }}</span>
           </label>
         {% endfor %}
+      </div>
+      <div class="flex flex-wrap items-end gap-2">
+        <label class="text-sm font-medium" for="lineup_min_poss">Minimum Possessions</label>
+        <input
+          id="lineup_min_poss"
+          type="number"
+          name="lineup_min_poss"
+          min="0"
+          value="{{ lineup_min_poss }}"
+          class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        />
       </div>
       <div>
         <button type="submit" class="px-3 py-1 text-sm border rounded">Apply</button>
@@ -556,6 +567,7 @@
       {% if mode == 'game' %}
         <div class="mt-10">
           <h2 class="text-lg sm:text-xl font-semibold mb-4">Lineup Efficiency</h2>
+          <p class="text-sm text-gray-500 mb-3">Showing lineups with at least {{ lineup_min_poss }} possessions.</p>
           <div class="space-y-8">
             <div>
               <h3 class="text-base font-semibold mb-3">Offense</h3>
