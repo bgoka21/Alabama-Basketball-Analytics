@@ -9,6 +9,7 @@
   <div class="flex space-x-4 mb-6">
     <button id="offenseBtn" class="px-4 py-2 rounded bg-[#9E1B32] text-white">Offense</button>
     <button id="defenseBtn" class="px-4 py-2 rounded bg-gray-200 text-gray-700">Defense</button>
+    <button id="lineupBtn" class="px-4 py-2 rounded bg-gray-200 text-gray-700">Lineup Efficiency</button>
   </div>
 
   <!-- OFFENSE TAB -->
@@ -227,75 +228,6 @@
         </div>
       </div>
 
-    <!-- Lineup Efficiency (Offense) -->
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
-      <div class="bg-white shadow rounded-lg p-6 mb-10">
-        <!-- Offense Size Tabs -->
-        <div class="flex space-x-2 mb-6">
-          {% for size in best_offense.keys()|sort %}
-            <button type="button"
-                    class="off-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
-                    data-size="{{ size }}">
-              {{ size }}-Man
-            </button>
-          {% endfor %}
-        </div>
-
-        <!-- Offense Tab Panes -->
-        {% for size in best_offense.keys()|sort %}
-        <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
-          <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Offense</h3>
-
-          {% if not best_offense[size] and not worst_offense[size] %}
-            <p class="italic text-center text-gray-500">
-              No {{ size }}-Man lineup data available for this game.
-            </p>
-          {% else %}
-            <h4 class="font-semibold mb-2">Best Offense</h4>
-            <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse mb-4">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp in best_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            </div>
-
-            <h4 class="font-semibold mb-2">Worst Offense</h4>
-            <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp in worst_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            </div>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-    </div>
   </div>
         
       
@@ -514,6 +446,80 @@
         </div>
       </div>
 
+  </div>
+
+  <!-- LINEUP EFFICIENCY TAB -->
+  <div id="lineupContent" class="hidden">
+    <!-- Lineup Efficiency (Offense) -->
+    <div class="mt-8">
+      <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
+      <div class="bg-white shadow rounded-lg p-6 mb-10">
+        <!-- Offense Size Tabs -->
+        <div class="flex space-x-2 mb-6">
+          {% for size in best_offense.keys()|sort %}
+            <button type="button"
+                    class="off-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
+                    data-size="{{ size }}">
+              {{ size }}-Man
+            </button>
+          {% endfor %}
+        </div>
+
+        <!-- Offense Tab Panes -->
+        {% for size in best_offense.keys()|sort %}
+        <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
+          <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Offense</h3>
+
+          {% if not best_offense[size] and not worst_offense[size] %}
+            <p class="italic text-center text-gray-500">
+              No {{ size }}-Man lineup data available for this game.
+            </p>
+          {% else %}
+            <h4 class="font-semibold mb-2">Best Offense</h4>
+            <div class="overflow-x-auto">
+            <table class="w-full table-auto border-collapse mb-4">
+              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">PPP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, ppp in best_offense[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+
+            <h4 class="font-semibold mb-2">Worst Offense</h4>
+            <div class="overflow-x-auto">
+            <table class="w-full table-auto border-collapse">
+              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">PPP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, ppp in worst_offense[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
     <!-- Lineup Efficiency (Defense) -->
     <div class="mt-8">
       <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
@@ -591,27 +597,55 @@
       // Top-level toggle
       const offBtn = document.getElementById('offenseBtn');
       const defBtn = document.getElementById('defenseBtn');
+      const lineupBtn = document.getElementById('lineupBtn');
       const offContent = document.getElementById('offenseContent');
       const defContent = document.getElementById('defenseContent');
+      const lineupContent = document.getElementById('lineupContent');
   
       function showOff() {
         offContent.classList.remove('hidden');
         defContent.classList.add('hidden');
+        lineupContent.classList.add('hidden');
         offBtn.classList.replace('bg-gray-200','bg-[#9E1B32]');
         offBtn.classList.replace('text-gray-700','text-white');
         defBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
         defBtn.classList.replace('text-white','text-gray-700');
+        lineupBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
+        lineupBtn.classList.replace('text-white','text-gray-700');
       }
       function showDef() {
         defContent.classList.remove('hidden');
         offContent.classList.add('hidden');
+        lineupContent.classList.add('hidden');
         defBtn.classList.replace('bg-gray-200','bg-[#9E1B32]');
         defBtn.classList.replace('text-gray-700','text-white');
         offBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
         offBtn.classList.replace('text-white','text-gray-700');
+        lineupBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
+        lineupBtn.classList.replace('text-white','text-gray-700');
+      }
+      function showLineup() {
+        lineupContent.classList.remove('hidden');
+        offContent.classList.add('hidden');
+        defContent.classList.add('hidden');
+        lineupBtn.classList.replace('bg-gray-200','bg-[#9E1B32]');
+        lineupBtn.classList.replace('text-gray-700','text-white');
+        offBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
+        offBtn.classList.replace('text-white','text-gray-700');
+        defBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
+        defBtn.classList.replace('text-white','text-gray-700');
+        const hasActiveOffTab = Array.from(offTabs).some(tab => !tab.classList.contains('hidden'));
+        const hasActiveDefTab = Array.from(defTabs).some(tab => !tab.classList.contains('hidden'));
+        if (offBtns.length && !hasActiveOffTab) {
+          offBtns[0].click();
+        }
+        if (defBtns.length && !hasActiveDefTab) {
+          defBtns[0].click();
+        }
       }
       offBtn.addEventListener('click', showOff);
       defBtn.addEventListener('click', showDef);
+      lineupBtn.addEventListener('click', showLineup);
       showOff();
   
       // Offense lineup tabs
