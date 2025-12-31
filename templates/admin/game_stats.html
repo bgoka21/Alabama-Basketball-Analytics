@@ -450,6 +450,57 @@
 
   <!-- LINEUP EFFICIENCY TAB -->
   <div id="lineupContent" class="hidden">
+    <!-- Most Used Lineups -->
+    <div class="mt-8">
+      <h2 class="text-2xl font-bold mb-4">Most Used Lineups</h2>
+      <div class="bg-white shadow rounded-lg p-6 mb-10">
+        <!-- Most Used Size Tabs -->
+        <div class="flex space-x-2 mb-6">
+          {% for size in most_used_lineups.keys()|sort %}
+            <button type="button"
+                    class="used-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
+                    data-size="{{ size }}">
+              {{ size }}-Man
+            </button>
+          {% endfor %}
+        </div>
+
+        <!-- Most Used Tab Panes -->
+        {% for size in most_used_lineups.keys()|sort %}
+        <div id="used-lineup-{{ size }}" class="used-lineup-tab hidden">
+          <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Lineups</h3>
+
+          {% if not most_used_lineups[size] %}
+            <p class="italic text-center text-gray-500">
+              No {{ size }}-Man lineup data available for this game.
+            </p>
+          {% else %}
+            <div class="overflow-x-auto">
+            <table class="w-full table-auto border-collapse">
+              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">Possessions</th>
+                  <th class="px-4 py-2 text-right">PPP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, poss, ppp in most_used_lineups[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ poss }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
     <!-- Lineup Efficiency (Offense) -->
     <div class="mt-8">
       <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
@@ -634,8 +685,12 @@
         offBtn.classList.replace('text-white','text-gray-700');
         defBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
         defBtn.classList.replace('text-white','text-gray-700');
+        const hasActiveUsedTab = Array.from(usedTabs).some(tab => !tab.classList.contains('hidden'));
         const hasActiveOffTab = Array.from(offTabs).some(tab => !tab.classList.contains('hidden'));
         const hasActiveDefTab = Array.from(defTabs).some(tab => !tab.classList.contains('hidden'));
+        if (usedBtns.length && !hasActiveUsedTab) {
+          usedBtns[0].click();
+        }
         if (offBtns.length && !hasActiveOffTab) {
           offBtns[0].click();
         }
@@ -648,6 +703,24 @@
       lineupBtn.addEventListener('click', showLineup);
       showOff();
   
+      // Most used lineup tabs
+      const usedBtns = document.querySelectorAll('.used-lineup-btn');
+      const usedTabs = document.querySelectorAll('.used-lineup-tab');
+      usedBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          usedBtns.forEach(b => {
+            b.classList.remove('bg-[#9E1B32]','text-white');
+            b.classList.add('bg-gray-100','text-gray-700');
+          });
+          usedTabs.forEach(t => t.classList.add('hidden'));
+          const sz = btn.dataset.size;
+          btn.classList.remove('bg-gray-100','text-gray-700');
+          btn.classList.add('bg-[#9E1B32]','text-white');
+          document.getElementById(`used-lineup-${sz}`).classList.remove('hidden');
+        });
+      });
+      if (usedBtns.length) usedBtns[0].click();
+
       // Offense lineup tabs
       const offBtns = document.querySelectorAll('.off-lineup-btn');
       const offTabs = document.querySelectorAll('.off-lineup-tab');
