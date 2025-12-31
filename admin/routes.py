@@ -10039,7 +10039,11 @@ def team_totals():
     team_defense_totals: Optional[dict[str, Any]] = None
     team_defense_possessions: dict[int, int] = {}
     lineup_group_sizes = (2, 3, 4, 5)
-    lineup_min_poss = 10
+    lineup_min_poss = request.args.get('lineup_min_poss', type=int)
+    if lineup_min_poss is None:
+        lineup_min_poss = 10
+    if lineup_min_poss < 0:
+        lineup_min_poss = 0
     best_offense = {size: [] for size in lineup_group_sizes}
     worst_offense = {size: [] for size in lineup_group_sizes}
     best_defense = {size: [] for size in lineup_group_sizes}
@@ -11258,6 +11262,8 @@ def team_totals():
                 params['session'] = selected_session
             if last_n:
                 params['last'] = last_n
+        if lineup_min_poss is not None:
+            params['lineup_min_poss'] = lineup_min_poss
         return params
 
     practice_mode_url = url_for('admin.team_totals', mode='practice', **_build_mode_params('practice'))
@@ -11301,6 +11307,7 @@ def team_totals():
         worst_offense=worst_offense,
         best_defense=best_defense,
         worst_defense=worst_defense,
+        lineup_min_poss=lineup_min_poss,
         # >>> TEMPLATE CONTEXT SESSION START
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
         sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
