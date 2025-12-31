@@ -157,6 +157,7 @@
   <button id="btnSeasonTotals" onclick="showTab('seasonTotals')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Totals</button>
   <button id="btnShotType" onclick="showTab('shotType')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Shot Type</button>
   <button id="btnGameStats" onclick="showTab('gameStats')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Game Stats</button>
+  <button id="btnLineupEfficiency" onclick="showTab('lineupEfficiency')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Lineup Efficiency</button>
   <button id="btnTrends" onclick="showTab('trends')" class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded">Trends</button>
 </div>
 <div id="seasonTotals" class="tab-content block">
@@ -564,129 +565,6 @@
         </table>
       </div>
 
-      {% if mode == 'game' %}
-        <div class="mt-10">
-          <h2 class="text-lg sm:text-xl font-semibold mb-4">Lineup Efficiency</h2>
-          <p class="text-sm text-gray-500 mb-3">Showing lineups with at least {{ lineup_min_poss }} possessions.</p>
-          <div class="space-y-8">
-            <div>
-              <h3 class="text-base font-semibold mb-3">Offense</h3>
-              <div class="flex flex-wrap gap-2 mb-4">
-                {% for size in best_offense.keys()|sort %}
-                  <button type="button" class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
-                    {{ size }}-Man
-                  </button>
-                {% endfor %}
-              </div>
-              {% for size in best_offense.keys()|sort %}
-              <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
-                <h4 class="text-base font-semibold mb-3">{{ size }}-Man Offense</h4>
-                {% if not best_offense[size] and not worst_offense[size] %}
-                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
-                {% else %}
-                <h5 class="font-semibold mb-2">Best Offense</h5>
-                <table class="w-full table-auto border-collapse mb-4">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in best_offense[size] %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                <h5 class="font-semibold mb-2">Worst Offense</h5>
-                <table class="w-full table-auto border-collapse">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in worst_offense[size] %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                {% endif %}
-              </div>
-              {% endfor %}
-            </div>
-            <div>
-              <h3 class="text-base font-semibold mb-3">Defense</h3>
-              <div class="flex flex-wrap gap-2 mb-4">
-                {% for size in best_defense.keys()|sort %}
-                  <button type="button" class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
-                    {{ size }}-Man
-                  </button>
-                {% endfor %}
-              </div>
-              {% for size in best_defense.keys()|sort %}
-              <div id="def-lineup-{{ size }}" class="def-lineup-tab hidden">
-                <h4 class="text-base font-semibold mb-3">{{ size }}-Man Defense</h4>
-                {% if not best_defense[size] and not worst_defense[size] %}
-                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
-                {% else %}
-                <h5 class="font-semibold mb-2">Best Defense</h5>
-                <table class="w-full table-auto border-collapse mb-4">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP Allowed</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in best_defense[size] %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                <h5 class="font-semibold mb-2">Worst Defense</h5>
-                <table class="w-full table-auto border-collapse">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP Allowed</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in worst_defense[size] %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                {% endif %}
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      {% endif %}
-
       {% if blue_totals %}
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
           <h3 class="text-base font-semibold mb-3">Season Blue Collar Summary</h3>
@@ -706,6 +584,133 @@
       {% endif %}
     </section>
   </div>
+</div>
+
+<div id="lineupEfficiency" class="tab-content hidden">
+  {% if mode == 'game' %}
+    <div class="mt-10">
+      <h2 class="text-lg sm:text-xl font-semibold mb-4">Lineup Efficiency</h2>
+      <p class="text-sm text-gray-500 mb-3">Showing lineups with at least {{ lineup_min_poss }} possessions.</p>
+      <div class="space-y-8">
+        <div>
+          <h3 class="text-base font-semibold mb-3">Offense</h3>
+          <div class="flex flex-wrap gap-2 mb-4">
+            {% for size in best_offense.keys()|sort %}
+              <button type="button" class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+                {{ size }}-Man
+              </button>
+            {% endfor %}
+          </div>
+          {% for size in best_offense.keys()|sort %}
+          <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
+            <h4 class="text-base font-semibold mb-3">{{ size }}-Man Offense</h4>
+            {% if not best_offense[size] and not worst_offense[size] %}
+            <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+            {% else %}
+            <h5 class="font-semibold mb-2">Best Offense</h5>
+            <table class="w-full table-auto border-collapse mb-4">
+              <thead class="bg-white border-b-2 border-[#9E1B32]">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">PPP</th>
+                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, ppp, poss in best_offense[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                  <td class="px-4 py-2 text-right">{{ poss }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <h5 class="font-semibold mb-2">Worst Offense</h5>
+            <table class="w-full table-auto border-collapse">
+              <thead class="bg-white border-b-2 border-[#9E1B32]">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">PPP</th>
+                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, ppp, poss in worst_offense[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                  <td class="px-4 py-2 text-right">{{ poss }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <div>
+          <h3 class="text-base font-semibold mb-3">Defense</h3>
+          <div class="flex flex-wrap gap-2 mb-4">
+            {% for size in best_defense.keys()|sort %}
+              <button type="button" class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+                {{ size }}-Man
+              </button>
+            {% endfor %}
+          </div>
+          {% for size in best_defense.keys()|sort %}
+          <div id="def-lineup-{{ size }}" class="def-lineup-tab hidden">
+            <h4 class="text-base font-semibold mb-3">{{ size }}-Man Defense</h4>
+            {% if not best_defense[size] and not worst_defense[size] %}
+            <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+            {% else %}
+            <h5 class="font-semibold mb-2">Best Defense</h5>
+            <table class="w-full table-auto border-collapse mb-4">
+              <thead class="bg-white border-b-2 border-[#9E1B32]">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">PPP Allowed</th>
+                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, ppp, poss in best_defense[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                  <td class="px-4 py-2 text-right">{{ poss }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <h5 class="font-semibold mb-2">Worst Defense</h5>
+            <table class="w-full table-auto border-collapse">
+              <thead class="bg-white border-b-2 border-[#9E1B32]">
+                <tr>
+                  <th class="px-4 py-2 text-left">Lineup</th>
+                  <th class="px-4 py-2 text-right">PPP Allowed</th>
+                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for combo, ppp, poss in worst_defense[size] %}
+                <tr class="odd:bg-white even:bg-gray-100">
+                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                  <td class="px-4 py-2 text-right">{{ poss }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <p class="text-sm text-gray-500">Lineup efficiency is only available in game mode.</p>
+  {% endif %}
 </div>
 
 <div id="shotType" class="tab-content hidden">
@@ -1134,8 +1139,8 @@ function buildTrendChart(){
 }
 </script>
 <script>
-const TAB_IDS=['seasonTotals','gameStats','shotType','trends'];
-const BUTTON_IDS=['btnSeasonTotals','btnGameStats','btnShotType','btnTrends'];
+const TAB_IDS=['seasonTotals','gameStats','lineupEfficiency','shotType','trends'];
+const BUTTON_IDS=['btnSeasonTotals','btnGameStats','btnLineupEfficiency','btnShotType','btnTrends'];
 function capitalize(str){return str.charAt(0).toUpperCase()+str.slice(1);}
 function showTab(tabName){
   TAB_IDS.forEach(id=>{
