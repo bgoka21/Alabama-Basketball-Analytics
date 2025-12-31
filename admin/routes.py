@@ -10187,20 +10187,28 @@ def team_totals():
 
         for size in lineup_group_sizes:
             sides = lineup_totals.get(size, {})
-            off_ppp = {
-                ",".join(lineup): stats["pts"] / stats["poss"]
+            off_entries = [
+                (
+                    ",".join(lineup),
+                    stats["pts"] / stats["poss"],
+                    stats["poss"],
+                )
                 for lineup, stats in sides.get("offense", {}).items()
                 if stats["poss"] >= lineup_min_poss
-            }
-            def_ppp = {
-                ",".join(lineup): stats["pts"] / stats["poss"]
+            ]
+            def_entries = [
+                (
+                    ",".join(lineup),
+                    stats["pts"] / stats["poss"],
+                    stats["poss"],
+                )
                 for lineup, stats in sides.get("defense", {}).items()
                 if stats["poss"] >= lineup_min_poss
-            }
-            best_offense[size] = sorted(off_ppp.items(), key=lambda x: x[1], reverse=True)[:5]
-            worst_offense[size] = sorted(off_ppp.items(), key=lambda x: x[1])[:5]
-            best_defense[size] = sorted(def_ppp.items(), key=lambda x: x[1])[:5]
-            worst_defense[size] = sorted(def_ppp.items(), key=lambda x: x[1], reverse=True)[:5]
+            ]
+            best_offense[size] = sorted(off_entries, key=lambda x: x[1], reverse=True)[:5]
+            worst_offense[size] = sorted(off_entries, key=lambda x: x[1])[:5]
+            best_defense[size] = sorted(def_entries, key=lambda x: x[1])[:5]
+            worst_defense[size] = sorted(def_entries, key=lambda x: x[1], reverse=True)[:5]
 
         q = (
             PlayerStats.query.join(Game, PlayerStats.game_id == Game.id)
