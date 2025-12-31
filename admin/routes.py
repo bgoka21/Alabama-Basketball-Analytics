@@ -11326,6 +11326,7 @@ def team_totals():
         worst_offense=worst_offense,
         best_defense=best_defense,
         worst_defense=worst_defense,
+        most_used_lineups=most_used_lineups,
         lineup_min_poss=lineup_min_poss,
         # >>> TEMPLATE CONTEXT SESSION START
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
