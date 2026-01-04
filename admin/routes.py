@@ -7312,6 +7312,68 @@ def game_stats(game_id):
         best_defense[size]  = sorted(dfens.items(), key=lambda x: x[1])[:5]
         worst_defense[size] = sorted(dfens.items(), key=lambda x: x[1], reverse=True)[:5]
 
+    lineup_group_sizes = (2, 3, 4, 5)
+    lineup_min_poss = request.args.get('lineup_min_poss', type=int)
+    if lineup_min_poss is None:
+        lineup_min_poss = 1
+    if lineup_min_poss < 0:
+        lineup_min_poss = 0
+    most_used_lineups = {size: [] for size in lineup_group_sizes}
+    lineup_possessions_query = (
+        db.session.query(
+            Possession.id.label('possession_id'),
+            Possession.points_scored,
+            Possession.time_segment,
+            Possession.possession_side,
+            Roster.player_name,
+        )
+        .join(PlayerPossession, PlayerPossession.possession_id == Possession.id)
+        .join(Roster, Roster.id == PlayerPossession.player_id)
+        .filter(Possession.game_id == game_id)
+    )
+    lineup_possession_map: dict[int, dict[str, Any]] = {}
+    for row in lineup_possessions_query.all():
+        entry = lineup_possession_map.setdefault(
+            row.possession_id,
+            {
+                "side": row.time_segment or row.possession_side or "",
+                "points_scored": row.points_scored or 0,
+                "players_on_floor": set(),
+            },
+        )
+        entry["players_on_floor"].add(row.player_name)
+    lineup_possession_data = [
+        {
+            "side": entry["side"],
+            "points_scored": entry["points_scored"],
+            "players_on_floor": sorted(entry["players_on_floor"]),
+        }
+        for entry in lineup_possession_map.values()
+    ]
+    lineup_totals = compute_lineup_totals(
+        lineup_possession_data,
+        group_sizes=lineup_group_sizes,
+    )
+    for size in lineup_group_sizes:
+        sides = lineup_totals.get(size, {})
+        combined_totals = defaultdict(lambda: {"poss": 0, "pts": 0})
+        for side_stats in sides.values():
+            for lineup, stats in side_stats.items():
+                combined_totals[lineup]["poss"] += stats["poss"]
+                combined_totals[lineup]["pts"] += stats["pts"]
+        combined_entries = [
+            (
+                ",".join(lineup),
+                stats["poss"],
+                stats["pts"] / stats["poss"] if stats["poss"] else 0,
+            )
+            for lineup, stats in combined_totals.items()
+            if stats["poss"] >= lineup_min_poss
+        ]
+        most_used_lineups[size] = sorted(
+            combined_entries, key=lambda x: x[1], reverse=True
+        )[:5]
+
     # ─── DEFENSIVE SECONDARY METRICS ──────────────────────────────────────────
     # We'll treat the opponent’s offense as “Defense rows” in the CSV:
     defense_rows = df[df['Row'] == "Defense"]
