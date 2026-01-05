@@ -10155,6 +10155,14 @@ def team_totals():
         lineup_min_poss = 10
     if lineup_min_poss < 0:
         lineup_min_poss = 0
+    lineup_players: list[str] = []
+    lineup_player: Optional[str] = None
+    lineup_player_normalized: Optional[str] = None
+
+    def _normalize_lineup_player_name(name: str) -> str:
+        return " ".join(name.split()).strip().lower()
+
+    raw_lineup_player = request.args.get('lineup_player') or ''
     best_offense = {size: [] for size in lineup_group_sizes}
     worst_offense = {size: [] for size in lineup_group_sizes}
     best_defense = {size: [] for size in lineup_group_sizes}
@@ -10277,6 +10285,7 @@ def team_totals():
             lineup_possessions_query = lineup_possessions_query.filter(Possession.season_id == season_id)
 
         lineup_possession_map: dict[int, dict[str, Any]] = {}
+        lineup_players_set: set[str] = set()
         for row in lineup_possessions_query.all():
             entry = lineup_possession_map.setdefault(
                 row.possession_id,
@@ -10286,7 +10295,20 @@ def team_totals():
                     "players_on_floor": set(),
                 },
             )
-            entry["players_on_floor"].add(row.player_name)
+            if row.player_name:
+                player_name = str(row.player_name).strip()
+                if player_name:
+                    entry["players_on_floor"].add(player_name)
+                    lineup_players_set.add(player_name)
+
+        lineup_players = sorted(lineup_players_set, key=lambda name: name.lower())
+        normalized_lineup_players = {
+            _normalize_lineup_player_name(name): name for name in lineup_players
+        }
+        requested_lineup_player = _normalize_lineup_player_name(raw_lineup_player) if raw_lineup_player else ""
+        if requested_lineup_player and requested_lineup_player in normalized_lineup_players:
+            lineup_player_normalized = requested_lineup_player
+            lineup_player = normalized_lineup_players[requested_lineup_player]
 
         lineup_possession_data = [
             {
@@ -10300,6 +10322,14 @@ def team_totals():
             lineup_possession_data,
             group_sizes=lineup_group_sizes,
         )
+
+        def _lineup_has_player(lineup: Sequence[str]) -> bool:
+            if not lineup_player_normalized:
+                return True
+            return any(
+                _normalize_lineup_player_name(name) == lineup_player_normalized
+                for name in lineup
+            )
 
         for size in lineup_group_sizes:
             sides = lineup_totals.get(size, {})
@@ -10315,7 +10345,7 @@ def team_totals():
                     stats["pts"] / stats["poss"] if stats["poss"] else 0,
                 )
                 for lineup, stats in combined_totals.items()
-                if stats["poss"] >= lineup_min_poss
+                if stats["poss"] >= lineup_min_poss and _lineup_has_player(lineup)
             ]
             most_used_lineups[size] = sorted(
                 combined_entries, key=lambda x: x[1], reverse=True
@@ -10327,7 +10357,7 @@ def team_totals():
                     stats["poss"],
                 )
                 for lineup, stats in sides.get("offense", {}).items()
-                if stats["poss"] >= lineup_min_poss
+                if stats["poss"] >= lineup_min_poss and _lineup_has_player(lineup)
             ]
             def_entries = [
                 (
@@ -10336,7 +10366,7 @@ def team_totals():
                     stats["poss"],
                 )
                 for lineup, stats in sides.get("defense", {}).items()
-                if stats["poss"] >= lineup_min_poss
+                if stats["poss"] >= lineup_min_poss and _lineup_has_player(lineup)
             ]
             best_offense[size] = sorted(off_entries, key=lambda x: x[1], reverse=True)[:5]
             worst_offense[size] = sorted(off_entries, key=lambda x: x[1])[:5]
@@ -11393,6 +11423,8 @@ def team_totals():
                 params['last'] = last_n
         if lineup_min_poss is not None:
             params['lineup_min_poss'] = lineup_min_poss
+        if lineup_player:
+            params['lineup_player'] = lineup_player
         return params
 
     practice_mode_url = url_for('admin.team_totals', mode='practice', **_build_mode_params('practice'))
@@ -11438,6 +11470,8 @@ def team_totals():
         worst_defense=worst_defense,
         most_used_lineups=most_used_lineups,
         lineup_min_poss=lineup_min_poss,
+        lineup_players=lineup_players,
+        lineup_player=lineup_player,
         # >>> TEMPLATE CONTEXT SESSION START
         selected_session=selected_session if 'selected_session' in locals() else request.args.get('session') or 'All',
         sessions=['Summer 1','Summer 2','Fall','Official Practice','All'],
