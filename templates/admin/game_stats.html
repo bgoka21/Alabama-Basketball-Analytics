@@ -450,6 +450,32 @@
 
   <!-- LINEUP EFFICIENCY TAB -->
   <div id="lineupContent" class="hidden">
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-2xl font-bold">Lineup Efficiency Filters</h2>
+        {% if lineup_player %}
+          <p class="text-sm text-gray-600">Filtered to: {{ lineup_player }}</p>
+        {% endif %}
+      </div>
+      <form method="get" class="flex items-center gap-2">
+        {% for key, value in request.args.items() %}
+          {% if key != 'lineup_player' %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+          {% endif %}
+        {% endfor %}
+        <label for="lineupPlayer" class="text-sm font-medium text-gray-700">Player</label>
+        <select id="lineupPlayer" name="lineup_player" class="rounded border-gray-300 text-sm" onchange="this.form.submit()">
+          <option value="">All Players</option>
+          {% for player in lineup_players %}
+            <option value="{{ player }}" {% if lineup_player == player %}selected{% endif %}>{{ player }}</option>
+          {% endfor %}
+        </select>
+        <noscript>
+          <button type="submit" class="px-3 py-1 text-sm font-medium rounded bg-gray-200">Apply</button>
+        </noscript>
+      </form>
+    </div>
+
     <!-- Most Used Lineups -->
     <div class="mt-8">
       <h2 class="text-2xl font-bold mb-4">Most Used Lineups</h2>
