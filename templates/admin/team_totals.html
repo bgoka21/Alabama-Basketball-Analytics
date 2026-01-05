@@ -40,7 +40,7 @@
     <form id="gameTypeFilterForm" method="get" class="no-print border rounded p-3 bg-gray-50 flex flex-col gap-3">
       <input type="hidden" name="mode" value="game">
       {% for key, values in request.args.lists() %}
-        {% if key not in ['mode', 'game_type', 'lineup_min_poss'] %}
+        {% if key not in ['mode', 'game_type', 'lineup_min_poss', 'lineup_player'] %}
           {% for v in values %}
             <input type="hidden" name="{{ key }}" value="{{ v }}">
           {% endfor %}
@@ -65,6 +65,17 @@
           value="{{ lineup_min_poss }}"
           class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
         />
+        <label class="text-sm font-medium" for="lineup_player">Player</label>
+        <select
+          id="lineup_player"
+          name="lineup_player"
+          class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+        >
+          <option value="">All Players</option>
+          {% for player in lineup_players %}
+            <option value="{{ player }}" {% if player == lineup_player %}selected{% endif %}>{{ player }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div>
         <button type="submit" class="px-3 py-1 text-sm border rounded">Apply</button>
@@ -81,6 +92,9 @@
       {% for gt in selected_game_types %}
         <input type="hidden" name="game_type" value="{{ gt }}">
       {% endfor %}
+      {% if lineup_player %}
+        <input type="hidden" name="lineup_player" value="{{ lineup_player }}">
+      {% endif %}
       <div>
         <label class="font-semibold mr-2">Season:</label>
         <select name="trend_season_id" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]">
@@ -591,12 +605,20 @@
     <div class="mt-10">
       <h2 class="text-lg sm:text-xl font-semibold mb-4">Lineup Efficiency</h2>
       <p class="text-sm text-gray-500 mb-3">Showing lineups with at least {{ lineup_min_poss }} possessions.</p>
+      {% if lineup_player %}
+        <p class="text-sm text-gray-600 mb-4">Filtered to: <span class="font-semibold">{{ lineup_player }}</span></p>
+      {% endif %}
       <div class="space-y-8">
         <div>
           <h3 class="text-base font-semibold mb-3">Most Used Lineups</h3>
           <div class="flex flex-wrap gap-2 mb-4">
             {% for size in most_used_lineups.keys()|sort %}
-              <button type="button" class="used-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+              <button
+                type="button"
+                class="used-lineup-btn px-4 py-2 rounded-lg bg-gray-100"
+                data-size="{{ size }}"
+                data-has-data="{{ 'true' if most_used_lineups[size] else 'false' }}"
+              >
                 {{ size }}-Man
               </button>
             {% endfor %}
@@ -633,7 +655,12 @@
           <h3 class="text-base font-semibold mb-3">Offense</h3>
           <div class="flex flex-wrap gap-2 mb-4">
             {% for size in best_offense.keys()|sort %}
-              <button type="button" class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+              <button
+                type="button"
+                class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100"
+                data-size="{{ size }}"
+                data-has-data="{{ 'true' if best_offense[size] or worst_offense[size] else 'false' }}"
+              >
                 {{ size }}-Man
               </button>
             {% endfor %}
@@ -690,7 +717,12 @@
           <h3 class="text-base font-semibold mb-3">Defense</h3>
           <div class="flex flex-wrap gap-2 mb-4">
             {% for size in best_defense.keys()|sort %}
-              <button type="button" class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100" data-size="{{ size }}">
+              <button
+                type="button"
+                class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100"
+                data-size="{{ size }}"
+                data-has-data="{{ 'true' if best_defense[size] or worst_defense[size] else 'false' }}"
+              >
                 {{ size }}-Man
               </button>
             {% endfor %}
@@ -1275,7 +1307,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       if (target) target.classList.remove('hidden');
     });
   });
-  if (usedBtns.length) usedBtns[0].click();
+  const defaultUsedBtn = Array.from(usedBtns).find(btn => btn.dataset.hasData === 'true') || usedBtns[0];
+  if (defaultUsedBtn) defaultUsedBtn.click();
   const offBtns = document.querySelectorAll('.off-lineup-btn');
   const offTabs = document.querySelectorAll('.off-lineup-tab');
   offBtns.forEach(btn => {
@@ -1292,7 +1325,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       if (target) target.classList.remove('hidden');
     });
   });
-  if (offBtns.length) offBtns[0].click();
+  const defaultOffBtn = Array.from(offBtns).find(btn => btn.dataset.hasData === 'true') || offBtns[0];
+  if (defaultOffBtn) defaultOffBtn.click();
   const defBtns = document.querySelectorAll('.def-lineup-btn');
   const defTabs = document.querySelectorAll('.def-lineup-tab');
   defBtns.forEach(btn => {
@@ -1309,7 +1343,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       if (target) target.classList.remove('hidden');
     });
   });
-  if (defBtns.length) defBtns[0].click();
+  const defaultDefBtn = Array.from(defBtns).find(btn => btn.dataset.hasData === 'true') || defBtns[0];
+  if (defaultDefBtn) defaultDefBtn.click();
   if(window.Chart && document.getElementById('trendChart')){
     const labels = trendData.map(d => {
       const [y,m,day] = d.date.split('-').map(Number);
