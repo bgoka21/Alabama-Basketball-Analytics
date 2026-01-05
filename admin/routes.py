@@ -7350,6 +7350,20 @@ def game_stats(game_id):
         }
         for entry in lineup_possession_map.values()
     ]
+    lineup_player_set = {
+        player
+        for entry in lineup_possession_data
+        for player in entry["players_on_floor"]
+    }
+    if not lineup_player_set:
+        lineup_player_set.update(
+            player.player_name
+            for player in Roster.query.filter_by(season_id=game.season_id).all()
+        )
+    lineup_players = sorted(lineup_player_set, key=str.casefold)
+    lineup_player_lookup = {player.casefold(): player for player in lineup_players}
+    lineup_player_raw = (request.args.get('lineup_player') or '').strip()
+    lineup_player = lineup_player_lookup.get(lineup_player_raw.casefold())
     lineup_totals = compute_lineup_totals(
         lineup_possession_data,
         group_sizes=lineup_group_sizes,
@@ -7373,6 +7387,38 @@ def game_stats(game_id):
         most_used_lineups[size] = sorted(
             combined_entries, key=lambda x: x[1], reverse=True
         )[:5]
+
+    if lineup_player:
+        def _lineup_contains_player(lineup_combo, player_name):
+            tokens = [token.strip() for token in lineup_combo.split(",") if token.strip()]
+            return player_name in tokens
+
+        def _filter_lineup_list(entries):
+            return [
+                entry for entry in entries
+                if _lineup_contains_player(entry[0], lineup_player)
+            ]
+
+        most_used_lineups = {
+            size: _filter_lineup_list(entries)
+            for size, entries in most_used_lineups.items()
+        }
+        best_offense = {
+            size: _filter_lineup_list(entries)
+            for size, entries in best_offense.items()
+        }
+        worst_offense = {
+            size: _filter_lineup_list(entries)
+            for size, entries in worst_offense.items()
+        }
+        best_defense = {
+            size: _filter_lineup_list(entries)
+            for size, entries in best_defense.items()
+        }
+        worst_defense = {
+            size: _filter_lineup_list(entries)
+            for size, entries in worst_defense.items()
+        }
 
     # ─── DEFENSIVE SECONDARY METRICS ──────────────────────────────────────────
     # We'll treat the opponent’s offense as “Defense rows” in the CSV:
@@ -7507,6 +7553,8 @@ def game_stats(game_id):
         best_defense=best_defense,
         worst_defense=worst_defense,
         most_used_lineups=most_used_lineups,
+        lineup_players=lineup_players,
+        lineup_player=lineup_player,
 
         # defensive secondary metrics
         opp_oreb_pct=opp_oreb_pct,
