@@ -677,43 +677,51 @@
                 <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
               {% else %}
                 <h5 class="font-semibold mb-2">Offense</h5>
-                <table class="w-full table-auto border-collapse mb-4">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">Total Possessions</th>
-                      <th class="px-4 py-2 text-right">PPP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, poss, ppp in used_offense %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-fixed border-collapse mb-4">
+                    <thead class="bg-white border-b-2 border-[#9E1B32]">
+                      <tr>
+                        <th class="w-3/5 px-4 py-2 text-left">Lineup</th>
+                        <th class="w-1/5 px-4 py-2 text-right">Total Possessions</th>
+                        <th class="w-1/5 px-4 py-2 text-right">PPP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, poss, ppp in used_offense %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2 whitespace-normal break-words leading-relaxed text-sm">
+                          {{ combo|replace(',', ', ') }}
+                        </td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
                 <h5 class="font-semibold mb-2">Defense</h5>
-                <table class="w-full table-auto border-collapse">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">Total Possessions</th>
-                      <th class="px-4 py-2 text-right">PPP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, poss, ppp in used_defense %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-fixed border-collapse">
+                    <thead class="bg-white border-b-2 border-[#9E1B32]">
+                      <tr>
+                        <th class="w-3/5 px-4 py-2 text-left">Lineup</th>
+                        <th class="w-1/5 px-4 py-2 text-right">Total Possessions</th>
+                        <th class="w-1/5 px-4 py-2 text-right">PPP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, poss, ppp in used_defense %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2 whitespace-normal break-words leading-relaxed text-sm">
+                          {{ combo|replace(',', ', ') }}
+                        </td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               {% endif %}
             </div>
           {% endfor %}
@@ -729,43 +737,51 @@
                 <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
               {% else %}
                 <h5 class="font-semibold mb-2">Best Offense</h5>
-                <table class="w-full table-auto border-collapse mb-4">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in best_offense_rows %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-fixed border-collapse mb-4">
+                    <thead class="bg-white border-b-2 border-[#9E1B32]">
+                      <tr>
+                        <th class="w-3/5 px-4 py-2 text-left">Lineup</th>
+                        <th class="w-1/5 px-4 py-2 text-right">PPP</th>
+                        <th class="w-1/5 px-4 py-2 text-right">Total Possessions Played</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp, poss in best_offense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2 whitespace-normal break-words leading-relaxed text-sm">
+                          {{ combo|replace(',', ', ') }}
+                        </td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
                 <h5 class="font-semibold mb-2">Worst Offense</h5>
-                <table class="w-full table-auto border-collapse">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in worst_offense_rows %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-fixed border-collapse">
+                    <thead class="bg-white border-b-2 border-[#9E1B32]">
+                      <tr>
+                        <th class="w-3/5 px-4 py-2 text-left">Lineup</th>
+                        <th class="w-1/5 px-4 py-2 text-right">PPP</th>
+                        <th class="w-1/5 px-4 py-2 text-right">Total Possessions Played</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp, poss in worst_offense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2 whitespace-normal break-words leading-relaxed text-sm">
+                          {{ combo|replace(',', ', ') }}
+                        </td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               {% endif %}
             </div>
           {% endfor %}
@@ -781,43 +797,51 @@
                 <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
               {% else %}
                 <h5 class="font-semibold mb-2">Best Defense</h5>
-                <table class="w-full table-auto border-collapse mb-4">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP Allowed</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in best_defense_rows %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-fixed border-collapse mb-4">
+                    <thead class="bg-white border-b-2 border-[#9E1B32]">
+                      <tr>
+                        <th class="w-3/5 px-4 py-2 text-left">Lineup</th>
+                        <th class="w-1/5 px-4 py-2 text-right">PPP Allowed</th>
+                        <th class="w-1/5 px-4 py-2 text-right">Total Possessions Played</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp, poss in best_defense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2 whitespace-normal break-words leading-relaxed text-sm">
+                          {{ combo|replace(',', ', ') }}
+                        </td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
                 <h5 class="font-semibold mb-2">Worst Defense</h5>
-                <table class="w-full table-auto border-collapse">
-                  <thead class="bg-white border-b-2 border-[#9E1B32]">
-                    <tr>
-                      <th class="px-4 py-2 text-left">Lineup</th>
-                      <th class="px-4 py-2 text-right">PPP Allowed</th>
-                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for combo, ppp, poss in worst_defense_rows %}
-                    <tr class="odd:bg-white even:bg-gray-100">
-                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                      <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-fixed border-collapse">
+                    <thead class="bg-white border-b-2 border-[#9E1B32]">
+                      <tr>
+                        <th class="w-3/5 px-4 py-2 text-left">Lineup</th>
+                        <th class="w-1/5 px-4 py-2 text-right">PPP Allowed</th>
+                        <th class="w-1/5 px-4 py-2 text-right">Total Possessions Played</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp, poss in worst_defense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2 whitespace-normal break-words leading-relaxed text-sm">
+                          {{ combo|replace(',', ', ') }}
+                        </td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               {% endif %}
             </div>
           {% endfor %}
