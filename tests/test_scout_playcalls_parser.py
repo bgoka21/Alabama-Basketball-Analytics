@@ -55,3 +55,19 @@ def test_ensure_schema_adds_missing_columns():
     columns_after = {col["name"] for col in inspect(engine).get_columns("scout_possessions")}
     assert "family" in columns_after
     assert "series" in columns_after
+
+
+def test_parse_playcalls_splits_comma_playcalls(tmp_path):
+    csv_content = """Instance Number,Playcall,Shot
+1,"Early Open, Flow - Drive & Kick",2
+"""
+    csv_path = _write_csv(tmp_path / "playcalls.csv", csv_content)
+
+    possessions = parse_playcalls_csv(str(csv_path))
+
+    assert [possession["instance_number"] for possession in possessions] == ["1-1", "1-2"]
+    assert [possession["playcall"] for possession in possessions] == [
+        "Early Open",
+        "Flow - Drive & Kick",
+    ]
+    assert [possession["points"] for possession in possessions] == [0, 2]
