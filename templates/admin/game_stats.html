@@ -450,242 +450,232 @@
 
   <!-- LINEUP EFFICIENCY TAB -->
   <div id="lineupContent" class="hidden">
-    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-2xl font-bold">Lineup Efficiency Filters</h2>
-        {% if lineup_player %}
-          <p class="text-sm text-gray-600">Filtered to: {{ lineup_player }}</p>
-        {% endif %}
-      </div>
-      <form method="get" class="flex items-center gap-2">
-        {% for key, value in request.args.items() %}
-          {% if key != 'lineup_player' %}
-            <input type="hidden" name="{{ key }}" value="{{ value }}">
-          {% endif %}
-        {% endfor %}
-        <label for="lineupPlayer" class="text-sm font-medium text-gray-700">Player</label>
-        <select id="lineupPlayer" name="lineup_player" class="rounded border-gray-300 text-sm" onchange="this.form.submit()">
-          <option value="">All Players</option>
-          {% for player in lineup_players %}
-            <option value="{{ player }}" {% if lineup_player == player %}selected{% endif %}>{{ player }}</option>
-          {% endfor %}
-        </select>
-        <noscript>
-          <button type="submit" class="px-3 py-1 text-sm font-medium rounded bg-gray-200">Apply</button>
-        </noscript>
-      </form>
-    </div>
-
-    <!-- Most Used Lineups -->
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold mb-4">Most Used Lineups</h2>
-      <div class="bg-white shadow rounded-lg p-6 mb-10">
-        <!-- Most Used Size Tabs -->
-        <div class="flex space-x-2 mb-6">
-          {% for size in most_used_lineups_offense.keys()|sort %}
+    {% set lineup_sizes = (most_used_lineups_offense.keys()|list + best_offense.keys()|list + best_defense.keys()|list)|unique|sort %}
+    <div class="mt-6 space-y-6">
+      <div class="bg-white shadow rounded-lg p-4 sm:p-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-lg sm:text-xl font-semibold">Lineup Efficiency</h2>
+            <p class="text-sm text-gray-500">
+              Showing lineups with at least {{ lineup_min_poss }} possessions
+              {% if lineup_player %}
+                • Filtered to: <span class="font-semibold text-gray-700">{{ lineup_player }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <form method="get" class="flex flex-wrap items-end gap-2 text-sm">
+            {% for key, value in request.args.items() %}
+              {% if key not in ['lineup_min_poss', 'lineup_player'] %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+              {% endif %}
+            {% endfor %}
+            <div class="flex flex-col">
+              <label for="lineupMinPoss" class="font-medium text-gray-700">Minimum Possessions</label>
+              <input
+                id="lineupMinPoss"
+                type="number"
+                name="lineup_min_poss"
+                min="0"
+                value="{{ lineup_min_poss }}"
+                class="rounded border-gray-300 text-sm"
+              />
+            </div>
+            <div class="flex flex-col">
+              <label for="lineupPlayer" class="font-medium text-gray-700">Player</label>
+              <select id="lineupPlayer" name="lineup_player" class="rounded border-gray-300 text-sm" onchange="this.form.submit()">
+                <option value="">All Players</option>
+                {% for player in lineup_players %}
+                  <option value="{{ player }}" {% if lineup_player == player %}selected{% endif %}>{{ player }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <noscript>
+              <button type="submit" class="px-3 py-1 text-sm font-medium rounded bg-gray-200">Apply</button>
+            </noscript>
+          </form>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-4">
+          {% for size in lineup_sizes %}
+            {% set has_size_data = most_used_lineups_offense.get(size, []) or most_used_lineups_defense.get(size, []) or best_offense.get(size, []) or worst_offense.get(size, []) or best_defense.get(size, []) or worst_defense.get(size, []) %}
             <button type="button"
-                    class="used-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
-                    data-size="{{ size }}">
+                    class="lineup-size-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100 text-gray-700"
+                    data-size="{{ size }}"
+                    data-has-data="{{ 'true' if has_size_data else 'false' }}">
               {{ size }}-Man
             </button>
           {% endfor %}
         </div>
-
-        <!-- Most Used Tab Panes -->
-        {% for size in most_used_lineups_offense.keys()|sort %}
-        <div id="used-lineup-{{ size }}" class="used-lineup-tab hidden">
-          <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Lineups</h3>
-
-          {% if not most_used_lineups_offense[size] and not most_used_lineups_defense[size] %}
-            <p class="italic text-center text-gray-500">
-              No {{ size }}-Man lineup data available for this game.
-            </p>
-          {% else %}
-            <h4 class="font-semibold mb-2">Offense</h4>
-            <div class="overflow-x-auto">
-              <table class="w-full table-auto border-collapse mb-4">
-                <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                  <tr>
-                    <th class="px-4 py-2 text-left">Lineup</th>
-                    <th class="px-4 py-2 text-right">Possessions</th>
-                    <th class="px-4 py-2 text-right">PPP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for combo, poss, ppp in most_used_lineups_offense[size] %}
-                  <tr class="odd:bg-white even:bg-gray-100">
-                    <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                    <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            <h4 class="font-semibold mb-2">Defense</h4>
-            <div class="overflow-x-auto">
-              <table class="w-full table-auto border-collapse">
-                <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                  <tr>
-                    <th class="px-4 py-2 text-left">Lineup</th>
-                    <th class="px-4 py-2 text-right">Possessions</th>
-                    <th class="px-4 py-2 text-right">PPP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for combo, poss, ppp in most_used_lineups_defense[size] %}
-                  <tr class="odd:bg-white even:bg-gray-100">
-                    <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                    <td class="px-4 py-2 text-right">{{ poss }}</td>
-                    <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% endif %}
-        </div>
-        {% endfor %}
       </div>
-    </div>
 
-    <!-- Lineup Efficiency (Offense) -->
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
-      <div class="bg-white shadow rounded-lg p-6 mb-10">
-        <!-- Offense Size Tabs -->
-        <div class="flex space-x-2 mb-6">
-          {% for size in best_offense.keys()|sort %}
-            <button type="button"
-                    class="off-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
-                    data-size="{{ size }}">
-              {{ size }}-Man
-            </button>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white shadow rounded-lg p-4">
+          <h3 class="text-base font-semibold mb-3">Most Used</h3>
+          {% for size in lineup_sizes %}
+            {% set used_offense = most_used_lineups_offense.get(size, []) %}
+            {% set used_defense = most_used_lineups_defense.get(size, []) %}
+            <div class="lineup-size-panel hidden" data-size="{{ size }}">
+              <h4 class="text-sm font-semibold mb-3">{{ size }}-Man Lineups</h4>
+              {% if not used_offense and not used_defense %}
+                <p class="italic text-center text-gray-500">
+                  No {{ size }}-Man lineup data available for this game.
+                </p>
+              {% else %}
+                <h5 class="font-semibold mb-2">Offense</h5>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-auto border-collapse mb-4">
+                    <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Lineup</th>
+                        <th class="px-4 py-2 text-right">Possessions</th>
+                        <th class="px-4 py-2 text-right">PPP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, poss, ppp in used_offense %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <h5 class="font-semibold mb-2">Defense</h5>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-auto border-collapse">
+                    <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Lineup</th>
+                        <th class="px-4 py-2 text-right">Possessions</th>
+                        <th class="px-4 py-2 text-right">PPP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, poss, ppp in used_defense %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                        <td class="px-4 py-2 text-right">{{ poss }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
+            </div>
           {% endfor %}
         </div>
 
-        <!-- Offense Tab Panes -->
-        {% for size in best_offense.keys()|sort %}
-        <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
-          <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Offense</h3>
-
-          {% if not best_offense[size] and not worst_offense[size] %}
-            <p class="italic text-center text-gray-500">
-              No {{ size }}-Man lineup data available for this game.
-            </p>
-          {% else %}
-            <h4 class="font-semibold mb-2">Best Offense</h4>
-            <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse mb-4">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp in best_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+        <div class="bg-white shadow rounded-lg p-4">
+          <h3 class="text-base font-semibold mb-3">Best/Worst Offense</h3>
+          {% for size in lineup_sizes %}
+            {% set best_offense_rows = best_offense.get(size, []) %}
+            {% set worst_offense_rows = worst_offense.get(size, []) %}
+            <div class="lineup-size-panel hidden" data-size="{{ size }}">
+              <h4 class="text-sm font-semibold mb-3">{{ size }}-Man Offense</h4>
+              {% if not best_offense_rows and not worst_offense_rows %}
+                <p class="italic text-center text-gray-500">
+                  No {{ size }}-Man lineup data available for this game.
+                </p>
+              {% else %}
+                <h5 class="font-semibold mb-2">Best Offense</h5>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-auto border-collapse mb-4">
+                    <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Lineup</th>
+                        <th class="px-4 py-2 text-right">PPP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp in best_offense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <h5 class="font-semibold mb-2">Worst Offense</h5>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-auto border-collapse">
+                    <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Lineup</th>
+                        <th class="px-4 py-2 text-right">PPP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp in worst_offense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
             </div>
-
-            <h4 class="font-semibold mb-2">Worst Offense</h4>
-            <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp in worst_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            </div>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- Lineup Efficiency (Defense) -->
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold mb-4">Lineup Efficiency</h2>
-      <div class="bg-white shadow rounded-lg p-6 mb-10">
-        <!-- Defense Size Tabs -->
-        <div class="flex space-x-2 mb-6">
-          {% for size in best_defense.keys()|sort %}
-            <button type="button"
-                    class="def-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
-                    data-size="{{ size }}">
-              {{ size }}-Man
-            </button>
           {% endfor %}
         </div>
 
-        <!-- Defense Tab Panes -->
-        {% for size in best_defense.keys()|sort %}
-        <div id="def-lineup-{{ size }}" class="def-lineup-tab hidden">
-          <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Defense</h3>
-
-          {% if not best_defense[size] and not worst_defense[size] %}
-            <p class="italic text-center text-gray-500">
-              No {{ size }}-Man lineup data available for this game.
-            </p>
-          {% else %}
-            <h4 class="font-semibold mb-2">Best Defense</h4>
-            <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse mb-4">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP Allowed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp in best_defense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+        <div class="bg-white shadow rounded-lg p-4">
+          <h3 class="text-base font-semibold mb-3">Best/Worst Defense</h3>
+          {% for size in lineup_sizes %}
+            {% set best_defense_rows = best_defense.get(size, []) %}
+            {% set worst_defense_rows = worst_defense.get(size, []) %}
+            <div class="lineup-size-panel hidden" data-size="{{ size }}">
+              <h4 class="text-sm font-semibold mb-3">{{ size }}-Man Defense</h4>
+              {% if not best_defense_rows and not worst_defense_rows %}
+                <p class="italic text-center text-gray-500">
+                  No {{ size }}-Man lineup data available for this game.
+                </p>
+              {% else %}
+                <h5 class="font-semibold mb-2">Best Defense</h5>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-auto border-collapse mb-4">
+                    <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Lineup</th>
+                        <th class="px-4 py-2 text-right">PPP Allowed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp in best_defense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <h5 class="font-semibold mb-2">Worst Defense</h5>
+                <div class="overflow-x-auto">
+                  <table class="w-full table-auto border-collapse">
+                    <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Lineup</th>
+                        <th class="px-4 py-2 text-right">PPP Allowed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for combo, ppp in worst_defense_rows %}
+                      <tr class="odd:bg-white even:bg-gray-100">
+                        <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                        <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
             </div>
-
-            <h4 class="font-semibold mb-2">Worst Defense</h4>
-            <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP Allowed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp in worst_defense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            </div>
-          {% endif %}
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
   </div>
@@ -700,6 +690,21 @@
       const offContent = document.getElementById('offenseContent');
       const defContent = document.getElementById('defenseContent');
       const lineupContent = document.getElementById('lineupContent');
+      const lineupSizeBtns = document.querySelectorAll('.lineup-size-btn');
+      const lineupSizePanels = document.querySelectorAll('.lineup-size-panel');
+      const setLineupSize = (size, activeBtn) => {
+        lineupSizeBtns.forEach(btn => {
+          btn.classList.remove('bg-[#9E1B32]','text-white');
+          btn.classList.add('bg-gray-100','text-gray-700');
+        });
+        if (activeBtn) {
+          activeBtn.classList.remove('bg-gray-100','text-gray-700');
+          activeBtn.classList.add('bg-[#9E1B32]','text-white');
+        }
+        lineupSizePanels.forEach(panel => {
+          panel.classList.toggle('hidden', panel.dataset.size !== size);
+        });
+      };
   
       function showOff() {
         offContent.classList.remove('hidden');
@@ -733,17 +738,12 @@
         offBtn.classList.replace('text-white','text-gray-700');
         defBtn.classList.replace('bg-[#9E1B32]','bg-gray-200');
         defBtn.classList.replace('text-white','text-gray-700');
-        const hasActiveUsedTab = Array.from(usedTabs).some(tab => !tab.classList.contains('hidden'));
-        const hasActiveOffTab = Array.from(offTabs).some(tab => !tab.classList.contains('hidden'));
-        const hasActiveDefTab = Array.from(defTabs).some(tab => !tab.classList.contains('hidden'));
-        if (usedBtns.length && !hasActiveUsedTab) {
-          usedBtns[0].click();
-        }
-        if (offBtns.length && !hasActiveOffTab) {
-          offBtns[0].click();
-        }
-        if (defBtns.length && !hasActiveDefTab) {
-          defBtns[0].click();
+        const hasActiveSize = Array.from(lineupSizePanels).some(panel => !panel.classList.contains('hidden'));
+        if (lineupSizeBtns.length && !hasActiveSize) {
+          const defaultBtn = Array.from(lineupSizeBtns).find(btn => btn.dataset.hasData === 'true') || lineupSizeBtns[0];
+          if (defaultBtn) {
+            setLineupSize(defaultBtn.dataset.size, defaultBtn);
+          }
         }
       }
       offBtn.addEventListener('click', showOff);
@@ -751,59 +751,15 @@
       lineupBtn.addEventListener('click', showLineup);
       showOff();
   
-      // Most used lineup tabs
-      const usedBtns = document.querySelectorAll('.used-lineup-btn');
-      const usedTabs = document.querySelectorAll('.used-lineup-tab');
-      usedBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          usedBtns.forEach(b => {
-            b.classList.remove('bg-[#9E1B32]','text-white');
-            b.classList.add('bg-gray-100','text-gray-700');
-          });
-          usedTabs.forEach(t => t.classList.add('hidden'));
-          const sz = btn.dataset.size;
-          btn.classList.remove('bg-gray-100','text-gray-700');
-          btn.classList.add('bg-[#9E1B32]','text-white');
-          document.getElementById(`used-lineup-${sz}`).classList.remove('hidden');
-        });
+      lineupSizeBtns.forEach(btn => {
+        btn.addEventListener('click', () => setLineupSize(btn.dataset.size, btn));
       });
-      if (usedBtns.length) usedBtns[0].click();
-
-      // Offense lineup tabs
-      const offBtns = document.querySelectorAll('.off-lineup-btn');
-      const offTabs = document.querySelectorAll('.off-lineup-tab');
-      offBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          offBtns.forEach(b => {
-            b.classList.remove('bg-[#9E1B32]','text-white');
-            b.classList.add('bg-gray-100','text-gray-700');
-          });
-          offTabs.forEach(t => t.classList.add('hidden'));
-          const sz = btn.dataset.size;
-          btn.classList.remove('bg-gray-100','text-gray-700');
-          btn.classList.add('bg-[#9E1B32]','text-white');
-          document.getElementById(`off-lineup-${sz}`).classList.remove('hidden');
-        });
-      });
-      if (offBtns.length) offBtns[0].click();
-  
-      // Defense lineup tabs
-      const defBtns = document.querySelectorAll('.def-lineup-btn');
-      const defTabs = document.querySelectorAll('.def-lineup-tab');
-      defBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          defBtns.forEach(b => {
-            b.classList.remove('bg-[#9E1B32]','text-white');
-            b.classList.add('bg-gray-100','text-gray-700');
-          });
-          defTabs.forEach(t => t.classList.add('hidden'));
-          const sz = btn.dataset.size;
-          btn.classList.remove('bg-gray-100','text-gray-700');
-          btn.classList.add('bg-[#9E1B32]','text-white');
-          document.getElementById(`def-lineup-${sz}`).classList.remove('hidden');
-        });
-      });
-      if (defBtns.length) defBtns[0].click();
+      if (lineupSizeBtns.length) {
+        const defaultBtn = Array.from(lineupSizeBtns).find(btn => btn.dataset.hasData === 'true') || lineupSizeBtns[0];
+        if (defaultBtn) {
+          setLineupSize(defaultBtn.dataset.size, defaultBtn);
+        }
+      }
     });
   </script>
 

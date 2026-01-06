@@ -602,197 +602,224 @@
 
 <div id="lineupEfficiency" class="tab-content hidden">
   {% if mode == 'game' %}
-    <div class="mt-10">
-      <h2 class="text-lg sm:text-xl font-semibold mb-4">Lineup Efficiency</h2>
-      <p class="text-sm text-gray-500 mb-3">Showing lineups with at least {{ lineup_min_poss }} possessions.</p>
-      {% if lineup_player %}
-        <p class="text-sm text-gray-600 mb-4">Filtered to: <span class="font-semibold">{{ lineup_player }}</span></p>
-      {% endif %}
-      <div class="space-y-8">
-        <div>
-          <h3 class="text-base font-semibold mb-3">Most Used Lineups</h3>
-          <div class="flex flex-wrap gap-2 mb-4">
-            {% for size in most_used_lineups_offense.keys()|sort %}
-              <button
-                type="button"
-                class="used-lineup-btn px-4 py-2 rounded-lg bg-gray-100"
-                data-size="{{ size }}"
-                data-has-data="{{ 'true' if most_used_lineups_offense[size] or most_used_lineups_defense[size] else 'false' }}"
-              >
-                {{ size }}-Man
-              </button>
+    {% set lineup_sizes = (most_used_lineups_offense.keys()|list + best_offense.keys()|list + best_defense.keys()|list)|unique|sort %}
+    <div class="mt-10 space-y-6">
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-lg sm:text-xl font-semibold">Lineup Efficiency</h2>
+            <p class="text-sm text-gray-500">
+              Showing lineups with at least {{ lineup_min_poss }} possessions
+              {% if lineup_player %}
+                • Filtered to: <span class="font-semibold text-gray-700">{{ lineup_player }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <form method="get" class="flex flex-wrap items-end gap-2 text-sm">
+            {% for key, values in request.args.lists() %}
+              {% if key not in ['lineup_min_poss', 'lineup_player'] %}
+                {% for v in values %}
+                  <input type="hidden" name="{{ key }}" value="{{ v }}">
+                {% endfor %}
+              {% endif %}
             {% endfor %}
-          </div>
-          {% for size in most_used_lineups_offense.keys()|sort %}
-          <div id="used-lineup-{{ size }}" class="used-lineup-tab hidden">
-            <h4 class="text-base font-semibold mb-3">{{ size }}-Man Lineups</h4>
-            {% if not most_used_lineups_offense[size] and not most_used_lineups_defense[size] %}
-            <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
-            {% else %}
-            <h5 class="font-semibold mb-2">Offense</h5>
-            <table class="w-full table-auto border-collapse mb-4">
-              <thead class="bg-white border-b-2 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">Total Possessions</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, poss, ppp in most_used_lineups_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
+            <div class="flex flex-col">
+              <label class="font-medium text-gray-700" for="lineup_min_poss_inline">Minimum Possessions</label>
+              <input
+                id="lineup_min_poss_inline"
+                type="number"
+                name="lineup_min_poss"
+                min="0"
+                value="{{ lineup_min_poss }}"
+                class="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+              />
+            </div>
+            <div class="flex flex-col">
+              <label class="font-medium text-gray-700" for="lineup_player_inline">Player</label>
+              <select
+                id="lineup_player_inline"
+                name="lineup_player"
+                class="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#9E1B32]"
+              >
+                <option value="">All Players</option>
+                {% for player in lineup_players %}
+                  <option value="{{ player }}" {% if player == lineup_player %}selected{% endif %}>{{ player }}</option>
                 {% endfor %}
-              </tbody>
-            </table>
-            <h5 class="font-semibold mb-2">Defense</h5>
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">Total Possessions</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, poss, ppp in most_used_lineups_defense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% endif %}
-          </div>
+              </select>
+            </div>
+            <button type="submit" class="px-3 py-1 border rounded">Apply</button>
+          </form>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-4">
+          {% for size in lineup_sizes %}
+            {% set has_size_data = most_used_lineups_offense.get(size, []) or most_used_lineups_defense.get(size, []) or best_offense.get(size, []) or worst_offense.get(size, []) or best_defense.get(size, []) or worst_defense.get(size, []) %}
+            <button
+              type="button"
+              class="lineup-size-btn px-4 py-2 rounded-lg bg-gray-100 text-gray-700"
+              data-size="{{ size }}"
+              data-has-data="{{ 'true' if has_size_data else 'false' }}"
+            >
+              {{ size }}-Man
+            </button>
           {% endfor %}
         </div>
-        <div>
-          <h3 class="text-base font-semibold mb-3">Offense</h3>
-          <div class="flex flex-wrap gap-2 mb-4">
-            {% for size in best_offense.keys()|sort %}
-              <button
-                type="button"
-                class="off-lineup-btn px-4 py-2 rounded-lg bg-gray-100"
-                data-size="{{ size }}"
-                data-has-data="{{ 'true' if best_offense[size] or worst_offense[size] else 'false' }}"
-              >
-                {{ size }}-Man
-              </button>
-            {% endfor %}
-          </div>
-          {% for size in best_offense.keys()|sort %}
-          <div id="off-lineup-{{ size }}" class="off-lineup-tab hidden">
-            <h4 class="text-base font-semibold mb-3">{{ size }}-Man Offense</h4>
-            {% if not best_offense[size] and not worst_offense[size] %}
-            <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
-            {% else %}
-            <h5 class="font-semibold mb-2">Best Offense</h5>
-            <table class="w-full table-auto border-collapse mb-4">
-              <thead class="bg-white border-b-2 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp, poss in best_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <h5 class="font-semibold mb-2">Worst Offense</h5>
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp, poss in worst_offense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% endif %}
-          </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+          <h3 class="text-base font-semibold mb-3">Most Used</h3>
+          {% for size in lineup_sizes %}
+            {% set used_offense = most_used_lineups_offense.get(size, []) %}
+            {% set used_defense = most_used_lineups_defense.get(size, []) %}
+            <div class="lineup-size-panel hidden" data-size="{{ size }}">
+              <h4 class="text-sm font-semibold mb-3">{{ size }}-Man Lineups</h4>
+              {% if not used_offense and not used_defense %}
+                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+              {% else %}
+                <h5 class="font-semibold mb-2">Offense</h5>
+                <table class="w-full table-auto border-collapse mb-4">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Lineup</th>
+                      <th class="px-4 py-2 text-right">Total Possessions</th>
+                      <th class="px-4 py-2 text-right">PPP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, poss, ppp in used_offense %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ poss }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <h5 class="font-semibold mb-2">Defense</h5>
+                <table class="w-full table-auto border-collapse">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Lineup</th>
+                      <th class="px-4 py-2 text-right">Total Possessions</th>
+                      <th class="px-4 py-2 text-right">PPP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, poss, ppp in used_defense %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ poss }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              {% endif %}
+            </div>
           {% endfor %}
         </div>
-        <div>
-          <h3 class="text-base font-semibold mb-3">Defense</h3>
-          <div class="flex flex-wrap gap-2 mb-4">
-            {% for size in best_defense.keys()|sort %}
-              <button
-                type="button"
-                class="def-lineup-btn px-4 py-2 rounded-lg bg-gray-100"
-                data-size="{{ size }}"
-                data-has-data="{{ 'true' if best_defense[size] or worst_defense[size] else 'false' }}"
-              >
-                {{ size }}-Man
-              </button>
-            {% endfor %}
-          </div>
-          {% for size in best_defense.keys()|sort %}
-          <div id="def-lineup-{{ size }}" class="def-lineup-tab hidden">
-            <h4 class="text-base font-semibold mb-3">{{ size }}-Man Defense</h4>
-            {% if not best_defense[size] and not worst_defense[size] %}
-            <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
-            {% else %}
-            <h5 class="font-semibold mb-2">Best Defense</h5>
-            <table class="w-full table-auto border-collapse mb-4">
-              <thead class="bg-white border-b-2 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP Allowed</th>
-                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp, poss in best_defense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <h5 class="font-semibold mb-2">Worst Defense</h5>
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2 border-[#9E1B32]">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">PPP Allowed</th>
-                  <th class="px-4 py-2 text-right">Total Possessions Played</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, ppp, poss in worst_defense[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% endif %}
-          </div>
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+          <h3 class="text-base font-semibold mb-3">Best/Worst Offense</h3>
+          {% for size in lineup_sizes %}
+            {% set best_offense_rows = best_offense.get(size, []) %}
+            {% set worst_offense_rows = worst_offense.get(size, []) %}
+            <div class="lineup-size-panel hidden" data-size="{{ size }}">
+              <h4 class="text-sm font-semibold mb-3">{{ size }}-Man Offense</h4>
+              {% if not best_offense_rows and not worst_offense_rows %}
+                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+              {% else %}
+                <h5 class="font-semibold mb-2">Best Offense</h5>
+                <table class="w-full table-auto border-collapse mb-4">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Lineup</th>
+                      <th class="px-4 py-2 text-right">PPP</th>
+                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp, poss in best_offense_rows %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      <td class="px-4 py-2 text-right">{{ poss }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <h5 class="font-semibold mb-2">Worst Offense</h5>
+                <table class="w-full table-auto border-collapse">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Lineup</th>
+                      <th class="px-4 py-2 text-right">PPP</th>
+                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp, poss in worst_offense_rows %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      <td class="px-4 py-2 text-right">{{ poss }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+          <h3 class="text-base font-semibold mb-3">Best/Worst Defense</h3>
+          {% for size in lineup_sizes %}
+            {% set best_defense_rows = best_defense.get(size, []) %}
+            {% set worst_defense_rows = worst_defense.get(size, []) %}
+            <div class="lineup-size-panel hidden" data-size="{{ size }}">
+              <h4 class="text-sm font-semibold mb-3">{{ size }}-Man Defense</h4>
+              {% if not best_defense_rows and not worst_defense_rows %}
+                <p class="italic text-center text-gray-500">No {{ size }}-Man lineup data available.</p>
+              {% else %}
+                <h5 class="font-semibold mb-2">Best Defense</h5>
+                <table class="w-full table-auto border-collapse mb-4">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Lineup</th>
+                      <th class="px-4 py-2 text-right">PPP Allowed</th>
+                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp, poss in best_defense_rows %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      <td class="px-4 py-2 text-right">{{ poss }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <h5 class="font-semibold mb-2">Worst Defense</h5>
+                <table class="w-full table-auto border-collapse">
+                  <thead class="bg-white border-b-2 border-[#9E1B32]">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Lineup</th>
+                      <th class="px-4 py-2 text-right">PPP Allowed</th>
+                      <th class="px-4 py-2 text-right">Total Possessions Played</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for combo, ppp, poss in worst_defense_rows %}
+                    <tr class="odd:bg-white even:bg-gray-100">
+                      <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                      <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                      <td class="px-4 py-2 text-right">{{ poss }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              {% endif %}
+            </div>
           {% endfor %}
         </div>
       </div>
@@ -1311,60 +1338,28 @@ document.addEventListener('DOMContentLoaded',()=>{
     const base=link.href.split('#')[0];
     link.href=base+window.location.hash;
   });
-  const usedBtns = document.querySelectorAll('.used-lineup-btn');
-  const usedTabs = document.querySelectorAll('.used-lineup-tab');
-  usedBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      usedBtns.forEach(b => {
-        b.classList.remove('bg-[#9E1B32]','text-white');
-        b.classList.add('bg-gray-100','text-gray-700');
-      });
-      usedTabs.forEach(t => t.classList.add('hidden'));
-      const sz = btn.dataset.size;
-      btn.classList.remove('bg-gray-100','text-gray-700');
-      btn.classList.add('bg-[#9E1B32]','text-white');
-      const target = document.getElementById(`used-lineup-${sz}`);
-      if (target) target.classList.remove('hidden');
+  const lineupSizeBtns = document.querySelectorAll('.lineup-size-btn');
+  const lineupSizePanels = document.querySelectorAll('.lineup-size-panel');
+  const setLineupSize = (size, activeBtn) => {
+    lineupSizeBtns.forEach(btn => {
+      btn.classList.remove('bg-[#9E1B32]','text-white');
+      btn.classList.add('bg-gray-100','text-gray-700');
     });
-  });
-  const defaultUsedBtn = Array.from(usedBtns).find(btn => btn.dataset.hasData === 'true') || usedBtns[0];
-  if (defaultUsedBtn) defaultUsedBtn.click();
-  const offBtns = document.querySelectorAll('.off-lineup-btn');
-  const offTabs = document.querySelectorAll('.off-lineup-tab');
-  offBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      offBtns.forEach(b => {
-        b.classList.remove('bg-[#9E1B32]','text-white');
-        b.classList.add('bg-gray-100','text-gray-700');
-      });
-      offTabs.forEach(t => t.classList.add('hidden'));
-      const sz = btn.dataset.size;
-      btn.classList.remove('bg-gray-100','text-gray-700');
-      btn.classList.add('bg-[#9E1B32]','text-white');
-      const target = document.getElementById(`off-lineup-${sz}`);
-      if (target) target.classList.remove('hidden');
+    if (activeBtn) {
+      activeBtn.classList.remove('bg-gray-100','text-gray-700');
+      activeBtn.classList.add('bg-[#9E1B32]','text-white');
+    }
+    lineupSizePanels.forEach(panel => {
+      panel.classList.toggle('hidden', panel.dataset.size !== size);
     });
+  };
+  lineupSizeBtns.forEach(btn => {
+    btn.addEventListener('click', () => setLineupSize(btn.dataset.size, btn));
   });
-  const defaultOffBtn = Array.from(offBtns).find(btn => btn.dataset.hasData === 'true') || offBtns[0];
-  if (defaultOffBtn) defaultOffBtn.click();
-  const defBtns = document.querySelectorAll('.def-lineup-btn');
-  const defTabs = document.querySelectorAll('.def-lineup-tab');
-  defBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      defBtns.forEach(b => {
-        b.classList.remove('bg-[#9E1B32]','text-white');
-        b.classList.add('bg-gray-100','text-gray-700');
-      });
-      defTabs.forEach(t => t.classList.add('hidden'));
-      const sz = btn.dataset.size;
-      btn.classList.remove('bg-gray-100','text-gray-700');
-      btn.classList.add('bg-[#9E1B32]','text-white');
-      const target = document.getElementById(`def-lineup-${sz}`);
-      if (target) target.classList.remove('hidden');
-    });
-  });
-  const defaultDefBtn = Array.from(defBtns).find(btn => btn.dataset.hasData === 'true') || defBtns[0];
-  if (defaultDefBtn) defaultDefBtn.click();
+  const defaultLineupBtn = Array.from(lineupSizeBtns).find(btn => btn.dataset.hasData === 'true') || lineupSizeBtns[0];
+  if (defaultLineupBtn) {
+    setLineupSize(defaultLineupBtn.dataset.size, defaultLineupBtn);
+  }
   if(window.Chart && document.getElementById('trendChart')){
     const labels = trendData.map(d => {
       const [y,m,day] = d.date.split('-').map(Number);
