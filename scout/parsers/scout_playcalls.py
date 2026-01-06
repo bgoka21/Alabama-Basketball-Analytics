@@ -41,6 +41,10 @@ def _should_exclude(playcall: str) -> bool:
     return playcall.strip().lower().startswith("transition")
 
 
+def _split_playcall(playcall: str) -> List[str]:
+    return [part.strip() for part in playcall.split(",") if part.strip()]
+
+
 def _resolve_field_name(fieldnames: Iterable[str], candidates: Iterable[str]) -> Optional[str]:
     lookup = {name.lower(): name for name in fieldnames}
     for candidate in candidates:
@@ -113,27 +117,31 @@ def parse_playcalls_csv(file_path: str) -> List[Dict[str, Any]]:
             # Skip instances that never received a playcall value.
             continue
 
-        if _should_exclude(playcall_value):
+        playcalls = [call for call in _split_playcall(playcall_value) if not _should_exclude(call)]
+        if not playcalls:
             continue
 
-        bucket = _determine_bucket(playcall_value)
-        possession_payload = {
-            "instance_number": instance_number,
-            "playcall": playcall_value,
-            "bucket": bucket,
-            "points": int(data.get("points") or 0),
-        }
+        total_points = int(data.get("points") or 0)
+        for index, playcall in enumerate(playcalls, start=1):
+            instance_id = instance_number if len(playcalls) == 1 else f"{instance_number}-{index}"
+            bucket = _determine_bucket(playcall)
+            possession_payload = {
+                "instance_number": instance_id,
+                "playcall": playcall,
+                "bucket": bucket,
+                "points": total_points if index == len(playcalls) else 0,
+            }
 
-        for field in optional_fields:
-            if field not in data:
-                continue
-            if field == "series":
-                series_value = (data.get(field) or "").strip()
-                possession_payload[field] = series_value or unknown_series
-                continue
-            possession_payload[field] = data.get(field)
+            for field in optional_fields:
+                if field not in data:
+                    continue
+                if field == "series":
+                    series_value = (data.get(field) or "").strip()
+                    possession_payload[field] = series_value or unknown_series
+                    continue
+                possession_payload[field] = data.get(field)
 
-        possessions.append(possession_payload)
+            possessions.append(possession_payload)
 
     return possessions
 
