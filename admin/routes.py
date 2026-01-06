@@ -7318,7 +7318,8 @@ def game_stats(game_id):
         lineup_min_poss = 1
     if lineup_min_poss < 0:
         lineup_min_poss = 0
-    most_used_lineups = {size: [] for size in lineup_group_sizes}
+    most_used_lineups_offense = {size: [] for size in lineup_group_sizes}
+    most_used_lineups_defense = {size: [] for size in lineup_group_sizes}
     lineup_possessions_query = (
         db.session.query(
             Possession.id.label('possession_id'),
@@ -7370,22 +7371,29 @@ def game_stats(game_id):
     )
     for size in lineup_group_sizes:
         sides = lineup_totals.get(size, {})
-        combined_totals = defaultdict(lambda: {"poss": 0, "pts": 0})
-        for side_stats in sides.values():
-            for lineup, stats in side_stats.items():
-                combined_totals[lineup]["poss"] += stats["poss"]
-                combined_totals[lineup]["pts"] += stats["pts"]
-        combined_entries = [
+        offense_entries = [
             (
                 ",".join(lineup),
                 stats["poss"],
                 stats["pts"] / stats["poss"] if stats["poss"] else 0,
             )
-            for lineup, stats in combined_totals.items()
+            for lineup, stats in sides.get("offense", {}).items()
             if stats["poss"] >= lineup_min_poss
         ]
-        most_used_lineups[size] = sorted(
-            combined_entries, key=lambda x: x[1], reverse=True
+        defense_entries = [
+            (
+                ",".join(lineup),
+                stats["poss"],
+                stats["pts"] / stats["poss"] if stats["poss"] else 0,
+            )
+            for lineup, stats in sides.get("defense", {}).items()
+            if stats["poss"] >= lineup_min_poss
+        ]
+        most_used_lineups_offense[size] = sorted(
+            offense_entries, key=lambda x: x[1], reverse=True
+        )[:5]
+        most_used_lineups_defense[size] = sorted(
+            defense_entries, key=lambda x: x[1], reverse=True
         )[:5]
 
     if lineup_player:
@@ -7399,9 +7407,13 @@ def game_stats(game_id):
                 if _lineup_contains_player(entry[0], lineup_player)
             ]
 
-        most_used_lineups = {
+        most_used_lineups_offense = {
             size: _filter_lineup_list(entries)
-            for size, entries in most_used_lineups.items()
+            for size, entries in most_used_lineups_offense.items()
+        }
+        most_used_lineups_defense = {
+            size: _filter_lineup_list(entries)
+            for size, entries in most_used_lineups_defense.items()
         }
         best_offense = {
             size: _filter_lineup_list(entries)
@@ -7552,7 +7564,8 @@ def game_stats(game_id):
         worst_offense=worst_offense,
         best_defense=best_defense,
         worst_defense=worst_defense,
-        most_used_lineups=most_used_lineups,
+        most_used_lineups_offense=most_used_lineups_offense,
+        most_used_lineups_defense=most_used_lineups_defense,
         lineup_players=lineup_players,
         lineup_player=lineup_player,
 
@@ -10167,7 +10180,8 @@ def team_totals():
     worst_offense = {size: [] for size in lineup_group_sizes}
     best_defense = {size: [] for size in lineup_group_sizes}
     worst_defense = {size: [] for size in lineup_group_sizes}
-    most_used_lineups = {size: [] for size in lineup_group_sizes}
+    most_used_lineups_offense = {size: [] for size in lineup_group_sizes}
+    most_used_lineups_defense = {size: [] for size in lineup_group_sizes}
 
     if mode == 'practice':
         q = PlayerStats.query.filter(PlayerStats.practice_id != None)
@@ -10333,22 +10347,29 @@ def team_totals():
 
         for size in lineup_group_sizes:
             sides = lineup_totals.get(size, {})
-            combined_totals = defaultdict(lambda: {"poss": 0, "pts": 0})
-            for side_stats in sides.values():
-                for lineup, stats in side_stats.items():
-                    combined_totals[lineup]["poss"] += stats["poss"]
-                    combined_totals[lineup]["pts"] += stats["pts"]
-            combined_entries = [
+            off_poss_entries = [
                 (
                     ",".join(lineup),
                     stats["poss"],
                     stats["pts"] / stats["poss"] if stats["poss"] else 0,
                 )
-                for lineup, stats in combined_totals.items()
+                for lineup, stats in sides.get("offense", {}).items()
                 if stats["poss"] >= lineup_min_poss and _lineup_has_player(lineup)
             ]
-            most_used_lineups[size] = sorted(
-                combined_entries, key=lambda x: x[1], reverse=True
+            def_poss_entries = [
+                (
+                    ",".join(lineup),
+                    stats["poss"],
+                    stats["pts"] / stats["poss"] if stats["poss"] else 0,
+                )
+                for lineup, stats in sides.get("defense", {}).items()
+                if stats["poss"] >= lineup_min_poss and _lineup_has_player(lineup)
+            ]
+            most_used_lineups_offense[size] = sorted(
+                off_poss_entries, key=lambda x: x[1], reverse=True
+            )[:5]
+            most_used_lineups_defense[size] = sorted(
+                def_poss_entries, key=lambda x: x[1], reverse=True
             )[:5]
             off_entries = [
                 (
@@ -11468,7 +11489,8 @@ def team_totals():
         worst_offense=worst_offense,
         best_defense=best_defense,
         worst_defense=worst_defense,
-        most_used_lineups=most_used_lineups,
+        most_used_lineups_offense=most_used_lineups_offense,
+        most_used_lineups_defense=most_used_lineups_defense,
         lineup_min_poss=lineup_min_poss,
         lineup_players=lineup_players,
         lineup_player=lineup_player,

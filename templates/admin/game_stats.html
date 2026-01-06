@@ -482,7 +482,7 @@
       <div class="bg-white shadow rounded-lg p-6 mb-10">
         <!-- Most Used Size Tabs -->
         <div class="flex space-x-2 mb-6">
-          {% for size in most_used_lineups.keys()|sort %}
+          {% for size in most_used_lineups_offense.keys()|sort %}
             <button type="button"
                     class="used-lineup-btn px-4 py-2 text-sm font-medium rounded-lg focus:outline-none bg-gray-100"
                     data-size="{{ size }}">
@@ -492,34 +492,56 @@
         </div>
 
         <!-- Most Used Tab Panes -->
-        {% for size in most_used_lineups.keys()|sort %}
+        {% for size in most_used_lineups_offense.keys()|sort %}
         <div id="used-lineup-{{ size }}" class="used-lineup-tab hidden">
           <h3 class="text-xl font-semibold mb-4">{{ size }}-Man Lineups</h3>
 
-          {% if not most_used_lineups[size] %}
+          {% if not most_used_lineups_offense[size] and not most_used_lineups_defense[size] %}
             <p class="italic text-center text-gray-500">
               No {{ size }}-Man lineup data available for this game.
             </p>
           {% else %}
+            <h4 class="font-semibold mb-2">Offense</h4>
             <div class="overflow-x-auto">
-            <table class="w-full table-auto border-collapse">
-              <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
-                <tr>
-                  <th class="px-4 py-2 text-left">Lineup</th>
-                  <th class="px-4 py-2 text-right">Possessions</th>
-                  <th class="px-4 py-2 text-right">PPP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for combo, poss, ppp in most_used_lineups[size] %}
-                <tr class="odd:bg-white even:bg-gray-100">
-                  <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
-                  <td class="px-4 py-2 text-right">{{ poss }}</td>
-                  <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+              <table class="w-full table-auto border-collapse mb-4">
+                <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                  <tr>
+                    <th class="px-4 py-2 text-left">Lineup</th>
+                    <th class="px-4 py-2 text-right">Possessions</th>
+                    <th class="px-4 py-2 text-right">PPP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for combo, poss, ppp in most_used_lineups_offense[size] %}
+                  <tr class="odd:bg-white even:bg-gray-100">
+                    <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                    <td class="px-4 py-2 text-right">{{ poss }}</td>
+                    <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <h4 class="font-semibold mb-2">Defense</h4>
+            <div class="overflow-x-auto">
+              <table class="w-full table-auto border-collapse">
+                <thead class="bg-white border-b-2" style="border-color:#9E1B32;">
+                  <tr>
+                    <th class="px-4 py-2 text-left">Lineup</th>
+                    <th class="px-4 py-2 text-right">Possessions</th>
+                    <th class="px-4 py-2 text-right">PPP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for combo, poss, ppp in most_used_lineups_defense[size] %}
+                  <tr class="odd:bg-white even:bg-gray-100">
+                    <td class="px-4 py-2">{{ combo|replace(',', ', ') }}</td>
+                    <td class="px-4 py-2 text-right">{{ poss }}</td>
+                    <td class="px-4 py-2 text-right">{{ '%.2f'|format(ppp) }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
           {% endif %}
         </div>
