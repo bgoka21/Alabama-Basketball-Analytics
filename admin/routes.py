@@ -7303,6 +7303,10 @@ def game_stats(game_id):
     best_defense = {}
     worst_defense = {}
     for size, sides in lineup_efficiencies.items():
+        try:
+            size = int(size)
+        except (TypeError, ValueError):
+            continue
         # Offense
         off = sides.get('offense', {})
         best_offense[size]  = sorted(off.items(), key=lambda x: x[1], reverse=True)[:5]
