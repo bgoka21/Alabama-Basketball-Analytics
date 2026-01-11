@@ -178,7 +178,18 @@ def _apply_side_filter(query: Query, side: str) -> Query:
     if not normalized:
         return query
     if normalized in ("offense", "defense"):
-        return query.filter(func.lower(Possession.time_segment) == normalized)
+        return query.filter(
+            or_(
+                func.lower(Possession.possession_side) == normalized,
+                and_(
+                    or_(
+                        Possession.possession_side == None,
+                        func.trim(Possession.possession_side) == "",
+                    ),
+                    func.lower(Possession.time_segment) == normalized,
+                ),
+            )
+        )
     return query.filter(func.lower(Possession.possession_side) == normalized)
 
 

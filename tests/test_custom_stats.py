@@ -53,10 +53,10 @@ def sample_custom_stats(app):
         db.session.add_all(games)
 
         possessions = [
-            Possession(id=101, game_id=1, season_id=1, time_segment='Offense', possession_side='Crimson'),
-            Possession(id=102, game_id=1, season_id=1, time_segment='Defense', possession_side='Crimson'),
-            Possession(id=201, game_id=2, season_id=1, time_segment='Offense', possession_side='Crimson'),
-            Possession(id=202, game_id=2, season_id=1, time_segment='Defense', possession_side='Crimson'),
+            Possession(id=101, game_id=1, season_id=1, time_segment='Offense', possession_side='Offense'),
+            Possession(id=102, game_id=1, season_id=1, time_segment='20:00-15:00', possession_side='Defense'),
+            Possession(id=201, game_id=2, season_id=1, time_segment='Offense', possession_side='Offense'),
+            Possession(id=202, game_id=2, season_id=1, time_segment='20:00-15:00', possession_side='Defense'),
         ]
         db.session.add_all(possessions)
 
@@ -406,7 +406,7 @@ def test_game_table_counts_off_possessions_for_dnp(app):
             game_id=1,
             season_id=1,
             time_segment='Offense',
-            possession_side='Crimson',
+            possession_side='Offense',
             points_scored=2,
         )
         db.session.add(possession)
