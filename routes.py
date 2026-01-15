@@ -1,8 +1,10 @@
 import os
 import csv
+import json
 import re
+from collections import defaultdict
 from io import StringIO
-from typing import Dict, Iterable, Mapping, Optional, List
+from typing import Dict, Iterable, Mapping, Optional, List, Any
 import pandas as pd
 from flask import render_template, jsonify, request, current_app, make_response, abort, redirect, url_for, flash
 from werkzeug.utils import secure_filename
@@ -43,6 +45,7 @@ from clients.synergy_client import SynergyDataCoreClient, SynergyAPI
 from app.utils.table_cells import num, pct
 from utils.records.qualifications import get_threshold
 from utils.records.stat_keys import get_label_for_key
+from utils.shot_location_map import normalize_shot_location
 # BEGIN Advanced Possession
 from services.reports.advanced_possession import (
     cache_get_or_compute_adv_poss_game,
@@ -70,6 +73,20 @@ def _normalize_flow_label(label: object) -> str:
     normalized = _FLOW_PREFIX_PATTERN.sub("", trimmed)
     return normalized.strip()
 
+
+def _load_shot_type_details(raw_value: Any) -> list[dict[str, Any]]:
+    """Load shot_type_details JSON blobs into a list of dicts."""
+    if not raw_value:
+        return []
+    try:
+        data = json.loads(raw_value) if isinstance(raw_value, str) else raw_value
+    except (TypeError, ValueError):
+        return []
+    if isinstance(data, list):
+        return [dict(item) for item in data if isinstance(item, Mapping)]
+    if isinstance(data, Mapping):
+        return [dict(data)]
+    return []
 
 
 def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, object]:
@@ -1330,6 +1347,54 @@ def api_player_stats():
 
     stats = synergy_api.get_player_stats(player_id)
     return jsonify(stats)
+
+
+@app.route('/api/players/<int:player_id>/shot-chart', methods=['GET'])
+@login_required
+def api_player_shot_chart(player_id):
+    """Return normalized shot-chart zones (and optional raw shots) for a player."""
+    season_id = request.args.get("season_id", type=int)
+    include_raw = request.args.get("raw", type=int) == 1
+
+    player = Roster.query.get(player_id)
+    if not player:
+        return jsonify({"error": "player not found"}), 404
+
+    if season_id is None:
+        season_id = player.season_id
+
+    season = Season.query.get(season_id)
+    if not season:
+        return jsonify({"error": "season not found"}), 404
+
+    stats = (
+        PlayerStats.query.filter(
+            PlayerStats.season_id == season_id,
+            PlayerStats.player_name == player.player_name,
+        )
+        .all()
+    )
+
+    zone_counts: dict[str, int] = defaultdict(int)
+    raw_shots: list[dict[str, Any]] = []
+    for stat in stats:
+        for shot in _load_shot_type_details(stat.shot_type_details):
+            normalized = normalize_shot_location(shot.get("shot_location"))
+            zone_counts[normalized] += 1
+            if include_raw:
+                shot_payload = dict(shot)
+                shot_payload["normalized_location"] = normalized
+                raw_shots.append(shot_payload)
+
+    response: dict[str, Any] = {
+        "player_id": player_id,
+        "season_id": season_id,
+        "zones": dict(zone_counts),
+    }
+    if include_raw:
+        response["raw"] = raw_shots
+
+    return jsonify(response)
 
 
 
