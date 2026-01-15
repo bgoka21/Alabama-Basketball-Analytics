@@ -96,6 +96,8 @@ def _normalize_shot_filter(value: Optional[str]) -> Optional[str]:
     if not isinstance(value, str):
         value = str(value)
     cleaned = value.strip()
+    if cleaned.lower() == "all":
+        return None
     return cleaned.lower() if cleaned else None
 
 
