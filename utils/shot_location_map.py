@@ -19,6 +19,8 @@ SHOT_LOCATION_MAP: Dict[str, str] = {
     "Right Slot": "slot_right",
     "Left Houston": "short_wing_left",
     "Right Houston": "short_wing_right",
+    "Left SC": "short_corner_left",
+    "Right SC": "short_corner_right",
     "Top": "top",
     "Logo": "logo",
     "Right SW": "short_wing_right",
