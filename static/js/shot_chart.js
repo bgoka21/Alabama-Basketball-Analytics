@@ -166,6 +166,7 @@ class ShotChart {
     this.container = container;
     this.playerId = container.dataset.playerId;
     this.seasonId = container.dataset.seasonId;
+    this.endpoint = container.dataset.shotChartEndpoint;
     this.svgHost = container.querySelector('[data-shot-chart-graphic]');
     this.summaryEl = container.querySelector('[data-shot-chart-summary]');
     this.statusEl = container.querySelector('[data-shot-chart-status]');
@@ -206,7 +207,8 @@ class ShotChart {
       params.set('season_id', this.seasonId);
     }
 
-    const response = await fetch(`/api/players/${this.playerId}/shot-chart?${params.toString()}`);
+    const baseUrl = this.endpoint || `/api/players/${this.playerId}/shot-chart`;
+    const response = await fetch(`${baseUrl}?${params.toString()}`);
     if (!response.ok) {
       this.setStatus('Unable to load shot data.');
       return;

@@ -1392,10 +1392,7 @@ def api_player_stats():
     return jsonify(stats)
 
 
-@app.route('/api/players/<int:player_id>/shot-chart', methods=['GET'])
-@login_required
-def api_player_shot_chart(player_id):
-    """Return normalized shot-chart zones (and optional raw shots) for a player."""
+def _build_player_shot_chart_payload(player_id: int):
     season_id = request.args.get("season", type=int)
     if season_id is None:
         season_id = request.args.get("season_id", type=int)
@@ -1459,6 +1456,19 @@ def api_player_shot_chart(player_id):
         response["raw"] = raw_shots
 
     return jsonify(response)
+
+
+@app.route('/api/players/<int:player_id>/shot-chart', methods=['GET'])
+@login_required
+def api_player_shot_chart(player_id):
+    """Return normalized shot-chart zones (and optional raw shots) for a player."""
+    return _build_player_shot_chart_payload(player_id)
+
+
+@app.route('/api/public/players/<int:player_id>/shot-chart', methods=['GET'])
+def api_public_player_shot_chart(player_id):
+    """Return normalized shot-chart zones (and optional raw shots) for a player."""
+    return _build_player_shot_chart_payload(player_id)
 
 
 

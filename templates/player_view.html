@@ -66,6 +66,7 @@
       data-shot-chart
       data-player-id="{{ player.id }}"
       data-season-id="{{ player.season_id }}"
+      data-shot-chart-endpoint="{{ url_for('api_public_player_shot_chart', player_id=player.id) }}"
     >
       <div class="flex flex-wrap gap-4 mb-4">
         <label class="text-sm font-medium text-gray-700">
