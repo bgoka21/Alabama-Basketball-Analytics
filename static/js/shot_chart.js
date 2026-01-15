@@ -15,6 +15,7 @@ const POSSESSION_OPTIONS = [
 const ZONE_POSITION_RATIO = {
   rim: { x: 0.5, y: 0.88 },
   paint: { x: 0.5, y: 0.74 },
+  nail: { x: 0.5, y: 0.62 },
   corner_left: { x: 0.1, y: 0.82 },
   corner_right: { x: 0.9, y: 0.82 },
   corner: { x: 0.5, y: 0.82 },
