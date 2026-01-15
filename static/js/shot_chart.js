@@ -22,6 +22,8 @@ const ZONE_POSITION_RATIO = {
   wing_right: { x: 0.8, y: 0.6 },
   slot_left: { x: 0.35, y: 0.55 },
   slot_right: { x: 0.65, y: 0.55 },
+  short_corner_left: { x: 0.16, y: 0.76 },
+  short_corner_right: { x: 0.84, y: 0.76 },
   short_wing_left: { x: 0.25, y: 0.68 },
   short_wing_right: { x: 0.75, y: 0.68 },
   top: { x: 0.5, y: 0.48 },
