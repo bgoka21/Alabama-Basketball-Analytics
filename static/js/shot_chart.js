@@ -208,12 +208,23 @@ class ShotChart {
     }
 
     const baseUrl = this.endpoint || `/api/players/${this.playerId}/shot-chart`;
-    const response = await fetch(`${baseUrl}?${params.toString()}`);
-    if (!response.ok) {
+    let payload;
+    try {
+      const response = await fetch(`${baseUrl}?${params.toString()}`);
+      if (!response.ok) {
+        this.setStatus('Unable to load shot data.');
+        return;
+      }
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        this.setStatus('Unable to load shot data.');
+        return;
+      }
+      payload = await response.json();
+    } catch (error) {
       this.setStatus('Unable to load shot data.');
       return;
     }
-    const payload = await response.json();
     this.rawShots = Array.isArray(payload.raw) ? payload.raw : [];
     if (!this.rawShots.length && payload.zones) {
       this.rawShots = Object.entries(payload.zones).flatMap(([zone, attempts]) =>
