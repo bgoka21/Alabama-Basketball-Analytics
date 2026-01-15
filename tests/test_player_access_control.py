@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
 from pathlib import Path
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request, redirect, url_for, jsonify
 from flask_login import LoginManager, current_user
 from werkzeug.security import generate_password_hash
 
@@ -35,6 +35,10 @@ def app():
     @app.route('/player/<player_name>')
     def player_view(player_name):
         return ''
+
+    @app.route('/api/public/players/<int:player_id>/shot-chart')
+    def api_public_player_shot_chart(player_id):
+        return jsonify({"player_id": player_id, "zones": {}})
 
     @app.before_request
     def restrict_player():
@@ -76,3 +80,9 @@ def test_recruit_routes_blocked(client):
 def test_other_route_blocked(client):
     resp = client.get('/admin/dashboard')
     assert resp.status_code == 302
+
+
+def test_player_shot_chart_allows_json(client):
+    resp = client.get('/api/public/players/1/shot-chart')
+    assert resp.status_code == 200
+    assert resp.content_type.startswith('application/json')

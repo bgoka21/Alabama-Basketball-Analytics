@@ -12,6 +12,8 @@ PLAYER_ALLOWED_ENDPOINTS = {
     'admin.logout',
     'admin.edit_skill_entry',
     'admin.delete_skill_entry',
+    'api_public_player_shot_chart',
+    'api_player_shot_chart',
     'player_view',
 }
 
