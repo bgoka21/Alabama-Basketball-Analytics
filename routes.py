@@ -2,6 +2,7 @@ import os
 import csv
 import json
 import re
+from functools import lru_cache
 from collections import defaultdict
 from io import StringIO
 from typing import Dict, Iterable, Mapping, Optional, List, Any
@@ -87,6 +88,48 @@ def _load_shot_type_details(raw_value: Any) -> list[dict[str, Any]]:
     if isinstance(data, Mapping):
         return [dict(data)]
     return []
+
+
+def _normalize_shot_filter(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        value = str(value)
+    cleaned = value.strip()
+    return cleaned.lower() if cleaned else None
+
+
+def _shot_matches_filters(
+    shot: Mapping[str, Any],
+    shot_class: Optional[str],
+    possession_type: Optional[str],
+) -> bool:
+    if shot_class:
+        shot_value = _normalize_shot_filter(shot.get("shot_class"))
+        if shot_value != shot_class:
+            return False
+    if possession_type:
+        shot_value = _normalize_shot_filter(shot.get("possession_type"))
+        if shot_value != possession_type:
+            return False
+    return True
+
+
+@lru_cache(maxsize=256)
+def _cached_player_season_zone_counts(player_name: str, season_id: int) -> dict[str, int]:
+    zone_counts: dict[str, int] = defaultdict(int)
+    stats = (
+        PlayerStats.query.filter(
+            PlayerStats.season_id == season_id,
+            PlayerStats.player_name == player_name,
+        )
+        .all()
+    )
+    for stat in stats:
+        for shot in _load_shot_type_details(stat.shot_type_details):
+            normalized = normalize_shot_location(shot.get("shot_location"))
+            zone_counts[normalized] += 1
+    return dict(zone_counts)
 
 
 def _flatten_playcall_series(series_payload: Mapping[str, object]) -> Dict[str, object]:
@@ -1353,7 +1396,13 @@ def api_player_stats():
 @login_required
 def api_player_shot_chart(player_id):
     """Return normalized shot-chart zones (and optional raw shots) for a player."""
-    season_id = request.args.get("season_id", type=int)
+    season_id = request.args.get("season", type=int)
+    if season_id is None:
+        season_id = request.args.get("season_id", type=int)
+    game_id = request.args.get("game", type=int)
+    practice_id = request.args.get("practice", type=int)
+    shot_class = _normalize_shot_filter(request.args.get("shot_class"))
+    possession_type = _normalize_shot_filter(request.args.get("possession_type"))
     include_raw = request.args.get("raw", type=int) == 1
 
     player = Roster.query.get(player_id)
@@ -1367,24 +1416,39 @@ def api_player_shot_chart(player_id):
     if not season:
         return jsonify({"error": "season not found"}), 404
 
-    stats = (
-        PlayerStats.query.filter(
+    use_cache = (
+        not include_raw
+        and shot_class is None
+        and possession_type is None
+        and game_id is None
+        and practice_id is None
+    )
+    if use_cache:
+        zone_counts = _cached_player_season_zone_counts(player.player_name, season_id)
+        raw_shots: list[dict[str, Any]] = []
+    else:
+        stats_query = PlayerStats.query.filter(
             PlayerStats.season_id == season_id,
             PlayerStats.player_name == player.player_name,
         )
-        .all()
-    )
+        if game_id is not None:
+            stats_query = stats_query.filter(PlayerStats.game_id == game_id)
+        if practice_id is not None:
+            stats_query = stats_query.filter(PlayerStats.practice_id == practice_id)
+        stats = stats_query.all()
 
-    zone_counts: dict[str, int] = defaultdict(int)
-    raw_shots: list[dict[str, Any]] = []
-    for stat in stats:
-        for shot in _load_shot_type_details(stat.shot_type_details):
-            normalized = normalize_shot_location(shot.get("shot_location"))
-            zone_counts[normalized] += 1
-            if include_raw:
-                shot_payload = dict(shot)
-                shot_payload["normalized_location"] = normalized
-                raw_shots.append(shot_payload)
+        zone_counts = defaultdict(int)
+        raw_shots = []
+        for stat in stats:
+            for shot in _load_shot_type_details(stat.shot_type_details):
+                if not _shot_matches_filters(shot, shot_class, possession_type):
+                    continue
+                normalized = normalize_shot_location(shot.get("shot_location"))
+                zone_counts[normalized] += 1
+                if include_raw:
+                    shot_payload = dict(shot)
+                    shot_payload["normalized_location"] = normalized
+                    raw_shots.append(shot_payload)
 
     response: dict[str, Any] = {
         "player_id": player_id,
