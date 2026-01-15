@@ -58,9 +58,34 @@
 
   {# Include shot type tables with sticky headers #}
     {% include "partials/shot_type_tables.html" with context %}
+
+  <section class="mt-8 bg-white rounded-lg p-4 shadow">
+    <h3 class="text-lg font-semibold mb-4">Shot Chart</h3>
+    <div
+      class="shot-chart-wrapper"
+      data-shot-chart
+      data-player-id="{{ player.id }}"
+      data-season-id="{{ player.season_id }}"
+    >
+      <div class="flex flex-wrap gap-4 mb-4">
+        <label class="text-sm font-medium text-gray-700">
+          Shot Class
+          <select class="ml-2 border rounded px-2 py-1" data-shot-class></select>
+        </label>
+        <label class="text-sm font-medium text-gray-700">
+          Possession Type
+          <select class="ml-2 border rounded px-2 py-1" data-possession-type></select>
+        </label>
+      </div>
+      <div class="text-sm text-gray-600 mb-2" data-shot-chart-summary>Attempts: 0 · Makes: 0 · FG%: 0.0%</div>
+      <div class="text-sm text-gray-500 mb-2 hidden" data-shot-chart-status></div>
+      <div class="flex justify-center" data-shot-chart-graphic></div>
+    </div>
+  </section>
   </div>
 </div>
 
+<script type="module" src="{{ url_for('static', filename='js/shot_chart.js') }}"></script>
 <script>
 function showTab(tabName) {
   ['seasonTotals','gameStats','shotType','skillDevelopment'].forEach(id => {

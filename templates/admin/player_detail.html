@@ -115,6 +115,14 @@
       Shot Type
     </button>
     <button
+      id="btnShotChart"
+      data-tab="shot_chart"
+      onclick="showTab('shotChart')"
+      class="w-full sm:w-auto px-4 py-3 sm:py-2 border rounded"
+    >
+      Shot Chart
+    </button>
+    <button
       type="button"
       id="btnSkillDevelopment"
       data-tab="skill_development"
@@ -823,6 +831,34 @@
 </div>  <!-- closes <div id="shotType"> -->
 </div>  <!-- extra close to unwind the inner wrapper -->
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
+<!-- 3) Shot Chart                                                                  -->
+<!-- ──────────────────────────────────────────────────────────────────────────── -->
+<div id="shotChart" class="tab-content hidden tab-panel">
+  <h2 class="text-lg sm:text-xl font-semibold mb-4">Shot Chart</h2>
+  <div
+    class="shot-chart-wrapper bg-white dark:bg-gray-800 rounded-lg shadow p-4"
+    data-shot-chart
+    data-player-id="{{ player.id }}"
+    data-season-id="{{ request.args.get('season_id', player.season_id) }}"
+  >
+    <div class="flex flex-wrap gap-4 mb-4">
+      <label class="text-sm font-medium text-gray-700 dark:text-gray-200">
+        Shot Class
+        <select class="ml-2 border rounded px-2 py-1" data-shot-class></select>
+      </label>
+      <label class="text-sm font-medium text-gray-700 dark:text-gray-200">
+        Possession Type
+        <select class="ml-2 border rounded px-2 py-1" data-possession-type></select>
+      </label>
+    </div>
+    <div class="text-sm text-gray-600 dark:text-gray-300 mb-2" data-shot-chart-summary>
+      Attempts: 0 · Makes: 0 · FG%: 0.0%
+    </div>
+    <div class="text-sm text-gray-500 dark:text-gray-400 mb-2 hidden" data-shot-chart-status></div>
+    <div class="flex justify-center" data-shot-chart-graphic></div>
+  </div>
+</div>
+<!-- ──────────────────────────────────────────────────────────────────────────── -->
 <!-- 4) Skill Development                                                           -->
 <!-- ──────────────────────────────────────────────────────────────────────────── -->
 <div id="skillDevelopment" class="tab-content hidden px-6 py-8 bg-gray-50 rounded-lg shadow-lg mb-8 tab-panel">
@@ -834,6 +870,7 @@
 
 
 
+  <script type="module" src="{{ url_for('static', filename='js/shot_chart.js') }}"></script>
   <script>
 // —— Utility ——
 function capitalize(str) {
@@ -842,13 +879,13 @@ function capitalize(str) {
 
 // —— Main tab switcher ——
 function showTab(tabName) {
-  ['seasonTotals','gameStats','shotType','skillDevelopment'].forEach(id => {
+  ['seasonTotals','gameStats','shotType','shotChart','skillDevelopment'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.toggle('hidden', id !== tabName);
     el.classList.toggle('block',  id === tabName);
   });
-  ['btnSeasonTotals','btnGameStats','btnShotType','btnSkillDevelopment'].forEach(btnId => {
+  ['btnSeasonTotals','btnGameStats','btnShotType','btnShotChart','btnSkillDevelopment'].forEach(btnId => {
     const b = document.getElementById(btnId);
     if (!b) return;
     if (btnId.toLowerCase().endsWith(tabName.toLowerCase())) {
@@ -905,7 +942,7 @@ function showShotTypeDetail(detail) {
         });
       }
 
-    if (['seasonTotals','gameStats','shotType','skillDevelopment'].includes(hash)) {
+    if (['seasonTotals','gameStats','shotType','shotChart','skillDevelopment'].includes(hash)) {
       showTab(hash);
     } else {
       showTab('seasonTotals');
