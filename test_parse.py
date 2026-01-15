@@ -139,6 +139,13 @@ def extract_tokens(cell_value):
         normalized = normalized.replace(sep, ",")
     return [token.strip() for token in normalized.split(",") if token.strip()]
 
+def normalize_player_column_name(value):
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        value = str(value)
+    return value.replace("\xa0", " ").strip()
+
 def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_collar_values):
     """
     Build a dict of zeros for every base stat plus ​every subcategory under ATR, 2FG, and 3FG.
@@ -263,7 +270,8 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
 
     # 1) First pass: identify shooter_col & shooter_type (exact match on ATR/2FG/3FG tokens)
     for col in df_columns:
-        if not col.startswith("#"):
+        player_name = normalize_player_column_name(col)
+        if not player_name.startswith("#"):
             continue
 
         tokens = extract_tokens(row.get(col, ""))
@@ -271,79 +279,83 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
             continue
 
         # Initialize this player if we haven't seen him/her yet
-        if col not in player_stats_dict:
-            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+        if player_name not in player_stats_dict:
+            player_stats_dict[player_name] = initialize_player_stats(
+                player_name, game_id, season_id, stat_mapping, blue_collar_values
+            )
 
         # Check for ATR
         if "ATR+" in tokens or "ATR-" in tokens:
-            shooter_col   = col
+            shooter_col   = player_name
             shooter_type  = "ATR"
             was_made      = ("ATR+" in tokens)
             shot_result   = "made" if was_made else "missed"
 
             # Increment counters once
             if was_made:
-                player_stats_dict[col]["atr_makes"] += 1
-                player_stats_dict[col]["points"]   += 2
-            player_stats_dict[col]["atr_attempts"] += 1
+                player_stats_dict[player_name]["atr_makes"] += 1
+                player_stats_dict[player_name]["points"]   += 2
+            player_stats_dict[player_name]["atr_attempts"] += 1
 
             break  # stop scanning other columns for shooter
 
         # Otherwise, check for 2FG
         elif "2FG+" in tokens or "2FG-" in tokens:
-            shooter_col   = col
+            shooter_col   = player_name
             shooter_type  = "2FG"
             was_made      = ("2FG+" in tokens)
             shot_result   = "made" if was_made else "missed"
 
             if was_made:
-                player_stats_dict[col]["fg2_makes"] += 1
-                player_stats_dict[col]["points"]   += 2
-            player_stats_dict[col]["fg2_attempts"] += 1
+                player_stats_dict[player_name]["fg2_makes"] += 1
+                player_stats_dict[player_name]["points"]   += 2
+            player_stats_dict[player_name]["fg2_attempts"] += 1
 
             break
 
         # Otherwise, check for 3FG
         elif "3FG+" in tokens or "3FG-" in tokens:
-            shooter_col   = col
+            shooter_col   = player_name
             shooter_type  = "3FG"
             was_made      = ("3FG+" in tokens)
             shot_result   = "made" if was_made else "missed"
 
             if was_made:
-                player_stats_dict[col]["fg3_makes"] += 1
-                player_stats_dict[col]["points"]   += 3
-            player_stats_dict[col]["fg3_attempts"] += 1
+                player_stats_dict[player_name]["fg3_makes"] += 1
+                player_stats_dict[player_name]["points"]   += 3
+            player_stats_dict[player_name]["fg3_attempts"] += 1
 
             break
 
     # 2) Scan entire row for EXACT "Assist" or "Pot. Assist" once a shooter is known
     if shooter_col and shooter_type:
         for other_col in df_columns:
-            if not str(other_col).startswith("#"):
+            other_name = normalize_player_column_name(other_col)
+            if not other_name.startswith("#"):
                 continue
 
             other_tokens = extract_tokens(row.get(other_col, ""))
             if not other_tokens:
                 continue
 
-            if other_col not in player_stats_dict:
-                player_stats_dict[other_col] = initialize_player_stats(
-                    other_col, game_id, season_id, stat_mapping, blue_collar_values
+            if other_name not in player_stats_dict:
+                player_stats_dict[other_name] = initialize_player_stats(
+                    other_name, game_id, season_id, stat_mapping, blue_collar_values
                 )
 
             if "Assist" in other_tokens:
                 assisted_flag = True
-                player_stats_dict[other_col]["assists"] += 1
+                player_stats_dict[other_name]["assists"] += 1
                 break
             elif "Pot. Assist" in other_tokens:
                 assisted_flag = True
-                player_stats_dict[other_col]["pot_assists"] += 1
+                player_stats_dict[other_name]["pot_assists"] += 1
                 break
 
     # 3) Free Throws (FT+ / FT-) always counted, even if no shooter_col
     for col in df_columns:
-        if not col.startswith("#"):
+        player_name = normalize_player_column_name(col)
+        if not player_name.startswith("#"):
             continue
         tokens = extract_tokens(row.get(col, ""))
         if not tokens:
@@ -354,34 +366,43 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
         if not ft_makes and not ft_misses:
             continue
 
-        if col not in player_stats_dict:
-            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+        if player_name not in player_stats_dict:
+            player_stats_dict[player_name] = initialize_player_stats(
+                player_name, game_id, season_id, stat_mapping, blue_collar_values
+            )
 
         if ft_makes:
-            player_stats_dict[col]["ftm"] += ft_makes
-            player_stats_dict[col]["points"] += ft_makes
+            player_stats_dict[player_name]["ftm"] += ft_makes
+            player_stats_dict[player_name]["points"] += ft_makes
 
         attempts = ft_makes + ft_misses
         if attempts:
-            player_stats_dict[col]["fta"] += attempts
+            player_stats_dict[player_name]["fta"] += attempts
 
     # 4) Miscellaneous mapped stats (Turnover, 2nd Assist, Fouled), excluding "Assist"/"Pot. Assist"
     for col in df_columns:
-        if not col.startswith("#"):
+        player_name = normalize_player_column_name(col)
+        if not player_name.startswith("#"):
             continue
         tokens = extract_tokens(row.get(col, ""))
-        if col not in player_stats_dict:
-            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+        if player_name not in player_stats_dict:
+            player_stats_dict[player_name] = initialize_player_stats(
+                player_name, game_id, season_id, stat_mapping, blue_collar_values
+            )
 
         for token in tokens:
             if token in stat_mapping and token not in ("Assist", "Pot. Assist"):
                 mapped_key = stat_mapping[token]
-                player_stats_dict[col][mapped_key] = player_stats_dict[col].get(mapped_key, 0) + 1
+                player_stats_dict[player_name][mapped_key] = (
+                    player_stats_dict[player_name].get(mapped_key, 0) + 1
+                )
 
     # 5) Build and append one shot_detail object if we found shooter_type
     if shooter_col and shooter_type:
         # Safely coerce possession type
-        poss_val = row.get("POSSESSION TYPE", "")
+        poss_val = row.get("Shot Possession Type", "")
+        if pd.isna(poss_val) or not str(poss_val).strip():
+            poss_val = row.get("POSSESSION TYPE", "")
         possession_str = "" if pd.isna(poss_val) else str(poss_val).strip()
 
         shot_detail = {
@@ -476,25 +497,29 @@ blue_collar_mapping = {
 
 def process_def_note_row(row, df_columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals):
     for col in df_columns:
-        if col.startswith("#"):
+        player_name = normalize_player_column_name(col)
+        if player_name.startswith("#"):
             tokens = extract_tokens(row.get(col, ""))
             if tokens:
-                if col not in player_stats_dict:
-                    player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, stat_mapping, blue_collar_values)
+                if player_name not in player_stats_dict:
+                    player_stats_dict[player_name] = initialize_player_stats(
+                        player_name, game_id, season_id, stat_mapping, blue_collar_values
+                    )
                 for token in tokens:
                     if token in blue_collar_mapping:
                         key = blue_collar_mapping[token]
-                        player_stats_dict[col]["blue_collar_accum"][key] += 1
+                        player_stats_dict[player_name]["blue_collar_accum"][key] += 1
                         team_totals[key] = team_totals.get(key, 0) + 1
                         team_totals["total_blue_collar"] += blue_collar_values[key]
                 blue_total = sum(
-                    player_stats_dict[col]["blue_collar_accum"].get(stat, 0) * blue_collar_values.get(stat, 0)
+                    player_stats_dict[player_name]["blue_collar_accum"].get(stat, 0)
+                    * blue_collar_values.get(stat, 0)
                     for stat in blue_collar_values
                 )
-                player_stats_dict[col]["_blue_collar_total"] = blue_total
+                player_stats_dict[player_name]["_blue_collar_total"] = blue_total
 
 def process_player_row(row, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values, team_totals):
-    player_name = str(row.get("Row", "")).strip()
+    player_name = normalize_player_column_name(row.get("Row", ""))
     if player_name not in player_stats_dict:
         player_stats_dict[player_name] = initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_collar_values)
     else:
@@ -535,17 +560,20 @@ def process_defense_player_row(row, df_columns, player_stats_dict, game_id, seas
         "Isolation": "blowby_isolation"
     }
     for col in df_columns:
-        if not col.startswith("#"):
+        player_name = normalize_player_column_name(col)
+        if not player_name.startswith("#"):
             continue
 
         tokens = extract_tokens(row.get(col, ""))
         if not tokens:
             continue
 
-        if col not in player_stats_dict or not isinstance(player_stats_dict.get(col), dict):
-            player_stats_dict[col] = initialize_player_stats(col, game_id, season_id, defense_mapping, {"dummy": 0})
+        if player_name not in player_stats_dict or not isinstance(player_stats_dict.get(player_name), dict):
+            player_stats_dict[player_name] = initialize_player_stats(
+                player_name, game_id, season_id, defense_mapping, {"dummy": 0}
+            )
 
-        slot = player_stats_dict[col]
+        slot = player_stats_dict[player_name]
         for token in tokens:
             if token == "Bump +":
                 inc_stat(slot, "bump_positive")
