@@ -25,7 +25,7 @@ def test_normalize_shot_location_seeded_values():
     assert normalize_shot_location("Left SC") == "short_corner_left"
     assert normalize_shot_location("Right SC") == "short_corner_right"
     assert normalize_shot_location("Left SW") == "short_wing_left"
-    assert normalize_shot_location("Nail") == "paint"
+    assert normalize_shot_location("Nail") == "nail"
     assert normalize_shot_location("Top") == "top"
     assert normalize_shot_location("Logo") == "logo"
     assert normalize_shot_location("Right SW") == "short_wing_right"
