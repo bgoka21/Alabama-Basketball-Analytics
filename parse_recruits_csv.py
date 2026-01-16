@@ -10,8 +10,12 @@ from yourapp import db
 
 
 def safe_str(value):
-    """Return empty string if None, else str(value)."""
-    return "" if value is None else str(value)
+    """Safely convert a value to a string, returning an empty string for NA values."""
+    if pd.isna(value):
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value)
 
 
 def extract_tokens(val):
@@ -169,4 +173,3 @@ def parse_recruits_csv(csv_path, recruit_id):
 if __name__ == '__main__':
     with db.app.app_context():
         parse_recruits_csv(sys.argv[1], int(sys.argv[2]))
-
