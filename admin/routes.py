@@ -8848,6 +8848,9 @@ def player_detail(player_name):
 
 
     # ─── Finally, render template with BOTH modes & all context ─────────
+    shot_chart_endpoint = None
+    if 'api_player_shot_chart' in current_app.view_functions:
+        shot_chart_endpoint = url_for('api_player_shot_chart', player_id=player.id)
     return render_template(
         'admin/player_detail.html',
         player_name                        = player_name,
@@ -8895,6 +8898,8 @@ def player_detail(player_name):
         pnr_totals                         = pnr_totals,
         development_plan                   = development_plan,
         player_stats                       = player_stats_map,
+        selected_season_id                 = selected_season_id,
+        shot_chart_endpoint                = shot_chart_endpoint,
 
         offensive_possessions              = ON_poss,
         ppp_on                             = round(PPP_ON,2),
