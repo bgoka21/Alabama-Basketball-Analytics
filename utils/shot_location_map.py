@@ -38,7 +38,7 @@ def normalize_shot_location(raw_value: str | None) -> str:
     if raw_value is None:
         return _record_unknown("<missing>")
 
-    key = raw_value.strip()
+    key = raw_value.strip() if isinstance(raw_value, str) else str(raw_value).strip()
     if key in SHOT_LOCATION_MAP:
         return SHOT_LOCATION_MAP[key]
 
