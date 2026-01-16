@@ -211,6 +211,8 @@ from services.leaderboard_game import (
     fetch_gap_help_last_game,
     fetch_low_man,
     fetch_low_man_last_game,
+    fetch_offense_contests,
+    fetch_offense_contests_last_game,
     fetch_offense_shrinks,
     fetch_offense_shrinks_last_game,
     fetch_oreb,
@@ -11754,12 +11756,16 @@ def leaderboard_game():
         game_types: Sequence[str],
     ):
         if not season_id:
-            return _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice()
+            return _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice(), _empty_slice()
 
         last_game_types: Optional[Sequence[str]] = None
 
         shrinks_season = fetch_offense_shrinks(season_id, window_start, window_end, game_types)
         shrinks_last = fetch_offense_shrinks_last_game(
+            season_id, window_start, window_end, last_game_types
+        )
+        contests_season = fetch_offense_contests(season_id, window_start, window_end, game_types)
+        contests_last = fetch_offense_contests_last_game(
             season_id, window_start, window_end, last_game_types
         )
         atr_season = fetch_atr_finishing(season_id, window_start, window_end, game_types)
@@ -11788,6 +11794,8 @@ def leaderboard_game():
         return (
             shrinks_season,
             shrinks_last,
+            contests_season,
+            contests_last,
             atr_season,
             atr_last,
             oreb_season,
@@ -11815,6 +11823,8 @@ def leaderboard_game():
     (
         shrinks_season,
         shrinks_last,
+        contests_season,
+        contests_last,
         atr_season,
         atr_last,
         oreb_season,
@@ -11873,6 +11883,15 @@ def leaderboard_game():
                     shrinks_last,
                     split_dual=True,
                     split_titles=("Season Shrink 3's", "Last Game Shrink 3's"),
+                    split_stacked=True,
+                ),
+                _group_item(
+                    'contests_offense',
+                    '3FG (Contested)',
+                    contests_season,
+                    contests_last,
+                    split_dual=True,
+                    split_titles=("Season Contested 3's", "Last Game Contested 3's"),
                     split_stacked=True,
                 ),
                 _group_item('atr_finishing', 'ATR Finishing', atr_season, atr_last),
