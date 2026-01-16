@@ -9507,6 +9507,33 @@ def inject_last_stats_update():
         formatted = "Never"
     return {"last_stats_update": formatted}
 
+@admin_bp.context_processor
+def inject_sidebar_players():
+    seasons = Season.query.order_by(Season.start_date.desc()).all()
+    selected = request.args.get('season_id', type=int) or (seasons[0].id if seasons else None)
+
+    import re
+    def sort_key(name):
+        match = re.match(r'#(\d+)', name)
+        return int(match.group(1)) if match else 9999
+
+    if selected:
+        roster_entries = Roster.query.filter_by(season_id=selected).all()
+        players = [r.player_name for r in roster_entries]
+    else:
+        players = [p[0] for p in db.session.query(PlayerStats.player_name).distinct().all()]
+
+    players.sort(key=sort_key)
+
+    selected_player = None
+    if request.view_args:
+        selected_player = request.view_args.get('player_name')
+
+    return {
+        'sidebar_players': players,
+        'sidebar_selected_player': selected_player,
+    }
+
 
 
 
