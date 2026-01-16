@@ -77,6 +77,24 @@
       <span class="flex-1 text-left">Players</span>
     </a>
   </li>
+  {% if sidebar_players %}
+  <li class="nav-item">
+    <label for="sidebar-player-select" class="sr-only">Select player</label>
+    <select
+      id="sidebar-player-select"
+      class="w-full rounded-md bg-white px-3 py-2 text-sm font-medium text-[#9E1B32] shadow-inner focus:outline-none focus:ring-2 focus:ring-white/60"
+      onchange="if (this.value) window.location.href = this.value;"
+    >
+      <option value="">Select a player</option>
+      {% for player in sidebar_players %}
+        {% set player_url = url_for('admin.player_detail', player_name=player, season_id=selected_season) %}
+        <option value="{{ player_url }}" {% if player == sidebar_selected_player %}selected{% endif %}>
+          {{ player }}
+        </option>
+      {% endfor %}
+    </select>
+  </li>
+  {% endif %}
   <li class="nav-item">
     <details class="group" {% if recruiting_active %}open{% endif %}>
       <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
