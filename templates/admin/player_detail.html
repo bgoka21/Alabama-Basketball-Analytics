@@ -839,7 +839,8 @@
     class="shot-chart-wrapper bg-white dark:bg-gray-800 rounded-lg shadow p-4"
     data-shot-chart
     data-player-id="{{ player.id }}"
-    data-season-id="{{ request.args.get('season_id', player.season_id) }}"
+    data-season-id="{{ selected_season_id }}"
+    {% if shot_chart_endpoint %}data-shot-chart-endpoint="{{ shot_chart_endpoint }}"{% endif %}
   >
     <div class="flex flex-wrap gap-4 mb-4">
       <label class="text-sm font-medium text-gray-700 dark:text-gray-200">
