@@ -16,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover
         ndarray = type('ndarray', (), {})
     np = _DummyNP()
 import sqlite3
+from collections import defaultdict
 from utils.lineup import compute_lineup_efficiencies, get_players_on_floor
 from utils.shottype import persist_player_shot_details
 # BEGIN Advanced Possession
@@ -146,6 +147,14 @@ def normalize_player_column_name(value):
         value = str(value)
     return value.replace("\xa0", " ").strip()
 
+def build_shot_detail(shot_class, result, shot_location, possession_type):
+    return {
+        "shot_class": shot_class,
+        "result": result,
+        "shot_location": shot_location,
+        "possession_type": possession_type,
+    }
+
 def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_collar_values):
     """
     Build a dict of zeros for every base stat plus ​every subcategory under ATR, 2FG, and 3FG.
@@ -258,6 +267,42 @@ def initialize_player_stats(player_name, game_id, season_id, stat_mapping, blue_
 
 
 
+def record_offense_shots(row, df_columns, player_shot_list, season_id):
+    shot_location = safe_str(row.get("Shot Location", ""))
+    possession_type = safe_str(row.get("Shot Possession Type", ""))
+
+    for col in df_columns:
+        player_name = normalize_player_column_name(col)
+        if not player_name.startswith("#"):
+            continue
+
+        tokens = extract_tokens(row.get(col, ""))
+        if not tokens:
+            continue
+
+        roster_entry = _find_roster_entry(player_name, season_id)
+        player_key = roster_entry.id if roster_entry else player_name
+
+        for token in tokens:
+            if token not in {"ATR+", "ATR-", "2FG+", "2FG-", "3FG+", "3FG-"}:
+                continue
+
+            if token.startswith("ATR"):
+                shot_class = "ATR"
+            elif token.startswith("2FG"):
+                shot_class = "2FG"
+            else:
+                shot_class = "3FG"
+
+            shot_obj = build_shot_detail(
+                shot_class,
+                "make" if token.endswith("+") else "miss",
+                shot_location,
+                possession_type,
+            )
+            player_shot_list[player_key].append(shot_obj)
+
+
 def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values):
     """
     Parses one “Offense” row (game), updates player_stats_dict, and records detailed shot info
@@ -289,7 +334,7 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
             shooter_col   = player_name
             shooter_type  = "ATR"
             was_made      = ("ATR+" in tokens)
-            shot_result   = "made" if was_made else "missed"
+            shot_result   = "make" if was_made else "miss"
 
             # Increment counters once
             if was_made:
@@ -304,7 +349,7 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
             shooter_col   = player_name
             shooter_type  = "2FG"
             was_made      = ("2FG+" in tokens)
-            shot_result   = "made" if was_made else "missed"
+            shot_result   = "make" if was_made else "miss"
 
             if was_made:
                 player_stats_dict[player_name]["fg2_makes"] += 1
@@ -318,7 +363,7 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
             shooter_col   = player_name
             shooter_type  = "3FG"
             was_made      = ("3FG+" in tokens)
-            shot_result   = "made" if was_made else "missed"
+            shot_result   = "make" if was_made else "miss"
 
             if was_made:
                 player_stats_dict[player_name]["fg3_makes"] += 1
@@ -397,61 +442,22 @@ def process_offense_row(row, df_columns, player_stats_dict, game_id, season_id, 
                     player_stats_dict[player_name].get(mapped_key, 0) + 1
                 )
 
-    # 5) Build and append one shot_detail object if we found shooter_type
+    # 5) Capture a per-shot detail entry for assisting attribution and tests.
     if shooter_col and shooter_type:
-        # Safely coerce possession type
         poss_val = row.get("Shot Possession Type", "")
         if pd.isna(poss_val) or not str(poss_val).strip():
             poss_val = row.get("POSSESSION TYPE", "")
         possession_str = "" if pd.isna(poss_val) else str(poss_val).strip()
 
-        shot_detail = {
-            "shot_class":      shooter_type,
-            "result":          shot_result,
-            "possession_type": possession_str,
-            "Assisted":        "Assisted"     if assisted_flag else "",
-            "Non-Assisted":    "" if assisted_flag else "Non-Assisted"
-        }
-        shot_location = safe_str(row.get("Shot Location", ""))
-        shot_detail["shot_location"] = shot_location
-        key_prefix = shooter_type.lower()  # → "atr" or "2fg" or "3fg"
-
-        # ─── Shared ATR & 2FG subcategories (pull from "2FG (…)” columns) ────────────
-        if shooter_type in ("ATR", "2FG"):
-            for suffix in ["Type", "Defenders", "Dribble", "Feet", "Hands", "Other", "PA", "RA"]:
-                col_name = f"2FG ({suffix})"
-                shot_detail[f"{key_prefix}_{suffix.lower().replace(' ', '_')}"] = safe_str(row.get(col_name, ""))
-
-            # 2FG Scheme (Attack) & (Pass)
-            for token2 in extract_tokens(row.get("2FG Scheme (Attack)", "")):
-                shot_detail[f"{key_prefix}_scheme_attack"] = token2
-
-            for token2 in extract_tokens(row.get("2FG Scheme (Drive)", "")):
-                shot_detail[f"{key_prefix}_scheme_drive"] = token2
-                
-            for token2 in extract_tokens(row.get("2FG Scheme (Pass)", "")):
-                shot_detail[f"{key_prefix}_scheme_pass"] = token2
-
-        # ─── 3FG-only subcategories (pull from "3FG (…)” columns) ───────────────
-        else:  # shooter_type == "3FG"
-            for suffix in ["Contest", "Footwork", "Good/Bad", "Line", "Move", "Pocket", "Shrink", "Type"]:
-                col_name = f"3FG ({suffix})"
-                json_key = f"{key_prefix}_{suffix.lower().replace('/', '_').replace(' ', '_')}"
-                shot_detail[json_key] = safe_str(row.get(col_name, ""))
-
-            # 3FG Scheme (Attack), (Drive), (Pass)
-            for token3 in extract_tokens(row.get("3FG Scheme (Attack)", "")):
-                shot_detail[f"{key_prefix}_scheme_attack"] = token3
-            for token3 in extract_tokens(row.get("3FG Scheme (Drive)", "")):
-                shot_detail[f"{key_prefix}_scheme_drive"] = token3
-            for token3 in extract_tokens(row.get("3FG Scheme (Pass)", "")):
-                shot_detail[f"{key_prefix}_scheme_pass"] = token3
-
-        # 6) Append this single shot_detail to the shooter’s shot_type_details list
+        shot_detail = build_shot_detail(
+            shooter_type,
+            shot_result,
+            safe_str(row.get("Shot Location", "")),
+            possession_str,
+        )
+        shot_detail["Assisted"] = "Assisted" if assisted_flag else ""
+        shot_detail["Non-Assisted"] = "" if assisted_flag else "Non-Assisted"
         player_stats_dict[shooter_col]["shot_type_details"].append(shot_detail)
-
-
-
 
 def process_defense_row(row, opponent_totals, stat_mapping):
     tokens = extract_tokens(row.get("OPP STATS", ""))
@@ -952,6 +958,7 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
     }
 
     player_stats_dict = {}
+    player_shot_list = defaultdict(list)
     team_totals = {
         "total_points": 0,
         "total_assists": 0,
@@ -1108,6 +1115,7 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
             continue
 
         if row_type == "Offense":
+            record_offense_shots(row, df.columns, player_shot_list, season_id)
             process_offense_row(row, df.columns, player_stats_dict, game_id, season_id, stat_mapping, blue_collar_values)
         elif row_type == "Defense":
             process_defense_row(row, opponent_totals, stat_mapping)
@@ -1140,10 +1148,12 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
                 .filter_by(player_name=player_name, game_id=game_id) \
                 .delete()
 
-            # Prepare shot-detail JSON (if any)
-            json_details = None
-            if player_stats.get("shot_type_details"):
-                json_details = json.dumps(player_stats["shot_type_details"])
+            roster_entry = _find_roster_entry(player_name, season_id)
+            player_shot_key = roster_entry.id if roster_entry else player_name
+            shots = player_shot_list.get(player_shot_key, [])
+
+            # Persist per-shot detail JSON for game shot charts (mirrors practice parser).
+            json_details = json.dumps(shots) if shots else None
 
             # Build a fresh dict of only valid columns (excluding array/dict fields)
             clean_stats = {
@@ -1169,7 +1179,7 @@ def parse_csv(file_path, game_id, season_id, file_date=None):
             db.session.add(player_stat)
             persist_player_shot_details(
                 player_stat,
-                player_stats.get("shot_type_details") or [],
+                shots,
                 replace=True,
             )
 
