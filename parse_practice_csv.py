@@ -19,8 +19,12 @@ from models import Possession, PossessionPlayer, ShotDetail
 
 
 def safe_str(value):
-    """Safely convert a value to a string, returning an empty string for None."""
-    return "" if value is None else str(value)
+    """Safely convert a value to a string, returning an empty string for NA values."""
+    if pd.isna(value):
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value)
 
 # ── COPY OF blue_collar_values FROM test_parse.py ───────────────────
 blue_collar_values = {
