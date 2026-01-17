@@ -151,9 +151,15 @@
   </div>
 
    <!-- Row 2: Shooting Breakdown -->
+  {% set atr_pct = (agg.atr_makes / agg.atr_attempts * 100) if agg.atr_attempts else None %}
+  {% set fg2_pct = (agg.fg2_makes / agg.fg2_attempts * 100) if agg.fg2_attempts else None %}
+  {% set fg3_pct = (agg.fg3_makes / agg.fg3_attempts * 100) if agg.fg3_attempts else None %}
+  {% set atr_grade_token = grade_token('atr2fg_pct', atr_pct) if atr_pct is not none else None %}
+  {% set fg2_grade_token = grade_token('fg2_pct', fg2_pct) if fg2_pct is not none else None %}
+  {% set fg3_grade_token = grade_token('fg3_pct', fg3_pct) if fg3_pct is not none else None %}
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
     <!-- ATR -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{% if agg.atr_attempts %}{{ (agg.atr_makes / agg.atr_attempts * 100) | grade_atr2fg_pct(agg.atr_attempts) }}{% endif %}">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{{ (' ' + atr_grade_token) if atr_grade_token else '' }}">
       <div class="text-sm font-medium text-black uppercase">ATR</div>
       <div class="text-3xl font-bold my-2 text-black">
         {% if agg.atr_attempts > 0 %}
@@ -165,7 +171,7 @@
       <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.atr.freq|round(1) }}%</div>
     </div>
     <!-- 2FG -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{% if agg.fg2_attempts %}{{ (agg.fg2_makes / agg.fg2_attempts * 100) | grade_atr2fg_pct(agg.fg2_attempts) }}{% endif %}">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{{ (' ' + fg2_grade_token) if fg2_grade_token else '' }}">
       <div class="text-sm font-medium text-black uppercase">2FG</div>
       <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fg2_attempts > 0 %}
@@ -177,7 +183,7 @@
       <div class="text-base font-semibold text-black">Freq: {{ shot_type_totals.fg2.freq|round(1) }}%</div>
     </div>
     <!-- 3FG -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{% if agg.fg3_attempts %}{{ (agg.fg3_makes / agg.fg3_attempts * 100) | grade_3fg_pct(agg.fg3_attempts) }}{% endif %}">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col items-center{{ (' ' + fg3_grade_token) if fg3_grade_token else '' }}">
       <div class="text-sm font-medium text-black uppercase">3FG</div>
       <div class="text-3xl font-bold my-2 text-black">
         {% if agg.fg3_attempts > 0 %}
