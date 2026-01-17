@@ -265,20 +265,6 @@ class ShotChart {
     });
   }
 
-  aggregateShots(shots) {
-    return shots.reduce((acc, shot) => {
-      const zone = shot.normalized_location || 'unknown';
-      if (!acc[zone]) {
-        acc[zone] = { attempts: 0, makes: 0 };
-      }
-      acc[zone].attempts += 1;
-      if (String(shot.result).toLowerCase() === 'made') {
-        acc[zone].makes += 1;
-      }
-      return acc;
-    }, {});
-  }
-
   render() {
     const shots = this.filterShots();
     const totals = shots.reduce(
@@ -314,30 +300,58 @@ class ShotChart {
     const existingMarkers = this.chartSvg.querySelectorAll('.shot-marker');
     existingMarkers.forEach((marker) => marker.remove());
 
-    const aggregates = this.aggregateShots(shots);
-    const maxAttempts = Math.max(...Object.values(aggregates).map((zone) => zone.attempts), 0);
-    Object.entries(aggregates).forEach(([zone, data]) => {
+    const markerRadius = 5;
+    const missSize = 6;
+    shots.forEach((shot) => {
+      const zone = shot.normalized_location || 'unknown';
       const ratios = ZONE_POSITION_RATIO[zone] || ZONE_POSITION_RATIO.unknown;
-      const radius = maxAttempts
-        ? 6 + (data.attempts / maxAttempts) * 14
-        : 6;
-      const fgPct = data.attempts ? data.makes / data.attempts : 0;
-      const color = getFgColor(fgPct);
+      const cx = ratios.x * width;
+      const cy = ratios.y * height;
+      const isMade = String(shot.result).toLowerCase() === 'made';
 
-      const marker = createSvgElement('circle', {
-        class: 'shot-marker',
-        cx: ratios.x * width,
-        cy: ratios.y * height,
-        r: radius,
-        fill: color,
-        'fill-opacity': 0.7,
-        stroke: '#1f2937',
-        'stroke-width': 1,
+      if (isMade) {
+        const marker = createSvgElement('circle', {
+          class: 'shot-marker',
+          cx,
+          cy,
+          r: markerRadius,
+          fill: getFgColor(1),
+          'fill-opacity': 0.85,
+          stroke: '#1f2937',
+          'stroke-width': 1,
+        });
+        const title = createSvgElement('title');
+        title.textContent = `Made shot (${toTitle(zone.replace(/_/g, ' '))})`;
+        marker.appendChild(title);
+        this.chartSvg.appendChild(marker);
+        return;
+      }
+
+      const markerGroup = createSvgElement('g', { class: 'shot-marker' });
+      const lineOne = createSvgElement('line', {
+        x1: cx - missSize,
+        y1: cy - missSize,
+        x2: cx + missSize,
+        y2: cy + missSize,
+        stroke: '#dc2626',
+        'stroke-width': 2,
+        'stroke-linecap': 'round',
+      });
+      const lineTwo = createSvgElement('line', {
+        x1: cx - missSize,
+        y1: cy + missSize,
+        x2: cx + missSize,
+        y2: cy - missSize,
+        stroke: '#dc2626',
+        'stroke-width': 2,
+        'stroke-linecap': 'round',
       });
       const title = createSvgElement('title');
-      title.textContent = `${toTitle(zone.replace(/_/g, ' '))}: ${data.makes}/${data.attempts} (${toPercent(fgPct)})`;
-      marker.appendChild(title);
-      this.chartSvg.appendChild(marker);
+      title.textContent = `Missed shot (${toTitle(zone.replace(/_/g, ' '))})`;
+      markerGroup.appendChild(title);
+      markerGroup.appendChild(lineOne);
+      markerGroup.appendChild(lineTwo);
+      this.chartSvg.appendChild(markerGroup);
     });
   }
 }
