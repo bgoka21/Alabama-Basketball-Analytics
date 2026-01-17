@@ -1410,10 +1410,12 @@ def _build_player_shot_chart_payload(player_id: int):
 
     if season_id is None:
         season_id = player.season_id
-
-    season = Season.query.get(season_id)
-    if not season:
-        return jsonify({"error": "season not found"}), 404
+    if season_id is None:
+        season_id = (
+            db.session.query(func.max(PlayerStats.season_id))
+            .filter(PlayerStats.player_name == player.player_name)
+            .scalar()
+        )
 
     use_cache = (
         not include_raw
