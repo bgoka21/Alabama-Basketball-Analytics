@@ -1,0 +1,25 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold">CSV Pipeline</h1>
+    <p class="text-sm text-gray-600">Upload Pre-Combined CSV + post-game group CSVs. Builds Final CSV per spec.</p>
+  </div>
+
+  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <h2 class="text-lg font-semibold text-gray-900">A) Build Final CSV (post-game combine + row-group patch)</h2>
+    <p class="text-sm text-gray-600 mt-2">
+      Placeholder for the final CSV builder flow. This will accept pre-combined inputs
+      and apply row-group patching per the agreed spec.
+    </p>
+  </section>
+
+  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <h2 class="text-lg font-semibold text-gray-900">B) Apply Playcall Overlay (upload playcall CSV, updates offense rows only)</h2>
+    <p class="text-sm text-gray-600 mt-2">
+      Placeholder for playcall overlay. This will upload a playcall CSV and update offense rows only.
+    </p>
+  </section>
+</div>
+{% endblock %}

@@ -28,6 +28,12 @@
         {{ icons.render('files') }}
         <span class="flex-1 text-left">Files</span>
       </a>
+      {% if view_exists('csv_pipeline.csv_pipeline_index') %}
+      <a class="{{ link_base_classes }}{% if request.endpoint == 'csv_pipeline.csv_pipeline_index' %} {{ active_classes }}{% endif %}" href="{{ url_for('csv_pipeline.csv_pipeline_index') }}">
+        {{ icons.render('table') }}
+        <span class="flex-1 text-left">CSV Pipeline</span>
+      </a>
+      {% endif %}
       <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.roster' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.roster') }}">
         {{ icons.render('roster') }}
         <span class="flex-1 text-left">Roster</span>

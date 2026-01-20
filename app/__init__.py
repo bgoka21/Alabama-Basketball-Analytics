@@ -20,6 +20,7 @@ from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from app.utils.schema import ensure_columns
 from app.utils.formatting import fmt_money, posneg_class
 from app.grades import grade_scale, grade_token
+from app.csv_pipeline.routes import csv_pipeline_bp
 
 # Allow JSON serialization of SimpleNamespace values across all Flask apps
 _orig_json_default = DefaultJSONProvider.default
@@ -240,6 +241,8 @@ def create_app():
 
     from recruits.admin_logo import bp_logo
     app.register_blueprint(bp_logo)
+
+    app.register_blueprint(csv_pipeline_bp, url_prefix="/management")
 
     from scout import scout_bp
     app.register_blueprint(scout_bp, url_prefix='/scout')
