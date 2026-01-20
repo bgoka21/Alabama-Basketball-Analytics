@@ -1,4 +1,5 @@
 from io import BytesIO
+import os
 
 import pandas as pd
 import pytest
@@ -289,3 +290,109 @@ def test_csv_pipeline_preserves_player_rows(client):
     player_row = output[output["Row"] == "Player"].iloc[0]
     assert player_row["#1"] == "keep-player"
     assert player_row["Misc"] == "keep"
+
+
+def test_playcall_overlay_updates_offense_rows_only(client):
+    game_df = pd.DataFrame(
+        {
+            "Row": ["Player", "Offense", "Offense", "Defense"],
+            "Timeline": ["T0", "T1", "T2", "T3"],
+            "PLAYCALL": ["", "Old1", "Old2", "Keep"],
+            "POSITION": ["", "", "", "Defense"],
+        }
+    )
+    playcall_df = pd.DataFrame(
+        {
+            "PLAYCALL": ["New1", "New2"],
+            "POSITION": ["Pos1", "Pos2"],
+            "SERIES": ["Series1", "Series2"],
+            "VS": ["Man", "Zone"],
+            "ACTION": ["Action1", "Action2"],
+        }
+    )
+
+    with client.application.app_context():
+        game = Game(
+            season_id=1,
+            game_date=pd.to_datetime("2024-11-20").date(),
+            opponent_name="Overlay Opponent",
+            home_or_away="Home",
+            result="N/A",
+            csv_filename="overlay_game.csv",
+        )
+        db.session.add(game)
+        db.session.commit()
+        csv_path = os.path.join(client.application.config["UPLOAD_FOLDER"], game.csv_filename)
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+        game_df.to_csv(csv_path, index=False)
+
+    data = {
+        "overlay_game_id": str(game.id),
+        "playcall_overlay": _csv_file(playcall_df, "playcall.csv"),
+        "action": "overlay",
+    }
+
+    resp = client.post(
+        "/management/csv-pipeline",
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 200
+
+    updated = pd.read_csv(csv_path)
+    offense_rows = updated[updated["Row"] == "Offense"].reset_index(drop=True)
+    assert offense_rows["PLAYCALL"].tolist() == ["New1", "New2"]
+    assert offense_rows["POSITION"].tolist() == ["Pos1", "Pos2"]
+    assert offense_rows["SERIES"].tolist() == ["Series1", "Series2"]
+    assert offense_rows["VS"].tolist() == ["Man", "Zone"]
+    assert offense_rows["ACTION"].tolist() == ["Action1", "Action2"]
+    assert updated.loc[updated["Row"] == "Defense", "PLAYCALL"].iloc[0] == "Keep"
+
+
+def test_playcall_overlay_row_count_mismatch(client):
+    game_df = pd.DataFrame(
+        {
+            "Row": ["Offense", "Offense", "Defense"],
+            "Timeline": ["T1", "T2", "T3"],
+        }
+    )
+    playcall_df = pd.DataFrame(
+        {
+            "PLAYCALL": ["Only1"],
+            "POSITION": ["Pos1"],
+            "SERIES": ["Series1"],
+            "VS": ["Man"],
+            "ACTION": ["Action1"],
+        }
+    )
+
+    with client.application.app_context():
+        game = Game(
+            season_id=1,
+            game_date=pd.to_datetime("2024-11-22").date(),
+            opponent_name="Mismatch Opponent",
+            home_or_away="Away",
+            result="N/A",
+            csv_filename="mismatch_game.csv",
+        )
+        db.session.add(game)
+        db.session.commit()
+        csv_path = os.path.join(client.application.config["UPLOAD_FOLDER"], game.csv_filename)
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+        game_df.to_csv(csv_path, index=False)
+
+    data = {
+        "overlay_game_id": str(game.id),
+        "playcall_overlay": _csv_file(playcall_df, "playcall.csv"),
+        "action": "overlay",
+    }
+
+    resp = client.post(
+        "/management/csv-pipeline",
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 400
+    assert "row count mismatch" in resp.data.decode("utf-8")
