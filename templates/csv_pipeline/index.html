@@ -19,6 +19,50 @@
 
   <form method="POST" enctype="multipart/form-data" class="space-y-6">
     <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">Link Final CSV to a Game</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Choose an existing game to replace its CSV, or provide details to create a new game record.
+      </p>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Existing Game (optional)</label>
+          <select name="game_id" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Create new game</option>
+            {% for game in games %}
+              <option value="{{ game.id }}">
+                {{ game.game_date }} — {{ game.opponent_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Season (required for new game)</label>
+          <select name="season_id" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Select season</option>
+            {% for season in seasons %}
+              <option value="{{ season.id }}">{{ season.season_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Game Date (required for new game)</label>
+          <input type="date" name="game_date" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Opponent (required for new game)</label>
+          <input type="text" name="opponent_name" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Home/Away (required for new game)</label>
+          <select name="home_or_away" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Select</option>
+            <option value="Home">Home</option>
+            <option value="Away">Away</option>
+          </select>
+        </div>
+      </div>
+    </section>
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900">Pre-Combined CSV (required)</h2>
       <p class="text-sm text-gray-600 mt-2">
         Upload the base CSV that will be patched with the combined group rows.

@@ -1,10 +1,20 @@
 """Routes for the CSV Pipeline management tool."""
 
+from datetime import date, datetime
 from io import BytesIO
+import os
 
 import pandas as pd
-from flask import Blueprint, flash, render_template, request, send_file
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    render_template,
+    request,
+    send_file,
+)
 from flask_login import login_required
+from werkzeug.utils import secure_filename
 
 from utils.auth import admin_required
 from app.csv_pipeline.service import (
@@ -13,6 +23,8 @@ from app.csv_pipeline.service import (
     GroupInputs,
     build_final_csv,
 )
+from models.database import Game, Season, db
+from models.uploaded_file import UploadedFile
 
 csv_pipeline_bp = Blueprint("csv_pipeline", __name__)
 
@@ -23,18 +35,32 @@ def _read_csv(file_storage, label: str) -> pd.DataFrame:
     return pd.read_csv(file_storage)
 
 
+def _final_filename(pre_combined_name: str) -> str:
+    base = secure_filename(pre_combined_name) or "pre_combined.csv"
+    stem, ext = os.path.splitext(base)
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    suffix = ext if ext else ".csv"
+    return f"final_{stem}_{timestamp}{suffix}"
+
+
+def _load_form_context():
+    seasons = Season.query.order_by(Season.start_date.desc(), Season.id.desc()).all()
+    games = Game.query.order_by(Game.game_date.desc(), Game.id.desc()).all()
+    return seasons, games
+
+
 @csv_pipeline_bp.route("/csv-pipeline", methods=["GET", "POST"])
 @login_required
 @admin_required
 def csv_pipeline_index():
+    seasons, games = _load_form_context()
+
     if request.method == "POST":
         errors: list[str] = []
 
         try:
-            pre_combined = _read_csv(
-                request.files.get("pre_combined"),
-                "Pre-Combined CSV",
-            )
+            pre_combined_file = request.files.get("pre_combined")
+            pre_combined = _read_csv(pre_combined_file, "Pre-Combined CSV")
 
             inputs = GroupInputs(
                 offense_shot_type=_read_csv(
@@ -97,7 +123,70 @@ def csv_pipeline_index():
                 defense_rebound=request.files.get("defense_rebound").filename,
             )
 
+            game_id = request.form.get("game_id", type=int)
+            season_id = request.form.get("season_id", type=int)
+            opponent_name = (request.form.get("opponent_name") or "").strip()
+            home_or_away = (request.form.get("home_or_away") or "").strip()
+            game_date_str = (request.form.get("game_date") or "").strip()
+
+            game = None
+            if game_id:
+                game = Game.query.get(game_id)
+                if not game:
+                    raise CsvPipelineError("Selected game was not found.")
+                if season_id is None:
+                    season_id = game.season_id
+            else:
+                if not season_id:
+                    raise CsvPipelineError("Season is required to create a game record.")
+                if not opponent_name:
+                    raise CsvPipelineError("Opponent name is required to create a game record.")
+                if not home_or_away:
+                    raise CsvPipelineError("Home/Away selection is required.")
+                if not game_date_str:
+                    raise CsvPipelineError("Game date is required.")
+
+                try:
+                    parsed_date = datetime.strptime(game_date_str, "%Y-%m-%d").date()
+                except ValueError as exc:
+                    raise CsvPipelineError("Game date must be in YYYY-MM-DD format.") from exc
+
+                game = Game(
+                    season_id=season_id,
+                    game_date=parsed_date,
+                    opponent_name=opponent_name,
+                    home_or_away=home_or_away,
+                    result="N/A",
+                )
+                db.session.add(game)
+                db.session.flush()
+
             final_df = build_final_csv(pre_combined, inputs, filenames)
+
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            if not upload_folder:
+                raise CsvPipelineError("Upload folder is not configured.")
+
+            os.makedirs(upload_folder, exist_ok=True)
+            filename = _final_filename(pre_combined_file.filename)
+            file_path = os.path.join(upload_folder, filename)
+
+            final_df.to_csv(file_path, index=False)
+
+            game.csv_filename = filename
+            if not game.game_date:
+                game.game_date = date.today()
+            db.session.commit()
+
+            uploaded_file = UploadedFile(
+                filename=filename,
+                parse_status="Not Parsed",
+                category="Game",
+                season_id=game.season_id,
+                file_date=game.game_date,
+            )
+            db.session.add(uploaded_file)
+            db.session.commit()
 
             csv_io = BytesIO()
             final_df.to_csv(csv_io, index=False)
@@ -105,7 +194,7 @@ def csv_pipeline_index():
             return send_file(
                 csv_io,
                 mimetype="text/csv",
-                download_name="final.csv",
+                download_name=filename,
                 as_attachment=True,
             )
         except CsvPipelineError as exc:
@@ -115,6 +204,19 @@ def csv_pipeline_index():
 
         for error in errors:
             flash(error, "error")
-        return render_template("csv_pipeline/index.html", errors=errors), 400
+        return (
+            render_template(
+                "csv_pipeline/index.html",
+                errors=errors,
+                seasons=seasons,
+                games=games,
+            ),
+            400,
+        )
 
-    return render_template("csv_pipeline/index.html", errors=[])
+    return render_template(
+        "csv_pipeline/index.html",
+        errors=[],
+        seasons=seasons,
+        games=games,
+    )

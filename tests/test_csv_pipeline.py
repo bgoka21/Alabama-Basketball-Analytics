@@ -8,12 +8,12 @@ from werkzeug.security import generate_password_hash
 
 from admin.routes import admin_bp
 from app.csv_pipeline.routes import csv_pipeline_bp
-from models.database import db
+from models.database import Game, Season, db
 from models.user import User
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
     app = Flask(__name__)
     app.config.update(
         TESTING=True,
@@ -21,6 +21,7 @@ def app():
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         WTF_CSRF_ENABLED=False,
+        UPLOAD_FOLDER=str(tmp_path / "uploads"),
     )
 
     db.init_app(app)
@@ -45,7 +46,13 @@ def app():
                 is_admin=True,
             )
             db.session.add(user)
-            db.session.commit()
+        season = Season(
+            id=1,
+            season_name="2024-25",
+            start_date=pd.to_datetime("2024-10-01").date(),
+        )
+        db.session.add(season)
+        db.session.commit()
 
     yield app
 
@@ -202,6 +209,10 @@ def _post_payload(pre_combined):
         "pnr_grade": _csv_file(pnr_grade, "pnr_grade.csv"),
         "offense_rebound": _csv_file(off_reb, "offense_rebound.csv"),
         "defense_rebound": _csv_file(def_reb, "defense_rebound.csv"),
+        "season_id": "1",
+        "game_date": "2024-11-15",
+        "opponent_name": "Test Opponent",
+        "home_or_away": "Home",
     }
 
 
@@ -223,6 +234,11 @@ def test_csv_pipeline_happy_path(client):
     assert "Shot Type" in offense_rows.columns
     assert "Shot Creation" in offense_rows.columns
     assert "TO Type" in offense_rows.columns
+
+    with client.application.app_context():
+        game = Game.query.filter_by(opponent_name="Test Opponent").first()
+        assert game is not None
+        assert game.csv_filename
 
 
 def test_csv_pipeline_missing_row_column(client):
