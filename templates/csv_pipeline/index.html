@@ -71,7 +71,6 @@
   {% endif %}
 
   <form method="POST" enctype="multipart/form-data" class="space-y-6">
-    <input type="hidden" name="action" value="build" />
     <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900">Link Final CSV to a Game</h2>
       <p class="text-sm text-gray-600 mt-2">
@@ -184,10 +183,21 @@
       </div>
     </section>
 
+    <div>
+      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-white">Build Final CSV</button>
+    </div>
+  </form>
+
+  <form
+    method="POST"
+    enctype="multipart/form-data"
+    action="{{ url_for('csv_pipeline.playcall_overlay') }}"
+    class="space-y-4"
+  >
     <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900">B) Apply Playcall Overlay (upload playcall CSV, updates offense rows only)</h2>
+      <h2 class="text-lg font-semibold text-gray-900">Playcall Overlay (Existing Game)</h2>
       <p class="text-sm text-gray-600 mt-2">
-        Placeholder for playcall overlay. This will upload a playcall CSV and update offense rows only.
+        Upload a playcall CSV to patch offense rows in an existing Final CSV.
       </p>
       <div class="mt-4 grid gap-4 md:grid-cols-2">
         <div class="md:col-span-2">
@@ -207,20 +217,11 @@
         </div>
       </div>
       <div class="mt-4">
-        <button
-          type="submit"
-          name="action"
-          value="overlay"
-          class="rounded bg-gray-700 px-4 py-2 text-white"
-        >
+        <button type="submit" class="rounded bg-gray-700 px-4 py-2 text-white">
           Apply Playcall Overlay
         </button>
       </div>
     </section>
-
-    <div>
-      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-white">Build Final CSV</button>
-    </div>
   </form>
 </div>
 {% endblock %}

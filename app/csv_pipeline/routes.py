@@ -25,10 +25,7 @@ from app.csv_pipeline.service import (
 )
 from models.database import Game, Season, db
 from models.uploaded_file import UploadedFile
-from services.reports.playcall import (
-    invalidate_playcall_report,
-    invalidate_playcall_report_season,
-)
+from services.reports.playcall import invalidate_playcall_report
 
 csv_pipeline_bp = Blueprint("csv_pipeline", __name__)
 
@@ -82,23 +79,70 @@ def _apply_playcall_overlay(game: Game, playcall_df: pd.DataFrame) -> None:
     offense_count = int(offense_mask.sum())
     if offense_count != len(playcall_df):
         raise CsvPipelineError(
-            f"Playcall row count mismatch: {len(playcall_df)} rows provided, "
-            f"expected {offense_count} offense rows."
+            "Playcall CSV row count does not match number of Offense rows"
         )
 
-    for col in PLAYCALL_COLUMNS:
-        if col not in playcall_df.columns:
-            playcall_df[col] = ""
+    overlay_columns = [col for col in PLAYCALL_COLUMNS if col in playcall_df.columns]
+    if not overlay_columns:
+        raise CsvPipelineError(
+            "Playcall CSV must include at least one of: PLAYCALL, POSITION, SERIES, VS, ACTION."
+        )
+
+    overlay_values = playcall_df[overlay_columns].reset_index(drop=True)
+    for col in overlay_columns:
         if col not in game_df.columns:
             game_df[col] = ""
-
-    overlay_values = playcall_df[PLAYCALL_COLUMNS].reset_index(drop=True)
-    for col in PLAYCALL_COLUMNS:
         game_df.loc[offense_mask, col] = overlay_values[col].values
 
     game_df.to_csv(csv_path, index=False)
     invalidate_playcall_report(game.id)
-    invalidate_playcall_report_season(game.season_id)
+
+
+@csv_pipeline_bp.route("/csv-pipeline/playcall-overlay", methods=["POST"])
+@login_required
+@admin_required
+def playcall_overlay():
+    seasons, games = _load_form_context()
+    errors: list[str] = []
+
+    try:
+        game_id = request.form.get("overlay_game_id", type=int)
+        playcall_file = request.files.get("playcall_overlay")
+        if not game_id:
+            raise CsvPipelineError("Select a game to apply the playcall overlay.")
+        if playcall_file is None or not playcall_file.filename:
+            raise CsvPipelineError("Playcall CSV is required for the overlay.")
+
+        game = Game.query.get(game_id)
+        if not game:
+            raise CsvPipelineError("Selected game was not found.")
+
+        playcall_df = pd.read_csv(playcall_file)
+        _apply_playcall_overlay(game, playcall_df)
+
+        flash("Playcall overlay applied successfully.", "success")
+        return render_template(
+            "csv_pipeline/index.html",
+            errors=[],
+            seasons=seasons,
+            games=games,
+        )
+    except CsvPipelineError as exc:
+        errors.append(str(exc))
+    except pd.errors.ParserError as exc:
+        errors.append(f"CSV parse error: {exc}")
+
+    for error in errors:
+        flash(error, "error")
+    return (
+        render_template(
+            "csv_pipeline/index.html",
+            errors=errors,
+            seasons=seasons,
+            games=games,
+        ),
+        400,
+    )
 
 
 @csv_pipeline_bp.route("/csv-pipeline", methods=["GET", "POST"])
@@ -109,32 +153,7 @@ def csv_pipeline_index():
 
     if request.method == "POST":
         errors: list[str] = []
-        action = (request.form.get("action") or "build").lower()
-
         try:
-            if action == "overlay":
-                game_id = request.form.get("overlay_game_id", type=int)
-                playcall_file = request.files.get("playcall_overlay")
-                if not game_id:
-                    raise CsvPipelineError("Select a game to apply the playcall overlay.")
-                if playcall_file is None or not playcall_file.filename:
-                    raise CsvPipelineError("Playcall CSV is required for the overlay.")
-
-                game = Game.query.get(game_id)
-                if not game:
-                    raise CsvPipelineError("Selected game was not found.")
-
-                playcall_df = pd.read_csv(playcall_file)
-                _apply_playcall_overlay(game, playcall_df)
-
-                flash("Playcall overlay applied successfully.", "success")
-                return render_template(
-                    "csv_pipeline/index.html",
-                    errors=[],
-                    seasons=seasons,
-                    games=games,
-                )
-
             pre_combined_file = request.files.get("pre_combined")
             pre_combined = _read_csv(pre_combined_file, "Pre-Combined CSV")
 
