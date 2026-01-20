@@ -329,11 +329,10 @@ def test_playcall_overlay_updates_offense_rows_only(client):
     data = {
         "overlay_game_id": str(game.id),
         "playcall_overlay": _csv_file(playcall_df, "playcall.csv"),
-        "action": "overlay",
     }
 
     resp = client.post(
-        "/management/csv-pipeline",
+        "/management/csv-pipeline/playcall-overlay",
         data=data,
         content_type="multipart/form-data",
     )
@@ -385,14 +384,16 @@ def test_playcall_overlay_row_count_mismatch(client):
     data = {
         "overlay_game_id": str(game.id),
         "playcall_overlay": _csv_file(playcall_df, "playcall.csv"),
-        "action": "overlay",
     }
 
     resp = client.post(
-        "/management/csv-pipeline",
+        "/management/csv-pipeline/playcall-overlay",
         data=data,
         content_type="multipart/form-data",
     )
 
     assert resp.status_code == 400
-    assert "row count mismatch" in resp.data.decode("utf-8")
+    assert (
+        "Playcall CSV row count does not match number of Offense rows"
+        in resp.data.decode("utf-8")
+    )
