@@ -7,6 +7,59 @@
     <p class="text-sm text-gray-600">Upload Pre-Combined CSV + post-game group CSVs. Builds Final CSV per spec.</p>
   </div>
 
+  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <h2 class="text-lg font-semibold text-gray-900">Required Inputs Checklist</h2>
+    <div class="mt-3 grid gap-4 md:grid-cols-2 text-sm text-gray-700">
+      <div>
+        <p class="font-semibold">Base File</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Pre-Combined CSV (required)</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">Offense Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Shot Type CSV</li>
+          <li>Shot Creation CSV</li>
+          <li>Turnover Type CSV</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">Defense Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Defensive Possessions CSV</li>
+          <li>Gap Help CSV</li>
+          <li>Shot Contest CSV</li>
+          <li>Pass Contest CSV</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">PnR Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>PnR Gap Help CSV</li>
+          <li>PnR Grade CSV</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">Rebounding Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Offense Rebound Opportunities CSV</li>
+          <li>Defense Rebound Opportunities CSV</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <p class="font-semibold">Overwrite rules</p>
+      <p class="mt-1">
+        The pipeline only overwrites Row groups: Offense, Defense, PnR, Offense Rebound Opportunities,
+        Defense Rebound Opportunities.
+      </p>
+      <p class="mt-2">
+        Player rows are never touched. Blue Collar rows are safe.
+      </p>
+    </div>
+  </section>
+
   {% if errors %}
     <div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
       <ul class="list-disc pl-5 space-y-1">

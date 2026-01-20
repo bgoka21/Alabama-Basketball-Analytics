@@ -37,7 +37,7 @@ PLAYCALL_COLUMNS = ["PLAYCALL", "POSITION", "SERIES", "VS", "ACTION"]
 
 def _read_csv(file_storage, label: str) -> pd.DataFrame:
     if file_storage is None or not file_storage.filename:
-        raise CsvPipelineError(f"Missing required file: {label}.")
+        raise CsvPipelineError(f"Missing required file: {label} is required.")
     return pd.read_csv(file_storage)
 
 
@@ -47,6 +47,14 @@ def _final_filename(pre_combined_name: str) -> str:
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     suffix = ext if ext else ".csv"
     return f"final_{stem}_{timestamp}{suffix}"
+
+
+def _download_filename(game: Game | None) -> str:
+    if not game:
+        return "final.csv"
+    opponent = (game.opponent_name or "game").strip().replace(" ", "_")
+    game_date = game.game_date.isoformat() if game.game_date else "game"
+    return f"{game_date}_{opponent}_FINAL.csv"
 
 
 def _load_form_context():
@@ -262,7 +270,7 @@ def csv_pipeline_index():
             return send_file(
                 csv_io,
                 mimetype="text/csv",
-                download_name=filename,
+                download_name=_download_filename(game),
                 as_attachment=True,
             )
         except CsvPipelineError as exc:
