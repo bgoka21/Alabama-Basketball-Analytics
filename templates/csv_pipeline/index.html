@@ -1,0 +1,226 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold">CSV Pipeline</h1>
+    <p class="text-sm text-gray-600">Upload Pre-Combined CSV + post-game group CSVs. Builds Final CSV per spec.</p>
+  </div>
+
+  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <h2 class="text-lg font-semibold text-gray-900">Required Inputs Checklist</h2>
+    <div class="mt-3 grid gap-4 md:grid-cols-2 text-sm text-gray-700">
+      <div>
+        <p class="font-semibold">Base File</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Pre-Combined CSV (required)</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">Offense Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Shot Type CSV</li>
+          <li>Shot Creation CSV</li>
+          <li>Turnover Type CSV</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">Defense Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Defensive Possessions CSV</li>
+          <li>Gap Help CSV</li>
+          <li>Shot Contest CSV</li>
+          <li>Pass Contest CSV</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">PnR Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>PnR Gap Help CSV</li>
+          <li>PnR Grade CSV</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold">Rebounding Group</p>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Offense Rebound Opportunities CSV</li>
+          <li>Defense Rebound Opportunities CSV</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <p class="font-semibold">Overwrite rules</p>
+      <p class="mt-1">
+        The pipeline only overwrites Row groups: Offense, Defense, PnR, Offense Rebound Opportunities,
+        Defense Rebound Opportunities.
+      </p>
+      <p class="mt-2">
+        Player rows are never touched. Blue Collar rows are safe.
+      </p>
+    </div>
+  </section>
+
+  {% if errors %}
+    <div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+      <ul class="list-disc pl-5 space-y-1">
+        {% for error in errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-6">
+    <input type="hidden" name="action" value="build" />
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">Link Final CSV to a Game</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Choose an existing game to replace its CSV, or provide details to create a new game record.
+      </p>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Existing Game (optional)</label>
+          <select name="game_id" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Create new game</option>
+            {% for game in games %}
+              <option value="{{ game.id }}">
+                {{ game.game_date }} — {{ game.opponent_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Season (required for new game)</label>
+          <select name="season_id" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Select season</option>
+            {% for season in seasons %}
+              <option value="{{ season.id }}">{{ season.season_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Game Date (required for new game)</label>
+          <input type="date" name="game_date" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Opponent (required for new game)</label>
+          <input type="text" name="opponent_name" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Home/Away (required for new game)</label>
+          <select name="home_or_away" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Select</option>
+            <option value="Home">Home</option>
+            <option value="Away">Away</option>
+          </select>
+        </div>
+      </div>
+    </section>
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">Pre-Combined CSV (required)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Upload the base CSV that will be patched with the combined group rows.
+      </p>
+      <input
+        type="file"
+        name="pre_combined"
+        accept=".csv"
+        required
+        class="mt-3 block w-full text-sm"
+      />
+    </section>
+
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">A) Build Final CSV (post-game combine + row-group patch)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Upload the post-game CSVs that contribute to the Offense, Defense, and PnR groups.
+      </p>
+
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Shot Type CSV</label>
+          <input type="file" name="offense_shot_type" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Shot Creation CSV</label>
+          <input type="file" name="offense_shot_creation" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Turnover Type CSV</label>
+          <input type="file" name="offense_turnover_type" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Possessions CSV</label>
+          <input type="file" name="defense_possessions" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Gap Help CSV</label>
+          <input type="file" name="defense_gap_help" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Shot Contest CSV</label>
+          <input type="file" name="defense_shot_contest" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Pass Contest CSV</label>
+          <input type="file" name="defense_pass_contest" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">PnR Gap Help CSV</label>
+          <input type="file" name="pnr_gap_help" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">PnR Grade CSV</label>
+          <input type="file" name="pnr_grade" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Rebound Opportunities CSV</label>
+          <input type="file" name="offense_rebound" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Rebound Opportunities CSV</label>
+          <input type="file" name="defense_rebound" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">B) Apply Playcall Overlay (upload playcall CSV, updates offense rows only)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Placeholder for playcall overlay. This will upload a playcall CSV and update offense rows only.
+      </p>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium text-gray-700">Target Game</label>
+          <select name="overlay_game_id" class="mt-2 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Select a game</option>
+            {% for game in games %}
+              <option value="{{ game.id }}">
+                {{ game.game_date }} — {{ game.opponent_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium text-gray-700">Playcall CSV</label>
+          <input type="file" name="playcall_overlay" accept=".csv" class="mt-2 block w-full text-sm" />
+        </div>
+      </div>
+      <div class="mt-4">
+        <button
+          type="submit"
+          name="action"
+          value="overlay"
+          class="rounded bg-gray-700 px-4 py-2 text-white"
+        >
+          Apply Playcall Overlay
+        </button>
+      </div>
+    </section>
+
+    <div>
+      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-white">Build Final CSV</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

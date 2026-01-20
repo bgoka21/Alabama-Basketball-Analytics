@@ -659,5 +659,13 @@ def invalidate_playcall_report(game_id: int) -> None:
     _IN_MEMORY_CACHE.pop(game_id, None)
     _delete_cache_value(_cache_key(game_id))
 
-# END Playcall Report
 
+def invalidate_playcall_report_season(season_id: int) -> None:
+    """Invalidate cached playcall report entries for a season."""
+    if season_id is None:
+        return
+    games = Game.query.filter(Game.season_id == season_id).all()
+    for game in games:
+        invalidate_playcall_report(game.id)
+
+# END Playcall Report
