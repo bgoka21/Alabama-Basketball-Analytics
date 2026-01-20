@@ -1,6 +1,6 @@
 {% if current_user.is_admin %}
 {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
-                      'admin.roster', 'admin.users_list',
+                      'csv_pipeline.csv_pipeline_index', 'admin.roster', 'admin.users_list',
                       'admin.usage_report', 'admin.correlation_workbench',
                       'admin.custom_stats_index', 'admin.draft_upload',
                       'admin.eybl_import', 'admin.eybl_identity', 'admin.eybl_synonyms',

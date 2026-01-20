@@ -7,19 +7,98 @@
     <p class="text-sm text-gray-600">Upload Pre-Combined CSV + post-game group CSVs. Builds Final CSV per spec.</p>
   </div>
 
-  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-    <h2 class="text-lg font-semibold text-gray-900">A) Build Final CSV (post-game combine + row-group patch)</h2>
-    <p class="text-sm text-gray-600 mt-2">
-      Placeholder for the final CSV builder flow. This will accept pre-combined inputs
-      and apply row-group patching per the agreed spec.
-    </p>
-  </section>
+  {% if errors %}
+    <div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+      <ul class="list-disc pl-5 space-y-1">
+        {% for error in errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 
-  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-    <h2 class="text-lg font-semibold text-gray-900">B) Apply Playcall Overlay (upload playcall CSV, updates offense rows only)</h2>
-    <p class="text-sm text-gray-600 mt-2">
-      Placeholder for playcall overlay. This will upload a playcall CSV and update offense rows only.
-    </p>
-  </section>
+  <form method="POST" enctype="multipart/form-data" class="space-y-6">
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">Pre-Combined CSV (required)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Upload the base CSV that will be patched with the combined group rows.
+      </p>
+      <input
+        type="file"
+        name="pre_combined"
+        accept=".csv"
+        required
+        class="mt-3 block w-full text-sm"
+      />
+    </section>
+
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">A) Build Final CSV (post-game combine + row-group patch)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Upload the post-game CSVs that contribute to the Offense, Defense, and PnR groups.
+      </p>
+
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Shot Type CSV</label>
+          <input type="file" name="offense_shot_type" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Shot Creation CSV</label>
+          <input type="file" name="offense_shot_creation" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Turnover Type CSV</label>
+          <input type="file" name="offense_turnover_type" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Possessions CSV</label>
+          <input type="file" name="defense_possessions" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Gap Help CSV</label>
+          <input type="file" name="defense_gap_help" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Shot Contest CSV</label>
+          <input type="file" name="defense_shot_contest" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Pass Contest CSV</label>
+          <input type="file" name="defense_pass_contest" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">PnR Gap Help CSV</label>
+          <input type="file" name="pnr_gap_help" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">PnR Grade CSV</label>
+          <input type="file" name="pnr_grade" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Offense Rebound Opportunities CSV</label>
+          <input type="file" name="offense_rebound" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Defense Rebound Opportunities CSV</label>
+          <input type="file" name="defense_rebound" accept=".csv" required class="mt-2 block w-full text-sm" />
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">B) Apply Playcall Overlay (upload playcall CSV, updates offense rows only)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Placeholder for playcall overlay. This will upload a playcall CSV and update offense rows only.
+      </p>
+      <div class="mt-3 rounded border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+        Upload control coming soon.
+      </div>
+    </section>
+
+    <div>
+      <button type="submit" class="rounded bg-gray-900 px-4 py-2 text-white">Build Final CSV</button>
+    </div>
+  </form>
 </div>
 {% endblock %}
