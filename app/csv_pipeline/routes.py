@@ -25,7 +25,10 @@ from app.csv_pipeline.service import (
 )
 from models.database import Game, Season, db
 from models.uploaded_file import UploadedFile
-from services.reports.playcall import invalidate_playcall_report
+from services.reports.playcall import (
+    invalidate_playcall_report,
+    invalidate_playcall_report_season,
+)
 
 csv_pipeline_bp = Blueprint("csv_pipeline", __name__)
 
@@ -87,6 +90,7 @@ def _apply_playcall_overlay(game: Game, playcall_df: pd.DataFrame) -> None:
 
     game_df.to_csv(csv_path, index=False)
     invalidate_playcall_report(game.id)
+    invalidate_playcall_report_season(game.season_id)
 
 
 @csv_pipeline_bp.route("/csv-pipeline", methods=["GET", "POST"])

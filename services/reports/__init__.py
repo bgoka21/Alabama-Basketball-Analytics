@@ -14,5 +14,6 @@ from .playcall import (  # noqa: F401
     compute_playcall_report,
     compute_playcall_report_from_dataframe,
     invalidate_playcall_report,
+    invalidate_playcall_report_season,
 )
 # END Playcall Report
