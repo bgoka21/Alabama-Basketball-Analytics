@@ -16,7 +16,6 @@ from typing import Optional
 from models.database import db, PageView, SavedStatProfile
 from models.user import User
 from admin.routes import admin_bp
-from merge_app.app import merge_bp
 from utils.auth import PLAYER_ALLOWED_ENDPOINTS
 from app.utils.schema import ensure_columns
 from app.utils.formatting import fmt_money, posneg_class
@@ -241,9 +240,6 @@ def create_app():
 
     from recruits.admin_logo import bp_logo
     app.register_blueprint(bp_logo)
-
-    # Register merge tool blueprint under /merge
-    app.register_blueprint(merge_bp, url_prefix='/merge')
 
     from scout import scout_bp
     app.register_blueprint(scout_bp, url_prefix='/scout')

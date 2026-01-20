@@ -1,6 +1,6 @@
 {% if current_user.is_admin %}
 {% set mgmt_active = request.endpoint in ['admin.dashboard', 'admin.files_view_unique',
-                      'merge.merge_csv', 'admin.roster', 'admin.users_list',
+                      'admin.roster', 'admin.users_list',
                       'admin.usage_report', 'admin.correlation_workbench',
                       'admin.custom_stats_index', 'admin.draft_upload',
                       'admin.eybl_import', 'admin.eybl_identity', 'admin.eybl_synonyms',
@@ -28,12 +28,6 @@
         {{ icons.render('files') }}
         <span class="flex-1 text-left">Files</span>
       </a>
-      {% if view_exists('merge.merge_csv') %}
-      <a class="{{ link_base_classes }}{% if request.endpoint == 'merge.merge_csv' %} {{ active_classes }}{% endif %}" href="{{ url_for('merge.merge_csv') }}">
-        {{ icons.render('merge') }}
-        <span class="flex-1 text-left">Merge CSV</span>
-      </a>
-      {% endif %}
       <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.roster' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.roster') }}">
         {{ icons.render('roster') }}
         <span class="flex-1 text-left">Roster</span>
