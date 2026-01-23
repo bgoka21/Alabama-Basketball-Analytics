@@ -8197,19 +8197,28 @@ def player_detail(player_name):
         value_str   = request.form.get('value', '').strip()
 
         if skill_name and value_str.isdigit():
-            # Insert a generic SkillEntry (e.g. “Free Throws” or anything else)
-            db.session.add(
-                SkillEntry(
-                    player_id   = player.id,
-                    date        = shot_date,
-                    skill_name  = skill_name,
-                    value       = int(value_str),
-                    shot_class  = None,
-                    subcategory = None,
-                    makes       = 0,
-                    attempts    = 0
+            # Insert or update a generic SkillEntry (e.g. “Free Throws” or anything else)
+            value_int = int(value_str)
+            existing_entry = SkillEntry.query.filter_by(
+                player_id=player.id,
+                date=shot_date,
+                skill_name=skill_name
+            ).first()
+            if existing_entry:
+                existing_entry.value += value_int
+            else:
+                db.session.add(
+                    SkillEntry(
+                        player_id   = player.id,
+                        date        = shot_date,
+                        skill_name  = skill_name,
+                        value       = value_int,
+                        shot_class  = None,
+                        subcategory = None,
+                        makes       = 0,
+                        attempts    = 0
+                    )
                 )
-            )
             db.session.commit()
             return redirect(
                 url_for('admin.player_detail', player_name=player_name) + '#skillDevelopment'
@@ -8226,17 +8235,29 @@ def player_detail(player_name):
                 attempts = int(request.form.get(f"{cls}_{key}_attempts", '0') or '0')
 
                 if makes or attempts:
-                    entry = SkillEntry(
-                        player_id   = player.id,
-                        date        = shot_date,
-                        skill_name  = human[cls],
-                        value       = attempts,
-                        shot_class  = cls,
-                        subcategory = sub,
-                        makes       = makes,
-                        attempts    = attempts
-                    )
-                    db.session.add(entry)
+                    existing_entry = SkillEntry.query.filter_by(
+                        player_id=player.id,
+                        date=shot_date,
+                        shot_class=cls,
+                        subcategory=sub
+                    ).first()
+                    if existing_entry:
+                        existing_entry.makes += makes
+                        existing_entry.attempts += attempts
+                        if existing_entry.value is not None:
+                            existing_entry.value += attempts
+                    else:
+                        entry = SkillEntry(
+                            player_id   = player.id,
+                            date        = shot_date,
+                            skill_name  = human[cls],
+                            value       = attempts,
+                            shot_class  = cls,
+                            subcategory = sub,
+                            makes       = makes,
+                            attempts    = attempts
+                        )
+                        db.session.add(entry)
 
         db.session.commit()
         return redirect(
