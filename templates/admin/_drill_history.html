@@ -20,10 +20,12 @@
           <td class="border-t px-4 py-2">{{ d.strftime('%b %d, %Y') }}</td>
           {% for cls, subs in shot_map.items() %}
             {% for sub in subs %}
-              {% set e = group|selectattr('shot_class','equalto',cls)|selectattr('subcategory','equalto',sub)|list|first %}
+              {% set matching = group|selectattr('shot_class','equalto',cls)|selectattr('subcategory','equalto',sub)|list %}
+              {% set total_makes = matching|sum(attribute='makes') %}
+              {% set total_attempts = matching|sum(attribute='attempts') %}
               <td class="border-t px-2 py-1 text-center">
-                {% if e %}
-                  {{ e.makes }}/{{ e.attempts }} ({{ e.fg_pct }}%)
+                {% if total_attempts %}
+                  {{ total_makes }}/{{ total_attempts }} ({{ ((total_makes / total_attempts) * 100)|round(0) }}%)
                 {% else %}-{% endif %}
               </td>
             {% endfor %}
