@@ -161,9 +161,18 @@ def _validate_group_rows(
                 df, shared_cols
             ).reset_index(drop=True)
             if not base_vals.equals(other_vals):
-                raise CsvPipelineError(
-                    f"{group_name} row order mismatch between {filenames[0]} and {name}."
-                )
+                for col in shared_cols:
+                    mismatches = base_vals[col] != other_vals[col]
+                    if mismatches.any():
+                        row_idx = mismatches[mismatches].index[0]
+                        base_value = base_vals.at[row_idx, col]
+                        other_value = other_vals.at[row_idx, col]
+                        raise CsvPipelineError(
+                            f"{group_name} protected column mismatch between "
+                            f"{filenames[0]} and {name}: column '{col}' at row "
+                            f"{row_idx} differs (base='{base_value}', "
+                            f"other='{other_value}')."
+                        )
 
 
 def _combine_disjoint_columns(
