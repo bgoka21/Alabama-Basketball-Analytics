@@ -221,7 +221,6 @@ def csv_pipeline_index():
             game_id = request.form.get("game_id", type=int)
             season_id = request.form.get("season_id", type=int)
             opponent_name = (request.form.get("opponent_name") or "").strip()
-            home_or_away = (request.form.get("home_or_away") or "").strip()
             game_date_str = (request.form.get("game_date") or "").strip()
 
             game = None
@@ -236,8 +235,6 @@ def csv_pipeline_index():
                     raise CsvPipelineError("Season is required to create a game record.")
                 if not opponent_name:
                     raise CsvPipelineError("Opponent name is required to create a game record.")
-                if not home_or_away:
-                    raise CsvPipelineError("Home/Away selection is required.")
                 if not game_date_str:
                     raise CsvPipelineError("Game date is required.")
 
@@ -250,7 +247,7 @@ def csv_pipeline_index():
                     season_id=season_id,
                     game_date=parsed_date,
                     opponent_name=opponent_name,
-                    home_or_away=home_or_away,
+                    home_or_away=None,
                     result="N/A",
                 )
                 db.session.add(game)
