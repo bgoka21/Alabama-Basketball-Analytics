@@ -168,11 +168,35 @@ def export_xml():
     try:
         csv_content: str | None = None
         upload_filename: str | None = None
+        selected_game_id = request.form.get("export_game_id", type=int)
         final_csv_path = request.form.get("final_csv_path")
         final_csv_content = request.form.get("final_csv_content")
         game_date = request.form.get("game_date")
 
-        if final_csv_path:
+        if selected_game_id:
+            game = Game.query.get(selected_game_id)
+            if not game:
+                raise CsvPipelineError("Selected game was not found.")
+            if not game.csv_filename:
+                raise CsvPipelineError("Selected game has no CSV file attached.")
+
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            if not upload_folder:
+                raise CsvPipelineError("Upload folder is not configured.")
+            csv_path = os.path.join(upload_folder, game.csv_filename)
+            abs_folder = os.path.abspath(upload_folder)
+            abs_path = os.path.abspath(csv_path)
+            if not abs_path.startswith(f"{abs_folder}{os.sep}"):
+                raise CsvPipelineError("Invalid Final CSV path provided.")
+            if not os.path.exists(abs_path):
+                raise CsvPipelineError("Final CSV file not found on disk.")
+
+            with open(abs_path, "rb") as csv_file:
+                csv_content = csv_file.read().decode("utf-8")
+            upload_filename = os.path.basename(abs_path)
+            if game.game_date:
+                game_date = game.game_date.isoformat()
+        elif final_csv_path:
             upload_folder = current_app.config.get("UPLOAD_FOLDER")
             if not upload_folder:
                 raise CsvPipelineError("Upload folder is not configured.")
