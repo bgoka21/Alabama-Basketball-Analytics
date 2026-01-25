@@ -148,10 +148,11 @@ def _validate_group_rows(
                 f"expected {len(base)}."
             )
 
+        skip_col = base.columns[0] if len(base.columns) > 0 else None
         shared_cols = [
             col
             for col in PROTECTED_COLUMNS
-            if col in base.columns and col in df.columns
+            if col in base.columns and col in df.columns and col != skip_col
         ]
         if shared_cols:
             base_vals = _normalize_protected_values(
