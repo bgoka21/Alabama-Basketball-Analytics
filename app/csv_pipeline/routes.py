@@ -354,7 +354,7 @@ def csv_pipeline_index():
                     season_id=season_id,
                     game_date=parsed_date,
                     opponent_name=opponent_name,
-                    home_or_away=None,
+                    home_or_away="N/A",
                     result="N/A",
                 )
                 db.session.add(game)
