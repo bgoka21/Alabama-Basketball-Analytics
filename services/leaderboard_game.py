@@ -173,23 +173,18 @@ def _aggregate_rows(
         entry["fg3_nonshrink_att"] = breakdown.get("fg3_nonshrink_att", 0)
         entry["fg3_nonshrink_pct"] = breakdown.get("fg3_nonshrink_pct")
         entry["fg3_nonshrink_freq_pct"] = breakdown.get("fg3_nonshrink_freq_pct")
-        contested_makes = breakdown.get("fg3_contest_makes", 0) + breakdown.get(
-            "fg3_late_makes", 0
-        )
-        contested_att = breakdown.get("fg3_contest_attempts", 0) + breakdown.get(
-            "fg3_late_attempts", 0
-        )
-        uncontested_makes = breakdown.get("fg3_no_contest_makes", 0)
-        uncontested_att = breakdown.get("fg3_no_contest_attempts", 0)
-        total_att = breakdown.get("fg3_att", 0)
-        entry["fg3_contested_makes"] = contested_makes
-        entry["fg3_contested_att"] = contested_att
-        entry["fg3_contested_pct"] = _safe_pct(contested_makes, contested_att)
-        entry["fg3_contested_freq_pct"] = _safe_pct(contested_att, total_att)
-        entry["fg3_uncontested_makes"] = uncontested_makes
-        entry["fg3_uncontested_att"] = uncontested_att
-        entry["fg3_uncontested_pct"] = _safe_pct(uncontested_makes, uncontested_att)
-        entry["fg3_uncontested_freq_pct"] = _safe_pct(uncontested_att, total_att)
+        entry["fg3_contested_makes"] = breakdown.get("fg3_contest_makes", 0)
+        entry["fg3_contested_att"] = breakdown.get("fg3_contest_attempts", 0)
+        entry["fg3_contested_pct"] = breakdown.get("fg3_contest_pct")
+        entry["fg3_contested_freq_pct"] = breakdown.get("fg3_contest_freq_pct")
+        entry["fg3_late_makes"] = breakdown.get("fg3_late_makes", 0)
+        entry["fg3_late_att"] = breakdown.get("fg3_late_attempts", 0)
+        entry["fg3_late_pct"] = breakdown.get("fg3_late_pct")
+        entry["fg3_late_freq_pct"] = breakdown.get("fg3_late_freq_pct")
+        entry["fg3_uncontested_makes"] = breakdown.get("fg3_no_contest_makes", 0)
+        entry["fg3_uncontested_att"] = breakdown.get("fg3_no_contest_attempts", 0)
+        entry["fg3_uncontested_pct"] = breakdown.get("fg3_no_contest_pct")
+        entry["fg3_uncontested_freq_pct"] = breakdown.get("fg3_no_contest_freq_pct")
 
     return players
 
@@ -350,6 +345,10 @@ def _build_contest_row(player: str, data: Dict[str, Any]) -> Dict[str, Any]:
             "fg3_contested_make": data.get("fg3_contested_makes", 0),
             "fg3_contested_pct": data.get("fg3_contested_pct"),
             "fg3_contested_freq_pct": data.get("fg3_contested_freq_pct"),
+            "fg3_late_att": data.get("fg3_late_att", 0),
+            "fg3_late_make": data.get("fg3_late_makes", 0),
+            "fg3_late_pct": data.get("fg3_late_pct"),
+            "fg3_late_freq_pct": data.get("fg3_late_freq_pct"),
             "fg3_uncontested_att": data.get("fg3_uncontested_att", 0),
             "fg3_uncontested_make": data.get("fg3_uncontested_makes", 0),
             "fg3_uncontested_pct": data.get("fg3_uncontested_pct"),
@@ -496,6 +495,7 @@ def _build_totals(rows: Sequence[Dict[str, Any]], mappings: Sequence[Tuple[str, 
         (("fg3_shrink_make", "fg3_shrink_att"), "fg3_shrink_pct"),
         (("fg3_nonshrink_make", "fg3_nonshrink_att"), "fg3_nonshrink_pct"),
         (("fg3_contested_make", "fg3_contested_att"), "fg3_contested_pct"),
+        (("fg3_late_make", "fg3_late_att"), "fg3_late_pct"),
         (("fg3_uncontested_make", "fg3_uncontested_att"), "fg3_uncontested_pct"),
         (("atr_make", "atr_att"), "atr_pct"),
         (("crash_plus", "crash_opps"), "crash_pct"),
@@ -516,6 +516,8 @@ def _build_totals(rows: Sequence[Dict[str, Any]], mappings: Sequence[Tuple[str, 
         totals["fg3_nonshrink_freq_pct"] = _safe_pct(totals["fg3_nonshrink_att"], totals["fg3_att"])
     if "fg3_contested_att" in totals and "fg3_att" in totals:
         totals["fg3_contested_freq_pct"] = _safe_pct(totals["fg3_contested_att"], totals["fg3_att"])
+    if "fg3_late_att" in totals and "fg3_att" in totals:
+        totals["fg3_late_freq_pct"] = _safe_pct(totals["fg3_late_att"], totals["fg3_att"])
     if "fg3_uncontested_att" in totals and "fg3_att" in totals:
         totals["fg3_uncontested_freq_pct"] = _safe_pct(
             totals["fg3_uncontested_att"], totals["fg3_att"]
@@ -601,6 +603,8 @@ def fetch_offense_contests(
             ("fg2_att", "fg2_att"),
             ("fg3_contested_make", "fg3_contested_make"),
             ("fg3_contested_att", "fg3_contested_att"),
+            ("fg3_late_make", "fg3_late_make"),
+            ("fg3_late_att", "fg3_late_att"),
             ("fg3_uncontested_make", "fg3_uncontested_make"),
             ("fg3_uncontested_att", "fg3_uncontested_att"),
         ),
@@ -623,6 +627,8 @@ def fetch_offense_contests_last_game(
             ("fg2_att", "fg2_att"),
             ("fg3_contested_make", "fg3_contested_make"),
             ("fg3_contested_att", "fg3_contested_att"),
+            ("fg3_late_make", "fg3_late_make"),
+            ("fg3_late_att", "fg3_late_att"),
             ("fg3_uncontested_make", "fg3_uncontested_make"),
             ("fg3_uncontested_att", "fg3_uncontested_att"),
         ),
