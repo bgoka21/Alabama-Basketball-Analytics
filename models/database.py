@@ -35,7 +35,7 @@ class Game(db.Model):
     season_id                = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
     game_date                = db.Column(db.Date, nullable=False)
     opponent_name            = db.Column(db.String(100), nullable=False)
-    home_or_away             = db.Column(db.String(10), nullable=False)
+    home_or_away             = db.Column(db.String(10), nullable=True)
     result                   = db.Column(db.String(10))
     csv_filename             = db.Column(db.String(255))
 
