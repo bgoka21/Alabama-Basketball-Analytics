@@ -15,6 +15,12 @@ PROTECTED_COLUMNS = [
     "Instance Number",
 ]
 
+TIME_LIKE_COLUMNS = {
+    "Timeline",
+    "Start time",
+    "Duration",
+}
+
 OVERWRITE_ROWS = {
     "Offense",
     "Defense",
@@ -97,6 +103,38 @@ def _merge_union_cell(base_value: object, donor_value: object) -> str:
     return ", ".join(base_tokens)
 
 
+def _format_timedelta(value: pd.Timedelta) -> str:
+    total_seconds = int(value.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _normalize_protected_values(
+    df: pd.DataFrame, columns: Iterable[str]
+) -> pd.DataFrame:
+    normalized = df[list(columns)].copy()
+    normalized = normalized.where(pd.notna(normalized), "")
+    normalized = normalized.apply(
+        lambda column: column.map(
+            lambda value: value.strip() if isinstance(value, str) else value
+        )
+    )
+    normalized = normalized.astype(str)
+    for column in TIME_LIKE_COLUMNS.intersection(normalized.columns):
+        series = normalized[column].str.strip()
+        time_mask = series.str.contains(
+            r":|\b\d+(?:\.\d+)?\s*[smhd]\b", regex=True
+        )
+        parsed = pd.to_timedelta(series.where(time_mask, pd.NA), errors="coerce")
+        if parsed.notna().any():
+            formatted = parsed.map(
+                lambda value: _format_timedelta(value) if pd.notna(value) else ""
+            )
+            normalized.loc[parsed.notna(), column] = formatted[parsed.notna()]
+    return normalized
+
+
 def _validate_group_rows(
     groups: Sequence[pd.DataFrame],
     filenames: Sequence[str],
@@ -116,8 +154,12 @@ def _validate_group_rows(
             if col in base.columns and col in df.columns
         ]
         if shared_cols:
-            base_vals = base[shared_cols].fillna("").reset_index(drop=True)
-            other_vals = df[shared_cols].fillna("").reset_index(drop=True)
+            base_vals = _normalize_protected_values(
+                base, shared_cols
+            ).reset_index(drop=True)
+            other_vals = _normalize_protected_values(
+                df, shared_cols
+            ).reset_index(drop=True)
             if not base_vals.equals(other_vals):
                 raise CsvPipelineError(
                     f"{group_name} row order mismatch between {filenames[0]} and {name}."
