@@ -13,6 +13,7 @@ PROTECTED_COLUMNS = [
     "Duration",
     "Row",
     "Instance Number",
+    "Instance number",
 ]
 
 TIME_LIKE_COLUMNS = {
@@ -77,6 +78,15 @@ def _extract_group(df: pd.DataFrame, row_label: str, filename: str) -> pd.DataFr
     _ensure_row_column(df, filename)
     group = df[df["Row"] == row_label].copy()
     return group.reset_index(drop=True)
+
+
+def _strip_grouped_columns(df: pd.DataFrame, row_label: str) -> pd.DataFrame:
+    cleaned = df.drop(
+        columns=[col for col in df.columns if col in PROTECTED_COLUMNS],
+        errors="ignore",
+    ).copy()
+    cleaned.insert(0, "Row", row_label)
+    return cleaned
 
 
 def _normalize_cell(value: object) -> str:
@@ -223,15 +233,27 @@ def build_offense_group(
 ) -> pd.DataFrame:
     group_label = "Offense"
     groups = [
-        _extract_group(shot_type, group_label, filenames[0]),
-        _extract_group(shot_creation, group_label, filenames[1]),
-        _extract_group(turnover_type, group_label, filenames[2]),
+        _strip_grouped_columns(
+            _extract_group(shot_type, group_label, filenames[0]), group_label
+        ),
+        _strip_grouped_columns(
+            _extract_group(shot_creation, group_label, filenames[1]), group_label
+        ),
+        _strip_grouped_columns(
+            _extract_group(turnover_type, group_label, filenames[2]), group_label
+        ),
     ]
     _validate_group_rows(groups, filenames, group_label)
     base = groups[0]
     donors = [
-        groups[1].drop(columns=[c for c in groups[1].columns if c in PROTECTED_COLUMNS], errors="ignore"),
-        groups[2].drop(columns=[c for c in groups[2].columns if c in PROTECTED_COLUMNS], errors="ignore"),
+        groups[1].drop(
+            columns=[c for c in groups[1].columns if c in PROTECTED_COLUMNS],
+            errors="ignore",
+        ),
+        groups[2].drop(
+            columns=[c for c in groups[2].columns if c in PROTECTED_COLUMNS],
+            errors="ignore",
+        ),
     ]
     return _combine_disjoint_columns(base, donors, group_label)
 
@@ -245,10 +267,19 @@ def build_defense_group(
 ) -> pd.DataFrame:
     group_label = "Defense"
     groups = [
-        _extract_group(defensive_possessions, group_label, filenames[0]),
-        _extract_group(gap_help, group_label, filenames[1]),
-        _extract_group(shot_contest, group_label, filenames[2]),
-        _extract_group(pass_contest, group_label, filenames[3]),
+        _strip_grouped_columns(
+            _extract_group(defensive_possessions, group_label, filenames[0]),
+            group_label,
+        ),
+        _strip_grouped_columns(
+            _extract_group(gap_help, group_label, filenames[1]), group_label
+        ),
+        _strip_grouped_columns(
+            _extract_group(shot_contest, group_label, filenames[2]), group_label
+        ),
+        _strip_grouped_columns(
+            _extract_group(pass_contest, group_label, filenames[3]), group_label
+        ),
     ]
     _validate_group_rows(groups, filenames, group_label)
     base = groups[0]
@@ -265,12 +296,18 @@ def build_pnr_group(
 ) -> pd.DataFrame:
     group_label = "PnR"
     groups = [
-        _extract_group(gap_help, group_label, filenames[0]),
-        _extract_group(grade, group_label, filenames[1]),
+        _strip_grouped_columns(
+            _extract_group(gap_help, group_label, filenames[0]), group_label
+        ),
+        _strip_grouped_columns(
+            _extract_group(grade, group_label, filenames[1]), group_label
+        ),
     ]
     _validate_group_rows(groups, filenames, group_label)
     base = groups[0]
-    keep_cols = [col for col in base.columns if col in PROTECTED_COLUMNS or col.startswith("#")]
+    keep_cols = [
+        col for col in base.columns if col in PROTECTED_COLUMNS or col.startswith("#")
+    ]
     base = base[keep_cols].copy()
     donor = groups[1][_player_columns(groups[1])].copy()
     return _apply_union_players(base, [donor])
@@ -289,7 +326,10 @@ def build_rebound_groups(
         raise CsvPipelineError(f"{filenames[0]} has no '{offense_label}' rows.")
     if def_group.empty:
         raise CsvPipelineError(f"{filenames[1]} has no '{defense_label}' rows.")
-    return off_group, def_group
+    return (
+        _strip_grouped_columns(off_group, offense_label),
+        _strip_grouped_columns(def_group, defense_label),
+    )
 
 
 def _align_columns(base_columns: Iterable[str], df: pd.DataFrame) -> pd.DataFrame:
