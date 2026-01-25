@@ -1,0 +1,37 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold">Final CSV Ready</h1>
+    <p class="text-sm text-gray-600">
+      Your Final CSV is ready to download, or export it as Sportscode XML for Hudl.
+    </p>
+  </div>
+
+  <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <a
+        href="{{ download_url }}"
+        class="inline-flex items-center rounded bg-gray-900 px-4 py-2 text-white"
+      >
+        Download Final CSV
+      </a>
+      <form method="POST" action="{{ url_for('csv_pipeline.export_xml') }}">
+        <input type="hidden" name="final_csv_path" value="{{ final_csv_path }}" />
+        <input type="hidden" name="game_date" value="{{ game_date }}" />
+        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">
+          Export XML
+        </button>
+      </form>
+    </div>
+    <p class="text-sm text-gray-600">
+      Download name: <span class="font-medium text-gray-900">{{ download_name }}</span>
+    </p>
+  </section>
+
+  <a href="{{ url_for('csv_pipeline.csv_pipeline_index') }}" class="text-sm text-blue-600">
+    Back to CSV Pipeline
+  </a>
+</div>
+{% endblock %}
