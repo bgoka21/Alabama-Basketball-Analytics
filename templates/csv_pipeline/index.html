@@ -215,5 +215,30 @@
       </div>
     </section>
   </form>
+
+  <form
+    method="POST"
+    enctype="multipart/form-data"
+    action="{{ url_for('csv_pipeline.export_xml') }}"
+    class="space-y-4"
+  >
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900">Export XML (Final CSV)</h2>
+      <p class="text-sm text-gray-600 mt-2">
+        Upload a Final CSV to export Hudl-compatible Sportscode XML.
+      </p>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium text-gray-700">Final CSV</label>
+          <input type="file" name="final_csv" accept=".csv" class="mt-2 block w-full text-sm" />
+        </div>
+      </div>
+      <div class="mt-4">
+        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">
+          Export XML
+        </button>
+      </div>
+    </section>
+  </form>
 </div>
 {% endblock %}

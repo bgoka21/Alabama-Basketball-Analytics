@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import csv
+from io import BytesIO
 from decimal import Decimal
 from pathlib import Path
+from typing import TextIO
 from typing import Iterable
 from xml.etree import ElementTree as ET
 
@@ -16,7 +18,10 @@ def _split_label_values(value: str) -> Iterable[str]:
             yield trimmed
 
 
-def export_csv_to_sportscode_xml(csv_path: str | Path, xml_path: str | Path) -> None:
+def export_csv_to_sportscode_xml(
+    csv_path: str | Path | TextIO,
+    xml_path: str | Path | BytesIO,
+) -> None:
     """Convert a Hudl-compatible CSV to Sportscode XML.
 
     Args:
@@ -24,10 +29,16 @@ def export_csv_to_sportscode_xml(csv_path: str | Path, xml_path: str | Path) -> 
         xml_path: Path to write the XML output.
     """
 
-    csv_path = Path(csv_path)
-    xml_path = Path(xml_path)
+    csv_file = None
+    close_csv = False
+    if hasattr(csv_path, "read"):
+        csv_file = csv_path
+    else:
+        csv_path = Path(csv_path)
+        csv_file = csv_path.open(newline="", encoding="utf-8")
+        close_csv = True
 
-    with csv_path.open(newline="", encoding="utf-8") as csv_file:
+    try:
         reader = csv.reader(csv_file)
         headers = next(reader, None)
         if not headers or len(headers) < 5:
@@ -75,7 +86,14 @@ def export_csv_to_sportscode_xml(csv_path: str | Path, xml_path: str | Path) -> 
             ET.SubElement(row_element, "R").text = "0"
             ET.SubElement(row_element, "G").text = "0"
             ET.SubElement(row_element, "B").text = "0"
+    finally:
+        if close_csv and csv_file:
+            csv_file.close()
 
     tree = ET.ElementTree(root)
-    with xml_path.open("wb") as xml_file:
-        tree.write(xml_file, encoding="utf-16", xml_declaration=True)
+    if hasattr(xml_path, "write"):
+        tree.write(xml_path, encoding="utf-16", xml_declaration=True)
+    else:
+        xml_path = Path(xml_path)
+        with xml_path.open("wb") as xml_file:
+            tree.write(xml_file, encoding="utf-16", xml_declaration=True)

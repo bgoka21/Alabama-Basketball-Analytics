@@ -1,10 +1,8 @@
 """Routes for the CSV Pipeline management tool."""
 
 from datetime import date, datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 import os
-import tempfile
-
 import pandas as pd
 from flask import (
     Blueprint,
@@ -13,6 +11,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    url_for,
 )
 from flask_login import login_required
 from werkzeug.utils import secure_filename
@@ -57,7 +56,9 @@ def _download_filename(game: Game | None) -> str:
     return f"{game_date}_{opponent}_FINAL.csv"
 
 
-def _xml_download_filename(upload_filename: str | None) -> str:
+def _xml_download_filename(upload_filename: str | None, game_date: str | None = None) -> str:
+    if game_date:
+        return f"{game_date}_FINAL.xml"
     if not upload_filename:
         game_date = date.today().isoformat()
         return f"{game_date}_game_FINAL.xml"
@@ -165,24 +166,45 @@ def playcall_overlay():
 def export_xml():
     errors: list[str] = []
     try:
-        final_csv_file = request.files.get("final_csv")
-        final_df = _read_csv(final_csv_file, "Final CSV")
-        _ensure_row_column(final_df, final_csv_file.filename)
+        csv_content: str | None = None
+        upload_filename: str | None = None
+        final_csv_path = request.form.get("final_csv_path")
+        final_csv_content = request.form.get("final_csv_content")
+        game_date = request.form.get("game_date")
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            csv_path = os.path.join(temp_dir, "final.csv")
-            xml_path = os.path.join(temp_dir, "final.xml")
-            final_df.to_csv(csv_path, index=False)
-            export_csv_to_sportscode_xml(csv_path, xml_path)
+        if final_csv_path:
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            if not upload_folder:
+                raise CsvPipelineError("Upload folder is not configured.")
+            abs_folder = os.path.abspath(upload_folder)
+            abs_path = os.path.abspath(final_csv_path)
+            if not abs_path.startswith(f"{abs_folder}{os.sep}"):
+                raise CsvPipelineError("Invalid Final CSV path provided.")
+            if not os.path.exists(abs_path):
+                raise CsvPipelineError("Final CSV file not found on disk.")
+            with open(abs_path, "rb") as csv_file:
+                csv_content = csv_file.read().decode("utf-8")
+            upload_filename = os.path.basename(abs_path)
+        elif final_csv_content:
+            csv_content = final_csv_content
+        else:
+            final_csv_file = request.files.get("final_csv")
+            if final_csv_file is None or not final_csv_file.filename:
+                raise CsvPipelineError("Final CSV is required.")
+            upload_filename = final_csv_file.filename
+            csv_content = final_csv_file.read().decode("utf-8")
 
-            with open(xml_path, "rb") as xml_file:
-                xml_io = BytesIO(xml_file.read())
-            xml_io.seek(0)
+        final_df = pd.read_csv(StringIO(csv_content))
+        _ensure_row_column(final_df, upload_filename or "Final CSV")
+
+        xml_io = BytesIO()
+        export_csv_to_sportscode_xml(StringIO(csv_content), xml_io)
+        xml_io.seek(0)
 
         return send_file(
             xml_io,
             mimetype="application/xml",
-            download_name=_xml_download_filename(final_csv_file.filename),
+            download_name=_xml_download_filename(upload_filename, game_date),
             as_attachment=True,
         )
     except CsvPipelineError as exc:
@@ -341,14 +363,16 @@ def csv_pipeline_index():
             db.session.add(uploaded_file)
             db.session.commit()
 
-            csv_io = BytesIO()
-            final_df.to_csv(csv_io, index=False)
-            csv_io.seek(0)
-            return send_file(
-                csv_io,
-                mimetype="text/csv",
+            return render_template(
+                "csv_pipeline/final_csv.html",
+                game=game,
                 download_name=_download_filename(game),
-                as_attachment=True,
+                download_url=url_for(
+                    "csv_pipeline.download_final_csv",
+                    game_id=game.id,
+                ),
+                final_csv_path=file_path,
+                game_date=game.game_date.isoformat() if game.game_date else "",
             )
         except CsvPipelineError as exc:
             errors.append(str(exc))
@@ -372,4 +396,47 @@ def csv_pipeline_index():
         errors=[],
         seasons=seasons,
         games=games,
+    )
+
+
+@csv_pipeline_bp.route("/csv-pipeline/download-final/<int:game_id>", methods=["GET"])
+@login_required
+@admin_required
+def download_final_csv(game_id: int):
+    game = Game.query.get(game_id)
+    if not game or not game.csv_filename:
+        flash("Final CSV not found for the selected game.", "error")
+        seasons, games = _load_form_context()
+        return (
+            render_template(
+                "csv_pipeline/index.html",
+                errors=["Final CSV not found for the selected game."],
+                seasons=seasons,
+                games=games,
+            ),
+            404,
+        )
+
+    upload_folder = current_app.config.get("UPLOAD_FOLDER")
+    if not upload_folder:
+        raise CsvPipelineError("Upload folder is not configured.")
+    csv_path = os.path.join(upload_folder, game.csv_filename)
+    if not os.path.exists(csv_path):
+        flash("Final CSV file not found on disk.", "error")
+        seasons, games = _load_form_context()
+        return (
+            render_template(
+                "csv_pipeline/index.html",
+                errors=["Final CSV file not found on disk."],
+                seasons=seasons,
+                games=games,
+            ),
+            404,
+        )
+
+    return send_file(
+        csv_path,
+        mimetype="text/csv",
+        download_name=_download_filename(game),
+        as_attachment=True,
     )
