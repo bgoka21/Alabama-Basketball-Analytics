@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from io import BytesIO
 import os
+import tempfile
 
 import pandas as pd
 from flask import (
@@ -22,9 +23,11 @@ from app.csv_pipeline.service import (
     GroupFilenames,
     GroupInputs,
     build_final_csv,
+    _ensure_row_column,
 )
 from models.database import Game, Season, db
 from models.uploaded_file import UploadedFile
+from scripts.export_xml import export_csv_to_sportscode_xml
 from services.reports.playcall import invalidate_playcall_report
 
 csv_pipeline_bp = Blueprint("csv_pipeline", __name__)
@@ -52,6 +55,17 @@ def _download_filename(game: Game | None) -> str:
     opponent = (game.opponent_name or "game").strip().replace(" ", "_")
     game_date = game.game_date.isoformat() if game.game_date else "game"
     return f"{game_date}_{opponent}_FINAL.csv"
+
+
+def _xml_download_filename(upload_filename: str | None) -> str:
+    if not upload_filename:
+        game_date = date.today().isoformat()
+        return f"{game_date}_game_FINAL.xml"
+    base = secure_filename(upload_filename)
+    stem, ext = os.path.splitext(base)
+    if ext.lower() == ".csv":
+        return f"{stem}.xml"
+    return f"{stem}_FINAL.xml"
 
 
 def _load_form_context():
@@ -134,6 +148,53 @@ def playcall_overlay():
 
     for error in errors:
         flash(error, "error")
+    return (
+        render_template(
+            "csv_pipeline/index.html",
+            errors=errors,
+            seasons=seasons,
+            games=games,
+        ),
+        400,
+    )
+
+
+@csv_pipeline_bp.route("/export-xml", methods=["POST"])
+@login_required
+@admin_required
+def export_xml():
+    errors: list[str] = []
+    try:
+        final_csv_file = request.files.get("final_csv")
+        final_df = _read_csv(final_csv_file, "Final CSV")
+        _ensure_row_column(final_df, final_csv_file.filename)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = os.path.join(temp_dir, "final.csv")
+            xml_path = os.path.join(temp_dir, "final.xml")
+            final_df.to_csv(csv_path, index=False)
+            export_csv_to_sportscode_xml(csv_path, xml_path)
+
+            with open(xml_path, "rb") as xml_file:
+                xml_io = BytesIO(xml_file.read())
+            xml_io.seek(0)
+
+        return send_file(
+            xml_io,
+            mimetype="application/xml",
+            download_name=_xml_download_filename(final_csv_file.filename),
+            as_attachment=True,
+        )
+    except CsvPipelineError as exc:
+        errors.append(str(exc))
+    except pd.errors.ParserError as exc:
+        errors.append(f"CSV parse error: {exc}")
+    except (ValueError, OSError) as exc:
+        errors.append(str(exc))
+
+    for error in errors:
+        flash(error, "error")
+    seasons, games = _load_form_context()
     return (
         render_template(
             "csv_pipeline/index.html",
