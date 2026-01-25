@@ -228,18 +228,22 @@ def test_csv_pipeline_happy_path(client):
     )
 
     assert resp.status_code == 200
-    assert resp.mimetype == "text/csv"
-
-    output = pd.read_csv(BytesIO(resp.data))
-    offense_rows = output[output["Row"] == "Offense"]
-    assert "Shot Type" in offense_rows.columns
-    assert "Shot Creation" in offense_rows.columns
-    assert "TO Type" in offense_rows.columns
+    assert resp.mimetype == "text/html"
 
     with client.application.app_context():
         game = Game.query.filter_by(opponent_name="Test Opponent").first()
         assert game is not None
         assert game.csv_filename
+
+    download_resp = client.get(f"/management/csv-pipeline/download-final/{game.id}")
+    assert download_resp.status_code == 200
+    assert download_resp.mimetype == "text/csv"
+
+    output = pd.read_csv(BytesIO(download_resp.data))
+    offense_rows = output[output["Row"] == "Offense"]
+    assert "Shot Type" in offense_rows.columns
+    assert "Shot Creation" in offense_rows.columns
+    assert "TO Type" in offense_rows.columns
 
 
 def test_csv_pipeline_missing_row_column(client):
@@ -286,7 +290,16 @@ def test_csv_pipeline_preserves_player_rows(client):
     )
 
     assert resp.status_code == 200
-    output = pd.read_csv(BytesIO(resp.data))
+    assert resp.mimetype == "text/html"
+
+    with client.application.app_context():
+        game = Game.query.filter_by(opponent_name="Test Opponent").first()
+        assert game is not None
+        assert game.csv_filename
+
+    download_resp = client.get(f"/management/csv-pipeline/download-final/{game.id}")
+    assert download_resp.status_code == 200
+    output = pd.read_csv(BytesIO(download_resp.data))
     player_row = output[output["Row"] == "Player"].iloc[0]
     assert player_row["#1"] == "keep-player"
     assert player_row["Misc"] == "keep"
