@@ -16,6 +16,8 @@ PROTECTED_COLUMNS = [
     "Instance number",
 ]
 
+PROTECTED_COLUMN_SET = set(PROTECTED_COLUMNS)
+
 TIME_LIKE_COLUMNS = {
     "Timeline",
     "Start time",
@@ -82,7 +84,7 @@ def _extract_group(df: pd.DataFrame, row_label: str, filename: str) -> pd.DataFr
 
 def _strip_grouped_columns(df: pd.DataFrame, row_label: str) -> pd.DataFrame:
     cleaned = df.drop(
-        columns=[col for col in df.columns if col in PROTECTED_COLUMNS],
+        columns=[col for col in df.columns if col in PROTECTED_COLUMN_SET],
         errors="ignore",
     ).copy()
     cleaned.insert(0, "Row", row_label)
@@ -161,7 +163,7 @@ def _validate_group_rows(
         skip_col = base.columns[0] if len(base.columns) > 0 else None
         shared_cols = [
             col
-            for col in PROTECTED_COLUMNS
+            for col in PROTECTED_COLUMN_SET
             if col in base.columns and col in df.columns and col != skip_col
         ]
         if shared_cols:
@@ -192,10 +194,10 @@ def _combine_disjoint_columns(
     group_name: str,
 ) -> pd.DataFrame:
     combined = base.copy()
-    existing = {col for col in combined.columns if col not in PROTECTED_COLUMNS}
+    existing = {col for col in combined.columns if col not in PROTECTED_COLUMN_SET}
     for donor in donors:
         for col in donor.columns:
-            if col in PROTECTED_COLUMNS:
+            if col in PROTECTED_COLUMN_SET:
                 continue
             if col in existing:
                 raise CsvPipelineError(
@@ -247,11 +249,11 @@ def build_offense_group(
     base = groups[0]
     donors = [
         groups[1].drop(
-            columns=[c for c in groups[1].columns if c in PROTECTED_COLUMNS],
+            columns=[c for c in groups[1].columns if c in PROTECTED_COLUMN_SET],
             errors="ignore",
         ),
         groups[2].drop(
-            columns=[c for c in groups[2].columns if c in PROTECTED_COLUMNS],
+            columns=[c for c in groups[2].columns if c in PROTECTED_COLUMN_SET],
             errors="ignore",
         ),
     ]
@@ -306,7 +308,9 @@ def build_pnr_group(
     _validate_group_rows(groups, filenames, group_label)
     base = groups[0]
     keep_cols = [
-        col for col in base.columns if col in PROTECTED_COLUMNS or col.startswith("#")
+        col
+        for col in base.columns
+        if col in PROTECTED_COLUMN_SET or col.startswith("#")
     ]
     base = base[keep_cols].copy()
     donor = groups[1][_player_columns(groups[1])].copy()
