@@ -252,8 +252,11 @@ def build_offense_group(
         ),
     ]
     _validate_group_rows(groups, filenames, group_label)
-    base = groups[0]
-    donors = groups[1:]
+    base = groups[0].drop(columns=_player_columns(groups[0]), errors="ignore")
+    donors = [
+        groups[1],
+        groups[2].drop(columns=_player_columns(groups[2]), errors="ignore"),
+    ]
     return _combine_disjoint_columns(base, donors, group_label)
 
 
