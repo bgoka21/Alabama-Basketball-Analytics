@@ -250,16 +250,7 @@ def build_offense_group(
     ]
     _validate_group_rows(groups, filenames, group_label)
     base = groups[0]
-    donors = [
-        groups[1].drop(
-            columns=[c for c in groups[1].columns if c in PROTECTED_COLUMN_SET],
-            errors="ignore",
-        ),
-        groups[2].drop(
-            columns=[c for c in groups[2].columns if c in PROTECTED_COLUMN_SET],
-            errors="ignore",
-        ),
-    ]
+    donors = groups[1:]
     return _combine_disjoint_columns(base, donors, group_label)
 
 
