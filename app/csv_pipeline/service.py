@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 PROTECTED_COLUMNS = [
     "Timeline",
@@ -83,10 +86,10 @@ def _extract_group(df: pd.DataFrame, row_label: str, filename: str) -> pd.DataFr
 
 
 def _strip_grouped_columns(df: pd.DataFrame, row_label: str) -> pd.DataFrame:
-    cleaned = df.drop(
-        columns=[col for col in df.columns if col in PROTECTED_COLUMN_SET],
-        errors="ignore",
-    ).copy()
+    protected_columns = [col for col in df.columns if col in PROTECTED_COLUMN_SET]
+    for column in protected_columns:
+        logger.debug("Dropping protected column: '%s' from %s", column, row_label)
+    cleaned = df.drop(columns=protected_columns, errors="ignore").copy()
     cleaned.insert(0, "Row", row_label)
     return cleaned
 
