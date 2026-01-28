@@ -164,7 +164,10 @@ def _validate_group_rows(
         shared_cols = [
             col
             for col in PROTECTED_COLUMN_SET
-            if col in base.columns and col in df.columns and col != skip_col
+            if col in base.columns
+            and col in df.columns
+            and col != skip_col
+            and col != "Timeline"
         ]
         if shared_cols:
             base_vals = _normalize_protected_values(
