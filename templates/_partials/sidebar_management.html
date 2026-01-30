@@ -9,7 +9,8 @@
                       'admin.record_entries_list', 'admin.record_entries_new',
                       'admin.record_entries_edit', 'admin.record_entries_update',
                       'admin.records_recompute', 'admin.records_recompute_seasons',
-                      'records_page'] %}
+                      'records_page', 'synergy.dashboard', 'synergy.pnr_analysis',
+                      'synergy.player_detail'] %}
 <li class="nav-item">
   <details class="group" {% if mgmt_active %}open{% endif %}>
     <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
@@ -98,6 +99,12 @@
         {{ icons.render('synonyms') }}
         <span class="flex-1 text-left">Synonyms</span>
       </a>
+      {% if view_exists('synergy.dashboard') %}
+      <a class="{{ link_base_classes }}{% if request.endpoint and request.endpoint.startswith('synergy.') %} {{ active_classes }}{% endif %}" href="{{ url_for('synergy.dashboard') }}">
+        {{ icons.render('dashboard') }}
+        <span class="flex-1 text-left">Synergy</span>
+      </a>
+      {% endif %}
     </div>
   </details>
 </li>
