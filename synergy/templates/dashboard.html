@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Synergy Stats Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-4">
+                <i class="fas fa-chart-bar"></i> Synergy Sports Analytics
+            </h1>
+            <p class="lead text-muted">
+                Advanced analytics powered by Synergy Sports Technology
+            </p>
+        </div>
+    </div>
+
+    <!-- Cache Status Banner -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% if cache_info.exists %}
+                {% if cache_info.is_stale %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Data may be outdated.</strong>
+                        Last updated {{ cache_info.age_hours|round(1) }} hours ago.
+                        {% if current_user.is_admin %}
+                            <button class="btn btn-sm btn-warning float-end" onclick="refreshSynergyData()">
+                                <i class="fas fa-sync-alt"></i> Refresh Now
+                            </button>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Data is current.</strong>
+                        Last updated {{ cache_info.age_hours|round(1) }} hours ago.
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>No data cached yet.</strong>
+                    {% if current_user.is_admin %}
+                        <button class="btn btn-sm btn-info float-end" onclick="refreshSynergyData()">
+                            <i class="fas fa-download"></i> Fetch Data
+                        </button>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-left-crimson">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-crimson text-uppercase mb-1">
+                                Pick & Roll Ball Handler
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ summary.ball_handler.ppp|round(3) }} PPP
+                            </div>
+                            <div class="mt-2 mb-0 text-muted text-xs">
+                                <span class="text-success mr-2">
+                                    <i class="fas fa-arrow-up"></i> {{ summary.ball_handler.possessions }} Possessions
+                                </span>
+                                <span>{{ summary.player_count_bh }} Players</span>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-basketball-ball fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-left-crimson">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-crimson text-uppercase mb-1">
+                                Pick & Roll Roll Man
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ summary.roll_man.ppp|round(3) }} PPP
+                            </div>
+                            <div class="mt-2 mb-0 text-muted text-xs">
+                                <span class="text-success mr-2">
+                                    <i class="fas fa-arrow-up"></i> {{ summary.roll_man.possessions }} Possessions
+                                </span>
+                                <span>{{ summary.player_count_rm }} Players</span>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dunk fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Cards -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <a href="{{ url_for('synergy.pnr_analysis') }}" class="text-decoration-none">
+                <div class="card h-100 shadow-hover">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-line fa-3x text-crimson mb-3"></i>
+                        <h5 class="card-title">Pick & Roll Analysis</h5>
+                        <p class="card-text text-muted">
+                            Detailed breakdown of PnR ball handlers and roll men
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-hover opacity-50">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-3x text-gray-400 mb-3"></i>
+                    <h5 class="card-title text-gray-600">Play Type Breakdown</h5>
+                    <p class="card-text text-muted">
+                        Coming soon: Isolation, Post-Up, Transition
+                    </p>
+                    <span class="badge badge-secondary">Coming Soon</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-hover opacity-50">
+                <div class="card-body text-center">
+                    <i class="fas fa-shield-alt fa-3x text-gray-400 mb-3"></i>
+                    <h5 class="card-title text-gray-600">Defensive Stats</h5>
+                    <p class="card-text text-muted">
+                        Coming soon: Defensive play type analytics
+                    </p>
+                    <span class="badge badge-secondary">Coming Soon</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .border-left-crimson {
+        border-left: 4px solid #9E1B32;
+    }
+    
+    .text-crimson {
+        color: #9E1B32;
+    }
+    
+    .shadow-hover {
+        transition: all 0.3s;
+    }
+    
+    .shadow-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .opacity-50 {
+        opacity: 0.6;
+    }
+</style>
+
+<script>
+function refreshSynergyData() {
+    if (!confirm('This will fetch fresh data from Synergy API. Continue?')) {
+        return;
+    }
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    
+    fetch('{{ url_for("synergy.api_refresh") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Data refreshed successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Now';
+        }
+    })
+    .catch(error => {
+        alert('Error refreshing data: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Now';
+    });
+}
+</script>
+{% endblock %}
