@@ -9,7 +9,9 @@
                       'admin.record_entries_list', 'admin.record_entries_new',
                       'admin.record_entries_edit', 'admin.record_entries_update',
                       'admin.records_recompute', 'admin.records_recompute_seasons',
-                      'records_page'] %}
+                      'records_page', 'synergy.dashboard', 'synergy.pnr_analysis',
+                      'synergy.player_detail']
+                      or request.path.startswith('/synergy') %}
 <li class="nav-item">
   <details class="group" {% if mgmt_active %}open{% endif %}>
     <summary class="{{ summary_base_classes }} {{ summary_active_classes }}">
@@ -97,6 +99,10 @@
       <a class="{{ link_base_classes }}{% if request.endpoint == 'admin.eybl_synonyms' %} {{ active_classes }}{% endif %}" href="{{ url_for('admin.eybl_synonyms') }}">
         {{ icons.render('synonyms') }}
         <span class="flex-1 text-left">Synonyms</span>
+      </a>
+      <a class="{{ link_base_classes }}{% if request.endpoint and request.endpoint.startswith('synergy.') or request.path.startswith('/synergy') %} {{ active_classes }}{% endif %}" href="/synergy/">
+        {{ icons.render('dashboard') }}
+        <span class="flex-1 text-left">Synergy</span>
       </a>
     </div>
   </details>
