@@ -30,6 +30,80 @@
   color: #1f2937;
 }
 
+.synergy-section {
+  background: #f8fafc;
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.synergy-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.synergy-kpi-card {
+  background: #ffffff;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 0.75rem 0.9rem;
+}
+
+.synergy-pnr-kpi-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.synergy-pnr-kpi-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.synergy-kpi-divider {
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+  margin: 0.75rem 0 0.5rem;
+}
+
+.synergy-summary-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  background: #f1f5f9;
+  border-radius: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.synergy-summary-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.synergy-summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.synergy-summary-badge {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  font-weight: 600;
+  font-size: 0.7rem;
+  padding: 0.35rem 0.5rem;
+}
+
 .synergy-table thead th {
   background: #F9FAFB;
   border-bottom: 2px solid #9E1B32;
