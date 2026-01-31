@@ -100,9 +100,10 @@
 }
 
 .synergy-kpi-card {
-  background: #f7f7f8;
+  background: #eef2f7;
   border-radius: 0.5rem;
   border: 1px solid var(--synergy-border);
+  border-left: 3px solid var(--synergy-primary);
   padding: 0.75rem 0.9rem;
 }
 
@@ -163,6 +164,7 @@
 
 .synergy-table {
   font-size: 0.85rem;
+  width: 100%;
 }
 
 .table-responsive .synergy-table thead th {
@@ -181,23 +183,23 @@
 }
 
 .synergy-table tbody tr.synergy-row-odd {
-  background: #ffffff;
+  background-color: #ffffff !important;
 }
 
 .synergy-table tbody tr.synergy-row-even {
-  background: #f9f9fb;
+  background-color: #f9f9fb !important;
 }
 
 .synergy-table tbody tr.synergy-top-row {
-  background: #fdf2f2;
+  background-color: #fdf2f2 !important;
 }
 
 .synergy-table tbody tr.synergy-table-divider {
-  background: rgba(226, 232, 240, 0.6);
+  background-color: rgba(226, 232, 240, 0.6) !important;
 }
 
 .synergy-table tbody tr:hover {
-  background: rgba(158, 27, 50, 0.08);
+  background-color: rgba(158, 27, 50, 0.08) !important;
 }
 
 .synergy-table-divider td {
