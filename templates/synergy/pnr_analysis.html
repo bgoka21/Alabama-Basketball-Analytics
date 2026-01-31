@@ -30,184 +30,22 @@
     </div>
 
     <!-- BALL HANDLER SECTION -->
-    <section class="mb-4">
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="card shadow">
-                    <div class="card-header synergy-section-header">
-                        <h4 class="mb-0">
-                            <i class="fas fa-dribble"></i> Pick & Roll Ball Handler
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <!-- Team Totals -->
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">Total Possessions</div>
-                                    <div class="synergy-stat-value">{{ bh_totals.possessions }}</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">Points Per Possession</div>
-                                    <div class="synergy-stat-value">{{ bh_totals.ppp|round(3) }}</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">FG%</div>
-                                    <div class="synergy-stat-value">{{ bh_totals.fg_pct|round(1) }}%</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">Total Points</div>
-                                    <div class="synergy-stat-value">{{ bh_totals.points }}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                    <!-- Player Stats Table -->
-                    <div class="table-responsive">
-                        <table class="table table-hover table-striped table-sm align-middle synergy-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Player</th>
-                                    <th class="text-end">Poss</th>
-                                    <th class="text-end">Pts</th>
-                                    <th class="text-end">PPP</th>
-                                    <th class="text-end">FG</th>
-                                    <th class="text-end">FG%</th>
-                                    <th class="text-end">TO</th>
-                                    <th class="text-end">TO%</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for player in ball_handlers %}
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-                                    <td>
-                                        <strong>{{ player.player_name }}</strong>
-                                    </td>
-                                    <td class="text-end">{{ player.possessions }}</td>
-                                    <td class="text-end">{{ player.points }}</td>
-                                    <td class="text-end tabular-nums">
-                                        <span class="badge tabular-nums badge-{% if player.ppp >= 1.0 %}success{% elif player.ppp >= 0.85 %}warning{% else %}danger{% endif %}">
-                                            {{ player.ppp|round(3) }}
-                                        </span>
-                                    </td>
-                                    <td class="text-end tabular-nums">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
-                                    <td class="text-end tabular-nums">{{ (player.fg_percent * 100)|round(1) }}%</td>
-                                    <td class="text-end tabular-nums">{{ player.turnovers }}</td>
-                                    <td class="text-end tabular-nums">{{ player.to_percent|round(1) }}%</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="9" class="text-center text-muted">
-                                        No data available. Click "Refresh Data" to fetch from Synergy.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+    {% set section_title = "Pick & Roll Ball Handler" %}
+    {% set section_icon = "fa-dribble" %}
+    {% set totals = bh_totals %}
+    {% set players = ball_handlers %}
+    {% set success_threshold = 1.0 %}
+    {% set warning_threshold = 0.85 %}
+    {% include "synergy/_pnr_section.html" %}
 
     <!-- ROLL MAN SECTION -->
-    <section class="mb-4">
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="card shadow">
-                    <div class="card-header synergy-section-header">
-                        <h4 class="mb-0">
-                            <i class="fas fa-running"></i> Pick & Roll Roll Man
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <!-- Team Totals -->
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">Total Possessions</div>
-                                    <div class="synergy-stat-value">{{ rm_totals.possessions }}</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">Points Per Possession</div>
-                                    <div class="synergy-stat-value">{{ rm_totals.ppp|round(3) }}</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">FG%</div>
-                                    <div class="synergy-stat-value">{{ rm_totals.fg_pct|round(1) }}%</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="synergy-stat-card text-center p-3 h-100">
-                                    <div class="synergy-stat-label">Total Points</div>
-                                    <div class="synergy-stat-value">{{ rm_totals.points }}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                    <!-- Player Stats Table -->
-                    <div class="table-responsive">
-                        <table class="table table-hover table-striped table-sm align-middle synergy-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Player</th>
-                                    <th class="text-end">Poss</th>
-                                    <th class="text-end">Pts</th>
-                                    <th class="text-end">PPP</th>
-                                    <th class="text-end">FG</th>
-                                    <th class="text-end">FG%</th>
-                                    <th class="text-end">TO</th>
-                                    <th class="text-end">TO%</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for player in roll_men %}
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-                                    <td>
-                                        <strong>{{ player.player_name }}</strong>
-                                    </td>
-                                    <td class="text-end">{{ player.possessions }}</td>
-                                    <td class="text-end">{{ player.points }}</td>
-                                    <td class="text-end tabular-nums">
-                                        <span class="badge tabular-nums badge-{% if player.ppp >= 1.1 %}success{% elif player.ppp >= 0.95 %}warning{% else %}danger{% endif %}">
-                                            {{ player.ppp|round(3) }}
-                                        </span>
-                                    </td>
-                                    <td class="text-end tabular-nums">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
-                                    <td class="text-end tabular-nums">{{ (player.fg_percent * 100)|round(1) }}%</td>
-                                    <td class="text-end tabular-nums">{{ player.turnovers }}</td>
-                                    <td class="text-end tabular-nums">{{ player.to_percent|round(1) }}%</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="9" class="text-center text-muted">
-                                        No data available. Click "Refresh Data" to fetch from Synergy.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+    {% set section_title = "Pick & Roll Roll Man" %}
+    {% set section_icon = "fa-running" %}
+    {% set totals = rm_totals %}
+    {% set players = roll_men %}
+    {% set success_threshold = 1.1 %}
+    {% set warning_threshold = 0.95 %}
+    {% include "synergy/_pnr_section.html" %}
 
     <!-- Key Insights -->
     <section class="mb-4">
@@ -261,38 +99,5 @@
     </section>
 </div>
 
-<script>
-function refreshData() {
-    if (!confirm('Fetch fresh data from Synergy API?')) {
-        return;
-    }
-    
-    const btn = event.target;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
-    
-    fetch('{{ url_for("synergy.api_refresh") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Data refreshed successfully!');
-            location.reload();
-        } else {
-            alert('Error: ' + data.error);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Data';
-        }
-    })
-    .catch(error => {
-        alert('Error: ' + error);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Data';
-    });
-}
-</script>
+{% include "synergy/_refresh_data_script.html" %}
 {% endblock %}

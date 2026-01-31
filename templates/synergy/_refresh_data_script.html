@@ -1,0 +1,34 @@
+<script>
+function refreshData() {
+    if (!confirm('Fetch fresh data from Synergy API?')) {
+        return;
+    }
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+
+    fetch('{{ url_for("synergy.api_refresh") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Data refreshed successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Data';
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Data';
+    });
+}
+</script>
