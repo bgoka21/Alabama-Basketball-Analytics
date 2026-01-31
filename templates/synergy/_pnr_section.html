@@ -11,19 +11,19 @@
                     <div class="synergy-kpi-grid mb-3">
                         <div class="synergy-kpi-card">
                             <div class="synergy-pnr-kpi-label">Total Possessions</div>
-                            <div class="synergy-pnr-kpi-value">{{ totals.possessions }}</div>
+                            <div class="synergy-pnr-kpi-value tabular-nums">{{ totals.possessions|round(0) }}</div>
                         </div>
                         <div class="synergy-kpi-card">
                             <div class="synergy-pnr-kpi-label">Points Per Possession</div>
-                            <div class="synergy-pnr-kpi-value">{{ totals.ppp|round(3) }}</div>
+                            <div class="synergy-pnr-kpi-value tabular-nums">{{ totals.ppp|round(3) }}</div>
                         </div>
                         <div class="synergy-kpi-card">
                             <div class="synergy-pnr-kpi-label">FG%</div>
-                            <div class="synergy-pnr-kpi-value">{{ totals.fg_pct|round(1) }}%</div>
+                            <div class="synergy-pnr-kpi-value tabular-nums">{{ totals.fg_pct|round(1) }}%</div>
                         </div>
                         <div class="synergy-kpi-card">
                             <div class="synergy-pnr-kpi-label">Total Points</div>
-                            <div class="synergy-pnr-kpi-value">{{ totals.points }}</div>
+                            <div class="synergy-pnr-kpi-value tabular-nums">{{ totals.points|round(0) }}</div>
                         </div>
                     </div>
 
@@ -32,10 +32,10 @@
                     <div class="synergy-summary-strip">
                         <span class="synergy-summary-title">Summary</span>
                         <div class="synergy-summary-badges">
-                            <span class="badge synergy-summary-badge">Poss {{ totals.possessions }}</span>
-                            <span class="badge synergy-summary-badge">PPP {{ totals.ppp|round(3) }}</span>
-                            <span class="badge synergy-summary-badge">FG% {{ totals.fg_pct|round(1) }}%</span>
-                            <span class="badge synergy-summary-badge">TO% {{ totals.to_percent|default(0)|round(1) }}%</span>
+                            <span class="badge synergy-summary-badge tabular-nums">Poss {{ totals.possessions|round(0) }}</span>
+                            <span class="badge synergy-summary-badge tabular-nums">PPP {{ totals.ppp|round(3) }}</span>
+                            <span class="badge synergy-summary-badge tabular-nums">FG% {{ totals.fg_pct|round(1) }}%</span>
+                            <span class="badge synergy-summary-badge tabular-nums">TO% {{ totals.to_percent|default(0)|round(1) }}%</span>
                         </div>
                     </div>
 
@@ -57,22 +57,27 @@
                             <tbody>
                                 {% for player in players %}
                                 <tr>
-                                    <td>{{ loop.index }}</td>
+                                    <td class="tabular-nums">{{ loop.index }}</td>
                                     <td>
                                         <strong>{{ player.player_name }}</strong>
                                     </td>
-                                    <td class="text-end">{{ player.possessions }}</td>
-                                    <td class="text-end">{{ player.points }}</td>
+                                    <td class="text-end tabular-nums">{{ player.possessions|round(0) }}</td>
+                                    <td class="text-end tabular-nums">{{ player.points|round(0) }}</td>
                                     <td class="text-end tabular-nums">
                                         <span class="badge tabular-nums badge-{% if player.ppp >= success_threshold %}success{% elif player.ppp >= warning_threshold %}warning{% else %}danger{% endif %}">
                                             {{ player.ppp|round(3) }}
                                         </span>
                                     </td>
-                                    <td class="text-end tabular-nums">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
+                                    <td class="text-end tabular-nums">{{ player.fg_made|round(0) }}/{{ player.fg_attempt|round(0) }}</td>
                                     <td class="text-end tabular-nums">{{ (player.fg_percent * 100)|round(1) }}%</td>
-                                    <td class="text-end tabular-nums">{{ player.turnovers }}</td>
-                                    <td class="text-end tabular-nums">{{ player.to_percent|round(1) }}%</td>
+                                    <td class="text-end tabular-nums">{{ player.turnovers|round(0) }}</td>
+                                    <td class="text-end tabular-nums">{{ player.to_percent|default(0)|round(1) }}%</td>
                                 </tr>
+                                {% if loop.index == 3 and not loop.last %}
+                                <tr class="synergy-table-divider">
+                                    <td colspan="9">Rest of roster</td>
+                                </tr>
+                                {% endif %}
                                 {% else %}
                                 <tr>
                                     <td colspan="9" class="text-center text-muted">
