@@ -9,7 +9,7 @@
             <h1 class="display-4">
                 <i class="fas fa-chart-bar"></i> Synergy Sports Analytics
             </h1>
-            <p class="lead text-muted">
+            <p class="lead synergy-muted">
                 Advanced analytics powered by Synergy Sports Technology
             </p>
         </div>
@@ -54,11 +54,11 @@
     <!-- Quick Stats Cards -->
     <div class="row mb-4">
         <div class="col-md-6">
-            <div class="card border-left-crimson">
+            <div class="card synergy-card synergy-card-accent">
                 <div class="card-body">
                     <div class="row">
                         <div class="col">
-                            <div class="text-xs font-weight-bold text-crimson text-uppercase mb-1">
+                            <div class="text-xs font-weight-bold synergy-accent text-uppercase mb-1">
                                 Pick & Roll Ball Handler
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
@@ -72,7 +72,7 @@
                             </div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-basketball-ball fa-2x text-gray-300"></i>
+                            <i class="fas fa-basketball-ball fa-2x synergy-muted"></i>
                         </div>
                     </div>
                 </div>
@@ -80,11 +80,11 @@
         </div>
 
         <div class="col-md-6">
-            <div class="card border-left-crimson">
+            <div class="card synergy-card synergy-card-accent">
                 <div class="card-body">
                     <div class="row">
                         <div class="col">
-                            <div class="text-xs font-weight-bold text-crimson text-uppercase mb-1">
+                            <div class="text-xs font-weight-bold synergy-accent text-uppercase mb-1">
                                 Pick & Roll Roll Man
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
@@ -98,7 +98,7 @@
                             </div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-dunk fa-2x text-gray-300"></i>
+                            <i class="fas fa-dunk fa-2x synergy-muted"></i>
                         </div>
                     </div>
                 </div>
@@ -110,11 +110,11 @@
     <div class="row">
         <div class="col-md-4 mb-4">
             <a href="{{ url_for('synergy.pnr_analysis') }}" class="text-decoration-none">
-                <div class="card h-100 shadow-hover">
+                <div class="card h-100 synergy-card synergy-card-hover">
                     <div class="card-body text-center">
-                        <i class="fas fa-chart-line fa-3x text-crimson mb-3"></i>
+                        <i class="fas fa-chart-line fa-3x synergy-accent mb-3"></i>
                         <h5 class="card-title">Pick & Roll Analysis</h5>
-                        <p class="card-text text-muted">
+                        <p class="card-text synergy-muted">
                             Detailed breakdown of PnR ball handlers and roll men
                         </p>
                     </div>
@@ -123,11 +123,11 @@
         </div>
 
         <div class="col-md-4 mb-4">
-            <div class="card h-100 shadow-hover opacity-50">
+            <div class="card h-100 synergy-card synergy-card-hover synergy-soft">
                 <div class="card-body text-center">
-                    <i class="fas fa-users fa-3x text-gray-400 mb-3"></i>
-                    <h5 class="card-title text-gray-600">Play Type Breakdown</h5>
-                    <p class="card-text text-muted">
+                    <i class="fas fa-users fa-3x synergy-muted mb-3"></i>
+                    <h5 class="card-title synergy-muted">Play Type Breakdown</h5>
+                    <p class="card-text synergy-muted">
                         Coming soon: Isolation, Post-Up, Transition
                     </p>
                     <span class="badge badge-secondary">Coming Soon</span>
@@ -136,11 +136,11 @@
         </div>
 
         <div class="col-md-4 mb-4">
-            <div class="card h-100 shadow-hover opacity-50">
+            <div class="card h-100 synergy-card synergy-card-hover synergy-soft">
                 <div class="card-body text-center">
-                    <i class="fas fa-shield-alt fa-3x text-gray-400 mb-3"></i>
-                    <h5 class="card-title text-gray-600">Defensive Stats</h5>
-                    <p class="card-text text-muted">
+                    <i class="fas fa-shield-alt fa-3x synergy-muted mb-3"></i>
+                    <h5 class="card-title synergy-muted">Defensive Stats</h5>
+                    <p class="card-text synergy-muted">
                         Coming soon: Defensive play type analytics
                     </p>
                     <span class="badge badge-secondary">Coming Soon</span>
@@ -149,29 +149,6 @@
         </div>
     </div>
 </div>
-
-<style>
-    .border-left-crimson {
-        border-left: 4px solid #9E1B32;
-    }
-    
-    .text-crimson {
-        color: #9E1B32;
-    }
-    
-    .shadow-hover {
-        transition: all 0.3s;
-    }
-    
-    .shadow-hover:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-    }
-    
-    .opacity-50 {
-        opacity: 0.6;
-    }
-</style>
 
 <script>
 function refreshSynergyData() {
