@@ -75,6 +75,10 @@ table:not(.table-exempt) a:focus-visible,
   font-variant-numeric: tabular-nums;
 }
 
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Fallback emphasis for percentage columns */
 .unified-table td[data-key*='pct'],
 .unified-table tfoot td[data-key*='pct'],

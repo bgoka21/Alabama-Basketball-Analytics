@@ -70,18 +70,18 @@
 
                     <!-- Player Stats Table -->
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped synergy-table">
+                        <table class="table table-hover table-striped table-sm align-middle synergy-table">
                             <thead>
                                 <tr>
                                     <th>#</th>
                                     <th>Player</th>
-                                    <th class="text-center">Poss</th>
-                                    <th class="text-center">Pts</th>
-                                    <th class="text-center">PPP</th>
-                                    <th class="text-center">FG</th>
-                                    <th class="text-center">FG%</th>
-                                    <th class="text-center">TO</th>
-                                    <th class="text-center">TO%</th>
+                                    <th class="text-end">Poss</th>
+                                    <th class="text-end">Pts</th>
+                                    <th class="text-end">PPP</th>
+                                    <th class="text-end">FG</th>
+                                    <th class="text-end">FG%</th>
+                                    <th class="text-end">TO</th>
+                                    <th class="text-end">TO%</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -91,17 +91,17 @@
                                     <td>
                                         <strong>{{ player.player_name }}</strong>
                                     </td>
-                                    <td class="text-center">{{ player.possessions }}</td>
-                                    <td class="text-center">{{ player.points }}</td>
-                                    <td class="text-center">
-                                        <span class="badge badge-{% if player.ppp >= 1.0 %}success{% elif player.ppp >= 0.85 %}warning{% else %}danger{% endif %}">
+                                    <td class="text-end">{{ player.possessions }}</td>
+                                    <td class="text-end">{{ player.points }}</td>
+                                    <td class="text-end tabular-nums">
+                                        <span class="badge tabular-nums badge-{% if player.ppp >= 1.0 %}success{% elif player.ppp >= 0.85 %}warning{% else %}danger{% endif %}">
                                             {{ player.ppp|round(3) }}
                                         </span>
                                     </td>
-                                    <td class="text-center">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
-                                    <td class="text-center">{{ (player.fg_percent * 100)|round(1) }}%</td>
-                                    <td class="text-center">{{ player.turnovers }}</td>
-                                    <td class="text-center">{{ player.to_percent|round(1) }}%</td>
+                                    <td class="text-end tabular-nums">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
+                                    <td class="text-end tabular-nums">{{ (player.fg_percent * 100)|round(1) }}%</td>
+                                    <td class="text-end tabular-nums">{{ player.turnovers }}</td>
+                                    <td class="text-end tabular-nums">{{ player.to_percent|round(1) }}%</td>
                                 </tr>
                                 {% else %}
                                 <tr>
@@ -160,18 +160,18 @@
 
                     <!-- Player Stats Table -->
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped synergy-table">
+                        <table class="table table-hover table-striped table-sm align-middle synergy-table">
                             <thead>
                                 <tr>
                                     <th>#</th>
                                     <th>Player</th>
-                                    <th class="text-center">Poss</th>
-                                    <th class="text-center">Pts</th>
-                                    <th class="text-center">PPP</th>
-                                    <th class="text-center">FG</th>
-                                    <th class="text-center">FG%</th>
-                                    <th class="text-center">TO</th>
-                                    <th class="text-center">TO%</th>
+                                    <th class="text-end">Poss</th>
+                                    <th class="text-end">Pts</th>
+                                    <th class="text-end">PPP</th>
+                                    <th class="text-end">FG</th>
+                                    <th class="text-end">FG%</th>
+                                    <th class="text-end">TO</th>
+                                    <th class="text-end">TO%</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -181,17 +181,17 @@
                                     <td>
                                         <strong>{{ player.player_name }}</strong>
                                     </td>
-                                    <td class="text-center">{{ player.possessions }}</td>
-                                    <td class="text-center">{{ player.points }}</td>
-                                    <td class="text-center">
-                                        <span class="badge badge-{% if player.ppp >= 1.1 %}success{% elif player.ppp >= 0.95 %}warning{% else %}danger{% endif %}">
+                                    <td class="text-end">{{ player.possessions }}</td>
+                                    <td class="text-end">{{ player.points }}</td>
+                                    <td class="text-end tabular-nums">
+                                        <span class="badge tabular-nums badge-{% if player.ppp >= 1.1 %}success{% elif player.ppp >= 0.95 %}warning{% else %}danger{% endif %}">
                                             {{ player.ppp|round(3) }}
                                         </span>
                                     </td>
-                                    <td class="text-center">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
-                                    <td class="text-center">{{ (player.fg_percent * 100)|round(1) }}%</td>
-                                    <td class="text-center">{{ player.turnovers }}</td>
-                                    <td class="text-center">{{ player.to_percent|round(1) }}%</td>
+                                    <td class="text-end tabular-nums">{{ player.fg_made }}/{{ player.fg_attempt }}</td>
+                                    <td class="text-end tabular-nums">{{ (player.fg_percent * 100)|round(1) }}%</td>
+                                    <td class="text-end tabular-nums">{{ player.turnovers }}</td>
+                                    <td class="text-end tabular-nums">{{ player.to_percent|round(1) }}%</td>
                                 </tr>
                                 {% else %}
                                 <tr>
