@@ -13,7 +13,7 @@
                             <div class="synergy-pnr-kpi-label">Total Possessions</div>
                             <div class="synergy-pnr-kpi-value tabular-nums">{{ totals.possessions|round(0) }}</div>
                         </div>
-                        <div class="synergy-kpi-card">
+                        <div class="synergy-kpi-card synergy-kpi-card-graded-{% if totals.ppp >= success_threshold %}success{% elif totals.ppp >= warning_threshold %}warning{% else %}danger{% endif %}">
                             <div class="synergy-pnr-kpi-label">Points Per Possession</div>
                             <div class="synergy-pnr-kpi-value tabular-nums">{{ totals.ppp|round(3) }}</div>
                         </div>
@@ -45,11 +45,11 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Player</th>
-                                    <th class="text-end">Poss</th>
+                                    <th class="text-end synergy-col-key">Poss</th>
                                     <th class="text-end">Pts</th>
-                                    <th class="text-end">PPP</th>
+                                    <th class="text-end synergy-col-key">PPP</th>
                                     <th class="text-end">FG</th>
-                                    <th class="text-end">FG%</th>
+                                    <th class="text-end synergy-col-key">FG%</th>
                                     <th class="text-end">TO</th>
                                     <th class="text-end">TO%</th>
                                 </tr>
@@ -69,17 +69,24 @@
                                 <tr class="{{ row_class }}">
                                     <td class="tabular-nums">{{ loop.index }}</td>
                                     <td>
+                                        {% if loop.index <= 3 %}
+                                            <span class="synergy-rank-badge">{{ loop.index }}</span>
+                                        {% endif %}
                                         <strong>{{ player.player_name }}</strong>
                                     </td>
                                     <td class="text-end tabular-nums">{{ player.possessions|round(0) }}</td>
                                     <td class="text-end tabular-nums">{{ player.points|round(0) }}</td>
                                     <td class="text-end tabular-nums">
-                                        <span class="badge tabular-nums badge-{% if player.ppp >= success_threshold %}success{% elif player.ppp >= warning_threshold %}warning{% else %}danger{% endif %}">
+                                        <span class="badge tabular-nums synergy-grade-badge badge-{% if player.ppp >= success_threshold %}success{% elif player.ppp >= warning_threshold %}warning{% else %}danger{% endif %}">
                                             {{ player.ppp|round(3) }}
                                         </span>
                                     </td>
                                     <td class="text-end tabular-nums">{{ player.fg_made|round(0) }}/{{ player.fg_attempt|round(0) }}</td>
-                                    <td class="text-end tabular-nums">{{ (player.fg_percent * 100)|round(1) }}%</td>
+                                    <td class="text-end tabular-nums">
+                                        <span class="badge tabular-nums badge-{% if (player.fg_percent * 100) >= 50 %}success{% elif (player.fg_percent * 100) >= 35 %}warning{% else %}danger{% endif %} synergy-grade-badge">
+                                            {{ (player.fg_percent * 100)|round(1) }}%
+                                        </span>
+                                    </td>
                                     <td class="text-end tabular-nums">{{ player.turnovers|round(0) }}</td>
                                     <td class="text-end tabular-nums">{{ player.to_percent|default(0)|round(1) }}%</td>
                                 </tr>
