@@ -5,23 +5,24 @@
 {% block content %}
 <div class="container-fluid">
     <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <h1 class="display-4">
+    <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="display-4 mb-1">
                 <i class="fas fa-basketball-ball"></i> Pick & Roll Analysis
             </h1>
-            <p class="lead text-muted">
+            <div class="text-muted small mb-2">Synergy Reports / Pick &amp; Roll</div>
+            <p class="lead text-muted mb-0">
                 Season: 2025-26 | Data from Synergy Sports
             </p>
         </div>
-        <div class="col-md-4 text-right">
+        <div class="d-flex flex-column align-items-end gap-2">
             {% if cache_info.exists %}
-                <small class="text-muted d-block">
+                <small class="text-muted">
                     Last updated: {{ cache_info.last_updated.strftime('%b %d, %Y at %I:%M %p') }}
                 </small>
             {% endif %}
             {% if current_user.is_admin %}
-                <button class="btn btn-sm btn-outline-crimson mt-2" onclick="refreshData()">
+                <button class="btn btn-sm btn-primary" onclick="refreshData()">
                     <i class="fas fa-sync-alt"></i> Refresh Data
                 </button>
             {% endif %}
@@ -29,42 +30,43 @@
     </div>
 
     <!-- BALL HANDLER SECTION -->
-    <div class="row mb-5">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header synergy-section-header">
-                    <h4 class="mb-0">
-                        <i class="fas fa-dribble"></i> Pick & Roll Ball Handler
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <!-- Team Totals -->
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">Total Possessions</div>
-                                <div class="synergy-stat-value">{{ bh_totals.possessions }}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">Points Per Possession</div>
-                                <div class="synergy-stat-value">{{ bh_totals.ppp|round(3) }}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">FG%</div>
-                                <div class="synergy-stat-value">{{ bh_totals.fg_pct|round(1) }}%</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">Total Points</div>
-                                <div class="synergy-stat-value">{{ bh_totals.points }}</div>
-                            </div>
-                        </div>
+    <section class="mb-4">
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header synergy-section-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-dribble"></i> Pick & Roll Ball Handler
+                        </h4>
                     </div>
+                    <div class="card-body">
+                        <!-- Team Totals -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">Total Possessions</div>
+                                    <div class="synergy-stat-value">{{ bh_totals.possessions }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">Points Per Possession</div>
+                                    <div class="synergy-stat-value">{{ bh_totals.ppp|round(3) }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">FG%</div>
+                                    <div class="synergy-stat-value">{{ bh_totals.fg_pct|round(1) }}%</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">Total Points</div>
+                                    <div class="synergy-stat-value">{{ bh_totals.points }}</div>
+                                </div>
+                            </div>
+                        </div>
 
                     <!-- Player Stats Table -->
                     <div class="table-responsive">
@@ -111,48 +113,50 @@
                             </tbody>
                         </table>
                     </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- ROLL MAN SECTION -->
-    <div class="row mb-5">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header synergy-section-header">
-                    <h4 class="mb-0">
-                        <i class="fas fa-running"></i> Pick & Roll Roll Man
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <!-- Team Totals -->
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">Total Possessions</div>
-                                <div class="synergy-stat-value">{{ rm_totals.possessions }}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">Points Per Possession</div>
-                                <div class="synergy-stat-value">{{ rm_totals.ppp|round(3) }}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">FG%</div>
-                                <div class="synergy-stat-value">{{ rm_totals.fg_pct|round(1) }}%</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="synergy-stat-card text-center p-3 h-100">
-                                <div class="synergy-stat-label">Total Points</div>
-                                <div class="synergy-stat-value">{{ rm_totals.points }}</div>
-                            </div>
-                        </div>
+    <section class="mb-4">
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header synergy-section-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-running"></i> Pick & Roll Roll Man
+                        </h4>
                     </div>
+                    <div class="card-body">
+                        <!-- Team Totals -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">Total Possessions</div>
+                                    <div class="synergy-stat-value">{{ rm_totals.possessions }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">Points Per Possession</div>
+                                    <div class="synergy-stat-value">{{ rm_totals.ppp|round(3) }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">FG%</div>
+                                    <div class="synergy-stat-value">{{ rm_totals.fg_pct|round(1) }}%</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="synergy-stat-card text-center p-3 h-100">
+                                    <div class="synergy-stat-label">Total Points</div>
+                                    <div class="synergy-stat-value">{{ rm_totals.points }}</div>
+                                </div>
+                            </div>
+                        </div>
 
                     <!-- Player Stats Table -->
                     <div class="table-responsive">
@@ -199,20 +203,22 @@
                             </tbody>
                         </table>
                     </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- Key Insights -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card bg-light">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-lightbulb"></i> Key Insights
-                    </h5>
-                    <ul class="mb-0">
+    <section class="mb-4">
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-lightbulb"></i> Key Insights
+                        </h5>
+                        <ul class="mb-0">
                         <li>
                             <strong>Ball Handler Efficiency:</strong> 
                             Team averaging {{ bh_totals.ppp|round(3) }} PPP on {{ bh_totals.possessions }} possessions
@@ -247,11 +253,12 @@
                             {{ roll_men[0].player_name }} leads with {{ roll_men[0].possessions }} possessions at {{ roll_men[0].ppp|round(3) }} PPP
                         </li>
                         {% endif %}
-                    </ul>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 
 <script>
