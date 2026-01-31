@@ -1,4 +1,4 @@
-<section class="synergy-section mb-4">
+<section class="synergy-section">
     <div class="row g-3">
         <div class="col-12">
             <div class="card shadow">
@@ -56,7 +56,17 @@
                             </thead>
                             <tbody>
                                 {% for player in players %}
-                                <tr>
+                                {% set row_class = "synergy-table-row" %}
+                                {% if loop.index <= 3 %}
+                                    {% set row_class = row_class ~ " synergy-top-row" %}
+                                {% else %}
+                                    {% if (loop.index - 3) % 2 == 1 %}
+                                        {% set row_class = row_class ~ " synergy-row-odd" %}
+                                    {% else %}
+                                        {% set row_class = row_class ~ " synergy-row-even" %}
+                                    {% endif %}
+                                {% endif %}
+                                <tr class="{{ row_class }}">
                                     <td class="tabular-nums">{{ loop.index }}</td>
                                     <td>
                                         <strong>{{ player.player_name }}</strong>
