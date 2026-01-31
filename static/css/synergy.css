@@ -94,7 +94,7 @@
 
 .synergy-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -105,6 +105,21 @@
   border: 1px solid var(--synergy-border);
   border-left: 3px solid var(--synergy-primary);
   padding: 0.75rem 0.9rem;
+}
+
+.synergy-kpi-card-graded-success {
+  background: #dcfce7 !important;
+  border-left-color: #16a34a !important;
+}
+
+.synergy-kpi-card-graded-warning {
+  background: #fef3c7 !important;
+  border-left-color: #d97706 !important;
+}
+
+.synergy-kpi-card-graded-danger {
+  background: #fee2e2 !important;
+  border-left-color: #dc2626 !important;
 }
 
 .synergy-pnr-kpi-label {
@@ -178,8 +193,50 @@
   white-space: nowrap;
 }
 
+.table-responsive .synergy-table thead th.synergy-col-key {
+  color: var(--synergy-primary);
+  border-bottom-color: var(--synergy-primary);
+}
+
 .synergy-table tbody td {
-  padding: 0.4rem 0.75rem;
+  padding: 0.3rem 0.75rem;
+}
+
+.synergy-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--synergy-primary);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-right: 0.4rem;
+  line-height: 1;
+}
+
+.synergy-grade-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.synergy-grade-badge.badge-success {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+.synergy-grade-badge.badge-warning {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+.synergy-grade-badge.badge-danger {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
 }
 
 .synergy-table tbody tr.synergy-row-odd {
