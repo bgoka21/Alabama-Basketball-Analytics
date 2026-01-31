@@ -55,3 +55,232 @@
 .bg-crimson {
   background-color: #9E1B32;
 }
+
+.synergy-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.synergy-hero {
+  background: linear-gradient(135deg, rgba(158, 27, 50, 0.12), rgba(158, 27, 50, 0.04));
+  border-radius: 1rem;
+  padding: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  border: 1px solid rgba(158, 27, 50, 0.15);
+}
+
+.synergy-hero-title {
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.synergy-hero-title i {
+  color: #9E1B32;
+  margin-right: 0.75rem;
+}
+
+.synergy-hero-subtitle {
+  margin: 0;
+  color: #4b5563;
+  font-size: 1rem;
+}
+
+.synergy-hero-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.synergy-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.synergy-status-current {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+.synergy-status-stale {
+  background: rgba(245, 158, 11, 0.2);
+  color: #b45309;
+}
+
+.synergy-status-empty {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.synergy-status-text {
+  color: #6b7280;
+}
+
+.synergy-status-row {
+  width: 100%;
+}
+
+.synergy-status-card {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.synergy-status-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem 0.5rem;
+}
+
+.synergy-status-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.synergy-status-title {
+  font-weight: 600;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.synergy-status-detail {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.synergy-status-action {
+  white-space: nowrap;
+}
+
+.synergy-kpi-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+.synergy-kpi {
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.synergy-kpi-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.synergy-kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.synergy-feature-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.synergy-feature-card {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.synergy-feature-card .card-body {
+  flex: 1;
+}
+
+.synergy-feature-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(158, 27, 50, 0.12);
+  color: #9E1B32;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.synergy-feature-card .card-title {
+  font-weight: 600;
+}
+
+.synergy-feature-card .card-footer {
+  background: transparent;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.25rem 1.1rem;
+}
+
+.synergy-feature-secondary {
+  font-size: 0.85rem;
+}
+
+.btn-crimson {
+  background-color: #9E1B32;
+  border-color: #9E1B32;
+  color: #ffffff;
+}
+
+.btn-crimson:hover {
+  background-color: #7c1627;
+  border-color: #7c1627;
+  color: #ffffff;
+}
+
+.synergy-feature-card.is-disabled {
+  opacity: 0.7;
+}
+
+.synergy-feature-card.is-disabled .synergy-feature-icon {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .synergy-hero {
+    padding: 1.5rem;
+  }
+
+  .synergy-status-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
