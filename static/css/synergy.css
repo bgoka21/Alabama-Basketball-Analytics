@@ -226,7 +226,7 @@
   padding: 2rem 1.5rem 3rem;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 2rem;
 }
 
 .synergy-hero {
@@ -295,6 +295,8 @@
 
 .synergy-status-row {
   width: 100%;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--synergy-border);
 }
 
 .synergy-status-card {
@@ -343,8 +345,8 @@
 }
 
 .synergy-kpi {
-  background: var(--synergy-background);
-  border-radius: 0.75rem;
+  background: #f7f7f8;
+  border-radius: 0.85rem;
   padding: 0.85rem 1rem;
   border: 1px solid var(--synergy-border);
 }
@@ -368,6 +370,7 @@
   display: grid;
   gap: 1.5rem;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
 }
 
 .synergy-feature-card {
@@ -376,11 +379,14 @@
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .synergy-feature-card .card-body {
-  flex: 1;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .synergy-feature-icon {
@@ -392,12 +398,23 @@
   justify-content: center;
   background: rgba(158, 27, 50, 0.12);
   color: var(--synergy-primary);
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.synergy-feature-icon svg {
+  width: 28px;
+  height: 28px;
+  display: block;
 }
 
 .synergy-feature-card .card-title {
   font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--synergy-secondary);
+}
+
+.synergy-feature-card .card-text {
+  margin-bottom: 0;
 }
 
 .synergy-feature-card .card-footer {
@@ -405,9 +422,10 @@
   border-top: 1px solid var(--synergy-border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   padding: 0.9rem 1.25rem 1.1rem;
+  margin-top: 1rem;
 }
 
 .synergy-feature-secondary {
@@ -427,12 +445,39 @@
 }
 
 .synergy-feature-card.is-disabled {
-  opacity: 0.7;
+  background: #fafafa;
+  border-color: rgba(148, 163, 184, 0.5);
 }
 
 .synergy-feature-card.is-disabled .synergy-feature-icon {
   background: rgba(148, 163, 184, 0.2);
-  color: #94a3b8;
+  color: #9ca3af;
+}
+
+.synergy-feature-card.is-disabled .card-title {
+  color: #6b7280;
+}
+
+.synergy-feature-card.is-disabled .synergy-feature-secondary {
+  color: #9ca3af;
+}
+
+.synergy-feature-card:not(.is-disabled) {
+  cursor: pointer;
+}
+
+.synergy-feature-card.is-disabled {
+  cursor: not-allowed;
+}
+
+.synergy-feature-card:hover {
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+}
+
+.synergy-feature-card.is-disabled:hover {
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+  transform: none;
 }
 
 @media (max-width: 768px) {
