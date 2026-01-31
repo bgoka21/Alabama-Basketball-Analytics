@@ -1,0 +1,57 @@
+.synergy-section-header {
+  background-color: #9E1B32;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.synergy-section-header h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.synergy-stat-card {
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border-left: 3px solid #9E1B32;
+}
+
+.synergy-stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #6c757d;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.08em;
+}
+
+.synergy-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.synergy-table thead th {
+  background: #F9FAFB;
+  border-bottom: 2px solid #9E1B32;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.synergy-table tbody td {
+  padding: 0.5rem 1rem;
+}
+
+.btn-outline-crimson {
+  color: #9E1B32;
+  border-color: #9E1B32;
+}
+
+.btn-outline-crimson:hover {
+  background-color: #9E1B32;
+  color: #ffffff;
+}
+
+.bg-crimson {
+  background-color: #9E1B32;
+}
