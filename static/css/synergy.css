@@ -57,6 +57,7 @@
   background-color: var(--synergy-primary);
   color: #ffffff;
   letter-spacing: 0.02em;
+  padding: 0.75rem 1rem;
 }
 
 .synergy-section-header h4 {
@@ -95,17 +96,18 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .synergy-kpi-card {
-  background: #ffffff;
-  border-radius: 0.65rem;
+  background: #f7f7f8;
+  border-radius: 0.85rem;
   border: 1px solid var(--synergy-border);
   padding: 0.75rem 0.9rem;
 }
 
 .synergy-pnr-kpi-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--synergy-muted);
@@ -114,14 +116,14 @@
 }
 
 .synergy-pnr-kpi-value {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--synergy-secondary);
 }
 
 .synergy-kpi-divider {
   border-top: 1px solid var(--synergy-border);
-  margin: 0.75rem 0 0.5rem;
+  margin: 0 0 0.5rem;
 }
 
 .synergy-summary-strip {
@@ -130,10 +132,10 @@
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  padding: 0.5rem 0.75rem;
-  background: var(--synergy-background);
+  padding: 0.6rem 0.9rem;
+  background: #f4f4f5;
   border-radius: 0.6rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 
 .synergy-summary-title {
@@ -179,11 +181,19 @@
 }
 
 .synergy-table tbody tr:nth-of-type(odd) {
-  background: rgba(148, 163, 184, 0.08);
+  background: #ffffff;
 }
 
 .synergy-table tbody tr:nth-of-type(even) {
-  background: rgba(248, 250, 252, 0.6);
+  background: #f9f9fb;
+}
+
+.synergy-table tbody tr:nth-of-type(-n+3) {
+  background: #fdf2f2;
+}
+
+.synergy-table tbody tr.synergy-table-divider {
+  background: rgba(226, 232, 240, 0.6);
 }
 
 .synergy-table tbody tr:hover {
@@ -227,6 +237,65 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+.main-content.synergy-pnr-page {
+  max-width: none;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.synergy-section {
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.synergy-section:last-of-type {
+  margin-bottom: 2.5rem;
+}
+
+.synergy-kpi-divider + .synergy-summary-strip {
+  margin-top: 1.5rem;
+}
+
+.synergy-table tbody tr.synergy-table-divider + tr {
+  background: #ffffff;
+}
+
+.synergy-insights-card {
+  background: #f7f7f8;
+  border-radius: 0.85rem;
+  border-left: 4px solid var(--synergy-primary);
+  border-top: 1px solid var(--synergy-border);
+  border-right: 1px solid var(--synergy-border);
+  border-bottom: 1px solid var(--synergy-border);
+}
+
+.synergy-insights-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.synergy-insights-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--synergy-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.synergy-insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.synergy-insights-list li {
+  line-height: 1.5;
 }
 
 .synergy-hero {

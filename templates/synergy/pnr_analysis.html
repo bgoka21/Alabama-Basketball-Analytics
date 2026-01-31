@@ -2,6 +2,8 @@
 
 {% block title %}Pick & Roll Analysis{% endblock %}
 
+{% block page_class %}synergy-pnr-page{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- Header -->
@@ -51,12 +53,12 @@
     <section class="mb-4">
         <div class="row g-3">
             <div class="col-12">
-                <div class="card bg-light">
-                    <div class="card-body">
-                        <h5 class="card-title">
+                <div class="card synergy-insights-card">
+                    <div class="card-body synergy-insights-body">
+                        <h5 class="synergy-insights-title">
                             <i class="fas fa-lightbulb"></i> Key Insights
                         </h5>
-                        <ul class="mb-0">
+                        <ul class="synergy-insights-list mb-0">
                         <li>
                             <strong>Ball Handler Efficiency:</strong> 
                             Team averaging {{ bh_totals.ppp|round(3) }} PPP on {{ bh_totals.possessions }} possessions
