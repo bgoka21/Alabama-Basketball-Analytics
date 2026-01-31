@@ -104,16 +104,51 @@
   padding: 0.35rem 0.5rem;
 }
 
-.synergy-table thead th {
+.synergy-table {
+  font-size: 0.85rem;
+}
+
+.table-responsive .synergy-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   background: #F9FAFB;
   border-bottom: 2px solid #9E1B32;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .synergy-table tbody td {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.synergy-table tbody tr:nth-of-type(odd) {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.synergy-table tbody tr:nth-of-type(even) {
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.synergy-table tbody tr:hover {
+  background: rgba(158, 27, 50, 0.08);
+}
+
+.synergy-table-divider td {
+  background: rgba(226, 232, 240, 0.6);
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0.35rem 0.75rem;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .btn-outline-crimson {
