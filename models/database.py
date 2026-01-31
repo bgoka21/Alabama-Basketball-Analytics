@@ -517,5 +517,68 @@ class SavedStatProfile(db.Model):
     created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
+
+class SynergyCache(db.Model):
+    """Tracks when Synergy data was last refreshed."""
+    __tablename__ = "synergy_cache"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cache_key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    metadata_json = db.Column("metadata", db.Text)
+
+    def __repr__(self):
+        return f"<SynergyCache {self.cache_key}>"
+
+
+class SynergyPnRStats(db.Model):
+    """Pick & Roll statistics from Synergy API."""
+    __tablename__ = "synergy_pnr_stats"
+
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.String(50), nullable=False, index=True)
+    player_name = db.Column(db.String(200), nullable=False)
+    season_id = db.Column(db.String(50), nullable=False, index=True)
+    team_id = db.Column(db.String(50), nullable=False)
+    play_type = db.Column(db.String(50), nullable=False, index=True)
+    defensive = db.Column(db.Boolean, default=False, nullable=False)
+    possessions = db.Column(db.Integer, default=0)
+    points = db.Column(db.Integer, default=0)
+    ppp = db.Column(db.Float, default=0.0)
+    fg_made = db.Column(db.Integer, default=0)
+    fg_attempt = db.Column(db.Integer, default=0)
+    fg_percent = db.Column(db.Float, default=0.0)
+    turnovers = db.Column(db.Integer, default=0)
+    fouls = db.Column(db.Integer, default=0)
+    games_played = db.Column(db.Integer, default=0)
+    raw_data = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<SynergyPnRStats {self.player_name} - {self.play_type}>"
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "player_id": self.player_id,
+            "player_name": self.player_name,
+            "play_type": self.play_type,
+            "possessions": self.possessions,
+            "points": self.points,
+            "ppp": round(self.ppp, 3),
+            "fg_made": self.fg_made,
+            "fg_attempt": self.fg_attempt,
+            "fg_percent": round(self.fg_percent * 100, 1),
+            "turnovers": self.turnovers,
+            "games_played": self.games_played,
+        }
+
+    @property
+    def to_percent(self):
+        if self.possessions == 0:
+            return 0
+        return round((self.turnovers / self.possessions) * 100, 1)
+
 # Re-export for compatibility with older imports
 from .uploaded_file import UploadedFile

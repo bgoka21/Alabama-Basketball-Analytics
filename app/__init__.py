@@ -247,6 +247,9 @@ def create_app():
     from scout import scout_bp
     app.register_blueprint(scout_bp, url_prefix='/scout')
 
+    from synergy import synergy_bp
+    app.register_blueprint(synergy_bp, url_prefix='/synergy')
+
     if scheduler.state == 0:
         scheduler.init_app(app)
         scheduler.start()
