@@ -1,5 +1,60 @@
+:root {
+  --synergy-primary: #9E1B32;
+  --synergy-secondary: #1f2937;
+  --synergy-muted: #6b7280;
+  --synergy-background: #f8fafc;
+  --synergy-border: rgba(148, 163, 184, 0.35);
+}
+
+.synergy-accent {
+  color: var(--synergy-primary);
+}
+
+.synergy-muted {
+  color: var(--synergy-muted);
+}
+
+.synergy-card {
+  background: #ffffff;
+  border: 1px solid var(--synergy-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.synergy-card-accent {
+  border-left: 4px solid var(--synergy-primary);
+}
+
+.synergy-card-hover {
+  transition: all 0.3s;
+}
+
+.synergy-card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.synergy-soft {
+  opacity: 0.6;
+}
+
+.display-4 {
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 700;
+}
+
+.lead {
+  font-size: 1.05rem;
+  font-weight: 400;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
 .synergy-section-header {
-  background-color: #9E1B32;
+  background-color: var(--synergy-primary);
   color: #ffffff;
   letter-spacing: 0.02em;
 }
@@ -12,13 +67,13 @@
 .synergy-stat-card {
   background: #f8f9fa;
   border-radius: 0.5rem;
-  border-left: 3px solid #9E1B32;
+  border-left: 3px solid var(--synergy-primary);
 }
 
 .synergy-stat-label {
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #6c757d;
+  color: var(--synergy-muted);
   font-weight: 600;
   margin-bottom: 0.25rem;
   letter-spacing: 0.08em;
@@ -27,11 +82,11 @@
 .synergy-stat-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--synergy-secondary);
 }
 
 .synergy-section {
-  background: #f8fafc;
+  background: var(--synergy-background);
   border-radius: 1rem;
   padding: 1rem;
 }
@@ -45,7 +100,7 @@
 .synergy-kpi-card {
   background: #ffffff;
   border-radius: 0.65rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  border: 1px solid var(--synergy-border);
   padding: 0.75rem 0.9rem;
 }
 
@@ -53,7 +108,7 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: var(--synergy-muted);
   font-weight: 600;
   margin-bottom: 0.25rem;
 }
@@ -61,11 +116,11 @@
 .synergy-pnr-kpi-value {
   font-size: 1.2rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--synergy-secondary);
 }
 
 .synergy-kpi-divider {
-  border-top: 1px solid rgba(148, 163, 184, 0.35);
+  border-top: 1px solid var(--synergy-border);
   margin: 0.75rem 0 0.5rem;
 }
 
@@ -76,7 +131,7 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   padding: 0.5rem 0.75rem;
-  background: #f1f5f9;
+  background: var(--synergy-background);
   border-radius: 0.6rem;
   margin-bottom: 0.75rem;
 }
@@ -85,7 +140,7 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: var(--synergy-muted);
   font-weight: 600;
 }
 
@@ -97,8 +152,8 @@
 
 .synergy-summary-badge {
   background: #ffffff;
-  color: #334155;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: var(--synergy-secondary);
+  border: 1px solid var(--synergy-border);
   font-weight: 600;
   font-size: 0.7rem;
   padding: 0.35rem 0.5rem;
@@ -113,7 +168,7 @@
   top: 0;
   z-index: 2;
   background: #F9FAFB;
-  border-bottom: 2px solid #9E1B32;
+  border-bottom: 2px solid var(--synergy-primary);
   padding: 0.4rem 0.75rem;
   font-weight: 600;
   white-space: nowrap;
@@ -137,7 +192,7 @@
 
 .synergy-table-divider td {
   background: rgba(226, 232, 240, 0.6);
-  color: #64748b;
+  color: var(--synergy-muted);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -152,17 +207,17 @@
 }
 
 .btn-outline-crimson {
-  color: #9E1B32;
-  border-color: #9E1B32;
+  color: var(--synergy-primary);
+  border-color: var(--synergy-primary);
 }
 
 .btn-outline-crimson:hover {
-  background-color: #9E1B32;
+  background-color: var(--synergy-primary);
   color: #ffffff;
 }
 
 .bg-crimson {
-  background-color: #9E1B32;
+  background-color: var(--synergy-primary);
 }
 
 .synergy-page {
@@ -187,21 +242,18 @@
 }
 
 .synergy-hero-title {
-  font-size: clamp(2rem, 3vw, 2.75rem);
   margin-bottom: 0.5rem;
-  font-weight: 700;
-  color: #111827;
+  color: var(--synergy-secondary);
 }
 
 .synergy-hero-title i {
-  color: #9E1B32;
+  color: var(--synergy-primary);
   margin-right: 0.75rem;
 }
 
 .synergy-hero-subtitle {
   margin: 0;
-  color: #4b5563;
-  font-size: 1rem;
+  color: var(--synergy-muted);
 }
 
 .synergy-hero-status {
@@ -246,7 +298,7 @@
 }
 
 .synergy-status-card {
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--synergy-border);
   border-radius: 0.75rem;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
@@ -275,7 +327,7 @@
 }
 
 .synergy-status-detail {
-  color: #6b7280;
+  color: var(--synergy-muted);
   font-size: 0.9rem;
 }
 
@@ -291,17 +343,17 @@
 }
 
 .synergy-kpi {
-  background: #f8fafc;
+  background: var(--synergy-background);
   border-radius: 0.75rem;
   padding: 0.85rem 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--synergy-border);
 }
 
 .synergy-kpi-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #6b7280;
+  color: var(--synergy-muted);
   font-weight: 600;
   margin-bottom: 0.35rem;
 }
@@ -309,7 +361,7 @@
 .synergy-kpi-value {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--synergy-secondary);
 }
 
 .synergy-feature-grid {
@@ -320,7 +372,7 @@
 
 .synergy-feature-card {
   border-radius: 0.9rem;
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  border: 1px solid var(--synergy-border);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
@@ -339,7 +391,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(158, 27, 50, 0.12);
-  color: #9E1B32;
+  color: var(--synergy-primary);
   font-size: 1.5rem;
   margin-bottom: 1rem;
 }
@@ -350,7 +402,7 @@
 
 .synergy-feature-card .card-footer {
   background: transparent;
-  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  border-top: 1px solid var(--synergy-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -363,8 +415,8 @@
 }
 
 .btn-crimson {
-  background-color: #9E1B32;
-  border-color: #9E1B32;
+  background-color: var(--synergy-primary);
+  border-color: var(--synergy-primary);
   color: #ffffff;
 }
 
