@@ -1,11 +1,64 @@
 {% extends 'base.html' %}
 {% from 'macros/table.html' import render_table %}
+{% block head_extra %}
+<style>
+  .pdf-action-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #9E1B32;
+    color: #ffffff;
+    padding: 0.6rem 1.25rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-weight: 600;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .pdf-action-button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  .pdf-action-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .pdf-loading {
+    display: none;
+    font-size: 0.875rem;
+    color: #4b5563;
+    margin-top: 0.5rem;
+  }
+  .pdf-loading.is-visible {
+    display: block;
+  }
+  .pdf-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div id="print-area">
   <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 p-4 sm:p-6 md:p-8">
     <div class="flex flex-col items-center text-center space-y-4 md:flex-row md:items-start md:space-y-0 md:space-x-6">
       <h1 class="text-2xl font-bold">{{ player.player_name }}</h1>
-      <button id="downloadPdfBtn">Download PDF</button>
+      <div class="flex flex-col items-center md:items-start">
+        <button
+          id="playerPdfBtn"
+          class="pdf-action-button"
+          type="button"
+          data-player-id="{{ player.id }}"
+          data-player-name="{{ player.player_name }}"
+        >
+          <svg class="pdf-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2.5L18.5 9H14zM8 13h1.5a1.5 1.5 0 0 1 0 3H8zm1.5 2a.5.5 0 0 0 0-1H9v1zm4-2h1.25a1.75 1.75 0 0 1 0 3.5H13.5zm1.25 2.5a.75.75 0 0 0 0-1.5H14.5v1.5zM17 13h2v1h-1v1h1v1h-2z"/>
+          </svg>
+          Generate PDF Report
+        </button>
+        <span id="playerPdfLoading" class="pdf-loading" role="status">Generating report…</span>
+      </div>
     </div>
 
   <h3 class="mt-6">On-Court Offensive Possessions &amp; Efficiency</h3>
@@ -139,12 +192,42 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  const pdfBtn = document.getElementById('downloadPdfBtn');
-  if (pdfBtn) {
-    pdfBtn.addEventListener('click', () =>
-      exportStatsPDF({ filename: `${player.player_name.replace(/\s+/g, '_')}.pdf` })
-    );
-  }
+  const pdfBtn = document.getElementById('playerPdfBtn');
+  const loading = document.getElementById('playerPdfLoading');
+  if (!pdfBtn) return;
+
+  pdfBtn.addEventListener('click', async () => {
+    const playerId = pdfBtn.dataset.playerId;
+    const playerName = pdfBtn.dataset.playerName || 'player_report';
+    if (!playerId) {
+      alert('Unable to generate the PDF because the player ID is missing.');
+      return;
+    }
+    pdfBtn.disabled = true;
+    loading?.classList.add('is-visible');
+
+    try {
+      const response = await fetch(`/pdf/player/${playerId}/generate`, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${playerName.replace(/\s+/g, '_')}_report.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert('Sorry, there was a problem generating the PDF. Please try again.');
+    } finally {
+      pdfBtn.disabled = false;
+      loading?.classList.remove('is-visible');
+    }
+  });
 });
 </script>
 
