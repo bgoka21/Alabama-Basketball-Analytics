@@ -154,18 +154,6 @@ table:not(.table-exempt) a:focus-visible,
   color: #6B7280; /* gray-500 */
 }
 
-/* === Print-friendly tweaks =========================================== */
-@media print {
-  .unified-table thead th {
-    background: #ffffff !important;
-    color: #000 !important;
-    border-color: #000 !important;
-  }
-  .unified-table { box-shadow: none !important; }
-  .table-card-accent {
-    display: none;
-  }
-}
 /* ===== Leaderboard legacy aliases -> match unified-table look =================
    This lets old markup (.table-wrap + .table-leaderboard) visually match the
    unified tables without changing templates or JS.
