@@ -11,9 +11,6 @@ import json
 from typing import Any, Iterable, Mapping
 
 from models.database import PlayerStats, Season
-from typing import Any, Iterable, Mapping
-
-from models.database import PlayerStats, Season
 from routes import _load_shot_type_details
 from utils.shot_location_map import normalize_shot_location
 from utils.shottype import gather_labels_for_shot
@@ -69,6 +66,7 @@ def _shot_points(shot_class: str) -> int:
 
 def compile_player_shot_data(player, db_session):
     """Return full player shot report payload based on PlayerStats details."""
+    player_name = getattr(player, "player_name", None) or "Unknown"
     season_name = None
     if getattr(player, "season_id", None):
         season_name = (
@@ -79,7 +77,7 @@ def compile_player_shot_data(player, db_session):
 
     stats_rows = (
         db_session.query(PlayerStats)
-        .filter(PlayerStats.player_name == player.player_name)
+        .filter(PlayerStats.player_name == player_name)
         .all()
     )
 
@@ -93,6 +91,8 @@ def compile_player_shot_data(player, db_session):
     fg3_attempts = sum((row.fg3_attempts or 0) for row in stats_rows)
     points = sum((row.points or 0) for row in stats_rows)
 
+    shot_details = _collect_shot_details(stats_rows)
+
     total_fga = atr_attempts + fg2_attempts + fg3_attempts
     ft_pct = round((ftm / fta) * 100, 1) if fta else 0.0
     efg = ((atr_makes + fg2_makes) + 1.5 * fg3_makes) / total_fga if total_fga else 0.0
@@ -102,16 +102,16 @@ def compile_player_shot_data(player, db_session):
     pps = round(points / total_fga, 2) if total_fga else 0.0
 
     return {
-        "name": player.player_name,
-        "number": _extract_jersey_number(player.player_name),
+        "name": player_name,
+        "number": _extract_jersey_number(player_name),
         "season": season_name or "",
         "ft_pct": ft_pct,
         "ts_pct": ts_pct,
         "pps": pps,
         "efg_pct": efg_pct,
-        "atr": _compile_shot_type_data(player, "atr", db_session),
-        "2fg": _compile_shot_type_data(player, "2fg", db_session),
-        "3fg": _compile_shot_type_data(player, "3fg", db_session),
+        "atr": _compile_shot_type_data(shot_details, "atr"),
+        "2fg": _compile_shot_type_data(shot_details, "2fg"),
+        "3fg": _compile_shot_type_data(shot_details, "3fg"),
     }
 
 
@@ -130,16 +130,14 @@ def _load_shot_type_details(raw_value: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _compile_shot_type_data(player, shot_type, db_session):
-    stats_rows = (
-        db_session.query(PlayerStats.shot_type_details)
-        .filter(PlayerStats.player_name == player.player_name)
-        .all()
-    )
-    shots = []
+def _collect_shot_details(stats_rows: Iterable[PlayerStats]) -> list[dict[str, Any]]:
+    shots: list[dict[str, Any]] = []
     for row in stats_rows:
-        shots.extend(_load_shot_type_details(row[0]))
+        shots.extend(_load_shot_type_details(getattr(row, "shot_type_details", None)))
+    return shots
 
+
+def _compile_shot_type_data(shots: Iterable[Mapping[str, Any]], shot_type: str):
     filtered = [
         shot
         for shot in shots
@@ -159,7 +157,7 @@ def _compile_shot_type_data(player, shot_type, db_session):
                 [shot for shot in filtered if _normalize_possession_type(shot.get("possession_type")) == "half_court"]
             ),
         },
-        "breakdown": _get_breakdown_data(player, shot_type, db_session),
+        "breakdown": _get_breakdown_data(filtered),
     }
 
 
@@ -207,21 +205,8 @@ def _get_zone_data(shots: Iterable[Mapping[str, Any]]):
     return zone_payload
 
 
-def _get_breakdown_data(player, shot_type, db_session):
-    stats_rows = (
-        db_session.query(PlayerStats.shot_type_details)
-        .filter(PlayerStats.player_name == player.player_name)
-        .all()
-    )
-    shots = []
-    for row in stats_rows:
-        shots.extend(_load_shot_type_details(row[0]))
-
-    filtered = [
-        shot
-        for shot in shots
-        if _normalize_shot_class(shot.get("shot_class")) == shot_type
-    ]
+def _get_breakdown_data(filtered: Iterable[Mapping[str, Any]]):
+    filtered = list(filtered)
 
     total_attempts = len(filtered)
     breakdown_map: dict[str, dict[str, list[Mapping[str, Any]]]] = defaultdict(

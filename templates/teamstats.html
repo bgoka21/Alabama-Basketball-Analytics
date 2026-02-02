@@ -12,6 +12,50 @@
             border: 1px solid #d1d5db;
             padding: 0.5rem;
         }
+        .pdf-action-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #9E1B32;
+            color: #ffffff;
+            padding: 0.6rem 1.25rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .pdf-action-button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .pdf-action-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .pdf-loading {
+            display: none;
+            font-size: 0.875rem;
+            color: #4b5563;
+            margin-top: 0.5rem;
+        }
+        .pdf-loading.is-visible {
+            display: block;
+        }
+        .pdf-icon {
+            width: 1rem;
+            height: 1rem;
+        }
+        .pdf-helper {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+            display: none;
+        }
+        .pdf-helper.is-visible {
+            display: block;
+        }
         .stats-updated {
             position: fixed;
             bottom: 0.5rem;
@@ -23,6 +67,16 @@
 </head>
 <body>
     <h1>🏀 Team Stats</h1>
+    <div>
+        <button id="teamPdfBtn" class="pdf-action-button" type="button">
+            <svg class="pdf-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2.5L18.5 9H14zM8 13h1.5a1.5 1.5 0 0 1 0 3H8zm1.5 2a.5.5 0 0 0 0-1H9v1zm4-2h1.25a1.75 1.75 0 0 1 0 3.5H13.5zm1.25 2.5a.75.75 0 0 0 0-1.5H14.5v1.5zM17 13h2v1h-1v1h1v1h-2z"/>
+            </svg>
+            Generate Team Report
+        </button>
+        <div id="teamPdfLoading" class="pdf-loading" role="status">Generating team report…</div>
+        <div id="teamPdfHelper" class="pdf-helper">This may take a minute...</div>
+    </div>
 
     <h2>📊 Game-by-Game Team Stats</h2>
     <div class="overflow-x-auto">
@@ -70,5 +124,47 @@
     <div class="stats-updated">
         Stats Updated: {{ last_stats_update }}
     </div>
+    <script>
+        const teamPdfBtn = document.getElementById('teamPdfBtn');
+        const teamPdfLoading = document.getElementById('teamPdfLoading');
+        const teamPdfHelper = document.getElementById('teamPdfHelper');
+
+        if (teamPdfBtn) {
+            teamPdfBtn.addEventListener('click', async () => {
+                teamPdfBtn.disabled = true;
+                teamPdfLoading.classList.add('is-visible');
+                teamPdfHelper.classList.add('is-visible');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+                try {
+                    const response = await fetch('/pdf/team/generate', {
+                        method: 'GET',
+                        signal: controller.signal,
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Request failed with status ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'team_report.pdf';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error(error);
+                    alert('Sorry, there was a problem generating the team PDF. Please try again.');
+                } finally {
+                    clearTimeout(timeoutId);
+                    teamPdfBtn.disabled = false;
+                    teamPdfLoading.classList.remove('is-visible');
+                    teamPdfHelper.classList.remove('is-visible');
+                }
+            });
+        }
+    </script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from io import BytesIO
 from typing import Mapping
 
@@ -24,6 +25,8 @@ from reportlab.platypus import (
 
 class ShotTypeReportGenerator:
     """Generate a four-page PDF report for a player."""
+
+    _base_court_drawing: Drawing | None = None
 
     def __init__(self, player_data: Mapping[str, object]):
         self.player_data = player_data
@@ -77,7 +80,9 @@ class ShotTypeReportGenerator:
         )
         elements.append(header)
 
-        player_name = f"#{self.player_data.get('number', '')} {self.player_data.get('name', '')}".strip()
+        number = self.player_data.get("number") or ""
+        name = self.player_data.get("name") or "N/A"
+        player_name = f"#{number} {name}".strip().replace("# ", "")
         elements.append(
             Paragraph(
                 player_name,
@@ -175,22 +180,7 @@ class ShotTypeReportGenerator:
         return box
 
     def _create_shot_chart(self, title: str, zone_data: Mapping[str, Mapping[str, object]]):
-        drawing = Drawing(180, 170)
-        drawing.add(Rect(5, 5, 170, 160, strokeColor=colors.black, fillColor=None))
-        drawing.add(Rect(65, 5, 50, 60, strokeColor=colors.black, fillColor=None))
-        drawing.add(Line(5, 85, 175, 85, strokeColor=colors.black))
-        drawing.add(Circle(90, 20, 4, strokeColor=colors.black, fillColor=None))
-
-        drawing.add(
-            String(
-                90,
-                150,
-                "ALABAMA",
-                fontSize=20,
-                fillColor=colors.Color(0, 0, 0, alpha=0.08),
-                textAnchor="middle",
-            )
-        )
+        drawing = self._get_base_court_drawing()
         drawing.add(String(90, 162, title, fontSize=10, textAnchor="middle"))
 
         zones = list(zone_data.items())
@@ -224,6 +214,26 @@ class ShotTypeReportGenerator:
             )
 
         return renderPDF.GraphicsFlowable(drawing)
+
+    def _get_base_court_drawing(self) -> Drawing:
+        if self._base_court_drawing is None:
+            base = Drawing(180, 170)
+            base.add(Rect(5, 5, 170, 160, strokeColor=colors.black, fillColor=None))
+            base.add(Rect(65, 5, 50, 60, strokeColor=colors.black, fillColor=None))
+            base.add(Line(5, 85, 175, 85, strokeColor=colors.black))
+            base.add(Circle(90, 20, 4, strokeColor=colors.black, fillColor=None))
+            base.add(
+                String(
+                    90,
+                    150,
+                    "ALABAMA",
+                    fontSize=20,
+                    fillColor=colors.Color(0, 0, 0, alpha=0.08),
+                    textAnchor="middle",
+                )
+            )
+            self._base_court_drawing = base
+        return deepcopy(self._base_court_drawing)
 
     def _create_footer(self):
         return Paragraph(
@@ -259,7 +269,9 @@ class ShotTypeReportGenerator:
         transition = data.get("transition", {})
         half_court = data.get("half_court", {})
 
-        player_name = f"#{self.player_data.get('number', '')} {self.player_data.get('name', '')}".strip()
+        number = self.player_data.get("number") or ""
+        name = self.player_data.get("name") or "N/A"
+        player_name = f"#{number} {name}".strip().replace("# ", "")
         summary_table = Table(
             [
                 ["", "TOTALS", "", "", "", "TRANSITION", "", "", "", "HALF COURT", "", "", ""],
@@ -358,6 +370,25 @@ class ShotTypeReportGenerator:
                     f"{half_court.get('fg_pct', 0)}%",
                     half_court.get("pps", 0),
                     f"{half_court.get('freq', 0)}%",
+                ]
+            )
+
+        if not row_keys:
+            rows.append(
+                [
+                    "No data",
+                    "0-0",
+                    "0%",
+                    0,
+                    "0%",
+                    "0-0",
+                    "0%",
+                    0,
+                    "0%",
+                    "0-0",
+                    "0%",
+                    0,
+                    "0%",
                 ]
             )
 

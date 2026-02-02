@@ -11,6 +11,7 @@ from flask import render_template, jsonify, request, current_app, make_response,
 from werkzeug.utils import secure_filename
 from app import app, db, PDFKIT_CONFIG, PDF_OPTIONS
 from sqlalchemy import func, or_
+from sqlalchemy.exc import SQLAlchemyError
 from models import Possession, PossessionPlayer, ShotDetail
 from models.database import PlayerDraftStock
 from admin.routes import (
@@ -1395,71 +1396,76 @@ def api_player_stats():
 
 
 def _build_player_shot_chart_payload(player_id: int):
-    season_id = request.args.get("season", type=int)
-    if season_id is None:
-        season_id = request.args.get("season_id", type=int)
-    game_id = request.args.get("game", type=int)
-    practice_id = request.args.get("practice", type=int)
-    shot_class = _normalize_shot_filter(request.args.get("shot_class"))
-    possession_type = _normalize_shot_filter(request.args.get("possession_type"))
-    include_raw = request.args.get("raw", type=int) == 1
+    try:
+        season_id = request.args.get("season", type=int)
+        if season_id is None:
+            season_id = request.args.get("season_id", type=int)
+        game_id = request.args.get("game", type=int)
+        practice_id = request.args.get("practice", type=int)
+        shot_class = _normalize_shot_filter(request.args.get("shot_class"))
+        possession_type = _normalize_shot_filter(request.args.get("possession_type"))
+        include_raw = request.args.get("raw", type=int) == 1
 
-    player = Roster.query.get(player_id)
-    if not player:
-        return jsonify({"error": "player not found"}), 404
+        player = Roster.query.get(player_id)
+        if not player:
+            return jsonify({"error": "player not found"}), 404
 
-    if season_id is None:
-        season_id = player.season_id
-    if season_id is None:
-        season_id = (
-            db.session.query(func.max(PlayerStats.season_id))
-            .filter(PlayerStats.player_name == player.player_name)
-            .scalar()
+        if season_id is None:
+            season_id = player.season_id
+        if season_id is None:
+            season_id = (
+                db.session.query(func.max(PlayerStats.season_id))
+                .filter(PlayerStats.player_name == player.player_name)
+                .scalar()
+            )
+
+        use_cache = (
+            not include_raw
+            and shot_class is None
+            and possession_type is None
+            and game_id is None
+            and practice_id is None
         )
+        if use_cache:
+            zone_counts = _cached_player_season_zone_counts(player.player_name, season_id)
+            raw_shots: list[dict[str, Any]] = []
+        else:
+            stats_query = PlayerStats.query.filter(
+                PlayerStats.season_id == season_id,
+                PlayerStats.player_name == player.player_name,
+            )
+            if game_id is not None:
+                stats_query = stats_query.filter(PlayerStats.game_id == game_id)
+            if practice_id is not None:
+                stats_query = stats_query.filter(PlayerStats.practice_id == practice_id)
+            stats = stats_query.all()
 
-    use_cache = (
-        not include_raw
-        and shot_class is None
-        and possession_type is None
-        and game_id is None
-        and practice_id is None
-    )
-    if use_cache:
-        zone_counts = _cached_player_season_zone_counts(player.player_name, season_id)
-        raw_shots: list[dict[str, Any]] = []
-    else:
-        stats_query = PlayerStats.query.filter(
-            PlayerStats.season_id == season_id,
-            PlayerStats.player_name == player.player_name,
-        )
-        if game_id is not None:
-            stats_query = stats_query.filter(PlayerStats.game_id == game_id)
-        if practice_id is not None:
-            stats_query = stats_query.filter(PlayerStats.practice_id == practice_id)
-        stats = stats_query.all()
+            zone_counts = defaultdict(int)
+            raw_shots = []
+            for stat in stats:
+                for shot in _load_shot_type_details(stat.shot_type_details):
+                    if not _shot_matches_filters(shot, shot_class, possession_type):
+                        continue
+                    normalized = normalize_shot_location(shot.get("shot_location"))
+                    zone_counts[normalized] += 1
+                    if include_raw:
+                        shot_payload = dict(shot)
+                        shot_payload["normalized_location"] = normalized
+                        raw_shots.append(shot_payload)
 
-        zone_counts = defaultdict(int)
-        raw_shots = []
-        for stat in stats:
-            for shot in _load_shot_type_details(stat.shot_type_details):
-                if not _shot_matches_filters(shot, shot_class, possession_type):
-                    continue
-                normalized = normalize_shot_location(shot.get("shot_location"))
-                zone_counts[normalized] += 1
-                if include_raw:
-                    shot_payload = dict(shot)
-                    shot_payload["normalized_location"] = normalized
-                    raw_shots.append(shot_payload)
+        response: dict[str, Any] = {
+            "player_id": player_id,
+            "season_id": season_id,
+            "zones": dict(zone_counts),
+        }
+        if include_raw:
+            response["raw"] = raw_shots
 
-    response: dict[str, Any] = {
-        "player_id": player_id,
-        "season_id": season_id,
-        "zones": dict(zone_counts),
-    }
-    if include_raw:
-        response["raw"] = raw_shots
-
-    return jsonify(response)
+        return jsonify(response)
+    except SQLAlchemyError:
+        current_app.logger.exception("Database error building shot chart for %s", player_id)
+        db.session.rollback()
+        return jsonify({"error": "Database error while building shot chart."}), 500
 
 
 @app.route('/api/players/<int:player_id>/shot-chart', methods=['GET'])
