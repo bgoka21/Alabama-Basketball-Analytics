@@ -9946,8 +9946,7 @@ def ft_daily():
         has_entries=has_entries,
         csv_url=csv_url,
         sort_urls=sort_urls,
-        active_page='ft_daily',
-        print_mode=False
+        active_page='ft_daily'
     )
 
 
@@ -9976,62 +9975,6 @@ def ft_daily_save_default():
 
     flash(f'Default since date saved: {setting.value}.', 'success')
     return redirect(url_for('admin.ft_daily', **redirect_args))
-
-
-@admin_bp.route('/ft-daily.pdf', methods=['GET'])
-@login_required
-def ft_daily_pdf():
-    """Return a PDF version of the ft_daily report."""
-    from app import PDFKIT_CONFIG, PDF_OPTIONS
-    if not PDFKIT_CONFIG:
-        abort(501)
-
-    (
-        start_date,
-        end_date,
-        since_date,
-        hide_zeros,
-        sort,
-        dir_,
-        _,
-    ) = _ft_daily_request_args()
-
-    rows, totals, has_entries, sort = _ft_daily_data(
-        start_date, end_date, since_date, hide_zeros, sort, dir_
-    )
-
-    start_date_str = start_date.isoformat()
-    end_date_str = end_date.isoformat()
-    since_date_str = since_date.isoformat()
-
-    html = render_template(
-        'admin/ft_daily.html',
-        selected_date=start_date,
-        start_date=start_date_str,
-        end_date=end_date_str,
-        since_date=since_date_str,
-        hide_zeros=hide_zeros,
-        sort=sort,
-        dir=dir_,
-        rows=rows,
-        totals=totals,
-        has_entries=has_entries,
-        active_page='ft_daily',
-        print_mode=True,
-    )
-
-    pdf = pdfkit.from_string(html, False, options=PDF_OPTIONS, configuration=PDFKIT_CONFIG)
-    response = make_response(pdf)
-    response.headers['Content-Type'] = 'application/pdf'
-    filename_range = (
-        start_date_str
-        if start_date == end_date
-        else f"{start_date_str}_to_{end_date_str}"
-    )
-    response.headers['Content-Disposition'] = (
-        f'attachment; filename=ft-daily-{filename_range}.pdf'
-    )
-    return response
 
 
 @admin_bp.route('/nba100_scores')
