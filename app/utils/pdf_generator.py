@@ -52,11 +52,11 @@ class ShotTypeReportGenerator:
         story = []
         story.extend(self._create_cover_page())
         story.append(PageBreak())
-        story.append(Paragraph("At The Rim | Individual Breakdown", self._header_style()))
+        story.extend(self._create_atr_page())
         story.append(PageBreak())
-        story.append(Paragraph("Non-ATR 2FG | Individual Breakdown", self._header_style()))
+        story.extend(self._create_2fg_page())
         story.append(PageBreak())
-        story.append(Paragraph("3FG Shots | Individual Breakdown", self._header_style()))
+        story.extend(self._create_3fg_page())
 
         doc.build(story)
         pdf_content = self.buffer.getvalue()
@@ -302,3 +302,116 @@ class ShotTypeReportGenerator:
             )
         )
         return summary_table
+
+    def _create_breakdown_table(self, shot_type: str):
+        breakdown = self.player_data.get(shot_type, {}).get("breakdown", {})
+        header_row = [
+            "BREAKDOWN",
+            "TOTALS",
+            "",
+            "",
+            "",
+            "TRANSITION",
+            "",
+            "",
+            "",
+            "HALF COURT",
+            "",
+            "",
+            "",
+        ]
+        subheader_row = [
+            "",
+            "FGA",
+            "FG%",
+            "PPS",
+            "Freq",
+            "FGA",
+            "FG%",
+            "PPS",
+            "Freq",
+            "FGA",
+            "FG%",
+            "PPS",
+            "Freq",
+        ]
+        rows = [header_row, subheader_row]
+
+        row_keys = []
+        for label_key, buckets in breakdown.items():
+            total = buckets.get("total", {})
+            transition = buckets.get("transition", {})
+            half_court = buckets.get("half_court", {})
+            row_keys.append(label_key)
+            rows.append(
+                [
+                    label_key.replace("_", " ").title(),
+                    total.get("fga", "0-0"),
+                    f"{total.get('fg_pct', 0)}%",
+                    total.get("pps", 0),
+                    f"{total.get('freq', 0)}%",
+                    transition.get("fga", "0-0"),
+                    f"{transition.get('fg_pct', 0)}%",
+                    transition.get("pps", 0),
+                    f"{transition.get('freq', 0)}%",
+                    half_court.get("fga", "0-0"),
+                    f"{half_court.get('fg_pct', 0)}%",
+                    half_court.get("pps", 0),
+                    f"{half_court.get('freq', 0)}%",
+                ]
+            )
+
+        table = Table(rows, colWidths=[1.6 * inch] + [0.45 * inch] * 12)
+        style_commands = [
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("SPAN", (1, 0), (4, 0)),
+            ("SPAN", (5, 0), (8, 0)),
+            ("SPAN", (9, 0), (12, 0)),
+            ("BACKGROUND", (0, 0), (-1, 1), self.light_gray),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 2), (0, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ]
+
+        for row_idx, row_key in enumerate(row_keys, start=2):
+            for col_offset, bucket_key in ((2, "total"), (6, "transition"), (10, "half_court")):
+                fg_pct = breakdown.get(row_key, {}).get(bucket_key, {}).get("fg_pct", 0)
+                fg_pct = float(fg_pct or 0)
+                if fg_pct >= 70:
+                    style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), self.green))
+                elif fg_pct <= 30:
+                    style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), self.red))
+
+        table.setStyle(TableStyle(style_commands))
+        return table
+
+    def _create_atr_page(self):
+        elements = [
+            self._create_breakdown_header("At The Rim | Individual Breakdown"),
+            Spacer(1, 0.15 * inch),
+            self._create_player_summary("atr"),
+            Spacer(1, 0.2 * inch),
+            self._create_breakdown_table("atr"),
+        ]
+        return elements
+
+    def _create_2fg_page(self):
+        elements = [
+            self._create_breakdown_header("Non-ATR 2FG | Individual Breakdown"),
+            Spacer(1, 0.15 * inch),
+            self._create_player_summary("2fg"),
+            Spacer(1, 0.2 * inch),
+            self._create_breakdown_table("2fg"),
+        ]
+        return elements
+
+    def _create_3fg_page(self):
+        elements = [
+            self._create_breakdown_header("3FG Shots | Individual Breakdown"),
+            Spacer(1, 0.15 * inch),
+            self._create_player_summary("3fg"),
+            Spacer(1, 0.2 * inch),
+            self._create_breakdown_table("3fg"),
+        ]
+        return elements
