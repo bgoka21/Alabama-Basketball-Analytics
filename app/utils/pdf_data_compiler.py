@@ -11,6 +11,10 @@ import json
 from typing import Any, Iterable, Mapping
 
 from models.database import PlayerStats, Season
+from typing import Any, Iterable, Mapping
+
+from models.database import PlayerStats, Season
+from routes import _load_shot_type_details
 from utils.shot_location_map import normalize_shot_location
 from utils.shottype import gather_labels_for_shot
 
