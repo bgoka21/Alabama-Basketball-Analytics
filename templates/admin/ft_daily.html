@@ -1,16 +1,5 @@
 {% extends 'admin/base.html' %}
 
-{% block head %}
-<style>
-@media print {
-  #sidebar, #mobile-menu-btn, .no-print { display: none !important; }
-  @page { size: portrait; margin: 1in; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border: 1px solid #000; }
-}
-</style>
-{% endblock %}
-
 {% block content %}
 {% set subtitle = 'Daily ' ~ start_date if start_date == end_date else 'From ' ~ start_date ~ ' to ' ~ end_date %}
 
@@ -23,16 +12,12 @@
       </h1>
       <p class="text-sm text-gray-600">Since {{ since_date }}</p>
     </div>
-    {% if not print_mode %}
-    <div class="space-x-2 no-print">
+    <div class="space-x-2">
       <a href="{{ csv_url }}" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">CSV</a>
-      <button type="button" onclick="window.print()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">Print / Save PDF</button>
     </div>
-    {% endif %}
   </div>
 
-  {% if not print_mode %}
-  <form method="get" class="flex flex-wrap items-end gap-4 no-print">
+  <form method="get" class="flex flex-wrap items-end gap-4">
     <div>
       <label for="start-date" class="block text-sm font-medium mb-1">From</label>
       <input id="start-date" type="date" name="start_date" value="{{ start_date }}" class="border border-gray-300 rounded px-2 py-1" />
@@ -83,7 +68,6 @@
       <a href="{{ url_for('admin.ft_daily') }}" class="text-gray-600 hover:underline text-sm">Reset</a>
     </div>
   </form>
-  {% endif %}
 </div>
 
 {% if has_entries %}
@@ -163,4 +147,3 @@
 {% endif %}
 
 {% endblock %}
-

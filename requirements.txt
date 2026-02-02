@@ -26,3 +26,6 @@ Flask-APScheduler
 APScheduler
 pdfkit
 openpyxl
+reportlab
+Pillow
+PyPDF2
