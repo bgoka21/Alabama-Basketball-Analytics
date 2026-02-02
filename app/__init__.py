@@ -250,6 +250,9 @@ def create_app():
     from synergy import synergy_bp
     app.register_blueprint(synergy_bp, url_prefix='/synergy')
 
+    from app.routes.pdf_routes import pdf_bp
+    app.register_blueprint(pdf_bp)
+
     if scheduler.state == 0:
         scheduler.init_app(app)
         scheduler.start()

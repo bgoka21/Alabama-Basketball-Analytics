@@ -7,6 +7,10 @@ the database, returning the structured payload needed for PDF reporting.
 from __future__ import annotations
 
 from collections import defaultdict
+import json
+from typing import Any, Iterable, Mapping
+
+from models.database import PlayerStats, Season
 from typing import Any, Iterable, Mapping
 
 from models.database import PlayerStats, Season
@@ -109,6 +113,21 @@ def compile_player_shot_data(player, db_session):
         "2fg": _compile_shot_type_data(player, "2fg", db_session),
         "3fg": _compile_shot_type_data(player, "3fg", db_session),
     }
+
+
+def _load_shot_type_details(raw_value: Any) -> list[dict[str, Any]]:
+    """Load shot_type_details JSON blobs into a list of dicts."""
+    if not raw_value:
+        return []
+    try:
+        data = json.loads(raw_value) if isinstance(raw_value, str) else raw_value
+    except (TypeError, ValueError):
+        return []
+    if isinstance(data, list):
+        return [dict(item) for item in data if isinstance(item, Mapping)]
+    if isinstance(data, Mapping):
+        return [dict(data)]
+    return []
 
 
 def _compile_shot_type_data(player, shot_type, db_session):
