@@ -10,18 +10,22 @@ from models.database import PlayerStats, Season
 def compile_player_shot_data(player, db_session):
     """Return full player shot report payload based on Shot Type tab data."""
     player_name = getattr(player, "player_name", None) or "Unknown"
+    resolved_season_id = getattr(player, "season_id", None)
+    if not resolved_season_id:
+        latest_season = db_session.query(Season).order_by(Season.start_date.desc()).first()
+        if latest_season:
+            resolved_season_id = latest_season.id
     season_name = None
-    if getattr(player, "season_id", None):
+    if resolved_season_id:
         season_name = (
             db_session.query(Season.season_name)
-            .filter(Season.id == player.season_id)
+            .filter(Season.id == resolved_season_id)
             .scalar()
         )
-    stats_rows = (
-        db_session.query(PlayerStats)
-        .filter(PlayerStats.player_name == player_name)
-        .all()
-    )
+    stats_query = db_session.query(PlayerStats).filter(PlayerStats.player_name == player_name)
+    if resolved_season_id:
+        stats_query = stats_query.filter(PlayerStats.season_id == resolved_season_id)
+    stats_rows = stats_query.all()
 
     # Mirror the website's game-type filtering:
     # 1) keep only game records (not practice)
