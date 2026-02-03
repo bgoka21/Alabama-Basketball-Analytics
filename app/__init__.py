@@ -250,8 +250,11 @@ def create_app():
     from synergy import synergy_bp
     app.register_blueprint(synergy_bp, url_prefix='/synergy')
 
-    from app.routes.pdf_routes import pdf_bp
-    app.register_blueprint(pdf_bp)
+    try:
+        from app.routes.pdf_routes import pdf_bp
+        app.register_blueprint(pdf_bp)
+    except Exception as e:
+        print("PDF routes disabled at startup:", e)
 
     if scheduler.state == 0:
         scheduler.init_app(app)

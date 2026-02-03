@@ -11,7 +11,6 @@ import json
 from typing import Any, Iterable, Mapping
 
 from models.database import PlayerStats, Season
-from routes import _load_shot_type_details
 from utils.shot_location_map import normalize_shot_location
 from utils.shottype import gather_labels_for_shot
 
@@ -33,6 +32,11 @@ def _normalize_shot_class(value: Any) -> str | None:
     if not text:
         return None
     return _SHOT_CLASS_MAP.get(text, text)
+
+
+def _load_shot_type_details_safe(*args, **kwargs):
+    from routes import _load_shot_type_details
+    return _load_shot_type_details(*args, **kwargs)
 
 
 def _normalize_possession_type(value: Any) -> str:
@@ -133,7 +137,7 @@ def _load_shot_type_details(raw_value: Any) -> list[dict[str, Any]]:
 def _collect_shot_details(stats_rows: Iterable[PlayerStats]) -> list[dict[str, Any]]:
     shots: list[dict[str, Any]] = []
     for row in stats_rows:
-        shots.extend(_load_shot_type_details(getattr(row, "shot_type_details", None)))
+        shots.extend(_load_shot_type_details_safe(getattr(row, "shot_type_details", None)))
     return shots
 
 
