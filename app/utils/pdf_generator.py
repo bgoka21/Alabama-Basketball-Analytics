@@ -51,7 +51,14 @@ class ShotTypeReportGenerator:
             topMargin=0.5 * inch,
             bottomMargin=0.5 * inch,
         )
+        story = self.get_story_elements()
+        doc.build(story)
+        pdf_content = self.buffer.getvalue()
+        self.buffer.close()
+        return pdf_content
 
+    def get_story_elements(self):
+        """Return the report's story elements without building a PDF."""
         # Page layout ordering lives here; adjust the sequence or add new
         # pages by inserting additional _create_*_page calls into the story.
         story = []
@@ -62,11 +69,7 @@ class ShotTypeReportGenerator:
         story.extend(self._create_2fg_page())
         story.append(PageBreak())
         story.extend(self._create_3fg_page())
-
-        doc.build(story)
-        pdf_content = self.buffer.getvalue()
-        self.buffer.close()
-        return pdf_content
+        return story
 
     def _create_cover_page(self):
         elements = []

@@ -8,7 +8,8 @@ from io import BytesIO
 import logging
 
 from flask import Blueprint, current_app, jsonify, send_file
-from PyPDF2 import PdfMerger
+from reportlab.lib.units import inch
+from reportlab.platypus import PageBreak, SimpleDocTemplate
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils.pdf_data_compiler import compile_player_shot_data
@@ -49,19 +50,27 @@ def generate_team_pdf():
         if not players:
             return jsonify({"error": "No players found to generate team report."}), 404
 
-        merger = PdfMerger()
         total_players = len(players)
         logger.info("Generating team PDF for %s players.", total_players)
+        output_buffer = BytesIO()
+        story = []
         for idx, player in enumerate(players, start=1):
+            if idx > 1:
+                story.append(PageBreak())
             logger.info("Generating PDF for %s (%s/%s).", player.player_name, idx, total_players)
             player_data = compile_player_shot_data(player, db.session)
             generator = ShotTypeReportGenerator(player_data)
-            pdf_bytes = generator.generate()
-            merger.append(BytesIO(pdf_bytes))
+            story.extend(generator.get_story_elements())
 
-        output_buffer = BytesIO()
-        merger.write(output_buffer)
-        merger.close()
+        doc = SimpleDocTemplate(
+            output_buffer,
+            pagesize=generator.pagesize,
+            rightMargin=0.5 * inch,
+            leftMargin=0.5 * inch,
+            topMargin=0.5 * inch,
+            bottomMargin=0.5 * inch,
+        )
+        doc.build(story)
         output_buffer.seek(0)
         filename = f"Team_Shot_Reports_{date.today().isoformat()}.pdf"
         return send_file(
