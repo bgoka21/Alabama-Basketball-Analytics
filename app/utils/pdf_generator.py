@@ -15,7 +15,6 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    KeepInFrame,
     SimpleDocTemplate,
     Spacer,
     Table,
@@ -36,7 +35,20 @@ class ShotTypeReportGenerator:
         self.buffer = BytesIO()
         self.pagesize = letter
         self.width, self.height = self.pagesize
-        self.margin = 0.35 * inch
+        self.margin = 0
+        self.base_font_size = 8.5
+        self.header_font_size = 10
+        self.section_header_font_size = 9
+        self.totals_strip_font_size = 8.5
+        self.row_height = 12
+        self.vert_padding = 2
+        self.horiz_padding = 4
+        self.section_space_before = 6
+        self.section_space_after = 4
+        self.line_height = 1.0
+        self.header_spacer = 0.05 * inch
+        self.summary_spacer = 0.08 * inch
+        self.columns_footer_spacer = 0.05 * inch
 
         self.crimson = colors.HexColor("#9E1B32")
         self.green = colors.HexColor("#90EE90")
@@ -190,6 +202,7 @@ class ShotTypeReportGenerator:
 
     def generate(self) -> bytes:
         """Build all four pages and return PDF bytes."""
+        self._validate_layout()
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=self.pagesize,
@@ -417,7 +430,13 @@ class ShotTypeReportGenerator:
         return f"{float(value or 0):.1f}%"
 
     def _header_style(self):
-        return ParagraphStyle("page_header", fontSize=10, textColor=self.crimson, alignment=TA_CENTER)
+        return ParagraphStyle(
+            "page_header",
+            fontSize=self.header_font_size,
+            leading=self.header_font_size * self.line_height,
+            textColor=self.crimson,
+            alignment=TA_CENTER,
+        )
 
     @staticmethod
     def _grade_fill(metric_key: str, value: float) -> colors.Color | None:
@@ -446,6 +465,7 @@ class ShotTypeReportGenerator:
         header_table = Table(
             [["ALABAMA CRIMSON TIDE", title]],
             colWidths=[3.5 * inch, 3.5 * inch],
+            rowHeights=[self.row_height],
         )
         header_table.setStyle(
             TableStyle(
@@ -453,9 +473,13 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (0, 0), "LEFT"),
                     ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                     ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("FONTSIZE", (0, 0), (-1, -1), self.header_font_size),
+                    ("LEADING", (0, 0), (-1, -1), self.header_font_size * self.line_height),
                     ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
+                    ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+                    ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
                 ]
             )
         )
@@ -491,11 +515,7 @@ class ShotTypeReportGenerator:
 
         label_width = 0.54 * col_width
         stat_width = (col_width - label_width) / 4
-        table = Table(
-            rows,
-            colWidths=[label_width] + [stat_width] * 4,
-            rowHeights=[10, 9] + [8] * (len(rows) - 2),
-        )
+        table = Table(rows, colWidths=[label_width] + [stat_width] * 4, rowHeights=[self.row_height] * len(rows))
         style_commands = [
             ("SPAN", (0, 0), (-1, 0)),
             ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
@@ -504,10 +524,15 @@ class ShotTypeReportGenerator:
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("ALIGN", (0, 2), (0, -1), "LEFT"),
             ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6),
+            ("FONTSIZE", (0, 0), (-1, 0), self.section_header_font_size),
+            ("FONTSIZE", (0, 1), (-1, -1), self.base_font_size),
+            ("LEADING", (0, 0), (-1, 0), self.section_header_font_size * self.line_height),
+            ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
             ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+            ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
         ]
         if grade_metric:
             for row_idx, label in enumerate(labels, start=2):
@@ -524,7 +549,7 @@ class ShotTypeReportGenerator:
     def _create_columns_layout(self, shot_type, left_sections, right_sections, max_pass_rows=None):
         usable_width = self.width - (2 * self.margin)
         col_width = usable_width / 2
-        col_height = self.height - (2 * self.margin) - (1.35 * inch)
+        col_height = self._available_column_height()
 
         breakdown, empty_bucket = self._build_breakdown_lookup(shot_type)
         grade_metric = {"atr": "atr2fg_pct", "2fg": "fg2_pct", "3fg": "fg3_pct"}.get(shot_type)
@@ -532,19 +557,30 @@ class ShotTypeReportGenerator:
         def build_section(title, labels):
             if title == "OFF PASS TYPE" and max_pass_rows:
                 labels = labels[:max_pass_rows]
-            return self._create_section_table(title, labels, breakdown, empty_bucket, col_width, grade_metric)
+            return self._create_section_table(title, labels, breakdown, empty_bucket, col_width, grade_metric), labels
 
         left_blocks = [build_section(title, labels) for title, labels in left_sections]
         right_blocks = [build_section(title, labels) for title, labels in right_sections]
 
-        left_frame = KeepInFrame(col_width, col_height, left_blocks, mode="shrink", vAlign="TOP")
-        right_frame = KeepInFrame(col_width, col_height, right_blocks, mode="shrink", vAlign="TOP")
+        left_content = self._stack_sections(left_blocks)
+        right_content = self._stack_sections(right_blocks)
+
         table = Table(
-            [[left_frame, right_frame]],
+            [[left_content, right_content]],
             colWidths=[col_width, col_width],
             rowHeights=[col_height],
         )
-        table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
         return table
 
     def _create_player_summary(self, shot_type: str):
@@ -582,6 +618,7 @@ class ShotTypeReportGenerator:
                 ],
             ],
             colWidths=[1.2 * inch] + [0.6 * inch] * 12,
+            rowHeights=[self.row_height] * 3,
         )
         grade_metric = {"atr": "atr2fg_pct", "fg2": "fg2_pct", "fg3": "fg3_pct"}.get(summary_key)
         style_commands = [
@@ -595,9 +632,12 @@ class ShotTypeReportGenerator:
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("ALIGN", (0, 1), (0, -1), "LEFT"),
             ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("FONTSIZE", (0, 0), (-1, -1), self.totals_strip_font_size),
+            ("LEADING", (0, 0), (-1, -1), self.totals_strip_font_size * self.line_height),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+            ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
         ]
         fg_total = getattr(total, "fg_pct", 0)
         fg_transition = getattr(transition, "fg_pct", 0)
@@ -752,10 +792,7 @@ class ShotTypeReportGenerator:
 
         row_heights = []
         for idx in range(len(rows)):
-            if idx in divider_rows:
-                row_heights.append(3)
-            else:
-                row_heights.append(None)
+            row_heights.append(self.row_height)
         table = Table(rows, colWidths=[1.6 * inch] + [0.45 * inch] * 12, rowHeights=row_heights)
         style_commands = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
@@ -766,9 +803,14 @@ class ShotTypeReportGenerator:
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("ALIGN", (0, 2), (0, -1), "LEFT"),
             ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("FONTSIZE", (0, 0), (-1, 0), self.section_header_font_size),
+            ("FONTSIZE", (0, 1), (-1, -1), self.base_font_size),
+            ("LEADING", (0, 0), (-1, 0), self.section_header_font_size * self.line_height),
+            ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+            ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
         ]
 
         for row_idx in divider_rows:
@@ -793,9 +835,9 @@ class ShotTypeReportGenerator:
     def _create_atr_page(self):
         elements = [
             self._create_breakdown_header("At The Rim | Individual Breakdown"),
-            Spacer(1, 0.05 * inch),
+            Spacer(1, self.header_spacer),
             self._create_player_summary("atr"),
-            Spacer(1, 0.08 * inch),
+            Spacer(1, self.summary_spacer),
             self._create_columns_layout(
                 "atr",
                 left_sections=[
@@ -806,7 +848,7 @@ class ShotTypeReportGenerator:
                     ("OFF PASS TYPE", self.off_pass_type_order),
                 ],
             ),
-            Spacer(1, 0.05 * inch),
+            Spacer(1, self.columns_footer_spacer),
             self._create_footer(),
         ]
         return elements
@@ -814,9 +856,9 @@ class ShotTypeReportGenerator:
     def _create_2fg_page(self):
         elements = [
             self._create_breakdown_header("Non-ATR 2FG | Individual Breakdown"),
-            Spacer(1, 0.05 * inch),
+            Spacer(1, self.header_spacer),
             self._create_player_summary("2fg"),
-            Spacer(1, 0.08 * inch),
+            Spacer(1, self.summary_spacer),
             self._create_columns_layout(
                 "2fg",
                 left_sections=[
@@ -827,7 +869,7 @@ class ShotTypeReportGenerator:
                     ("OFF PASS TYPE", self.off_pass_type_order),
                 ],
             ),
-            Spacer(1, 0.05 * inch),
+            Spacer(1, self.columns_footer_spacer),
             self._create_footer(),
         ]
         return elements
@@ -835,9 +877,9 @@ class ShotTypeReportGenerator:
     def _create_3fg_page(self):
         elements = [
             self._create_breakdown_header("3FG Shots | Individual Breakdown"),
-            Spacer(1, 0.05 * inch),
+            Spacer(1, self.header_spacer),
             self._create_player_summary("3fg"),
-            Spacer(1, 0.08 * inch),
+            Spacer(1, self.summary_spacer),
             self._create_columns_layout(
                 "3fg",
                 left_sections=[
@@ -849,7 +891,56 @@ class ShotTypeReportGenerator:
                 ],
                 max_pass_rows=24,
             ),
-            Spacer(1, 0.05 * inch),
+            Spacer(1, self.columns_footer_spacer),
             self._create_footer(),
         ]
         return elements
+
+    def _available_column_height(self) -> float:
+        content_height = self.height - (2 * self.margin)
+        fixed_height = (
+            self.row_height
+            + self.header_spacer
+            + (self.row_height * 3)
+            + self.summary_spacer
+            + self.columns_footer_spacer
+            + (self.header_font_size * self.line_height)
+        )
+        return content_height - fixed_height
+
+    def _stack_sections(self, sections):
+        flowables = []
+        for table, _labels in sections:
+            flowables.append(Spacer(1, self.section_space_before))
+            flowables.append(table)
+            flowables.append(Spacer(1, self.section_space_after))
+        return flowables
+
+    def _section_height(self, label_count: int) -> float:
+        return self.section_space_before + self.section_space_after + (self.row_height * (label_count + 2))
+
+    def _validate_layout(self) -> None:
+        story = self.get_story_elements()
+        page_breaks = sum(isinstance(item, PageBreak) for item in story)
+        if page_breaks != 3:
+            raise ValueError("Shot type report must contain exactly 4 pages.")
+        for shot_type, left_sections, right_sections, max_pass_rows in (
+            ("atr", [("BREAKDOWN", self.atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], None),
+            ("2fg", [("BREAKDOWN", self.non_atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], None),
+            ("3fg", [("BREAKDOWN", self.three_breakdown_order), ("OFF DRIBBLE TYPE", self.three_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], 24),
+        ):
+            col_height = self._available_column_height()
+            if col_height <= 0:
+                raise ValueError(f"{shot_type} layout exceeds page height.")
+            left_height = 0
+            for title, labels in left_sections:
+                if title == "OFF PASS TYPE" and max_pass_rows:
+                    labels = labels[:max_pass_rows]
+                left_height += self._section_height(len(labels))
+            right_height = 0
+            for title, labels in right_sections:
+                if title == "OFF PASS TYPE" and max_pass_rows:
+                    labels = labels[:max_pass_rows]
+                right_height += self._section_height(len(labels))
+            if left_height > col_height or right_height > col_height:
+                raise ValueError(f"{shot_type} column content exceeds available height.")
