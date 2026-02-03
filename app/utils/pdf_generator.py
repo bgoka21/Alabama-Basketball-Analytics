@@ -70,6 +70,18 @@ class ShotTypeReportGenerator:
 
     def _create_cover_page(self):
         elements = []
+        elements.append(
+            Paragraph(
+                "ALABAMA CRIMSON TIDE",
+                ParagraphStyle(
+                    "cover_brand",
+                    fontSize=14,
+                    textColor=self.crimson,
+                    alignment=TA_CENTER,
+                    spaceAfter=8,
+                ),
+            )
+        )
         header = Paragraph(
             f"{self.player_data.get('season', '')} Season Totals",
             ParagraphStyle(
@@ -115,6 +127,9 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 11),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
+                    ("BACKGROUND", (0, 1), (-1, 1), self.light_gray),
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
                     ("TOPPADDING", (0, 1), (-1, 1), 6),
                 ]
@@ -428,6 +443,8 @@ class ShotTypeReportGenerator:
             self._create_player_summary("atr"),
             Spacer(1, 0.2 * inch),
             self._create_breakdown_table("atr"),
+            Spacer(1, 0.2 * inch),
+            self._create_footer(),
         ]
         return elements
 
@@ -438,6 +455,8 @@ class ShotTypeReportGenerator:
             self._create_player_summary("2fg"),
             Spacer(1, 0.2 * inch),
             self._create_breakdown_table("2fg"),
+            Spacer(1, 0.2 * inch),
+            self._create_footer(),
         ]
         return elements
 
@@ -448,5 +467,7 @@ class ShotTypeReportGenerator:
             self._create_player_summary("3fg"),
             Spacer(1, 0.2 * inch),
             self._create_breakdown_table("3fg"),
+            Spacer(1, 0.2 * inch),
+            self._create_footer(),
         ]
         return elements

@@ -11,12 +11,6 @@
 
 <div class="w-full p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
   <h1 class="text-xl sm:text-3xl font-bold mb-4">{{ player_name }} - Player Stats</h1>
-  <button id="downloadPdfBtn"
-          title="Download player stats as PDF"
-          class="no-print bg-[#9E1B32] text-white px-4 py-2 rounded shadow hover:bg-[#7f1528]"
-          type="button">
-    Download PDF
-  </button>
   {% if not has_stats %}
     <p class="mb-4 text-yellow-600">No stats found for this player.</p>
   {% endif %}
@@ -938,17 +932,6 @@ function showShotTypeDetail(detail) {
     const params = new URLSearchParams(window.location.search);
     const mode   = params.get('mode');
     const hash   = window.location.hash.replace('#','');
-      const pdfBtn = document.getElementById("downloadPdfBtn");
-      if (pdfBtn) {
-        pdfBtn.addEventListener("click", () => {
-          if (window.exportStatsPDF) {
-            exportStatsPDF({ filename: "{{ player_name|replace(" ", "_") }}.pdf" });
-          } else {
-            alert('PDF export unavailable');
-          }
-        });
-      }
-
     if (['seasonTotals','gameStats','shotType','shotChart','skillDevelopment'].includes(hash)) {
       showTab(hash);
     } else {
