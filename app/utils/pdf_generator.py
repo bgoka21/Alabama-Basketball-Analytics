@@ -48,7 +48,7 @@ class ShotTypeReportGenerator:
         self.section_space_after = 16
         self.off_dribble_extra_space = 4
         self.off_pass_extra_space = 6
-        self.group_spacing = 8
+        self.group_spacing = 2
         self.section_label_font_scale = 0.85
         self.line_height = 1.0
         self.header_spacer = 0.11 * inch
