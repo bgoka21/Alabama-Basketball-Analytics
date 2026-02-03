@@ -38,22 +38,22 @@ class ShotTypeReportGenerator:
         self.totals_strip_font_size = 9
         self.row_height = 11
         self.header_row_height = self.row_height * 1.4
-        self.totals_row_height = self.row_height * 1.25
-        self.breakdown_row_height = self.row_height * 1.12
-        self.off_pass_row_height = self.breakdown_row_height * 1.08
+        self.totals_row_height = self.row_height * 1.5
+        self.breakdown_row_height = self.row_height * 1.16
+        self.off_pass_row_height = self.row_height * 1.16
         self.vert_padding = 1
         self.horiz_padding = 4
-        self.header_vert_padding = self.vert_padding + 2
-        self.section_space_before = 8
-        self.section_space_after = 6
+        self.header_vert_padding = self.vert_padding + 3
+        self.section_space_before = 16
+        self.section_space_after = 16
         self.off_dribble_extra_space = 4
-        self.off_pass_extra_space = 2
+        self.off_pass_extra_space = 6
         self.group_spacing = 8
         self.section_label_font_scale = 0.9
         self.line_height = 1.0
-        self.header_spacer = 0.08 * inch
+        self.header_spacer = 0.11 * inch
         self.summary_spacer = 0.12 * inch
-        self.columns_footer_spacer = 0.08 * inch
+        self.columns_footer_spacer = 0.1 * inch
 
         self.crimson = colors.HexColor("#9E1B32")
         self.green = colors.HexColor("#90EE90")
@@ -61,7 +61,6 @@ class ShotTypeReportGenerator:
         self.tan = colors.HexColor("#F5DEB3")
         self.light_gray = colors.HexColor("#E0E0E0")
         self.very_light_gray = colors.HexColor("#F7F7F7")
-        self.zero_row_gray = colors.HexColor("#EFEFEF")
         self.totals_header_gray = colors.HexColor("#D4D4D4")
         self.medium_gray = colors.HexColor("#828A8F")
         self.freq_text_gray = colors.HexColor("#9FA6AD")
@@ -471,7 +470,7 @@ class ShotTypeReportGenerator:
                     ("TEXTCOLOR", (0, 0), (-1, 0), self.medium_gray),
                     ("TEXTCOLOR", (2, 0), (2, 0), self.freq_text_gray),
                     ("TOPPADDING", (0, 0), (-1, 0), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
                 ]
             )
         )
@@ -631,19 +630,8 @@ class ShotTypeReportGenerator:
         if group_breaks:
             for row_idx in group_breaks:
                 style_commands.append(("BOTTOMPADDING", (0, row_idx), (-1, row_idx), self.group_spacing))
-        for idx, attempts in enumerate(attempts_by_row, start=2):
-            if attempts == 0:
-                style_commands.extend(
-                    [
-                        ("TEXTCOLOR", (0, idx), (-1, idx), self.medium_gray),
-                        ("BACKGROUND", (0, idx), (-1, idx), self.zero_row_gray),
-                        ("FONTNAME", (0, idx), (-1, idx), "Helvetica"),
-                        ("FONTNAME", (0, idx), (0, idx), "Helvetica-Oblique"),
-                    ]
-                )
-                if title == "OFF PASS TYPE":
-                    style_commands.append(("FONTNAME", (0, idx), (-1, idx), "Helvetica-Oblique"))
-            elif (idx - 2) % 2 == 1:
+        for idx, _attempts in enumerate(attempts_by_row, start=2):
+            if (idx - 2) % 2 == 1:
                 style_commands.append(("BACKGROUND", (0, idx), (-1, idx), self.very_light_gray))
         if grade_metric:
             for row_idx, label in enumerate(labels, start=2):
@@ -694,7 +682,7 @@ class ShotTypeReportGenerator:
                 row_height = self.breakdown_row_height
                 group_breaks = None
             else:
-                table_width = col_width * 0.72
+                table_width = col_width * 0.74
                 row_height = self.off_pass_row_height
                 group_breaks = None
             table = self._create_section_table(
@@ -737,9 +725,10 @@ class ShotTypeReportGenerator:
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 0),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (0, 0), 6),
+                    ("LEFTPADDING", (1, 0), (1, 0), 6),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ("LINEBEFORE", (1, 0), (1, -1), 0.6, self.light_gray),
                 ]
             )
         )
@@ -972,7 +961,7 @@ class ShotTypeReportGenerator:
 
         row_heights = []
         for idx in range(len(rows)):
-            row_heights.append(self.row_height)
+            row_heights.append(self.breakdown_row_height)
         row_order = {row_idx: order for order, row_idx in enumerate(data_row_indices)}
         table = Table(rows, colWidths=[1.6 * inch] + [0.45 * inch] * 12, rowHeights=row_heights)
         style_commands = [
@@ -1023,17 +1012,7 @@ class ShotTypeReportGenerator:
                 pps_fill = self._grade_fill("pps", getattr(bucket, "pps", 0))
                 if pps_fill:
                     style_commands.append(("BACKGROUND", (col_offset + 1, row_idx), (col_offset + 1, row_idx), pps_fill))
-            total_attempts = getattr(breakdown.get(row_key).total, "attempts", 0) if breakdown.get(row_key) else 0
-            if total_attempts == 0:
-                style_commands.extend(
-                    [
-                        ("TEXTCOLOR", (0, row_idx), (-1, row_idx), self.medium_gray),
-                        ("BACKGROUND", (0, row_idx), (-1, row_idx), self.zero_row_gray),
-                        ("FONTNAME", (0, row_idx), (-1, row_idx), "Helvetica"),
-                        ("FONTNAME", (0, row_idx), (0, row_idx), "Helvetica-Oblique"),
-                    ]
-                )
-            elif row_order[row_idx] % 2 == 1:
+            if row_order[row_idx] % 2 == 1:
                 style_commands.append(("BACKGROUND", (0, row_idx), (-1, row_idx), self.very_light_gray))
 
         table.setStyle(TableStyle(style_commands))
