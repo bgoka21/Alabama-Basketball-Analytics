@@ -39,8 +39,8 @@ class ShotTypeReportGenerator:
         self.row_height = 11
         self.header_row_height = self.row_height * 1.4
         self.totals_row_height = self.row_height * 1.5
-        self.breakdown_row_height = self.row_height * 1.16
-        self.off_pass_row_height = self.row_height * 1.16
+        self.breakdown_row_height = self.row_height * 1.35
+        self.off_pass_row_height = self.row_height * 1.3
         self.vert_padding = 1
         self.horiz_padding = 4
         self.header_vert_padding = self.vert_padding + 3
@@ -49,7 +49,7 @@ class ShotTypeReportGenerator:
         self.off_dribble_extra_space = 4
         self.off_pass_extra_space = 6
         self.group_spacing = 8
-        self.section_label_font_scale = 0.9
+        self.section_label_font_scale = 0.85
         self.line_height = 1.0
         self.header_spacer = 0.11 * inch
         self.summary_spacer = 0.12 * inch
@@ -592,7 +592,7 @@ class ShotTypeReportGenerator:
                 ]
             )
 
-        label_width = 0.54 * col_width
+        label_width = 0.6 * col_width
         stat_width = (col_width - label_width) / 4
         header_height = row_height * 1.15
         table = Table(
