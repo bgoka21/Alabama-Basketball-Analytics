@@ -51,3 +51,15 @@ def test_normalize_shot_location_unknown_values_are_recorded(caplog):
         "Unknown shot location encountered" in record.message
         for record in caplog.records
     )
+
+
+def test_normalize_shot_location_nan_is_silent(caplog):
+    clear_unknown_shot_locations()
+
+    with caplog.at_level(logging.WARNING):
+        assert normalize_shot_location(float("nan")) == "unknown"
+
+    assert not any(
+        "Unknown shot location encountered" in record.message
+        for record in caplog.records
+    )
