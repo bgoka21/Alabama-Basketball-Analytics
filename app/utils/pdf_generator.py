@@ -207,6 +207,15 @@ class ShotTypeReportGenerator:
     def generate(self) -> bytes:
         """Build all four pages and return PDF bytes."""
         self._validate_layout()
+        pages = self._page_sequence()
+        self._validate_page_content(pages)
+        page_count = {"value": 0}
+
+        def _track_pages(_canvas, _doc):
+            page_count["value"] += 1
+            if page_count["value"] > 4:
+                raise ValueError("Shot type report must contain exactly 4 pages.")
+
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=self.pagesize,
@@ -215,8 +224,10 @@ class ShotTypeReportGenerator:
             topMargin=self.margin,
             bottomMargin=self.margin,
         )
-        story = self.get_story_elements()
-        doc.build(story)
+        story = self._build_story(pages)
+        doc.build(story, onFirstPage=_track_pages, onLaterPages=_track_pages)
+        if page_count["value"] != 4:
+            raise ValueError("Shot type report must contain exactly 4 pages.")
         pdf_content = self.buffer.getvalue()
         self.buffer.close()
         return pdf_content
@@ -225,15 +236,29 @@ class ShotTypeReportGenerator:
         """Return the report's story elements without building a PDF."""
         # Page layout ordering lives here; adjust the sequence or add new
         # pages by inserting additional _create_*_page calls into the story.
+        pages = self._page_sequence()
+        return self._build_story(pages)
+
+    def _page_sequence(self):
+        return [
+            self._create_cover_page(),
+            self._create_atr_page(),
+            self._create_2fg_page(),
+            self._create_3fg_page(),
+        ]
+
+    def _build_story(self, pages):
         story = []
-        story.extend(self._create_cover_page())
-        story.append(PageBreak())
-        story.extend(self._create_atr_page())
-        story.append(PageBreak())
-        story.extend(self._create_2fg_page())
-        story.append(PageBreak())
-        story.extend(self._create_3fg_page())
+        for index, elements in enumerate(pages):
+            story.extend(elements)
+            if index < len(pages) - 1:
+                story.append(self._advance_page(pages[index + 1]))
         return story
+
+    def _advance_page(self, next_page):
+        if not self._has_main_content(next_page):
+            raise ValueError("Cannot advance to a page without main content.")
+        return PageBreak()
 
     def _create_cover_page(self):
         elements = []
@@ -297,6 +322,7 @@ class ShotTypeReportGenerator:
             colWidths=[2.2 * inch] * 3,
         )
         summary_boxes.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        summary_boxes._is_main_content = True
         elements.append(summary_boxes)
         elements.append(Spacer(1, 0.25 * inch))
         elements.append(self._create_footer(1, "Season Totals"))
@@ -370,6 +396,7 @@ class ShotTypeReportGenerator:
                 ]
             )
         )
+        table._is_main_content = True
         return table
 
     def _create_shot_chart(
@@ -520,6 +547,7 @@ class ShotTypeReportGenerator:
                 ]
             )
         )
+        header_table._is_header = True
         return header_table
 
     def _build_breakdown_lookup(self, shot_type: str):
@@ -642,6 +670,7 @@ class ShotTypeReportGenerator:
                 ]
             )
         )
+        table._is_main_content = True
         return table
 
     def _create_player_summary(self, shot_type: str):
@@ -732,6 +761,7 @@ class ShotTypeReportGenerator:
             if fill:
                 style_commands.append(("BACKGROUND", (col, 2), (col, 2), fill))
         summary_table.setStyle(TableStyle(style_commands))
+        summary_table._is_main_content = True
         return summary_table
 
     def _create_breakdown_table(self, shot_type: str):
@@ -1009,6 +1039,16 @@ class ShotTypeReportGenerator:
             + (self.header_font_size * self.line_height)
         )
         return content_height - fixed_height
+
+    def _has_main_content(self, elements):
+        return any(getattr(element, "_is_main_content", False) for element in elements)
+
+    def _validate_page_content(self, pages):
+        if len(pages) != 4:
+            raise ValueError("Shot type report must contain exactly 4 pages.")
+        for page in pages:
+            if not self._has_main_content(page):
+                raise ValueError("Each page must contain main content.")
 
     def _stack_sections(self, sections):
         flowables = []
