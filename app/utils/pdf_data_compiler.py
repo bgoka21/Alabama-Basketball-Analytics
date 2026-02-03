@@ -2,9 +2,7 @@
 These helpers reuse the Shot Type tab data pipeline without recomputing stats.
 """
 from __future__ import annotations
-
 import re
-
 from admin.routes import compute_team_shot_details
 from models.database import PlayerStats, Season
 
@@ -24,12 +22,20 @@ def compile_player_shot_data(player, db_session):
         .filter(PlayerStats.player_name == player_name)
         .all()
     )
-    shot_type_totals, shot_summaries = compute_team_shot_details(stats_rows, label_set=None)
 
+    # Mirror the website's game-type filtering:
+    # 1) keep only game records (not practice)
+    # 2) exclude Exhibition by default (same as DEFAULT_GAME_TYPE_SELECTION)
+    default_game_types = ["Non-Conference", "Conference", "Postseason"]
+    stats_rows = [
+        r for r in stats_rows
+        if r.game_id and r.game and any(tag in default_game_types for tag in r.game.game_types)
+    ]
+
+    shot_type_totals, shot_summaries = compute_team_shot_details(stats_rows, label_set=None)
     # Strip leading #<number> from the raw DB name so the renderer can
     # safely reconstruct "#{number} {name}" without doubling.
     clean_name = re.sub(r"^#\d+\s*", "", player_name)
-
     return {
         "name": clean_name,
         "number": _extract_jersey_number(player_name),
