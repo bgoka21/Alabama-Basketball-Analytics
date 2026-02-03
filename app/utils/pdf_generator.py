@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from types import SimpleNamespace
 from io import BytesIO
 from typing import Mapping
 
@@ -21,6 +22,7 @@ from reportlab.platypus import (
     Paragraph,
     PageBreak,
 )
+from app.grades import grade_token
 
 
 class ShotTypeReportGenerator:
@@ -46,10 +48,10 @@ class ShotTypeReportGenerator:
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=self.pagesize,
-            rightMargin=0.5 * inch,
-            leftMargin=0.5 * inch,
-            topMargin=0.5 * inch,
-            bottomMargin=0.5 * inch,
+            rightMargin=0.35 * inch,
+            leftMargin=0.35 * inch,
+            topMargin=0.35 * inch,
+            bottomMargin=0.35 * inch,
         )
         story = self.get_story_elements()
         doc.build(story)
@@ -107,80 +109,44 @@ class ShotTypeReportGenerator:
                     "player_name",
                     fontSize=36,
                     alignment=TA_CENTER,
-                    spaceAfter=14,
+                    spaceAfter=10,
                 ),
             )
         )
+        elements.append(Spacer(1, 0.15 * inch))
 
-        stats_table = Table(
-            [
-                ["FT%", "TS%", "PPS", "EFG%"],
-                [
-                    f"{self.player_data.get('ft_pct', 0)}%",
-                    f"{self.player_data.get('ts_pct', 0)}%",
-                    f"{self.player_data.get('pps', 0)}",
-                    f"{self.player_data.get('efg_pct', 0)}%",
-                ],
-            ],
-            colWidths=[1.6 * inch] * 4,
-        )
-        stats_table.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 11),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
-                    ("BACKGROUND", (0, 1), (-1, 1), self.light_gray),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-                    ("TOPPADDING", (0, 1), (-1, 1), 6),
-                ]
-            )
-        )
-        elements.append(stats_table)
-        elements.append(Spacer(1, 0.25 * inch))
-
+        shot_type_totals = self.player_data.get("shot_type_totals")
         summary_boxes = Table(
             [
                 [
-                    self._create_summary_box("ATR", self.player_data.get("atr", {}).get("total", {}), self.green),
-                    self._create_summary_box("2FG", self.player_data.get("2fg", {}).get("total", {}), self.tan),
-                    self._create_summary_box("3FG", self.player_data.get("3fg", {}).get("total", {}), self.green),
+                    self._create_summary_box("ATR", getattr(shot_type_totals, "atr", None), self.green),
+                    self._create_summary_box("2FG", getattr(shot_type_totals, "fg2", None), self.tan),
+                    self._create_summary_box("3FG", getattr(shot_type_totals, "fg3", None), self.green),
                 ]
             ],
             colWidths=[2.2 * inch] * 3,
         )
         summary_boxes.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
         elements.append(summary_boxes)
-        elements.append(Spacer(1, 0.3 * inch))
-
-        charts_row = Table(
-            [
-                [
-                    self._create_shot_chart("TOTAL", self.player_data.get("atr", {}).get("shot_charts", {}).get("total", {})),
-                    self._create_shot_chart("HALF COURT", self.player_data.get("atr", {}).get("shot_charts", {}).get("half_court", {})),
-                    self._create_shot_chart("TRANSITION", self.player_data.get("atr", {}).get("shot_charts", {}).get("transition", {})),
-                ]
-            ],
-            colWidths=[2.4 * inch] * 3,
-        )
-        charts_row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
-        elements.append(charts_row)
-        elements.append(Spacer(1, 0.3 * inch))
+        elements.append(Spacer(1, 0.2 * inch))
         elements.append(self._create_footer())
         return elements
 
     def _create_summary_box(self, title, data, bgcolor):
+        makes = getattr(data, "makes", 0) if data else 0
+        attempts = getattr(data, "attempts", 0) if data else 0
+        fg_pct = getattr(data, "fg_pct", 0) if data else 0
+        pps = getattr(data, "pps", 0) if data else 0
+        freq = getattr(data, "freq", 0) if data else 0
         box = Table(
             [
                 [title],
                 ["FGA", "FG%", "PPS", "Freq%"],
                 [
-                    data.get("fga", "0-0"),
-                    f"{data.get('fg_pct', 0)}%",
-                    data.get("pps", 0),
-                    f"{data.get('freq', 0)}%",
+                    f"{makes}-{attempts}",
+                    f"{fg_pct:.1f}%",
+                    f"{pps:.2f}",
+                    f"{freq:.1f}%",
                 ],
             ],
             colWidths=[0.55 * inch] * 4,
@@ -192,7 +158,7 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                 ]
             )
@@ -262,8 +228,38 @@ class ShotTypeReportGenerator:
             ParagraphStyle("footer", alignment=TA_CENTER, fontSize=10, textColor=self.medium_gray),
         )
 
+    @staticmethod
+    def _format_pct(value: float) -> str:
+        pct_value = float(value or 0)
+        if pct_value <= 1:
+            pct_value *= 100
+        return f"{pct_value:.1f}%"
+
     def _header_style(self):
-        return ParagraphStyle("page_header", fontSize=12, textColor=self.crimson, alignment=TA_CENTER)
+        return ParagraphStyle("page_header", fontSize=10, textColor=self.crimson, alignment=TA_CENTER)
+
+    @staticmethod
+    def _grade_fill(metric_key: str, value: float) -> colors.Color | None:
+        token = grade_token(metric_key, value)
+        if not token:
+            return None
+        token_parts = token.split()
+        token_value = next((part for part in token_parts if part.startswith("grade-token--")), None)
+        palette = {
+            "grade-token--0": "#ff5050",
+            "grade-token--1": "#ff8c8c",
+            "grade-token--2": "#ffb4b4",
+            "grade-token--3": "#fff5a8",
+            "grade-token--4": "#ffe138",
+            "grade-token--5": "#bef9be",
+            "grade-token--6": "#aaeeaa",
+            "grade-token--7": "#8cd98c",
+            "grade-token--8": "#64c064",
+        }
+        color_hex = palette.get(token_value)
+        if not color_hex:
+            return None
+        return colors.HexColor(color_hex)
 
     def _create_breakdown_header(self, title: str):
         header_table = Table(
@@ -276,68 +272,154 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (0, 0), "LEFT"),
                     ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                     ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 11),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
                     ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                 ]
             )
         )
         return header_table
 
     def _create_player_summary(self, shot_type: str):
-        data = self.player_data.get(shot_type, {})
-        total = data.get("total", {})
-        transition = data.get("transition", {})
-        half_court = data.get("half_court", {})
+        shot_type_totals = self.player_data.get("shot_type_totals")
+        shot_summaries = self.player_data.get("shot_summaries", {})
+        summary_key = {"atr": "atr", "2fg": "fg2", "3fg": "fg3"}.get(shot_type, shot_type)
+        summary = shot_summaries.get(summary_key)
+        total = summary.total if summary else None
+        transition = summary.transition if summary else None
+        half_court = summary.halfcourt if summary else None
+        totals_bucket = getattr(shot_type_totals, summary_key, None) if shot_type_totals else None
 
         number = self.player_data.get("number") or ""
         name = self.player_data.get("name") or "N/A"
         player_name = f"#{number} {name}".strip().replace("# ", "")
+        total_freq = getattr(totals_bucket, "freq", None) if totals_bucket else None
         summary_table = Table(
             [
                 ["", "TOTALS", "", "", "", "TRANSITION", "", "", "", "HALF COURT", "", "", ""],
                 ["PLAYER", "FGA", "FG%", "PPS", "Freq%", "FGA", "FG%", "PPS", "Freq%", "FGA", "FG%", "PPS", "Freq%"],
                 [
                     player_name,
-                    total.get("fga", "0-0"),
-                    f"{total.get('fg_pct', 0)}%",
-                    total.get("pps", 0),
-                    f"{total.get('freq', 0)}%",
-                    transition.get("fga", "0-0"),
-                    f"{transition.get('fg_pct', 0)}%",
-                    transition.get("pps", 0),
-                    f"{transition.get('freq', 0)}%",
-                    half_court.get("fga", "0-0"),
-                    f"{half_court.get('fg_pct', 0)}%",
-                    half_court.get("pps", 0),
-                    f"{half_court.get('freq', 0)}%",
+                    f"{getattr(total, 'makes', 0)}-{getattr(total, 'attempts', 0)}",
+                    self._format_pct(getattr(total, "fg_pct", 0)),
+                    f"{getattr(total, 'pps', 0):.2f}",
+                    f"{total_freq:.1f}%" if total_freq is not None else "—",
+                    f"{getattr(transition, 'makes', 0)}-{getattr(transition, 'attempts', 0)}",
+                    self._format_pct(getattr(transition, "fg_pct", 0)),
+                    f"{getattr(transition, 'pps', 0):.2f}",
+                    "—",
+                    f"{getattr(half_court, 'makes', 0)}-{getattr(half_court, 'attempts', 0)}",
+                    self._format_pct(getattr(half_court, "fg_pct", 0)),
+                    f"{getattr(half_court, 'pps', 0):.2f}",
+                    "—",
                 ],
             ],
             colWidths=[1.2 * inch] + [0.6 * inch] * 12,
         )
-        summary_table.setStyle(
-            TableStyle(
-                [
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-                    ("BACKGROUND", (1, 0), (4, 0), self.light_gray),
-                    ("BACKGROUND", (5, 0), (8, 0), self.light_gray),
-                    ("BACKGROUND", (9, 0), (12, 0), self.light_gray),
-                    ("SPAN", (1, 0), (4, 0)),
-                    ("SPAN", (5, 0), (8, 0)),
-                    ("SPAN", (9, 0), (12, 0)),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("ALIGN", (0, 1), (0, -1), "LEFT"),
-                    ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ]
-            )
-        )
+        grade_metric = {"atr": "atr2fg_pct", "fg2": "fg2_pct", "fg3": "fg3_pct"}.get(summary_key)
+        style_commands = [
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BACKGROUND", (1, 0), (4, 0), self.light_gray),
+            ("BACKGROUND", (5, 0), (8, 0), self.light_gray),
+            ("BACKGROUND", (9, 0), (12, 0), self.light_gray),
+            ("SPAN", (1, 0), (4, 0)),
+            ("SPAN", (5, 0), (8, 0)),
+            ("SPAN", (9, 0), (12, 0)),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 1), (0, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ]
+        fg_total = getattr(total, "fg_pct", 0)
+        fg_transition = getattr(transition, "fg_pct", 0)
+        fg_halfcourt = getattr(half_court, "fg_pct", 0)
+        pps_total = getattr(total, "pps", 0)
+        pps_transition = getattr(transition, "pps", 0)
+        pps_halfcourt = getattr(half_court, "pps", 0)
+        fg_cells = [(2, fg_total), (6, fg_transition), (10, fg_halfcourt)]
+        pps_cells = [(3, pps_total), (7, pps_transition), (11, pps_halfcourt)]
+        if grade_metric:
+            for col, value in fg_cells:
+                fill = self._grade_fill(grade_metric, value)
+                if fill:
+                    style_commands.append(("BACKGROUND", (col, 2), (col, 2), fill))
+        for col, value in pps_cells:
+            fill = self._grade_fill("pps", value)
+            if fill:
+                style_commands.append(("BACKGROUND", (col, 2), (col, 2), fill))
+        summary_table.setStyle(TableStyle(style_commands))
         return summary_table
 
     def _create_breakdown_table(self, shot_type: str):
-        breakdown = self.player_data.get(shot_type, {}).get("breakdown", {})
+        shot_summaries = self.player_data.get("shot_summaries", {})
+        summary_key = {"atr": "atr", "2fg": "fg2", "3fg": "fg3"}.get(shot_type, shot_type)
+        summary = shot_summaries.get(summary_key)
+        breakdown = summary.cats if summary else {}
+        empty_bucket = SimpleNamespace(
+            total=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0),
+            transition=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0),
+            halfcourt=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0),
+        )
+        if shot_type == "atr":
+            groups = [
+                ("Assisted", ["Assisted", "Non-Assisted"]),
+                ("Dribble", ["Dribble", "No Dribble"]),
+                ("RA", ["Restricted Area", "Non Restricted Area"]),
+                ("Feet", ["Off 1 Foot", "Off 2 Feet"]),
+                ("Hands", ["Left Hand Finish", "Right Hand Finish", "Hands To Rim", "Hands Away From Rim"]),
+                ("PA", ["Play Action", "No Play Action"]),
+                ("Defenders", ["Primary Defender", "Secondary Defender", "Multiple Defenders", "Unguarded"]),
+                ("Type", ["Dunk", "Catch", "Floater", "Layup", "Turnaround J", "Pull Up", "Step Back"]),
+                ("Other", ["Blocked"]),
+                ("Scheme – Drive", ["Middle Drive", "Baseline Drive", "Slot Drive", "Drive Right", "Drive Left"]),
+                ("Scheme – Attack", ["Beast / Post", "DHO / Get", "Iso", "PnR Handler", "Off Closeout", "PnR Sneak", "Transition Push", "OREB Putback"]),
+                ("Scheme – Pass", [
+                    "Swing", "Check Down", "Off Screen", "1 More", "Lift", "PnR Pocket", "Post Entry", "Drift", "PnR Lob", "Post Pass Out", "Kickdown",
+                    "PnR Late Roll", "Dump Off", "Slot Skip", "Pocket Extra", "Lob", "Nail Pitch", "DHO / Get", "PnR Pop", "Slash / Cut", "Reshape",
+                    "Shake", "Skip", "Pull Behind", "Outlet", "Press Break", "Cross Court", "Under OB", "Kick Ahead", "Dagger", "Side / Press OB",
+                ]),
+            ]
+        elif shot_type == "2fg":
+            groups = [
+                ("Assisted", ["Assisted", "Non-Assisted"]),
+                ("Dribble", ["Dribble", "No Dribble"]),
+                ("RA", ["Restricted Area", "Non Restricted Area"]),
+                ("Feet", ["Off 1 Foot", "Off 2 Feet"]),
+                ("Hands", ["Left Hand Finish", "Right Hand Finish", "Hands To Rim", "Hands Away From Rim"]),
+                ("PA", ["Play Action", "No Play Action"]),
+                ("Defenders", ["Primary Defender", "Secondary Defender", "Multiple Defenders", "Unguarded"]),
+                ("Type", ["Dunk", "Catch", "Floater", "Layup", "Turnaround J", "Pull Up", "Step Back"]),
+                ("Other", ["Blocked"]),
+                ("Scheme – Drive", ["Middle Drive", "Baseline Drive", "Slot Drive", "Drive Right", "Drive Left"]),
+                ("Scheme – Attack", ["Beast / Post", "DHO / Get", "Iso", "PnR Handler", "Off Closeout", "PnR Sneak", "Transition Push", "OREB Putback"]),
+                ("Scheme – Pass", [
+                    "Swing", "Check Down", "Off Screen", "1 More", "Lift", "PnR Pocket", "Post Entry", "Drift", "PnR Lob", "Post Pass Out", "Kickdown",
+                    "PnR Late Roll", "Dump Off", "Slot Skip", "Pocket Extra", "Lob", "Nail Pitch", "DHO / Get", "PnR Pop", "Slash / Cut", "Reshape",
+                    "Shake", "Skip", "Pull Behind", "Outlet", "Press Break", "Cross Court", "Under OB", "Kick Ahead", "Dagger", "Side / Press OB",
+                ]),
+            ]
+        else:
+            groups = [
+                ("Assisted", ["Assisted", "Non-Assisted"]),
+                ("Type", ["Catch and Shoot", "Pull Up", "Step Back", "Catch and Hold", "Slide Dribble"]),
+                ("Line", ["On The Line", "Off The Line"]),
+                ("Pocket", ["Shot Pocket", "Non-Shot Pocket"]),
+                ("Move", ["Stationary", "On Move"]),
+                ("Balance", ["On Balance", "Off Balance"]),
+                ("Contested", ["Contested", "Uncontested", "Late Contest", "Blocked"]),
+                ("Footwork", ["WTN Left-Right", "WTN Right-Left", "Left-Right", "Right-Left", "Hop"]),
+                ("Good/Bad", ["Good", "Bad", "Neutral Three"]),
+                ("Shrink", ["Shrink", "Non-Shrink"]),
+                ("Scheme – Attack", ["Beast / Post", "DHO / Get", "PnR Handler", "Iso", "Off Closeout", "PnR Sneak", "Transition Push", "OREB Putback"]),
+                ("Scheme – Drive", ["Drive Right", "Drive Left", "Dip"]),
+                ("Scheme – Pass", [
+                    "Swing", "Checkdown", "Off Screen", "1 More", "Lift", "Drift", "Post Entry", "Post Pass Out",
+                    "Kickdown", "Slot Skip", "Pocket Extra", "Lob", "Nail Pitch", "DHO / Get", "PnR Pop", "Reshape", "Shake", "Skip",
+                    "Pull Behind", "Outlet", "Press Break", "Cross Court", "Under OB", "Kick Ahead", "Dagger", "Side / Press OB",
+                ]),
+            ]
         header_row = [
             "BREAKDOWN",
             "TOTALS",
@@ -369,51 +451,44 @@ class ShotTypeReportGenerator:
             "Freq",
         ]
         rows = [header_row, subheader_row]
-
         row_keys = []
-        for label_key, buckets in breakdown.items():
-            total = buckets.get("total", {})
-            transition = buckets.get("transition", {})
-            half_court = buckets.get("half_court", {})
-            row_keys.append(label_key)
-            rows.append(
-                [
-                    label_key.replace("_", " ").title(),
-                    total.get("fga", "0-0"),
-                    f"{total.get('fg_pct', 0)}%",
-                    total.get("pps", 0),
-                    f"{total.get('freq', 0)}%",
-                    transition.get("fga", "0-0"),
-                    f"{transition.get('fg_pct', 0)}%",
-                    transition.get("pps", 0),
-                    f"{transition.get('freq', 0)}%",
-                    half_court.get("fga", "0-0"),
-                    f"{half_court.get('fg_pct', 0)}%",
-                    half_court.get("pps", 0),
-                    f"{half_court.get('freq', 0)}%",
-                ]
-            )
+        data_row_indices = []
+        divider_rows = []
+        for _group_name, categories in groups:
+            divider_rows.append(len(rows))
+            rows.append([""] * 13)
+            for label_key in categories:
+                buckets = breakdown.get(label_key, empty_bucket)
+                total = buckets.total
+                transition = buckets.transition
+                half_court = buckets.halfcourt
+                row_keys.append(label_key)
+                data_row_indices.append(len(rows))
+                rows.append(
+                    [
+                        label_key,
+                        f"{total.makes}-{total.attempts}",
+                        f"{total.fg_pct * 100:.1f}%",
+                        f"{total.pps:.2f}",
+                        "—",
+                        f"{transition.makes}-{transition.attempts}",
+                        f"{transition.fg_pct * 100:.1f}%",
+                        f"{transition.pps:.2f}",
+                        "—",
+                        f"{half_court.makes}-{half_court.attempts}",
+                        f"{half_court.fg_pct * 100:.1f}%",
+                        f"{half_court.pps:.2f}",
+                        "—",
+                    ]
+                )
 
-        if not row_keys:
-            rows.append(
-                [
-                    "No data",
-                    "0-0",
-                    "0%",
-                    0,
-                    "0%",
-                    "0-0",
-                    "0%",
-                    0,
-                    "0%",
-                    "0-0",
-                    "0%",
-                    0,
-                    "0%",
-                ]
-            )
-
-        table = Table(rows, colWidths=[1.6 * inch] + [0.45 * inch] * 12)
+        row_heights = []
+        for idx in range(len(rows)):
+            if idx in divider_rows:
+                row_heights.append(3)
+            else:
+                row_heights.append(None)
+        table = Table(rows, colWidths=[1.6 * inch] + [0.45 * inch] * 12, rowHeights=row_heights)
         style_commands = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
             ("SPAN", (1, 0), (4, 0)),
@@ -423,18 +498,26 @@ class ShotTypeReportGenerator:
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("ALIGN", (0, 2), (0, -1), "LEFT"),
             ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("FONTSIZE", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
         ]
 
-        for row_idx, row_key in enumerate(row_keys, start=2):
-            for col_offset, bucket_key in ((2, "total"), (6, "transition"), (10, "half_court")):
-                fg_pct = breakdown.get(row_key, {}).get(bucket_key, {}).get("fg_pct", 0)
-                fg_pct = float(fg_pct or 0)
-                # Adjust color thresholds here to change green/red cutoffs for FG%.
-                if fg_pct >= 70:
-                    style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), self.green))
-                elif fg_pct <= 30:
-                    style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), self.red))
+        for row_idx in divider_rows:
+            style_commands.append(("BACKGROUND", (0, row_idx), (-1, row_idx), self.crimson))
+            style_commands.append(("GRID", (0, row_idx), (-1, row_idx), 0, colors.white))
+
+        grade_metric = {"atr": "atr2fg_pct", "2fg": "fg2_pct", "3fg": "fg3_pct"}.get(shot_type)
+        for row_idx, row_key in zip(data_row_indices, row_keys):
+            for col_offset, bucket_key in ((2, "total"), (6, "transition"), (10, "halfcourt")):
+                bucket = getattr(breakdown.get(row_key), bucket_key, None)
+                if grade_metric:
+                    fg_fill = self._grade_fill(grade_metric, getattr(bucket, "fg_pct", 0))
+                    if fg_fill:
+                        style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), fg_fill))
+                pps_fill = self._grade_fill("pps", getattr(bucket, "pps", 0))
+                if pps_fill:
+                    style_commands.append(("BACKGROUND", (col_offset + 1, row_idx), (col_offset + 1, row_idx), pps_fill))
 
         table.setStyle(TableStyle(style_commands))
         return table
@@ -442,11 +525,11 @@ class ShotTypeReportGenerator:
     def _create_atr_page(self):
         elements = [
             self._create_breakdown_header("At The Rim | Individual Breakdown"),
-            Spacer(1, 0.15 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_player_summary("atr"),
-            Spacer(1, 0.2 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_breakdown_table("atr"),
-            Spacer(1, 0.2 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_footer(),
         ]
         return elements
@@ -454,11 +537,11 @@ class ShotTypeReportGenerator:
     def _create_2fg_page(self):
         elements = [
             self._create_breakdown_header("Non-ATR 2FG | Individual Breakdown"),
-            Spacer(1, 0.15 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_player_summary("2fg"),
-            Spacer(1, 0.2 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_breakdown_table("2fg"),
-            Spacer(1, 0.2 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_footer(),
         ]
         return elements
@@ -466,11 +549,11 @@ class ShotTypeReportGenerator:
     def _create_3fg_page(self):
         elements = [
             self._create_breakdown_header("3FG Shots | Individual Breakdown"),
-            Spacer(1, 0.15 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_player_summary("3fg"),
-            Spacer(1, 0.2 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_breakdown_table("3fg"),
-            Spacer(1, 0.2 * inch),
+            Spacer(1, 0.1 * inch),
             self._create_footer(),
         ]
         return elements
