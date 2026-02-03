@@ -53,6 +53,8 @@ class ShotTypeReportGenerator:
         
         self.section_space_before = 16
         self.section_space_after = 16
+        self.section_space_before_tight = max(0, self.section_space_before - 4)
+        self.section_space_after_tight = max(0, self.section_space_after - 4)
         self.off_dribble_extra_space = 4
         self.off_pass_extra_space = 0
         self.group_spacing = 2
@@ -686,7 +688,15 @@ class ShotTypeReportGenerator:
             break_indices.append(row_cursor - 1)
         return break_indices
 
-    def _create_columns_layout(self, shot_type, left_sections, right_sections, max_pass_rows=None):
+    def _create_columns_layout(
+        self,
+        shot_type,
+        left_sections,
+        right_sections,
+        max_pass_rows=None,
+        section_space_before=None,
+        section_space_after=None,
+    ):
         usable_width = self.width - (2 * self.margin)
         col_width = usable_width / 2
 
@@ -732,10 +742,14 @@ class ShotTypeReportGenerator:
         left_content = self._stack_sections(
             left_blocks,
             extra_spacing={"OFF DRIBBLE TYPE": self.off_dribble_extra_space},
+            section_space_before=section_space_before,
+            section_space_after=section_space_after,
         )
         right_content = self._stack_sections(
             right_blocks,
             extra_spacing={"OFF PASS TYPE": self.off_pass_extra_space},
+            section_space_before=section_space_before,
+            section_space_after=section_space_after,
         )
 
         table = Table(
@@ -1080,6 +1094,8 @@ class ShotTypeReportGenerator:
                 right_sections=[
                     ("OFF PASS TYPE", self.off_pass_type_order),
                 ],
+                section_space_before=self.section_space_before_tight,
+                section_space_after=self.section_space_after_tight,
             ),
             Spacer(1, self.columns_footer_spacer),
             self._create_footer(3, "Non-ATR 2FG"),
@@ -1134,27 +1150,59 @@ class ShotTypeReportGenerator:
             if not self._has_main_content(page):
                 raise ValueError("Each page must contain main content.")
 
-    def _stack_sections(self, sections, extra_spacing=None):
+    def _stack_sections(self, sections, extra_spacing=None, section_space_before=None, section_space_after=None):
         flowables = []
         extra_spacing = extra_spacing or {}
+        section_space_before = self.section_space_before if section_space_before is None else section_space_before
+        section_space_after = self.section_space_after if section_space_after is None else section_space_after
         for table, _labels in sections:
             section_title = table._cellvalues[0][0] if table._cellvalues else ""
-            space_before = self.section_space_before + extra_spacing.get(section_title, 0)
+            space_before = section_space_before + extra_spacing.get(section_title, 0)
             flowables.append(Spacer(1, space_before))
             flowables.append(table)
-            flowables.append(Spacer(1, self.section_space_after))
+            flowables.append(Spacer(1, section_space_after))
         return flowables
 
-    def _section_height(self, label_count: int, row_height: float, extra_before: float = 0) -> float:
-        return self.section_space_before + extra_before + self.section_space_after + (row_height * (label_count + 2))
+    def _section_height(
+        self,
+        label_count: int,
+        row_height: float,
+        extra_before: float = 0,
+        section_space_before: float | None = None,
+        section_space_after: float | None = None,
+    ) -> float:
+        section_space_before = self.section_space_before if section_space_before is None else section_space_before
+        section_space_after = self.section_space_after if section_space_after is None else section_space_after
+        return section_space_before + extra_before + section_space_after + (row_height * (label_count + 2))
 
     def _validate_layout(self) -> None:
         pages = self._page_sequence()
         self._validate_page_content(pages)
-        for shot_type, left_sections, right_sections, max_pass_rows in (
-            ("atr", [("BREAKDOWN", self.atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], None),
-            ("2fg", [("BREAKDOWN", self.non_atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], None),
-            ("3fg", [("BREAKDOWN", self.three_breakdown_order), ("OFF DRIBBLE TYPE", self.three_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], 24),
+        for shot_type, left_sections, right_sections, max_pass_rows, section_space_before, section_space_after in (
+            (
+                "atr",
+                [("BREAKDOWN", self.atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)],
+                [("OFF PASS TYPE", self.off_pass_type_order)],
+                None,
+                None,
+                None,
+            ),
+            (
+                "2fg",
+                [("BREAKDOWN", self.non_atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)],
+                [("OFF PASS TYPE", self.off_pass_type_order)],
+                None,
+                self.section_space_before_tight,
+                self.section_space_after_tight,
+            ),
+            (
+                "3fg",
+                [("BREAKDOWN", self.three_breakdown_order), ("OFF DRIBBLE TYPE", self.three_off_dribble_order)],
+                [("OFF PASS TYPE", self.off_pass_type_order)],
+                24,
+                None,
+                None,
+            ),
         ):
             col_height = self._available_column_height()
             if col_height <= 0:
@@ -1172,7 +1220,13 @@ class ShotTypeReportGenerator:
                 else:
                     row_height = self.breakdown_row_height
                     extra_before = 0
-                left_height += self._section_height(len(labels), row_height, extra_before)
+                left_height += self._section_height(
+                    len(labels),
+                    row_height,
+                    extra_before,
+                    section_space_before=section_space_before,
+                    section_space_after=section_space_after,
+                )
             right_height = 0
             for title, labels in right_sections:
                 if title == "OFF PASS TYPE" and max_pass_rows:
@@ -1186,6 +1240,12 @@ class ShotTypeReportGenerator:
                 else:
                     row_height = self.breakdown_row_height
                     extra_before = 0
-                right_height += self._section_height(len(labels), row_height, extra_before)
+                right_height += self._section_height(
+                    len(labels),
+                    row_height,
+                    extra_before,
+                    section_space_before=section_space_before,
+                    section_space_after=section_space_after,
+                )
             if left_height > col_height or right_height > col_height:
                 raise ValueError(f"{shot_type} column content exceeds available height.")
