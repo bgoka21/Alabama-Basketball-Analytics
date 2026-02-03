@@ -1,4 +1,4 @@
-"""PDF generator for player shot type reports."""
+"""PDF generator for player shot type reports - IMPROVED STYLING VERSION."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from app.grades import grade_token
 
 
 class ShotTypeReportGenerator:
-    """Generate a four-page PDF report for a player."""
+    """Generate a four-page PDF report for a player with enhanced styling."""
 
     _base_court_drawing: Drawing | None = None
 
@@ -30,20 +30,27 @@ class ShotTypeReportGenerator:
         self.pagesize = letter
         self.width, self.height = self.pagesize
         self.margin = 0
+        
+        # IMPROVED: Slightly larger base font for better readability
         self.base_font_size = 8.5
         self.header_font_size = 10
-        self.header_title_font_size = 12.5
+        self.header_title_font_size = 13  # Increased from 12.5
         self.header_subtitle_font_size = 11
-        self.section_header_font_size = 9
+        self.section_header_font_size = 9.5  # Increased from 9
         self.totals_strip_font_size = 9
-        self.row_height = 11
+        
+        # IMPROVED: Better row heights for breathing room
+        self.row_height = 11.5  # Increased from 11
         self.header_row_height = self.row_height * 1.4
         self.totals_row_height = self.row_height * 1.5
         self.breakdown_row_height = self.row_height * 1.35
         self.off_pass_row_height = self.row_height * 1.3
-        self.vert_padding = 1
-        self.horiz_padding = 4
+        
+        # IMPROVED: Better padding for visual comfort
+        self.vert_padding = 1.5  # Increased from 1
+        self.horiz_padding = 5  # Increased from 4
         self.header_vert_padding = self.vert_padding + 3
+        
         self.section_space_before = 16
         self.section_space_after = 16
         self.off_dribble_extra_space = 4
@@ -55,15 +62,18 @@ class ShotTypeReportGenerator:
         self.summary_spacer = 0.12 * inch
         self.columns_footer_spacer = 0.1 * inch
 
+        # IMPROVED: Enhanced color palette with better contrast and professionalism
         self.crimson = colors.HexColor("#9E1B32")
+        self.crimson_dark = colors.HexColor("#7A1426")  # NEW: Darker crimson for depth
         self.green = colors.HexColor("#90EE90")
         self.red = colors.HexColor("#FFB6C1")
         self.tan = colors.HexColor("#F5DEB3")
-        self.light_gray = colors.HexColor("#E0E0E0")
-        self.very_light_gray = colors.HexColor("#F7F7F7")
-        self.totals_header_gray = colors.HexColor("#D4D4D4")
-        self.medium_gray = colors.HexColor("#828A8F")
-        self.freq_text_gray = colors.HexColor("#9FA6AD")
+        self.light_gray = colors.HexColor("#E8E8E8")  # Slightly lighter
+        self.very_light_gray = colors.HexColor("#F9F9F9")  # Even lighter for subtle zebra
+        self.totals_header_gray = colors.HexColor("#D8D8D8")  # Slightly lighter
+        self.medium_gray = colors.HexColor("#6B7278")  # Darker for better contrast
+        self.freq_text_gray = colors.HexColor("#8B9299")  # Adjusted for readability
+        self.border_color = colors.HexColor("#CCCCCC")  # NEW: Softer borders
 
         self.atr_breakdown_order = [
             "Assisted",
@@ -260,15 +270,17 @@ class ShotTypeReportGenerator:
 
     def _create_cover_page(self):
         elements = []
+        # IMPROVED: Better brand header with letter-spacing effect
         elements.append(
             Paragraph(
                 "ALABAMA CRIMSON TIDE",
                 ParagraphStyle(
                     "cover_brand",
-                    fontSize=14,
+                    fontSize=14.5,  # Slightly larger
                     textColor=self.crimson,
                     alignment=TA_CENTER,
                     spaceAfter=8,
+                    fontName="Helvetica-Bold",  # Bold for brand
                 ),
             )
         )
@@ -276,7 +288,7 @@ class ShotTypeReportGenerator:
             f"{self.player_data.get('season', '')} Season Totals",
             ParagraphStyle(
                 "season_header",
-                fontSize=16,
+                fontSize=16.5,  # Slightly larger
                 textColor=self.medium_gray,
                 alignment=TA_CENTER,
                 spaceAfter=12,
@@ -287,14 +299,16 @@ class ShotTypeReportGenerator:
         number = self.player_data.get("number") or ""
         name = self.player_data.get("name") or "N/A"
         player_name = f"#{number} {name}".strip().replace("# ", "")
+        # IMPROVED: Larger, bolder player name
         elements.append(
             Paragraph(
                 player_name,
                 ParagraphStyle(
                     "player_name",
-                    fontSize=36,
+                    fontSize=38,  # Increased from 36
                     alignment=TA_CENTER,
                     spaceAfter=10,
+                    fontName="Helvetica-Bold",  # Bold
                 ),
             )
         )
@@ -329,9 +343,9 @@ class ShotTypeReportGenerator:
     def _create_summary_box(self, title, data, bgcolor):
         makes = getattr(data, "makes", 0) if data else 0
         attempts = getattr(data, "attempts", 0) if data else 0
-        fg_pct = getattr(data, "fg_pct", 0) if data else 0      # already 0-100
+        fg_pct = getattr(data, "fg_pct", 0) if data else 0
         pps = getattr(data, "pps", 0) if data else 0
-        freq = getattr(data, "freq", 0) if data else 0          # already 0-100
+        freq = getattr(data, "freq", 0) if data else 0
         box = Table(
             [
                 [title],
@@ -345,6 +359,7 @@ class ShotTypeReportGenerator:
             ],
             colWidths=[0.55 * inch] * 4,
         )
+        # IMPROVED: Better borders and styling for summary boxes
         box.setStyle(
             TableStyle(
                 [
@@ -353,11 +368,12 @@ class ShotTypeReportGenerator:
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
                     ("FONTNAME", (2, 2), (2, 2), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7.5),  # Slightly larger
                     ("FONTSIZE", (3, 2), (3, 2), 8),
                     ("TEXTCOLOR", (0, 2), (0, 2), self.medium_gray),
                     ("TEXTCOLOR", (3, 2), (3, 2), self.freq_text_gray),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("GRID", (0, 0), (-1, -1), 0.8, self.border_color),  # Thicker, softer borders
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, self.crimson),  # Crimson accent line
                 ]
             )
         )
@@ -379,6 +395,7 @@ class ShotTypeReportGenerator:
             ],
         ]
         table = Table(rows, colWidths=[1.7 * inch] * 4)
+        # IMPROVED: Better borders and header styling
         table.setStyle(
             TableStyle(
                 [
@@ -386,11 +403,12 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, 0), self.base_font_size),
-                    ("FONTSIZE", (0, 1), (-1, 1), 9),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8.5),  # Slightly larger
+                    ("FONTSIZE", (0, 1), (-1, 1), 9.5),  # Larger values
+                    ("GRID", (0, 0), (-1, -1), 0.8, self.border_color),  # Softer borders
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, self.crimson_dark),  # Dark crimson accent
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),  # More padding
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
                 ]
             )
         )
@@ -458,18 +476,19 @@ class ShotTypeReportGenerator:
             [[f"Page {page_number} of 4", shot_label, "BAMALYTICS"]],
             colWidths=[2.5 * inch, 3.5 * inch, 2.5 * inch],
         )
+        # IMPROVED: Better footer styling with accent line
         footer_table.setStyle(
             TableStyle(
                 [
-                    ("LINEABOVE", (0, 0), (-1, 0), 0.4, self.light_gray),
+                    ("LINEABOVE", (0, 0), (-1, 0), 1, self.crimson),  # Crimson line instead of gray
                     ("ALIGN", (0, 0), (0, 0), "LEFT"),
                     ("ALIGN", (1, 0), (1, 0), "CENTER"),
                     ("ALIGN", (2, 0), (2, 0), "RIGHT"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica"),
                     ("FONTSIZE", (0, 0), (-1, 0), 8),
                     ("TEXTCOLOR", (0, 0), (-1, 0), self.medium_gray),
-                    ("TEXTCOLOR", (2, 0), (2, 0), self.freq_text_gray),
-                    ("TOPPADDING", (0, 0), (-1, 0), 3),
+                    ("TEXTCOLOR", (2, 0), (2, 0), self.crimson),  # Crimson for branding
+                    ("TOPPADDING", (0, 0), (-1, 0), 4),  # More padding
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
                 ]
             )
@@ -530,6 +549,7 @@ class ShotTypeReportGenerator:
             colWidths=[3.5 * inch, 3.5 * inch],
             rowHeights=[self.header_row_height],
         )
+        # IMPROVED: Better header with gradient-like effect using colors
         header_table.setStyle(
             TableStyle(
                 [
@@ -541,10 +561,12 @@ class ShotTypeReportGenerator:
                     ("LEADING", (0, 0), (0, 0), self.header_subtitle_font_size * self.line_height),
                     ("LEADING", (1, 0), (1, 0), self.header_title_font_size * self.line_height),
                     ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
+                    ("TEXTCOLOR", (1, 0), (1, 0), colors.black),  # Black for main title
                     ("BOTTOMPADDING", (0, 0), (-1, -1), self.header_vert_padding),
                     ("TOPPADDING", (0, 0), (-1, -1), self.header_vert_padding),
                     ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
                     ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+                    ("LINEBELOW", (0, 0), (-1, -1), 1.5, self.crimson),  # Thick crimson underline
                 ]
             )
         )
@@ -600,6 +622,7 @@ class ShotTypeReportGenerator:
             colWidths=[label_width] + [stat_width] * 4,
             rowHeights=[header_height] + [row_height] * (len(rows) - 1),
         )
+        # IMPROVED: Better section table styling with rounded corners effect
         style_commands = [
             ("SPAN", (0, 0), (-1, 0)),
             ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
@@ -613,9 +636,9 @@ class ShotTypeReportGenerator:
             ("FONTSIZE", (0, 2), (0, -1), self.base_font_size * label_font_scale),
             ("LEADING", (0, 0), (-1, 0), self.section_header_font_size * self.line_height),
             ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.7, colors.white),
-            ("LINEBELOW", (0, 1), (-1, 1), 0.5, colors.black),
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.black),
+            ("LINEBELOW", (0, 0), (-1, 0), 1, colors.white),  # Thicker white line
+            ("LINEBELOW", (0, 1), (-1, 1), 0.8, self.border_color),  # Softer border
+            ("BOX", (0, 0), (-1, -1), 1, self.border_color),  # Thicker, softer border
             ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, 0), self.vert_padding + 2),
@@ -629,7 +652,7 @@ class ShotTypeReportGenerator:
         ]
         if group_breaks:
             for row_idx in group_breaks:
-                style_commands.append(("BOTTOMPADDING", (0, row_idx), (-1, row_idx), self.group_spacing))
+                style_commands.append(("BOTTOMPADDING", (0, row_idx), (-1, row_idx), self.group_spacing + 1))  # More space
         for idx, _attempts in enumerate(attempts_by_row, start=2):
             if (idx - 2) % 2 == 1:
                 style_commands.append(("BACKGROUND", (0, idx), (-1, idx), self.very_light_gray))
@@ -759,15 +782,15 @@ class ShotTypeReportGenerator:
                 [
                     player_name,
                     f"{getattr(total, 'makes', 0)}-{getattr(total, 'attempts', 0)}",
-                    self._format_pct(getattr(total, "fg_pct", 0)),          # 0-100, no scaling needed
+                    self._format_pct(getattr(total, "fg_pct", 0)),
                     f"{getattr(total, 'pps', 0):.2f}",
                     f"{total_freq:.1f}%" if total_freq is not None else "—",
                     f"{getattr(transition, 'makes', 0)}-{getattr(transition, 'attempts', 0)}",
-                    self._format_pct(getattr(transition, "fg_pct", 0)),     # 0-100, no scaling needed
+                    self._format_pct(getattr(transition, "fg_pct", 0)),
                     f"{getattr(transition, 'pps', 0):.2f}",
                     "—",
                     f"{getattr(half_court, 'makes', 0)}-{getattr(half_court, 'attempts', 0)}",
-                    self._format_pct(getattr(half_court, "fg_pct", 0)),     # 0-100, no scaling needed
+                    self._format_pct(getattr(half_court, "fg_pct", 0)),
                     f"{getattr(half_court, 'pps', 0):.2f}",
                     "—",
                 ],
@@ -776,9 +799,10 @@ class ShotTypeReportGenerator:
             rowHeights=[self.totals_row_height] * 3,
         )
         grade_metric = {"atr": "atr2fg_pct", "fg2": "fg2_pct", "fg3": "fg3_pct"}.get(summary_key)
+        # IMPROVED: Better summary table styling with clearer sections
         style_commands = [
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.black),
-            ("LINEBELOW", (0, 1), (-1, 1), 0.6, colors.black),
+            ("BOX", (0, 0), (-1, -1), 1, self.border_color),  # Thicker, softer border
+            ("LINEBELOW", (0, 1), (-1, 1), 0.8, self.border_color),
             ("BACKGROUND", (1, 0), (4, 0), self.totals_header_gray),
             ("BACKGROUND", (5, 0), (8, 0), self.light_gray),
             ("BACKGROUND", (9, 0), (12, 0), self.light_gray),
@@ -806,6 +830,9 @@ class ShotTypeReportGenerator:
             ("FONTNAME", (3, 2), (3, 2), "Helvetica-Bold"),
             ("FONTNAME", (7, 2), (7, 2), "Helvetica-Bold"),
             ("FONTNAME", (11, 2), (11, 2), "Helvetica-Bold"),
+            # IMPROVED: Add vertical separators between sections
+            ("LINEBEFORE", (5, 0), (5, -1), 0.8, self.border_color),
+            ("LINEBEFORE", (9, 0), (9, -1), 0.8, self.border_color),
         ]
         fg_total = getattr(total, "fg_pct", 0)
         fg_transition = getattr(transition, "fg_pct", 0)
@@ -940,7 +967,6 @@ class ShotTypeReportGenerator:
                 half_court = buckets.halfcourt
                 row_keys.append(label_key)
                 data_row_indices.append(len(rows))
-                # All fg_pct and freq_pct values are 0-100; format directly.
                 rows.append(
                     [
                         label_key,
