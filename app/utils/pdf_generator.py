@@ -15,14 +15,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-    Paragraph,
-    PageBreak,
-)
+from reportlab.platypus import Spacer, Table, TableStyle, Paragraph
 from app.grades import grade_token
 
 
@@ -208,28 +201,22 @@ class ShotTypeReportGenerator:
     def generate(self) -> bytes:
         """Build all four pages and return PDF bytes."""
         self._validate_layout()
-        pages = self._page_sequence()
-        self._validate_page_content(pages)
-        doc = SimpleDocTemplate(
-            self.buffer,
-            pagesize=self.pagesize,
-            rightMargin=self.margin,
-            leftMargin=self.margin,
-            topMargin=self.margin,
-            bottomMargin=self.margin,
-        )
-        story = self._build_story(pages)
-        doc.build(story, canvasmaker=self._page_count_canvas)
+        pdf_canvas = canvas.Canvas(self.buffer, pagesize=self.pagesize)
+        self._render_cover_page(pdf_canvas)
+        pdf_canvas.showPage()
+        self._render_atr_page(pdf_canvas)
+        pdf_canvas.showPage()
+        self._render_2fg_page(pdf_canvas)
+        pdf_canvas.showPage()
+        self._render_3fg_page(pdf_canvas)
+        pdf_canvas.save()
         pdf_content = self.buffer.getvalue()
         self.buffer.close()
         return pdf_content
 
     def get_story_elements(self):
-        """Return the report's story elements without building a PDF."""
-        # Page layout ordering lives here; adjust the sequence or add new
-        # pages by inserting additional _create_*_page calls into the story.
-        pages = self._page_sequence()
-        return self._build_story(pages)
+        """Return the report's page elements without building a PDF."""
+        return self._page_sequence()
 
     def _page_sequence(self):
         return [
@@ -239,18 +226,27 @@ class ShotTypeReportGenerator:
             self._create_3fg_page(),
         ]
 
-    def _build_story(self, pages):
-        story = []
-        for index, elements in enumerate(pages):
-            story.extend(elements)
-            if index < len(pages) - 1:
-                story.append(self._advance_page(pages[index + 1]))
-        return story
+    def _render_page(self, pdf_canvas: canvas.Canvas, elements):
+        usable_width = self.width - (2 * self.margin)
+        cursor_y = self.height - self.margin
+        for element in elements:
+            _, element_height = element.wrap(usable_width, cursor_y)
+            if cursor_y - element_height < self.margin:
+                raise ValueError("Page content exceeds available height.")
+            cursor_y -= element_height
+            element.drawOn(pdf_canvas, self.margin, cursor_y)
 
-    def _advance_page(self, next_page):
-        if not self._has_main_content(next_page):
-            raise ValueError("Cannot advance to a page without main content.")
-        return PageBreak()
+    def _render_cover_page(self, pdf_canvas: canvas.Canvas) -> None:
+        self._render_page(pdf_canvas, self._create_cover_page())
+
+    def _render_atr_page(self, pdf_canvas: canvas.Canvas) -> None:
+        self._render_page(pdf_canvas, self._create_atr_page())
+
+    def _render_2fg_page(self, pdf_canvas: canvas.Canvas) -> None:
+        self._render_page(pdf_canvas, self._create_2fg_page())
+
+    def _render_3fg_page(self, pdf_canvas: canvas.Canvas) -> None:
+        self._render_page(pdf_canvas, self._create_3fg_page())
 
     def _create_cover_page(self):
         elements = []
@@ -1046,26 +1042,6 @@ class ShotTypeReportGenerator:
             if not self._has_main_content(page):
                 raise ValueError("Each page must contain main content.")
 
-    def _page_count_canvas(self, *args, **kwargs):
-        class PageCountCanvas(canvas.Canvas):
-            def __init__(self, *inner_args, **inner_kwargs):
-                super().__init__(*inner_args, **inner_kwargs)
-                self._page_count = 0
-
-            def showPage(self):
-                self._page_count += 1
-                super().showPage()
-
-            def save(self):
-                page_count = self._page_count
-                if getattr(self, "_pageHasData", False):
-                    page_count += 1
-                if page_count != 4:
-                    raise ValueError("Shot type report must contain exactly 4 pages.")
-                super().save()
-
-        return PageCountCanvas(*args, **kwargs)
-
     def _stack_sections(self, sections):
         flowables = []
         for table, _labels in sections:
@@ -1078,10 +1054,8 @@ class ShotTypeReportGenerator:
         return self.section_space_before + self.section_space_after + (self.row_height * (label_count + 2))
 
     def _validate_layout(self) -> None:
-        story = self.get_story_elements()
-        page_breaks = sum(isinstance(item, PageBreak) for item in story)
-        if page_breaks != 3:
-            raise ValueError("Shot type report must contain exactly 4 pages.")
+        pages = self._page_sequence()
+        self._validate_page_content(pages)
         for shot_type, left_sections, right_sections, max_pass_rows in (
             ("atr", [("BREAKDOWN", self.atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], None),
             ("2fg", [("BREAKDOWN", self.non_atr_breakdown_order), ("OFF DRIBBLE TYPE", self.atr_off_dribble_order)], [("OFF PASS TYPE", self.off_pass_type_order)], None),
