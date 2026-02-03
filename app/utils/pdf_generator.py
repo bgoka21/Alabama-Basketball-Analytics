@@ -135,9 +135,9 @@ class ShotTypeReportGenerator:
     def _create_summary_box(self, title, data, bgcolor):
         makes = getattr(data, "makes", 0) if data else 0
         attempts = getattr(data, "attempts", 0) if data else 0
-        fg_pct = getattr(data, "fg_pct", 0) if data else 0
+        fg_pct = getattr(data, "fg_pct", 0) if data else 0      # already 0-100
         pps = getattr(data, "pps", 0) if data else 0
-        freq = getattr(data, "freq", 0) if data else 0
+        freq = getattr(data, "freq", 0) if data else 0          # already 0-100
         box = Table(
             [
                 [title],
@@ -230,10 +230,8 @@ class ShotTypeReportGenerator:
 
     @staticmethod
     def _format_pct(value: float) -> str:
-        pct_value = float(value or 0)
-        if pct_value <= 1:
-            pct_value *= 100
-        return f"{pct_value:.1f}%"
+        """Format a 0-100 pct value as a string like '60.6%'."""
+        return f"{float(value or 0):.1f}%"
 
     def _header_style(self):
         return ParagraphStyle("page_header", fontSize=10, textColor=self.crimson, alignment=TA_CENTER)
@@ -301,15 +299,15 @@ class ShotTypeReportGenerator:
                 [
                     player_name,
                     f"{getattr(total, 'makes', 0)}-{getattr(total, 'attempts', 0)}",
-                    self._format_pct(getattr(total, "fg_pct", 0)),
+                    self._format_pct(getattr(total, "fg_pct", 0)),          # 0-100, no scaling needed
                     f"{getattr(total, 'pps', 0):.2f}",
                     f"{total_freq:.1f}%" if total_freq is not None else "—",
                     f"{getattr(transition, 'makes', 0)}-{getattr(transition, 'attempts', 0)}",
-                    self._format_pct(getattr(transition, "fg_pct", 0)),
+                    self._format_pct(getattr(transition, "fg_pct", 0)),     # 0-100, no scaling needed
                     f"{getattr(transition, 'pps', 0):.2f}",
                     "—",
                     f"{getattr(half_court, 'makes', 0)}-{getattr(half_court, 'attempts', 0)}",
-                    self._format_pct(getattr(half_court, "fg_pct", 0)),
+                    self._format_pct(getattr(half_court, "fg_pct", 0)),     # 0-100, no scaling needed
                     f"{getattr(half_court, 'pps', 0):.2f}",
                     "—",
                 ],
@@ -358,9 +356,9 @@ class ShotTypeReportGenerator:
         summary = shot_summaries.get(summary_key)
         breakdown = summary.cats if summary else {}
         empty_bucket = SimpleNamespace(
-            total=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0),
-            transition=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0),
-            halfcourt=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0),
+            total=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0, freq_pct=0),
+            transition=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0, freq_pct=0),
+            halfcourt=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0, freq_pct=0),
         )
         if shot_type == "atr":
             groups = [
@@ -464,21 +462,22 @@ class ShotTypeReportGenerator:
                 half_court = buckets.halfcourt
                 row_keys.append(label_key)
                 data_row_indices.append(len(rows))
+                # All fg_pct and freq_pct values are 0-100; format directly.
                 rows.append(
                     [
                         label_key,
                         f"{total.makes}-{total.attempts}",
-                        f"{total.fg_pct * 100:.1f}%",
+                        f"{total.fg_pct:.1f}%",
                         f"{total.pps:.2f}",
-                        "—",
+                        f"{total.freq_pct:.1f}%" if total.attempts else "—",
                         f"{transition.makes}-{transition.attempts}",
-                        f"{transition.fg_pct * 100:.1f}%",
+                        f"{transition.fg_pct:.1f}%",
                         f"{transition.pps:.2f}",
-                        "—",
+                        f"{transition.freq_pct:.1f}%" if transition.attempts else "—",
                         f"{half_court.makes}-{half_court.attempts}",
-                        f"{half_court.fg_pct * 100:.1f}%",
+                        f"{half_court.fg_pct:.1f}%",
                         f"{half_court.pps:.2f}",
-                        "—",
+                        f"{half_court.freq_pct:.1f}%" if half_court.attempts else "—",
                     ]
                 )
 

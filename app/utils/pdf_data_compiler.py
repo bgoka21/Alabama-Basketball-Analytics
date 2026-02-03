@@ -1,12 +1,13 @@
 """Compile player shot data for PDF generation.
-
 These helpers reuse the Shot Type tab data pipeline without recomputing stats.
 """
-
 from __future__ import annotations
+
+import re
 
 from admin.routes import compute_team_shot_details
 from models.database import PlayerStats, Season
+
 
 def compile_player_shot_data(player, db_session):
     """Return full player shot report payload based on Shot Type tab data."""
@@ -18,7 +19,6 @@ def compile_player_shot_data(player, db_session):
             .filter(Season.id == player.season_id)
             .scalar()
         )
-
     stats_rows = (
         db_session.query(PlayerStats)
         .filter(PlayerStats.player_name == player_name)
@@ -26,8 +26,12 @@ def compile_player_shot_data(player, db_session):
     )
     shot_type_totals, shot_summaries = compute_team_shot_details(stats_rows, label_set=None)
 
+    # Strip leading #<number> from the raw DB name so the renderer can
+    # safely reconstruct "#{number} {name}" without doubling.
+    clean_name = re.sub(r"^#\d+\s*", "", player_name)
+
     return {
-        "name": player_name,
+        "name": clean_name,
         "number": _extract_jersey_number(player_name),
         "season": season_name or "",
         "shot_type_totals": shot_type_totals,
