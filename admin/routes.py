@@ -8082,8 +8082,11 @@ def compute_team_shot_details(stats_records, label_set):
 
     # ── Compute fg_pct (0-100) and freq_pct (0-100) on each cat bucket ──
     for stype, bucket in detail_counts.items():
+        totals_by_context = {
+            ctx: direct_counts[stype][ctx]["attempts"]
+            for ctx in ("total", "transition", "halfcourt")
+        }
         for data in bucket.values():
-            total_att_for_cat = data["total"]["attempts"] or 1
             pts = 2 if stype in ("atr", "fg2") else 3
             for ctx in ("total", "transition", "halfcourt"):
                 a = data[ctx]["attempts"]
@@ -8091,7 +8094,8 @@ def compute_team_shot_details(stats_records, label_set):
                 fg = (m / a) if a else 0
                 data[ctx]["fg_pct"] = fg * 100                          # 0-100
                 data[ctx]["pps"] = round(pts * fg, 2) if a else 0
-                data[ctx]["freq_pct"] = (a / total_att_for_cat) * 100   # 0-100
+                total_attempts = totals_by_context[ctx]
+                data[ctx]["freq_pct"] = (a / total_attempts * 100) if total_attempts else 0
 
     shot_summaries = {}
     for stype, bucket in detail_counts.items():
