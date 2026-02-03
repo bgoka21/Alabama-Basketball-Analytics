@@ -39,9 +39,9 @@ class ShotTypeReportGenerator:
         self.base_font_size = 8.5
         self.header_font_size = 10
         self.section_header_font_size = 9
-        self.totals_strip_font_size = 8.5
-        self.row_height = 12
-        self.vert_padding = 2
+        self.totals_strip_font_size = 9
+        self.row_height = 11
+        self.vert_padding = 1
         self.horiz_padding = 4
         self.section_space_before = 6
         self.section_space_after = 4
@@ -55,7 +55,11 @@ class ShotTypeReportGenerator:
         self.red = colors.HexColor("#FFB6C1")
         self.tan = colors.HexColor("#F5DEB3")
         self.light_gray = colors.HexColor("#E0E0E0")
+        self.very_light_gray = colors.HexColor("#F7F7F7")
+        self.zero_row_gray = colors.HexColor("#EFEFEF")
+        self.totals_header_gray = colors.HexColor("#D4D4D4")
         self.medium_gray = colors.HexColor("#828A8F")
+        self.freq_text_gray = colors.HexColor("#9FA6AD")
 
         self.atr_breakdown_order = [
             "Assisted",
@@ -279,9 +283,9 @@ class ShotTypeReportGenerator:
         atr_totals = getattr(shot_type_totals, "atr", None) if shot_type_totals else None
         fg2_totals = getattr(shot_type_totals, "fg2", None) if shot_type_totals else None
         fg3_totals = getattr(shot_type_totals, "fg3", None) if shot_type_totals else None
-        atr_fill = self._grade_fill("atr2fg_pct", getattr(atr_totals, "fg_pct", 0)) or self.light_gray
-        fg2_fill = self._grade_fill("fg2_pct", getattr(fg2_totals, "fg_pct", 0)) or self.light_gray
-        fg3_fill = self._grade_fill("fg3_pct", getattr(fg3_totals, "fg_pct", 0)) or self.light_gray
+        atr_fill = self._soften_color(self._grade_fill("atr2fg_pct", getattr(atr_totals, "fg_pct", 0))) or self.light_gray
+        fg2_fill = self._soften_color(self._grade_fill("fg2_pct", getattr(fg2_totals, "fg_pct", 0))) or self.light_gray
+        fg3_fill = self._soften_color(self._grade_fill("fg3_pct", getattr(fg3_totals, "fg_pct", 0))) or self.light_gray
         summary_boxes = Table(
             [
                 [
@@ -295,7 +299,7 @@ class ShotTypeReportGenerator:
         summary_boxes.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
         elements.append(summary_boxes)
         elements.append(Spacer(1, 0.25 * inch))
-        elements.append(self._create_footer())
+        elements.append(self._create_footer(1, "Season Totals"))
         return elements
 
     def _create_summary_box(self, title, data, bgcolor):
@@ -324,7 +328,11 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+                    ("FONTNAME", (2, 2), (2, 2), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("FONTSIZE", (3, 2), (3, 2), 8),
+                    ("TEXTCOLOR", (0, 2), (0, 2), self.medium_gray),
+                    ("TEXTCOLOR", (3, 2), (3, 2), self.freq_text_gray),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                 ]
             )
@@ -353,7 +361,9 @@ class ShotTypeReportGenerator:
                     ("BACKGROUND", (0, 0), (-1, 0), self.light_gray),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), self.base_font_size),
+                    ("FONTSIZE", (0, 1), (-1, 1), 9),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                     ("TOPPADDING", (0, 0), (-1, -1), 2),
@@ -383,7 +393,7 @@ class ShotTypeReportGenerator:
         for idx, (zone_name, payload) in enumerate(zones[: len(zone_boxes)]):
             x, y, w, h = zone_boxes[idx]
             pct = float(payload.get("pct", 0) or 0)
-            fill = self._grade_fill(metric_key, pct) or self.light_gray
+            fill = self._soften_color(self._grade_fill(metric_key, pct), 0.35) or self.light_gray
             drawing.add(Rect(x, y, w, h, fillColor=fill, strokeColor=colors.black))
             drawing.add(String(x + w / 2, y + h / 2 + 8, f"{int(round(pct))}%", fontSize=8, textAnchor="middle"))
             drawing.add(
@@ -418,11 +428,27 @@ class ShotTypeReportGenerator:
             self._base_court_drawing = base
         return deepcopy(self._base_court_drawing)
 
-    def _create_footer(self):
-        return Paragraph(
-            "BAMALYTICS",
-            ParagraphStyle("footer", alignment=TA_CENTER, fontSize=10, textColor=self.medium_gray),
+    def _create_footer(self, page_number: int, shot_label: str):
+        footer_table = Table(
+            [[f"Page {page_number} of 4", shot_label, "BAMALYTICS"]],
+            colWidths=[2.5 * inch, 3.5 * inch, 2.5 * inch],
         )
+        footer_table.setStyle(
+            TableStyle(
+                [
+                    ("LINEABOVE", (0, 0), (-1, 0), 0.4, self.light_gray),
+                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                    ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), self.medium_gray),
+                    ("TEXTCOLOR", (2, 0), (2, 0), self.freq_text_gray),
+                    ("TOPPADDING", (0, 0), (-1, 0), 3),
+                ]
+            )
+        )
+        return footer_table
 
     @staticmethod
     def _format_pct(value: float) -> str:
@@ -460,6 +486,17 @@ class ShotTypeReportGenerator:
         if not color_hex:
             return None
         return colors.HexColor(color_hex)
+
+    @staticmethod
+    def _soften_color(color: colors.Color, factor: float = 0.45) -> colors.Color:
+        """Blend a color with white to reduce saturation."""
+        if color is None:
+            return color
+        factor = max(0.0, min(factor, 1.0))
+        red = color.red + (1 - color.red) * factor
+        green = color.green + (1 - color.green) * factor
+        blue = color.blue + (1 - color.blue) * factor
+        return colors.Color(red, green, blue)
 
     def _create_breakdown_header(self, title: str):
         header_table = Table(
@@ -500,9 +537,11 @@ class ShotTypeReportGenerator:
     def _create_section_table(self, title, labels, breakdown, empty_bucket, col_width, grade_metric):
         header_row = ["", "FGA", "FG%", "PPS", "Freq"]
         rows = [[title, "", "", "", ""], header_row]
+        attempts_by_row = []
         for label in labels:
             bucket = breakdown.get(label, empty_bucket)
             total = bucket.total
+            attempts_by_row.append(getattr(total, "attempts", 0))
             rows.append(
                 [
                     label,
@@ -528,16 +567,37 @@ class ShotTypeReportGenerator:
             ("FONTSIZE", (0, 1), (-1, -1), self.base_font_size),
             ("LEADING", (0, 0), (-1, 0), self.section_header_font_size * self.line_height),
             ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.white),
             ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
             ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("TOPPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
+            ("TOPPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
             ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+            ("TEXTCOLOR", (1, 2), (1, -1), self.medium_gray),
+            ("TEXTCOLOR", (4, 2), (4, -1), self.freq_text_gray),
+            ("FONTSIZE", (4, 2), (4, -1), 8),
+            ("FONTNAME", (3, 2), (3, -1), "Helvetica-Bold"),
         ]
+        for idx, attempts in enumerate(attempts_by_row, start=2):
+            if attempts == 0:
+                style_commands.extend(
+                    [
+                        ("TEXTCOLOR", (0, idx), (-1, idx), self.medium_gray),
+                        ("BACKGROUND", (0, idx), (-1, idx), self.zero_row_gray),
+                        ("FONTNAME", (0, idx), (-1, idx), "Helvetica"),
+                        ("FONTNAME", (0, idx), (0, idx), "Helvetica-Oblique"),
+                    ]
+                )
+            elif (idx - 2) % 2 == 1:
+                style_commands.append(("BACKGROUND", (0, idx), (-1, idx), self.very_light_gray))
         if grade_metric:
             for row_idx, label in enumerate(labels, start=2):
                 bucket = breakdown.get(label, empty_bucket)
-                fg_fill = self._grade_fill(grade_metric, getattr(bucket.total, "fg_pct", 0))
+                fg_fill = self._soften_color(self._grade_fill(grade_metric, getattr(bucket.total, "fg_pct", 0)))
                 if fg_fill:
                     style_commands.append(("BACKGROUND", (2, row_idx), (2, row_idx), fg_fill))
                 pps_fill = self._grade_fill("pps", getattr(bucket.total, "pps", 0))
@@ -578,6 +638,7 @@ class ShotTypeReportGenerator:
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ("LINEBEFORE", (1, 0), (1, -1), 0.4, self.light_gray),
                 ]
             )
         )
@@ -623,7 +684,7 @@ class ShotTypeReportGenerator:
         grade_metric = {"atr": "atr2fg_pct", "fg2": "fg2_pct", "fg3": "fg3_pct"}.get(summary_key)
         style_commands = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-            ("BACKGROUND", (1, 0), (4, 0), self.light_gray),
+            ("BACKGROUND", (1, 0), (4, 0), self.totals_header_gray),
             ("BACKGROUND", (5, 0), (8, 0), self.light_gray),
             ("BACKGROUND", (9, 0), (12, 0), self.light_gray),
             ("SPAN", (1, 0), (4, 0)),
@@ -638,6 +699,20 @@ class ShotTypeReportGenerator:
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+            ("LINEBEFORE", (5, 0), (5, -1), 0.6, colors.white),
+            ("LINEBEFORE", (9, 0), (9, -1), 0.6, colors.white),
+            ("TEXTCOLOR", (1, 2), (1, 2), self.medium_gray),
+            ("TEXTCOLOR", (5, 2), (5, 2), self.medium_gray),
+            ("TEXTCOLOR", (9, 2), (9, 2), self.medium_gray),
+            ("TEXTCOLOR", (4, 2), (4, 2), self.freq_text_gray),
+            ("TEXTCOLOR", (8, 2), (8, 2), self.freq_text_gray),
+            ("TEXTCOLOR", (12, 2), (12, 2), self.freq_text_gray),
+            ("FONTSIZE", (4, 2), (4, 2), 8),
+            ("FONTSIZE", (8, 2), (8, 2), 8),
+            ("FONTSIZE", (12, 2), (12, 2), 8),
+            ("FONTNAME", (3, 2), (3, 2), "Helvetica-Bold"),
+            ("FONTNAME", (7, 2), (7, 2), "Helvetica-Bold"),
+            ("FONTNAME", (11, 2), (11, 2), "Helvetica-Bold"),
         ]
         fg_total = getattr(total, "fg_pct", 0)
         fg_transition = getattr(transition, "fg_pct", 0)
@@ -649,7 +724,7 @@ class ShotTypeReportGenerator:
         pps_cells = [(3, pps_total), (7, pps_transition), (11, pps_halfcourt)]
         if grade_metric:
             for col, value in fg_cells:
-                fill = self._grade_fill(grade_metric, value)
+                fill = self._soften_color(self._grade_fill(grade_metric, value))
                 if fill:
                     style_commands.append(("BACKGROUND", (col, 2), (col, 2), fill))
         for col, value in pps_cells:
@@ -793,6 +868,7 @@ class ShotTypeReportGenerator:
         row_heights = []
         for idx in range(len(rows)):
             row_heights.append(self.row_height)
+        row_order = {row_idx: order for order, row_idx in enumerate(data_row_indices)}
         table = Table(rows, colWidths=[1.6 * inch] + [0.45 * inch] * 12, rowHeights=row_heights)
         style_commands = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
@@ -811,23 +887,49 @@ class ShotTypeReportGenerator:
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.white),
+            ("TEXTCOLOR", (1, 2), (1, -1), self.medium_gray),
+            ("TEXTCOLOR", (5, 2), (5, -1), self.medium_gray),
+            ("TEXTCOLOR", (9, 2), (9, -1), self.medium_gray),
+            ("TEXTCOLOR", (4, 2), (4, -1), self.freq_text_gray),
+            ("TEXTCOLOR", (8, 2), (8, -1), self.freq_text_gray),
+            ("TEXTCOLOR", (12, 2), (12, -1), self.freq_text_gray),
+            ("FONTSIZE", (4, 2), (4, -1), 8),
+            ("FONTSIZE", (8, 2), (8, -1), 8),
+            ("FONTSIZE", (12, 2), (12, -1), 8),
+            ("FONTNAME", (3, 2), (3, -1), "Helvetica-Bold"),
+            ("FONTNAME", (7, 2), (7, -1), "Helvetica-Bold"),
+            ("FONTNAME", (11, 2), (11, -1), "Helvetica-Bold"),
         ]
 
         for row_idx in divider_rows:
             style_commands.append(("BACKGROUND", (0, row_idx), (-1, row_idx), self.crimson))
             style_commands.append(("GRID", (0, row_idx), (-1, row_idx), 0, colors.white))
+            style_commands.append(("LINEBELOW", (0, row_idx), (-1, row_idx), 0.6, colors.white))
 
         grade_metric = {"atr": "atr2fg_pct", "2fg": "fg2_pct", "3fg": "fg3_pct"}.get(shot_type)
         for row_idx, row_key in zip(data_row_indices, row_keys):
             for col_offset, bucket_key in ((2, "total"), (6, "transition"), (10, "halfcourt")):
                 bucket = getattr(breakdown.get(row_key), bucket_key, None)
                 if grade_metric:
-                    fg_fill = self._grade_fill(grade_metric, getattr(bucket, "fg_pct", 0))
+                    fg_fill = self._soften_color(self._grade_fill(grade_metric, getattr(bucket, "fg_pct", 0)))
                     if fg_fill:
                         style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), fg_fill))
                 pps_fill = self._grade_fill("pps", getattr(bucket, "pps", 0))
                 if pps_fill:
                     style_commands.append(("BACKGROUND", (col_offset + 1, row_idx), (col_offset + 1, row_idx), pps_fill))
+            total_attempts = getattr(breakdown.get(row_key).total, "attempts", 0) if breakdown.get(row_key) else 0
+            if total_attempts == 0:
+                style_commands.extend(
+                    [
+                        ("TEXTCOLOR", (0, row_idx), (-1, row_idx), self.medium_gray),
+                        ("BACKGROUND", (0, row_idx), (-1, row_idx), self.zero_row_gray),
+                        ("FONTNAME", (0, row_idx), (-1, row_idx), "Helvetica"),
+                        ("FONTNAME", (0, row_idx), (0, row_idx), "Helvetica-Oblique"),
+                    ]
+                )
+            elif row_order[row_idx] % 2 == 1:
+                style_commands.append(("BACKGROUND", (0, row_idx), (-1, row_idx), self.very_light_gray))
 
         table.setStyle(TableStyle(style_commands))
         return table
@@ -849,7 +951,7 @@ class ShotTypeReportGenerator:
                 ],
             ),
             Spacer(1, self.columns_footer_spacer),
-            self._create_footer(),
+            self._create_footer(2, "ATR"),
         ]
         return elements
 
@@ -870,7 +972,7 @@ class ShotTypeReportGenerator:
                 ],
             ),
             Spacer(1, self.columns_footer_spacer),
-            self._create_footer(),
+            self._create_footer(3, "Non-ATR 2FG"),
         ]
         return elements
 
@@ -892,7 +994,7 @@ class ShotTypeReportGenerator:
                 max_pass_rows=24,
             ),
             Spacer(1, self.columns_footer_spacer),
-            self._create_footer(),
+            self._create_footer(4, "3FG"),
         ]
         return elements
 
