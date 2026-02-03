@@ -39,15 +39,15 @@ class ShotTypeReportGenerator:
         self.section_header_font_size = 9.5  # Increased from 9
         self.totals_strip_font_size = 9
         
-        # IMPROVED: Better row heights for breathing room
-        self.row_height = 11.5  # Increased from 11
+        # IMPROVED: Better row heights for breathing room (balanced for page fit)
+        self.row_height = 11.2  # Slightly increased from 11 (was 11.5, reduced for fit)
         self.header_row_height = self.row_height * 1.4
         self.totals_row_height = self.row_height * 1.5
         self.breakdown_row_height = self.row_height * 1.35
         self.off_pass_row_height = self.row_height * 1.3
         
-        # IMPROVED: Better padding for visual comfort
-        self.vert_padding = 1.5  # Increased from 1
+        # IMPROVED: Better padding for visual comfort (balanced for page fit)
+        self.vert_padding = 1.2  # Increased from 1 (was 1.5, reduced for fit)
         self.horiz_padding = 5  # Increased from 4
         self.header_vert_padding = self.vert_padding + 3
         
@@ -407,8 +407,8 @@ class ShotTypeReportGenerator:
                     ("FONTSIZE", (0, 1), (-1, 1), 9.5),  # Larger values
                     ("GRID", (0, 0), (-1, -1), 0.8, self.border_color),  # Softer borders
                     ("LINEBELOW", (0, 0), (-1, 0), 1.2, self.crimson_dark),  # Dark crimson accent
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),  # More padding
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),  # Balanced padding
+                    ("TOPPADDING", (0, 0), (-1, -1), 2.5),
                 ]
             )
         )
@@ -488,7 +488,7 @@ class ShotTypeReportGenerator:
                     ("FONTSIZE", (0, 0), (-1, 0), 8),
                     ("TEXTCOLOR", (0, 0), (-1, 0), self.medium_gray),
                     ("TEXTCOLOR", (2, 0), (2, 0), self.crimson),  # Crimson for branding
-                    ("TOPPADDING", (0, 0), (-1, 0), 4),  # More padding
+                    ("TOPPADDING", (0, 0), (-1, 0), 3.5),  # Balanced padding
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
                 ]
             )
@@ -652,7 +652,7 @@ class ShotTypeReportGenerator:
         ]
         if group_breaks:
             for row_idx in group_breaks:
-                style_commands.append(("BOTTOMPADDING", (0, row_idx), (-1, row_idx), self.group_spacing + 1))  # More space
+                style_commands.append(("BOTTOMPADDING", (0, row_idx), (-1, row_idx), self.group_spacing + 0.5))  # Balanced spacing
         for idx, _attempts in enumerate(attempts_by_row, start=2):
             if (idx - 2) % 2 == 1:
                 style_commands.append(("BACKGROUND", (0, idx), (-1, idx), self.very_light_gray))
