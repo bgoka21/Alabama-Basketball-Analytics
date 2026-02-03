@@ -116,12 +116,18 @@ class ShotTypeReportGenerator:
         elements.append(Spacer(1, 0.15 * inch))
 
         shot_type_totals = self.player_data.get("shot_type_totals")
+        atr_totals = getattr(shot_type_totals, "atr", None) if shot_type_totals else None
+        fg2_totals = getattr(shot_type_totals, "fg2", None) if shot_type_totals else None
+        fg3_totals = getattr(shot_type_totals, "fg3", None) if shot_type_totals else None
+        atr_fill = self._grade_fill("atr2fg_pct", getattr(atr_totals, "fg_pct", 0)) or self.light_gray
+        fg2_fill = self._grade_fill("fg2_pct", getattr(fg2_totals, "fg_pct", 0)) or self.light_gray
+        fg3_fill = self._grade_fill("fg3_pct", getattr(fg3_totals, "fg_pct", 0)) or self.light_gray
         summary_boxes = Table(
             [
                 [
-                    self._create_summary_box("ATR", getattr(shot_type_totals, "atr", None), self.green),
-                    self._create_summary_box("2FG", getattr(shot_type_totals, "fg2", None), self.tan),
-                    self._create_summary_box("3FG", getattr(shot_type_totals, "fg3", None), self.green),
+                    self._create_summary_box("ATR", atr_totals, atr_fill),
+                    self._create_summary_box("2FG", fg2_totals, fg2_fill),
+                    self._create_summary_box("3FG", fg3_totals, fg3_fill),
                 ]
             ],
             colWidths=[2.2 * inch] * 3,
@@ -165,7 +171,12 @@ class ShotTypeReportGenerator:
         )
         return box
 
-    def _create_shot_chart(self, title: str, zone_data: Mapping[str, Mapping[str, object]]):
+    def _create_shot_chart(
+        self,
+        title: str,
+        zone_data: Mapping[str, Mapping[str, object]],
+        metric_key: str = "fg2_pct",
+    ):
         drawing = self._get_base_court_drawing()
         drawing.add(String(90, 162, title, fontSize=10, textAnchor="middle"))
 
@@ -181,13 +192,7 @@ class ShotTypeReportGenerator:
         for idx, (zone_name, payload) in enumerate(zones[: len(zone_boxes)]):
             x, y, w, h = zone_boxes[idx]
             pct = float(payload.get("pct", 0) or 0)
-            # Adjust color thresholds here to tune the green/red grading bands.
-            if pct >= 60:
-                fill = self.green
-            elif pct <= 25:
-                fill = self.red
-            else:
-                fill = self.light_gray
+            fill = self._grade_fill(metric_key, pct) or self.light_gray
             drawing.add(Rect(x, y, w, h, fillColor=fill, strokeColor=colors.black))
             drawing.add(String(x + w / 2, y + h / 2 + 8, f"{int(round(pct))}%", fontSize=8, textAnchor="middle"))
             drawing.add(
