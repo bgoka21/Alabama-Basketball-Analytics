@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Dict, Set
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,9 @@ def normalize_shot_location(raw_value: str | None) -> str:
     if raw_value is None:
         return _record_unknown("<missing>")
 
+    if _is_nan(raw_value):
+        return _record_unknown("<missing>", log_warning=False)
+
     key = raw_value.strip() if isinstance(raw_value, str) else str(raw_value).strip()
     if key in SHOT_LOCATION_MAP:
         return SHOT_LOCATION_MAP[key]
@@ -48,10 +52,18 @@ def normalize_shot_location(raw_value: str | None) -> str:
     return _record_unknown(key)
 
 
-def _record_unknown(raw_value: str) -> str:
+def _record_unknown(raw_value: str, log_warning: bool = True) -> str:
     UNKNOWN_SHOT_LOCATIONS.add(raw_value)
-    logger.warning("Unknown shot location encountered: %s", raw_value)
+    if log_warning:
+        logger.warning("Unknown shot location encountered: %s", raw_value)
     return "unknown"
+
+
+def _is_nan(raw_value: object) -> bool:
+    try:
+        return math.isnan(raw_value)  # type: ignore[arg-type]
+    except TypeError:
+        return False
 
 
 def get_unknown_shot_locations() -> Set[str]:
