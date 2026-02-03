@@ -52,6 +52,8 @@ class ShotTypeReportGenerator:
             bottomMargin=0.5 * inch,
         )
 
+        # Page layout ordering lives here; adjust the sequence or add new
+        # pages by inserting additional _create_*_page calls into the story.
         story = []
         story.extend(self._create_cover_page())
         story.append(PageBreak())
@@ -195,6 +197,7 @@ class ShotTypeReportGenerator:
         for idx, (zone_name, payload) in enumerate(zones[: len(zone_boxes)]):
             x, y, w, h = zone_boxes[idx]
             pct = float(payload.get("pct", 0) or 0)
+            # Adjust color thresholds here to tune the green/red grading bands.
             if pct >= 60:
                 fill = self.green
             elif pct <= 25:
@@ -409,6 +412,7 @@ class ShotTypeReportGenerator:
             for col_offset, bucket_key in ((2, "total"), (6, "transition"), (10, "half_court")):
                 fg_pct = breakdown.get(row_key, {}).get(bucket_key, {}).get("fg_pct", 0)
                 fg_pct = float(fg_pct or 0)
+                # Adjust color thresholds here to change green/red cutoffs for FG%.
                 if fg_pct >= 70:
                     style_commands.append(("BACKGROUND", (col_offset, row_idx), (col_offset, row_idx), self.green))
                 elif fg_pct <= 30:

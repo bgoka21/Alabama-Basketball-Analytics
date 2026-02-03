@@ -52,3 +52,19 @@ Visit `/admin/player/<player name>/development` to view a player's current seaso
 
 Administrators can upload player headshots from the roster management page. The
 app accepts `.png` and `.jpg` images and stores them in `static/headshots/`.
+
+### PDF Shot Report Generation
+
+The app generates downloadable PDF shot reports for individual players and for the full team:
+
+- **Player PDF**: triggered from the player view by calling `/pdf/player/<player_id>/generate`.
+- **Team PDF**: triggered from the team stats page by calling `/pdf/team/generate`, which merges all player reports.
+
+PDF content is built in `app/utils/pdf_generator.py` and uses data assembled by
+`app/utils/pdf_data_compiler.py`. To add new breakdown categories or court zones,
+update `utils/shottype.gather_labels_for_shot` (for new labels) and
+`utils/shot_location_map.normalize_shot_location` (for zone definitions). Color
+thresholds for green/red highlights live in the PDF generator where shot chart
+and breakdown tables are styled. Page layout sequencing is controlled by the
+`ShotTypeReportGenerator.generate` story order, so new pages can be inserted
+there as needed.

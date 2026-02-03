@@ -189,6 +189,8 @@ def _calculate_situation_stats(shots: Iterable[Mapping[str, Any]], situation: st
 
 
 def _get_zone_data(shots: Iterable[Mapping[str, Any]]):
+    # Court zones are defined in utils/shot_location_map.normalize_shot_location.
+    # Update that mapping to change how raw shot locations roll up into PDF zones.
     zone_totals: dict[str, dict[str, int]] = defaultdict(lambda: {"made": 0, "attempts": 0})
     for shot in shots:
         zone = normalize_shot_location(shot.get("shot_location"))
@@ -214,6 +216,8 @@ def _get_breakdown_data(filtered: Iterable[Mapping[str, Any]]):
     )
 
     for shot in filtered:
+        # Add new breakdown categories by extending utils/shottype.gather_labels_for_shot
+        # to emit additional labels for the shots you want to group.
         labels = gather_labels_for_shot(shot)
         situation = _normalize_possession_type(shot.get("possession_type"))
         for label in labels:
