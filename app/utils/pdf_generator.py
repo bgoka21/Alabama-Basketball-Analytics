@@ -47,7 +47,7 @@ class ShotTypeReportGenerator:
         self.section_space_before = 16
         self.section_space_after = 16
         self.off_dribble_extra_space = 4
-        self.off_pass_extra_space = 6
+        self.off_pass_extra_space = 0
         self.group_spacing = 2
         self.section_label_font_scale = 0.85
         self.line_height = 1.0
@@ -678,11 +678,11 @@ class ShotTypeReportGenerator:
                 row_height = self.breakdown_row_height
                 group_breaks = self._breakdown_group_breaks(shot_type, labels)
             elif title == "OFF DRIBBLE TYPE":
-                table_width = col_width * 0.88
+                table_width = col_width
                 row_height = self.breakdown_row_height
                 group_breaks = None
             else:
-                table_width = col_width * 0.74
+                table_width = col_width
                 row_height = self.off_pass_row_height
                 group_breaks = None
             table = self._create_section_table(
