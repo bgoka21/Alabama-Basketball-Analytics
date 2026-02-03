@@ -1022,13 +1022,17 @@ class ShotTypeReportGenerator:
 
     def _available_column_height(self) -> float:
         content_height = self.height - (2 * self.margin)
+        usable_width = self.width - (2 * self.margin)
+        header_height = self._create_breakdown_header("Shot Breakdown").wrap(usable_width, content_height)[1]
+        summary_height = self._create_player_summary("atr").wrap(usable_width, content_height)[1]
+        footer_height = self._create_footer(1, "Summary").wrap(usable_width, content_height)[1]
         fixed_height = (
-            self.row_height
+            header_height
             + self.header_spacer
-            + (self.row_height * 3)
+            + summary_height
             + self.summary_spacer
             + self.columns_footer_spacer
-            + (self.header_font_size * self.line_height)
+            + footer_height
         )
         return content_height - fixed_height
 
