@@ -1053,7 +1053,10 @@ class ShotTypeReportGenerator:
                 super().showPage()
 
             def save(self):
-                if self._page_count != 4:
+                page_count = self._page_count
+                if getattr(self, "_pageHasData", False):
+                    page_count += 1
+                if page_count != 4:
                     raise ValueError("Shot type report must contain exactly 4 pages.")
                 super().save()
 
