@@ -1044,13 +1044,16 @@ class ShotTypeReportGenerator:
 
     def _page_count_canvas(self, *args, **kwargs):
         class PageCountCanvas(canvas.Canvas):
+            def __init__(self, *inner_args, **inner_kwargs):
+                super().__init__(*inner_args, **inner_kwargs)
+                self._page_count = 0
+
             def showPage(self):
-                if self.getPageNumber() >= 4:
-                    raise ValueError("Shot type report must contain exactly 4 pages.")
+                self._page_count += 1
                 super().showPage()
 
             def save(self):
-                if self.getPageNumber() != 4:
+                if self._page_count != 4:
                     raise ValueError("Shot type report must contain exactly 4 pages.")
                 super().save()
 
