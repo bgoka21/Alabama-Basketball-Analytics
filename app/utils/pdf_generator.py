@@ -32,17 +32,28 @@ class ShotTypeReportGenerator:
         self.margin = 0
         self.base_font_size = 8.5
         self.header_font_size = 10
+        self.header_title_font_size = 12.5
+        self.header_subtitle_font_size = 11
         self.section_header_font_size = 9
         self.totals_strip_font_size = 9
         self.row_height = 11
+        self.header_row_height = self.row_height * 1.4
+        self.totals_row_height = self.row_height * 1.25
+        self.breakdown_row_height = self.row_height * 1.12
+        self.off_pass_row_height = self.breakdown_row_height * 1.08
         self.vert_padding = 1
         self.horiz_padding = 4
-        self.section_space_before = 6
-        self.section_space_after = 4
+        self.header_vert_padding = self.vert_padding + 2
+        self.section_space_before = 8
+        self.section_space_after = 6
+        self.off_dribble_extra_space = 4
+        self.off_pass_extra_space = 2
+        self.group_spacing = 8
+        self.section_label_font_scale = 0.9
         self.line_height = 1.0
-        self.header_spacer = 0.05 * inch
-        self.summary_spacer = 0.08 * inch
-        self.columns_footer_spacer = 0.05 * inch
+        self.header_spacer = 0.08 * inch
+        self.summary_spacer = 0.12 * inch
+        self.columns_footer_spacer = 0.08 * inch
 
         self.crimson = colors.HexColor("#9E1B32")
         self.green = colors.HexColor("#90EE90")
@@ -460,6 +471,7 @@ class ShotTypeReportGenerator:
                     ("TEXTCOLOR", (0, 0), (-1, 0), self.medium_gray),
                     ("TEXTCOLOR", (2, 0), (2, 0), self.freq_text_gray),
                     ("TOPPADDING", (0, 0), (-1, 0), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
                 ]
             )
         )
@@ -517,7 +529,7 @@ class ShotTypeReportGenerator:
         header_table = Table(
             [["ALABAMA CRIMSON TIDE", title]],
             colWidths=[3.5 * inch, 3.5 * inch],
-            rowHeights=[self.row_height],
+            rowHeights=[self.header_row_height],
         )
         header_table.setStyle(
             TableStyle(
@@ -525,11 +537,13 @@ class ShotTypeReportGenerator:
                     ("ALIGN", (0, 0), (0, 0), "LEFT"),
                     ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                     ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), self.header_font_size),
-                    ("LEADING", (0, 0), (-1, -1), self.header_font_size * self.line_height),
+                    ("FONTSIZE", (0, 0), (0, 0), self.header_subtitle_font_size),
+                    ("FONTSIZE", (1, 0), (1, 0), self.header_title_font_size),
+                    ("LEADING", (0, 0), (0, 0), self.header_subtitle_font_size * self.line_height),
+                    ("LEADING", (1, 0), (1, 0), self.header_title_font_size * self.line_height),
                     ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
-                    ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), self.header_vert_padding),
+                    ("TOPPADDING", (0, 0), (-1, -1), self.header_vert_padding),
                     ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
                     ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
                 ]
@@ -550,7 +564,18 @@ class ShotTypeReportGenerator:
         )
         return breakdown, empty_bucket
 
-    def _create_section_table(self, title, labels, breakdown, empty_bucket, col_width, grade_metric):
+    def _create_section_table(
+        self,
+        title,
+        labels,
+        breakdown,
+        empty_bucket,
+        col_width,
+        grade_metric,
+        row_height,
+        label_font_scale=1.0,
+        group_breaks=None,
+    ):
         header_row = ["", "FGA", "FG%", "PPS", "Freq"]
         rows = [[title, "", "", "", ""], header_row]
         attempts_by_row = []
@@ -570,7 +595,12 @@ class ShotTypeReportGenerator:
 
         label_width = 0.54 * col_width
         stat_width = (col_width - label_width) / 4
-        table = Table(rows, colWidths=[label_width] + [stat_width] * 4, rowHeights=[self.row_height] * len(rows))
+        header_height = row_height * 1.15
+        table = Table(
+            rows,
+            colWidths=[label_width] + [stat_width] * 4,
+            rowHeights=[header_height] + [row_height] * (len(rows) - 1),
+        )
         style_commands = [
             ("SPAN", (0, 0), (-1, 0)),
             ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
@@ -581,16 +611,16 @@ class ShotTypeReportGenerator:
             ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), self.section_header_font_size),
             ("FONTSIZE", (0, 1), (-1, -1), self.base_font_size),
+            ("FONTSIZE", (0, 2), (0, -1), self.base_font_size * label_font_scale),
             ("LEADING", (0, 0), (-1, 0), self.section_header_font_size * self.line_height),
             ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.7, colors.white),
+            ("LINEBELOW", (0, 1), (-1, 1), 0.5, colors.black),
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.black),
             ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
-            ("TOPPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
-            ("TOPPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), self.vert_padding + 1),
+            ("TOPPADDING", (0, 0), (-1, 0), self.vert_padding + 2),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), self.vert_padding + 2),
             ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("TEXTCOLOR", (1, 2), (1, -1), self.medium_gray),
@@ -598,6 +628,9 @@ class ShotTypeReportGenerator:
             ("FONTSIZE", (4, 2), (4, -1), 8),
             ("FONTNAME", (3, 2), (3, -1), "Helvetica-Bold"),
         ]
+        if group_breaks:
+            for row_idx in group_breaks:
+                style_commands.append(("BOTTOMPADDING", (0, row_idx), (-1, row_idx), self.group_spacing))
         for idx, attempts in enumerate(attempts_by_row, start=2):
             if attempts == 0:
                 style_commands.extend(
@@ -608,6 +641,8 @@ class ShotTypeReportGenerator:
                         ("FONTNAME", (0, idx), (0, idx), "Helvetica-Oblique"),
                     ]
                 )
+                if title == "OFF PASS TYPE":
+                    style_commands.append(("FONTNAME", (0, idx), (-1, idx), "Helvetica-Oblique"))
             elif (idx - 2) % 2 == 1:
                 style_commands.append(("BACKGROUND", (0, idx), (-1, idx), self.very_light_gray))
         if grade_metric:
@@ -622,10 +657,27 @@ class ShotTypeReportGenerator:
         table.setStyle(TableStyle(style_commands))
         return table
 
+    def _breakdown_group_breaks(self, shot_type: str, labels):
+        group_sizes_map = {
+            "atr": [2, 2, 2, 2, 4, 2, 4, 4],
+            "2fg": [2, 2, 2, 2, 4, 2, 4, 6],
+            "3fg": [2, 5, 2, 2, 2, 4, 5, 2],
+        }
+        group_sizes = group_sizes_map.get(shot_type, [])
+        break_indices = []
+        row_cursor = 2
+        label_cursor = 0
+        for size in group_sizes:
+            label_cursor += size
+            if label_cursor >= len(labels):
+                break
+            row_cursor += size
+            break_indices.append(row_cursor - 1)
+        return break_indices
+
     def _create_columns_layout(self, shot_type, left_sections, right_sections, max_pass_rows=None):
         usable_width = self.width - (2 * self.margin)
         col_width = usable_width / 2
-        col_height = self._available_column_height()
 
         breakdown, empty_bucket = self._build_breakdown_lookup(shot_type)
         grade_metric = {"atr": "atr2fg_pct", "2fg": "fg2_pct", "3fg": "fg3_pct"}.get(shot_type)
@@ -633,18 +685,51 @@ class ShotTypeReportGenerator:
         def build_section(title, labels):
             if title == "OFF PASS TYPE" and max_pass_rows:
                 labels = labels[:max_pass_rows]
-            return self._create_section_table(title, labels, breakdown, empty_bucket, col_width, grade_metric), labels
+            if title == "BREAKDOWN":
+                table_width = col_width
+                row_height = self.breakdown_row_height
+                group_breaks = self._breakdown_group_breaks(shot_type, labels)
+            elif title == "OFF DRIBBLE TYPE":
+                table_width = col_width * 0.88
+                row_height = self.breakdown_row_height
+                group_breaks = None
+            else:
+                table_width = col_width * 0.72
+                row_height = self.off_pass_row_height
+                group_breaks = None
+            table = self._create_section_table(
+                title,
+                labels,
+                breakdown,
+                empty_bucket,
+                table_width,
+                grade_metric,
+                row_height,
+                label_font_scale=self.section_label_font_scale,
+                group_breaks=group_breaks,
+            )
+            table.hAlign = "CENTER"
+            return table, labels
 
-        left_blocks = [build_section(title, labels) for title, labels in left_sections]
-        right_blocks = [build_section(title, labels) for title, labels in right_sections]
+        left_blocks = []
+        for title, labels in left_sections:
+            left_blocks.append(build_section(title, labels))
+        right_blocks = []
+        for title, labels in right_sections:
+            right_blocks.append(build_section(title, labels))
 
-        left_content = self._stack_sections(left_blocks)
-        right_content = self._stack_sections(right_blocks)
+        left_content = self._stack_sections(
+            left_blocks,
+            extra_spacing={"OFF DRIBBLE TYPE": self.off_dribble_extra_space},
+        )
+        right_content = self._stack_sections(
+            right_blocks,
+            extra_spacing={"OFF PASS TYPE": self.off_pass_extra_space},
+        )
 
         table = Table(
             [[left_content, right_content]],
             colWidths=[col_width, col_width],
-            rowHeights=[col_height],
         )
         table.setStyle(
             TableStyle(
@@ -654,7 +739,7 @@ class ShotTypeReportGenerator:
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ("LINEBEFORE", (1, 0), (1, -1), 0.4, self.light_gray),
+                    ("LINEBEFORE", (1, 0), (1, -1), 0.6, self.light_gray),
                 ]
             )
         )
@@ -675,6 +760,9 @@ class ShotTypeReportGenerator:
         name = self.player_data.get("name") or "N/A"
         player_name = f"#{number} {name}".strip().replace("# ", "")
         total_freq = getattr(totals_bucket, "freq", None) if totals_bucket else None
+        usable_width = self.width - (2 * self.margin)
+        label_width = usable_width * 0.4
+        stat_width = (usable_width - label_width) / 12
         summary_table = Table(
             [
                 ["", "TOTALS", "", "", "", "TRANSITION", "", "", "", "HALF COURT", "", "", ""],
@@ -695,12 +783,13 @@ class ShotTypeReportGenerator:
                     "—",
                 ],
             ],
-            colWidths=[1.2 * inch] + [0.6 * inch] * 12,
-            rowHeights=[self.row_height] * 3,
+            colWidths=[label_width] + [stat_width] * 12,
+            rowHeights=[self.totals_row_height] * 3,
         )
         grade_metric = {"atr": "atr2fg_pct", "fg2": "fg2_pct", "fg3": "fg3_pct"}.get(summary_key)
         style_commands = [
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.black),
+            ("LINEBELOW", (0, 1), (-1, 1), 0.6, colors.black),
             ("BACKGROUND", (1, 0), (4, 0), self.totals_header_gray),
             ("BACKGROUND", (5, 0), (8, 0), self.light_gray),
             ("BACKGROUND", (9, 0), (12, 0), self.light_gray),
@@ -716,8 +805,6 @@ class ShotTypeReportGenerator:
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
-            ("LINEBEFORE", (5, 0), (5, -1), 0.6, colors.white),
-            ("LINEBEFORE", (9, 0), (9, -1), 0.6, colors.white),
             ("TEXTCOLOR", (1, 2), (1, 2), self.medium_gray),
             ("TEXTCOLOR", (5, 2), (5, 2), self.medium_gray),
             ("TEXTCOLOR", (9, 2), (9, 2), self.medium_gray),
@@ -1042,16 +1129,19 @@ class ShotTypeReportGenerator:
             if not self._has_main_content(page):
                 raise ValueError("Each page must contain main content.")
 
-    def _stack_sections(self, sections):
+    def _stack_sections(self, sections, extra_spacing=None):
         flowables = []
+        extra_spacing = extra_spacing or {}
         for table, _labels in sections:
-            flowables.append(Spacer(1, self.section_space_before))
+            section_title = table._cellvalues[0][0] if table._cellvalues else ""
+            space_before = self.section_space_before + extra_spacing.get(section_title, 0)
+            flowables.append(Spacer(1, space_before))
             flowables.append(table)
             flowables.append(Spacer(1, self.section_space_after))
         return flowables
 
-    def _section_height(self, label_count: int) -> float:
-        return self.section_space_before + self.section_space_after + (self.row_height * (label_count + 2))
+    def _section_height(self, label_count: int, row_height: float, extra_before: float = 0) -> float:
+        return self.section_space_before + extra_before + self.section_space_after + (row_height * (label_count + 2))
 
     def _validate_layout(self) -> None:
         pages = self._page_sequence()
@@ -1068,11 +1158,29 @@ class ShotTypeReportGenerator:
             for title, labels in left_sections:
                 if title == "OFF PASS TYPE" and max_pass_rows:
                     labels = labels[:max_pass_rows]
-                left_height += self._section_height(len(labels))
+                if title == "OFF DRIBBLE TYPE":
+                    row_height = self.breakdown_row_height
+                    extra_before = self.off_dribble_extra_space
+                elif title == "OFF PASS TYPE":
+                    row_height = self.off_pass_row_height
+                    extra_before = self.off_pass_extra_space
+                else:
+                    row_height = self.breakdown_row_height
+                    extra_before = 0
+                left_height += self._section_height(len(labels), row_height, extra_before)
             right_height = 0
             for title, labels in right_sections:
                 if title == "OFF PASS TYPE" and max_pass_rows:
                     labels = labels[:max_pass_rows]
-                right_height += self._section_height(len(labels))
+                if title == "OFF DRIBBLE TYPE":
+                    row_height = self.breakdown_row_height
+                    extra_before = self.off_dribble_extra_space
+                elif title == "OFF PASS TYPE":
+                    row_height = self.off_pass_row_height
+                    extra_before = self.off_pass_extra_space
+                else:
+                    row_height = self.breakdown_row_height
+                    extra_before = 0
+                right_height += self._section_height(len(labels), row_height, extra_before)
             if left_height > col_height or right_height > col_height:
                 raise ValueError(f"{shot_type} column content exceeds available height.")
