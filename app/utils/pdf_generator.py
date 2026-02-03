@@ -15,6 +15,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
+    KeepInFrame,
     SimpleDocTemplate,
     Spacer,
     Table,
@@ -35,6 +36,7 @@ class ShotTypeReportGenerator:
         self.buffer = BytesIO()
         self.pagesize = letter
         self.width, self.height = self.pagesize
+        self.margin = 0.35 * inch
 
         self.crimson = colors.HexColor("#9E1B32")
         self.green = colors.HexColor("#90EE90")
@@ -43,15 +45,158 @@ class ShotTypeReportGenerator:
         self.light_gray = colors.HexColor("#E0E0E0")
         self.medium_gray = colors.HexColor("#828A8F")
 
+        self.atr_breakdown_order = [
+            "Assisted",
+            "Non-Assisted",
+            "Dribble",
+            "No Dribble",
+            "Restricted Area",
+            "Non Restricted Area",
+            "Off 1 Foot",
+            "Off 2 Feet",
+            "Left Hand Finish",
+            "Right Hand Finish",
+            "Hands To Rim",
+            "Hands Away From Rim",
+            "Play Action",
+            "No Play Action",
+            "Primary Defender",
+            "Secondary Defender",
+            "Multiple Defenders",
+            "Unguarded",
+            "Dunk",
+            "Layup",
+            "Floater",
+            "Blocked",
+        ]
+        self.atr_off_dribble_order = [
+            "Baseline Drive",
+            "Middle Drive",
+            "Slot Drive",
+            "Drive Left",
+            "Drive Right",
+            "Beast / Post",
+            "DHO / Get",
+            "PnR Handler",
+            "PnR Sneak",
+            "Off Closeout",
+            "Iso",
+            "OREB Putback",
+            "Transition Push",
+        ]
+        self.off_pass_type_order = [
+            "Perimeter Pass",
+            "Swing",
+            "1 More",
+            "Skip",
+            "Pass Out",
+            "Check Down",
+            "Lift",
+            "Drift",
+            "Kickdown",
+            "Slot Skip",
+            "Nail Pitch",
+            "Shake",
+            "Pull Behind",
+            "Dagger",
+            "Pocket Extra (Out)",
+            "Post Pass Out",
+            "Pass In",
+            "Slash / Cut",
+            "Pocket Extra (In)",
+            "Dump Off",
+            "Lob",
+            "Post Entry",
+            "PnR Pass to Screener",
+            "PnR Pocket",
+            "PnR Lob",
+            "PnR Late Roll",
+            "PnR Pop",
+            "Off Screen Pass",
+            "Handoff",
+            "Transition Pass",
+            "Outlet",
+            "Cross Court",
+            "Kickahead",
+            "Inbound Pass",
+            "Under OB",
+            "Side / Press OB",
+        ]
+        self.non_atr_breakdown_order = [
+            "Assisted",
+            "Non-Assisted",
+            "Dribble",
+            "No Dribble",
+            "Restricted Area",
+            "Non Restricted Area",
+            "Off 1 Foot",
+            "Off 2 Feet",
+            "Left Hand Finish",
+            "Right Hand Finish",
+            "Hands To Rim",
+            "Hands Away From Rim",
+            "Play Action",
+            "No Play Action",
+            "Primary Defender",
+            "Secondary Defender",
+            "Multiple Defenders",
+            "Unguarded",
+            "Layup",
+            "Floater",
+            "Turnaround J",
+            "Pull Up",
+            "Step Back",
+            "Catch",
+        ]
+        self.three_breakdown_order = [
+            "Assisted",
+            "Non-Assisted",
+            "Catch and Shoot",
+            "Catch and Hold",
+            "Slide Dribble",
+            "Step Back",
+            "Pull Up",
+            "On The Line",
+            "Off The Line",
+            "Shot Pocket",
+            "Non-Shot Pocket",
+            "Stationary",
+            "On Move",
+            "Contested",
+            "Uncontested",
+            "Late Contest",
+            "Blocked",
+            "Hop",
+            "Right-Left",
+            "Left-Right",
+            "WTN Right-Left",
+            "WTN Left-Right",
+            "Shrink",
+            "Non-Shrink",
+        ]
+        self.three_off_dribble_order = [
+            "Drive Left",
+            "Drive Right",
+            "Dip",
+            "Beast / Post",
+            "DHO / Get",
+            "PnR Handler",
+            "PnR Sneak",
+            "Off Closeout",
+            "Iso",
+            "OREB Putback",
+            "Transition Push",
+        ]
+
     def generate(self) -> bytes:
         """Build all four pages and return PDF bytes."""
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=self.pagesize,
-            rightMargin=0.35 * inch,
-            leftMargin=0.35 * inch,
-            topMargin=0.35 * inch,
-            bottomMargin=0.35 * inch,
+            rightMargin=self.margin,
+            leftMargin=self.margin,
+            topMargin=self.margin,
+            bottomMargin=self.margin,
         )
         story = self.get_story_elements()
         doc.build(story)
@@ -114,6 +259,8 @@ class ShotTypeReportGenerator:
             )
         )
         elements.append(Spacer(1, 0.15 * inch))
+        elements.append(self._create_stat_strip())
+        elements.append(Spacer(1, 0.2 * inch))
 
         shot_type_totals = self.player_data.get("shot_type_totals")
         atr_totals = getattr(shot_type_totals, "atr", None) if shot_type_totals else None
@@ -134,7 +281,7 @@ class ShotTypeReportGenerator:
         )
         summary_boxes.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
         elements.append(summary_boxes)
-        elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Spacer(1, 0.25 * inch))
         elements.append(self._create_footer())
         return elements
 
@@ -170,6 +317,37 @@ class ShotTypeReportGenerator:
             )
         )
         return box
+
+    def _create_stat_strip(self):
+        stats = self.player_data.get("season_stats", {}) or {}
+        ft_pct = stats.get("ft_pct")
+        ts_pct = stats.get("ts_pct")
+        pps = stats.get("pps")
+        efg_pct = stats.get("efg_pct")
+        rows = [
+            ["FT%", "TS%", "PPS", "EFG%"],
+            [
+                self._format_pct(ft_pct) if ft_pct is not None else "—",
+                self._format_pct(ts_pct) if ts_pct is not None else "—",
+                f"{pps:.2f}" if pps is not None else "—",
+                self._format_pct(efg_pct) if efg_pct is not None else "—",
+            ],
+        ]
+        table = Table(rows, colWidths=[1.7 * inch] * 4)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), self.light_gray),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ]
+            )
+        )
+        return table
 
     def _create_shot_chart(
         self,
@@ -282,6 +460,92 @@ class ShotTypeReportGenerator:
             )
         )
         return header_table
+
+    def _build_breakdown_lookup(self, shot_type: str):
+        shot_summaries = self.player_data.get("shot_summaries", {})
+        summary_key = {"atr": "atr", "2fg": "fg2", "3fg": "fg3"}.get(shot_type, shot_type)
+        summary = shot_summaries.get(summary_key)
+        breakdown = summary.cats if summary else {}
+        empty_bucket = SimpleNamespace(
+            total=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0, freq_pct=0),
+            transition=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0, freq_pct=0),
+            halfcourt=SimpleNamespace(attempts=0, makes=0, fg_pct=0, pps=0, freq_pct=0),
+        )
+        return breakdown, empty_bucket
+
+    def _create_section_table(self, title, labels, breakdown, empty_bucket, col_width, grade_metric):
+        header_row = ["", "FGA", "FG%", "PPS", "Freq"]
+        rows = [[title, "", "", "", ""], header_row]
+        for label in labels:
+            bucket = breakdown.get(label, empty_bucket)
+            total = bucket.total
+            rows.append(
+                [
+                    label,
+                    f"{total.makes}-{total.attempts}",
+                    f"{total.fg_pct:.1f}%",
+                    f"{total.pps:.2f}",
+                    f"{total.freq_pct:.1f}%" if total.attempts else "—",
+                ]
+            )
+
+        label_width = 0.54 * col_width
+        stat_width = (col_width - label_width) / 4
+        table = Table(
+            rows,
+            colWidths=[label_width] + [stat_width] * 4,
+            rowHeights=[10, 9] + [8] * (len(rows) - 2),
+        )
+        style_commands = [
+            ("SPAN", (0, 0), (-1, 0)),
+            ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BACKGROUND", (0, 1), (-1, 1), self.light_gray),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 2), (0, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 6),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ]
+        if grade_metric:
+            for row_idx, label in enumerate(labels, start=2):
+                bucket = breakdown.get(label, empty_bucket)
+                fg_fill = self._grade_fill(grade_metric, getattr(bucket.total, "fg_pct", 0))
+                if fg_fill:
+                    style_commands.append(("BACKGROUND", (2, row_idx), (2, row_idx), fg_fill))
+                pps_fill = self._grade_fill("pps", getattr(bucket.total, "pps", 0))
+                if pps_fill:
+                    style_commands.append(("BACKGROUND", (3, row_idx), (3, row_idx), pps_fill))
+        table.setStyle(TableStyle(style_commands))
+        return table
+
+    def _create_columns_layout(self, shot_type, left_sections, right_sections, max_pass_rows=None):
+        usable_width = self.width - (2 * self.margin)
+        col_width = usable_width / 2
+        col_height = self.height - (2 * self.margin) - (1.35 * inch)
+
+        breakdown, empty_bucket = self._build_breakdown_lookup(shot_type)
+        grade_metric = {"atr": "atr2fg_pct", "2fg": "fg2_pct", "3fg": "fg3_pct"}.get(shot_type)
+
+        def build_section(title, labels):
+            if title == "OFF PASS TYPE" and max_pass_rows:
+                labels = labels[:max_pass_rows]
+            return self._create_section_table(title, labels, breakdown, empty_bucket, col_width, grade_metric)
+
+        left_blocks = [build_section(title, labels) for title, labels in left_sections]
+        right_blocks = [build_section(title, labels) for title, labels in right_sections]
+
+        left_frame = KeepInFrame(col_width, col_height, left_blocks, mode="shrink", vAlign="TOP")
+        right_frame = KeepInFrame(col_width, col_height, right_blocks, mode="shrink", vAlign="TOP")
+        table = Table(
+            [[left_frame, right_frame]],
+            colWidths=[col_width, col_width],
+            rowHeights=[col_height],
+        )
+        table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        return table
 
     def _create_player_summary(self, shot_type: str):
         shot_type_totals = self.player_data.get("shot_type_totals")
@@ -529,11 +793,20 @@ class ShotTypeReportGenerator:
     def _create_atr_page(self):
         elements = [
             self._create_breakdown_header("At The Rim | Individual Breakdown"),
-            Spacer(1, 0.1 * inch),
+            Spacer(1, 0.05 * inch),
             self._create_player_summary("atr"),
-            Spacer(1, 0.1 * inch),
-            self._create_breakdown_table("atr"),
-            Spacer(1, 0.1 * inch),
+            Spacer(1, 0.08 * inch),
+            self._create_columns_layout(
+                "atr",
+                left_sections=[
+                    ("BREAKDOWN", self.atr_breakdown_order),
+                    ("OFF DRIBBLE TYPE", self.atr_off_dribble_order),
+                ],
+                right_sections=[
+                    ("OFF PASS TYPE", self.off_pass_type_order),
+                ],
+            ),
+            Spacer(1, 0.05 * inch),
             self._create_footer(),
         ]
         return elements
@@ -541,11 +814,20 @@ class ShotTypeReportGenerator:
     def _create_2fg_page(self):
         elements = [
             self._create_breakdown_header("Non-ATR 2FG | Individual Breakdown"),
-            Spacer(1, 0.1 * inch),
+            Spacer(1, 0.05 * inch),
             self._create_player_summary("2fg"),
-            Spacer(1, 0.1 * inch),
-            self._create_breakdown_table("2fg"),
-            Spacer(1, 0.1 * inch),
+            Spacer(1, 0.08 * inch),
+            self._create_columns_layout(
+                "2fg",
+                left_sections=[
+                    ("BREAKDOWN", self.non_atr_breakdown_order),
+                    ("OFF DRIBBLE TYPE", self.atr_off_dribble_order),
+                ],
+                right_sections=[
+                    ("OFF PASS TYPE", self.off_pass_type_order),
+                ],
+            ),
+            Spacer(1, 0.05 * inch),
             self._create_footer(),
         ]
         return elements
@@ -553,11 +835,21 @@ class ShotTypeReportGenerator:
     def _create_3fg_page(self):
         elements = [
             self._create_breakdown_header("3FG Shots | Individual Breakdown"),
-            Spacer(1, 0.1 * inch),
+            Spacer(1, 0.05 * inch),
             self._create_player_summary("3fg"),
-            Spacer(1, 0.1 * inch),
-            self._create_breakdown_table("3fg"),
-            Spacer(1, 0.1 * inch),
+            Spacer(1, 0.08 * inch),
+            self._create_columns_layout(
+                "3fg",
+                left_sections=[
+                    ("BREAKDOWN", self.three_breakdown_order),
+                    ("OFF DRIBBLE TYPE", self.three_off_dribble_order),
+                ],
+                right_sections=[
+                    ("OFF PASS TYPE", self.off_pass_type_order),
+                ],
+                max_pass_rows=24,
+            ),
+            Spacer(1, 0.05 * inch),
             self._create_footer(),
         ]
         return elements
