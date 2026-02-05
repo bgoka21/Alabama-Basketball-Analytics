@@ -1281,53 +1281,31 @@ class ShotTypeReportGenerator:
                 None,
             ),
         ):
+            atr_page = shot_type == "atr"
+            page_margin = self.margin + self.atr_margin if atr_page else self.margin
             col_height = self._available_column_height(
-                margin=self.margin + self.atr_margin if shot_type == "atr" else None,
-                summary_spacer=self.atr_summary_spacer if shot_type == "atr" else None,
-                summary_row_height=self.totals_row_height * self.atr_row_height_scale if shot_type == "atr" else None,
+                margin=page_margin,
+                summary_spacer=self.atr_summary_spacer if atr_page else None,
+                summary_row_height=self.totals_row_height * self.atr_row_height_scale if atr_page else None,
             )
             if col_height <= 0:
                 raise ValueError(f"{shot_type} layout exceeds page height.")
-            left_height = 0
-            row_scale = self.atr_row_height_scale if shot_type == "atr" else 1.0
-            for title, labels in left_sections:
-                if title == "OFF PASS TYPE" and max_pass_rows:
-                    labels = labels[:max_pass_rows]
-                if title == "OFF DRIBBLE TYPE":
-                    row_height = self.breakdown_row_height * row_scale
-                    extra_before = self.off_dribble_extra_space
-                elif title == "OFF PASS TYPE":
-                    row_height = self.off_pass_row_height * row_scale
-                    extra_before = self.off_pass_extra_space
-                else:
-                    row_height = self.breakdown_row_height * row_scale
-                    extra_before = 0
-                left_height += self._section_height(
-                    len(labels),
-                    row_height,
-                    extra_before,
-                    section_space_before=section_space_before,
-                    section_space_after=section_space_after,
-                )
-            right_height = 0
-            for title, labels in right_sections:
-                if title == "OFF PASS TYPE" and max_pass_rows:
-                    labels = labels[:max_pass_rows]
-                if title == "OFF DRIBBLE TYPE":
-                    row_height = self.breakdown_row_height * row_scale
-                    extra_before = self.off_dribble_extra_space
-                elif title == "OFF PASS TYPE":
-                    row_height = self.off_pass_row_height * row_scale
-                    extra_before = self.off_pass_extra_space
-                else:
-                    row_height = self.breakdown_row_height * row_scale
-                    extra_before = 0
-                right_height += self._section_height(
-                    len(labels),
-                    row_height,
-                    extra_before,
-                    section_space_before=section_space_before,
-                    section_space_after=section_space_after,
-                )
-            if left_height > col_height or right_height > col_height:
+            columns = self._create_columns_layout(
+                shot_type,
+                left_sections,
+                right_sections,
+                max_pass_rows=max_pass_rows,
+                section_space_before=section_space_before,
+                section_space_after=section_space_after,
+                margin=page_margin,
+                row_height_scale=self.atr_row_height_scale if atr_page else 1.0,
+                section_header_font_size=self.atr_section_header_font_size if atr_page else None,
+                header_padding=self.atr_section_header_padding if atr_page else None,
+                color_soften_factor=self.atr_color_soften_factor if atr_page else None,
+                zero_attempts_style=atr_page,
+                gutter=self.atr_column_gutter if atr_page else None,
+            )
+            usable_width = self.width - (2 * page_margin)
+            required_height = columns.wrap(usable_width, col_height)[1]
+            if required_height > col_height:
                 raise ValueError(f"{shot_type} column content exceeds available height.")
