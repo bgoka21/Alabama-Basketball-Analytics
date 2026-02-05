@@ -15,7 +15,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Spacer, Table, TableStyle, Paragraph
+from reportlab.platypus import Spacer, Table, TableStyle, Paragraph, KeepTogether
 from app.grades import grade_token
 
 
@@ -597,7 +597,7 @@ class ShotTypeReportGenerator:
         )
     
         spacer = Spacer(1, 6)
-        return [*elements, spacer]
+        return KeepTogether([*elements, spacer])
 
     def _build_breakdown_lookup(self, shot_type: str):
         shot_summaries = self.player_data.get("shot_summaries", {})
