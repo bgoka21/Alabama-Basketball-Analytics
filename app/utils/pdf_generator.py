@@ -1110,7 +1110,8 @@ class ShotTypeReportGenerator:
 
     def _create_atr_page(self):
         atr_margin = self.margin + self.atr_margin
-        atr_row_height = self.totals_row_height * self.atr_row_height_scale
+        atr_layout = self._resolve_atr_layout()
+        atr_row_height = self.totals_row_height * atr_layout.row_height_scale
         elements = [
             self._create_breakdown_header("At The Rim | Individual Breakdown"),
             Spacer(1, self.header_spacer),
@@ -1120,7 +1121,7 @@ class ShotTypeReportGenerator:
                 row_height=atr_row_height,
                 color_soften_factor=self.atr_color_soften_factor,
             ),
-            Spacer(1, self.atr_summary_spacer),
+            Spacer(1, atr_layout.summary_spacer),
             self._create_columns_layout(
                 "atr",
                 left_sections=[
@@ -1131,9 +1132,9 @@ class ShotTypeReportGenerator:
                     ("OFF PASS TYPE", self.off_pass_type_order),
                 ],
                 margin=atr_margin,
-                row_height_scale=self.atr_row_height_scale,
-                section_space_before=self.atr_section_space_before,
-                section_space_after=self.atr_section_space_after,
+                row_height_scale=atr_layout.row_height_scale,
+                section_space_before=atr_layout.section_space_before,
+                section_space_after=atr_layout.section_space_after,
                 section_header_font_size=self.atr_section_header_font_size,
                 header_padding=self.atr_section_header_padding,
                 color_soften_factor=self.atr_color_soften_factor,
@@ -1283,10 +1284,14 @@ class ShotTypeReportGenerator:
         ):
             atr_page = shot_type == "atr"
             page_margin = self.margin + self.atr_margin if atr_page else self.margin
+            atr_layout = self._resolve_atr_layout() if atr_page else None
+            row_height_scale = atr_layout.row_height_scale if atr_layout else 1.0
+            section_space_before = atr_layout.section_space_before if atr_layout else section_space_before
+            section_space_after = atr_layout.section_space_after if atr_layout else section_space_after
             col_height = self._available_column_height(
                 margin=page_margin,
-                summary_spacer=self.atr_summary_spacer if atr_page else None,
-                summary_row_height=self.totals_row_height * self.atr_row_height_scale if atr_page else None,
+                summary_spacer=atr_layout.summary_spacer if atr_layout else None,
+                summary_row_height=self.totals_row_height * row_height_scale if atr_layout else None,
             )
             if col_height <= 0:
                 raise ValueError(f"{shot_type} layout exceeds page height.")
@@ -1298,7 +1303,7 @@ class ShotTypeReportGenerator:
                 section_space_before=section_space_before,
                 section_space_after=section_space_after,
                 margin=page_margin,
-                row_height_scale=self.atr_row_height_scale if atr_page else 1.0,
+                row_height_scale=row_height_scale,
                 section_header_font_size=self.atr_section_header_font_size if atr_page else None,
                 header_padding=self.atr_section_header_padding if atr_page else None,
                 color_soften_factor=self.atr_color_soften_factor if atr_page else None,
@@ -1309,3 +1314,56 @@ class ShotTypeReportGenerator:
             required_height = columns.wrap(usable_width, col_height)[1]
             if required_height > col_height:
                 raise ValueError(f"{shot_type} column content exceeds available height.")
+
+    def _resolve_atr_layout(self) -> SimpleNamespace:
+        atr_margin = self.margin + self.atr_margin
+        usable_width = self.width - (2 * atr_margin)
+        variants = [
+            {
+                "row_height_scale": self.atr_row_height_scale,
+                "summary_spacer": self.atr_summary_spacer,
+                "section_space_before": self.atr_section_space_before,
+                "section_space_after": self.atr_section_space_after,
+            },
+            {
+                "row_height_scale": 1.03,
+                "summary_spacer": self.summary_spacer,
+                "section_space_before": self.section_space_before_tight,
+                "section_space_after": self.section_space_after_tight,
+            },
+            {
+                "row_height_scale": 1.0,
+                "summary_spacer": max(0, self.summary_spacer - 2),
+                "section_space_before": self.section_space_before_tight,
+                "section_space_after": self.section_space_after_tight,
+            },
+        ]
+        for variant in variants:
+            col_height = self._available_column_height(
+                margin=atr_margin,
+                summary_spacer=variant["summary_spacer"],
+                summary_row_height=self.totals_row_height * variant["row_height_scale"],
+            )
+            columns = self._create_columns_layout(
+                "atr",
+                left_sections=[
+                    ("BREAKDOWN", self.atr_breakdown_order),
+                    ("OFF DRIBBLE TYPE", self.atr_off_dribble_order),
+                ],
+                right_sections=[
+                    ("OFF PASS TYPE", self.off_pass_type_order),
+                ],
+                margin=atr_margin,
+                row_height_scale=variant["row_height_scale"],
+                section_space_before=variant["section_space_before"],
+                section_space_after=variant["section_space_after"],
+                section_header_font_size=self.atr_section_header_font_size,
+                header_padding=self.atr_section_header_padding,
+                color_soften_factor=self.atr_color_soften_factor,
+                zero_attempts_style=True,
+                gutter=self.atr_column_gutter,
+            )
+            required_height = columns.wrap(usable_width, col_height)[1]
+            if required_height <= col_height:
+                return SimpleNamespace(**variant)
+        raise ValueError("atr column content exceeds available height.")
