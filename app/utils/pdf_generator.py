@@ -33,27 +33,27 @@ class ShotTypeReportGenerator:
         self.atr_margin = 0.15 * inch
 
         # IMPROVED: Slightly larger base font for better readability
-        self.base_font_size = 8.5
+        self.base_font_size = 7.5
         self.header_font_size = 10
         self.header_title_font_size = 13  # Increased from 12.5
         self.header_subtitle_font_size = 11
-        self.section_header_font_size = 9.5  # Increased from 9
+        self.section_header_font_size = 8.5  # Increased from 9
         self.totals_strip_font_size = 9
         
         # IMPROVED: Better row heights for breathing room (balanced for page fit)
-        self.row_height = 11.2  # Slightly increased from 11 (was 11.5, reduced for fit)
+        self.row_height = 9.5  # Slightly increased from 11 (was 11.5, reduced for fit)
         self.header_row_height = self.row_height * 1.4
         self.totals_row_height = self.row_height * 1.5
-        self.breakdown_row_height = self.row_height * 1.35
-        self.off_pass_row_height = self.row_height * 1.3
+        self.breakdown_row_height = self.row_height * 1.15
+        self.off_pass_row_height = self.row_height * 1.1
         
         # IMPROVED: Better padding for visual comfort (balanced for page fit)
-        self.vert_padding = 1.2  # Increased from 1 (was 1.5, reduced for fit)
-        self.horiz_padding = 5  # Increased from 4
+        self.vert_padding = 0.8  # Increased from 1 (was 1.5, reduced for fit)
+        self.horiz_padding = 3  # Increased from 4
         self.header_vert_padding = self.vert_padding + 3
         
-        self.section_space_before = 16
-        self.section_space_after = 16
+        self.section_space_before = 6
+        self.section_space_after = 6
         self.section_space_before_tight = max(0, self.section_space_before - 4)
         self.section_space_after_tight = max(0, self.section_space_after - 4)
         self.off_dribble_extra_space = 4
@@ -61,13 +61,13 @@ class ShotTypeReportGenerator:
         self.group_spacing = 2
         self.section_label_font_scale = 0.85
         self.line_height = 1.0
-        self.header_spacer = 0.11 * inch
+        self.header_spacer = 0.05 * inch
         self.summary_spacer = 0.12 * inch
         self.columns_footer_spacer = 0.1 * inch
-        self.atr_summary_spacer = self.summary_spacer + (0.05 * inch)
-        self.atr_row_height_scale = 1.06
-        self.atr_section_space_before = self.section_space_before + 4
-        self.atr_section_space_after = self.section_space_after + 4
+        self.atr_summary_spacer = 0.08 * inch
+        self.atr_row_height_scale = 1.0
+        self.atr_section_space_before = self.section_space_before
+        self.atr_section_space_after = self.section_space_after
         self.atr_section_header_font_size = self.section_header_font_size + 0.6
         self.atr_section_header_padding = self.vert_padding + 3
         self.atr_color_soften_factor = 0.6
@@ -557,30 +557,20 @@ class ShotTypeReportGenerator:
 
     def _create_breakdown_header(self, title: str):
         header_table = Table(
-            [["ALABAMA CRIMSON TIDE", title]],
-            colWidths=[3.5 * inch, 3.5 * inch],
-            rowHeights=[self.header_row_height],
+            [[f"ALABAMA CRIMSON TIDE  |  {title}"]],
+            colWidths=[7 * inch],
+            rowHeights=[10]
         )
-        # IMPROVED: Better header with gradient-like effect using colors
         header_table.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (0, 0), self.header_subtitle_font_size),
-                    ("FONTSIZE", (1, 0), (1, 0), self.header_title_font_size),
-                    ("LEADING", (0, 0), (0, 0), self.header_subtitle_font_size * self.line_height),
-                    ("LEADING", (1, 0), (1, 0), self.header_title_font_size * self.line_height),
-                    ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
-                    ("TEXTCOLOR", (1, 0), (1, 0), colors.black),  # Black for main title
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), self.header_vert_padding),
-                    ("TOPPADDING", (0, 0), (-1, -1), self.header_vert_padding),
-                    ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
-                    ("LINEBELOW", (0, 0), (-1, -1), 1.5, self.crimson),  # Thick crimson underline
-                ]
-            )
+            TableStyle([
+                ("ALIGN", (0, 0), (0, 0), "CENTER"),
+                ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (0, 0), 11),
+                ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
+                ("BOTTOMPADDING", (0, 0), (0, 0), 2),
+                ("TOPPADDING", (0, 0), (0, 0), 2),
+                ("LINEBELOW", (0, 0), (0, 0), 1, self.crimson),
+            ])
         )
         header_table._is_header = True
         return header_table
