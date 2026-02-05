@@ -35,6 +35,29 @@ OVERWRITE_ROWS = {
     "Defense Rebound Opportunities",
 }
 
+CSV_SOURCE_MAP = {
+    # Offense
+    "shot_type": "offense",
+    "shot_creation": "offense",
+    "turnover_type": "offense",
+    # Defense
+    "defensive_possessions": "defense",
+    "gap_help": "defense",
+    "shot_contest": "defense",
+    "pass_contest": "defense",
+    # PnR
+    "pnr_gap_help": "pnr",
+    "pnr_grade": "pnr",
+    # Rebounding
+    "off_rebound_opps": "rebounding",
+    "def_rebound_opps": "rebounding",
+}
+
+STAT_DISPLAY_MAP = {
+    "offense.shot_type.ft_below": "FT Below",
+    "offense.shot_creation.ft_below": "FT Below (Creation)",
+}
+
 
 @dataclass(frozen=True)
 class GroupInputs:
@@ -83,6 +106,14 @@ def _extract_group(df: pd.DataFrame, row_label: str, filename: str) -> pd.DataFr
     _ensure_row_column(df, filename)
     group = df[df["Row"] == row_label].copy()
     return group.reset_index(drop=True)
+
+
+def normalize_stat_column(col: str) -> str:
+    return col.strip().lower().replace("%", "pct").replace(" ", "_")
+
+
+def build_stat_key(group: str, source: str, col: str) -> str:
+    return f"{group}.{source}.{normalize_stat_column(col)}"
 
 
 def _strip_grouped_columns(df: pd.DataFrame, row_label: str) -> pd.DataFrame:
@@ -205,6 +236,9 @@ def _combine_disjoint_columns(
         for col in donor.columns:
             if col in PROTECTED_COLUMN_SET:
                 continue
+            # Non-protected columns are fully-qualified stat keys
+            # (<group>.<source>.<stat>) so a collision now means the same
+            # source uploaded the same normalized stat twice.
             if col in existing:
                 raise CsvPipelineError(
                     f"{group_name} column overlap detected for '{col}'."
@@ -212,6 +246,35 @@ def _combine_disjoint_columns(
             combined[col] = donor[col].values
             existing.add(col)
     return combined
+
+
+def _namespace_stat_columns(
+    df: pd.DataFrame,
+    *,
+    group: str,
+    source: str,
+    group_name: str,
+) -> pd.DataFrame:
+    namespaced = df.copy()
+    namespaced_columns: list[str] = []
+    seen_stat_keys: set[str] = set()
+    for col in namespaced.columns:
+        if col in PROTECTED_COLUMN_SET or (
+            isinstance(col, str) and col.startswith("#")
+        ):
+            namespaced_columns.append(col)
+            continue
+        stat_key = build_stat_key(group, source, str(col))
+        if stat_key in seen_stat_keys:
+            raise CsvPipelineError(
+                f"{group_name} column overlap detected for '{stat_key}'."
+            )
+        seen_stat_keys.add(stat_key)
+        namespaced_columns.append(stat_key)
+        STAT_DISPLAY_MAP.setdefault(stat_key, str(col).strip())
+
+    namespaced.columns = namespaced_columns
+    return namespaced
 
 
 def _apply_union_players(
@@ -241,14 +304,29 @@ def build_offense_group(
 ) -> pd.DataFrame:
     group_label = "Offense"
     groups = [
-        _strip_grouped_columns(
+        _namespace_stat_columns(
+            _strip_grouped_columns(
             _extract_group(shot_type, group_label, filenames[0]), group_label
+            ),
+            group=CSV_SOURCE_MAP["shot_type"],
+            source="shot_type",
+            group_name=group_label,
         ),
-        _strip_grouped_columns(
+        _namespace_stat_columns(
+            _strip_grouped_columns(
             _extract_group(shot_creation, group_label, filenames[1]), group_label
+            ),
+            group=CSV_SOURCE_MAP["shot_creation"],
+            source="shot_creation",
+            group_name=group_label,
         ),
-        _strip_grouped_columns(
+        _namespace_stat_columns(
+            _strip_grouped_columns(
             _extract_group(turnover_type, group_label, filenames[2]), group_label
+            ),
+            group=CSV_SOURCE_MAP["turnover_type"],
+            source="turnover_type",
+            group_name=group_label,
         ),
     ]
     _validate_group_rows(groups, filenames, group_label)
@@ -269,26 +347,49 @@ def build_defense_group(
 ) -> pd.DataFrame:
     group_label = "Defense"
     groups = [
-        _strip_grouped_columns(
-            _extract_group(defensive_possessions, group_label, filenames[0]),
-            group_label,
+        _namespace_stat_columns(
+            _strip_grouped_columns(
+                _extract_group(defensive_possessions, group_label, filenames[0]),
+                group_label,
+            ),
+            group=CSV_SOURCE_MAP["defensive_possessions"],
+            source="defensive_possessions",
+            group_name=group_label,
         ),
-        _strip_grouped_columns(
-            _extract_group(gap_help, group_label, filenames[1]), group_label
+        _namespace_stat_columns(
+            _strip_grouped_columns(
+                _extract_group(gap_help, group_label, filenames[1]), group_label
+            ),
+            group=CSV_SOURCE_MAP["gap_help"],
+            source="gap_help",
+            group_name=group_label,
         ),
-        _strip_grouped_columns(
-            _extract_group(shot_contest, group_label, filenames[2]), group_label
+        _namespace_stat_columns(
+            _strip_grouped_columns(
+                _extract_group(shot_contest, group_label, filenames[2]), group_label
+            ),
+            group=CSV_SOURCE_MAP["shot_contest"],
+            source="shot_contest",
+            group_name=group_label,
         ),
-        _strip_grouped_columns(
-            _extract_group(pass_contest, group_label, filenames[3]), group_label
+        _namespace_stat_columns(
+            _strip_grouped_columns(
+                _extract_group(pass_contest, group_label, filenames[3]), group_label
+            ),
+            group=CSV_SOURCE_MAP["pass_contest"],
+            source="pass_contest",
+            group_name=group_label,
         ),
     ]
     _validate_group_rows(groups, filenames, group_label)
-    base = groups[0]
-    donor_players = []
-    for donor in groups[1:]:
-        donor_players.append(donor[_player_columns(donor)].copy())
-    return _apply_union_players(base, donor_players)
+    base_players = _player_columns(groups[0])
+    base = groups[0].drop(columns=base_players, errors="ignore")
+    donors = [donor.drop(columns=_player_columns(donor), errors="ignore") for donor in groups[1:]]
+    merged = _combine_disjoint_columns(base, donors, group_label)
+    for player_col in base_players:
+        merged[player_col] = groups[0][player_col].values
+    donor_players = [donor[_player_columns(donor)].copy() for donor in groups[1:]]
+    return _apply_union_players(merged, donor_players)
 
 
 def build_pnr_group(
@@ -298,23 +399,32 @@ def build_pnr_group(
 ) -> pd.DataFrame:
     group_label = "PnR"
     groups = [
-        _strip_grouped_columns(
-            _extract_group(gap_help, group_label, filenames[0]), group_label
+        _namespace_stat_columns(
+            _strip_grouped_columns(
+                _extract_group(gap_help, group_label, filenames[0]), group_label
+            ),
+            group=CSV_SOURCE_MAP["pnr_gap_help"],
+            source="pnr_gap_help",
+            group_name=group_label,
         ),
-        _strip_grouped_columns(
-            _extract_group(grade, group_label, filenames[1]), group_label
+        _namespace_stat_columns(
+            _strip_grouped_columns(
+                _extract_group(grade, group_label, filenames[1]), group_label
+            ),
+            group=CSV_SOURCE_MAP["pnr_grade"],
+            source="pnr_grade",
+            group_name=group_label,
         ),
     ]
     _validate_group_rows(groups, filenames, group_label)
-    base = groups[0]
-    keep_cols = [
-        col
-        for col in base.columns
-        if col in PROTECTED_COLUMN_SET or col.startswith("#")
-    ]
-    base = base[keep_cols].copy()
-    donor = groups[1][_player_columns(groups[1])].copy()
-    return _apply_union_players(base, [donor])
+    base_players = _player_columns(groups[0])
+    base = groups[0].drop(columns=base_players, errors="ignore")
+    donor = groups[1].drop(columns=_player_columns(groups[1]), errors="ignore")
+    merged = _combine_disjoint_columns(base, [donor], group_label)
+    for player_col in base_players:
+        merged[player_col] = groups[0][player_col].values
+    donor_players = groups[1][_player_columns(groups[1])].copy()
+    return _apply_union_players(merged, [donor_players])
 
 
 def build_rebound_groups(
@@ -331,8 +441,18 @@ def build_rebound_groups(
     if def_group.empty:
         raise CsvPipelineError(f"{filenames[1]} has no '{defense_label}' rows.")
     return (
-        _strip_grouped_columns(off_group, offense_label),
-        _strip_grouped_columns(def_group, defense_label),
+        _namespace_stat_columns(
+            _strip_grouped_columns(off_group, offense_label),
+            group=CSV_SOURCE_MAP["off_rebound_opps"],
+            source="off_rebound_opps",
+            group_name=offense_label,
+        ),
+        _namespace_stat_columns(
+            _strip_grouped_columns(def_group, defense_label),
+            group=CSV_SOURCE_MAP["def_rebound_opps"],
+            source="def_rebound_opps",
+            group_name=defense_label,
+        ),
     )
 
 

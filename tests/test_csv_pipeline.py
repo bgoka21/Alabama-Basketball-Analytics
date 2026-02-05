@@ -241,9 +241,41 @@ def test_csv_pipeline_happy_path(client):
 
     output = pd.read_csv(BytesIO(download_resp.data))
     offense_rows = output[output["Row"] == "Offense"]
-    assert "Shot Type" in offense_rows.columns
-    assert "Shot Creation" in offense_rows.columns
-    assert "TO Type" in offense_rows.columns
+    assert "offense.shot_type.shot_type" in offense_rows.columns
+    assert "offense.shot_creation.shot_creation" in offense_rows.columns
+    assert "offense.turnover_type.to_type" in offense_rows.columns
+
+
+
+
+def test_csv_pipeline_allows_cross_source_stat_name_overlap(client):
+    pre_combined = _base_pre_combined()
+    shot_type, shot_creation, turnover_type = _offense_inputs()
+    shot_type["FT BELOW"] = ["A", "B"]
+    shot_creation["FT BELOW"] = ["C", "D"]
+
+    data = _post_payload(pre_combined)
+    data["offense_shot_type"] = _csv_file(shot_type, "offense_shot_type.csv")
+    data["offense_shot_creation"] = _csv_file(shot_creation, "offense_shot_creation.csv")
+    data["offense_turnover_type"] = _csv_file(turnover_type, "offense_turnover.csv")
+
+    resp = client.post(
+        "/management/csv-pipeline",
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 200
+
+    with client.application.app_context():
+        game = Game.query.filter_by(opponent_name="Test Opponent").order_by(Game.id.desc()).first()
+
+    download_resp = client.get(f"/management/csv-pipeline/download-final/{game.id}")
+    output = pd.read_csv(BytesIO(download_resp.data))
+    offense_rows = output[output["Row"] == "Offense"]
+
+    assert "offense.shot_type.ft_below" in offense_rows.columns
+    assert "offense.shot_creation.ft_below" in offense_rows.columns
 
 
 def test_csv_pipeline_missing_row_column(client):
