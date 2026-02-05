@@ -557,19 +557,32 @@ class ShotTypeReportGenerator:
 
     def _create_breakdown_header(self, title: str):
         header_table = Table(
-            [[f"ALABAMA CRIMSON TIDE  |  {title}"]],
+            [
+                ["ALABAMA CRIMSON TIDE"],
+                [title],
+            ],
             colWidths=[7 * inch],
-            rowHeights=[10]
+            rowHeights=[8, 14],
         )
         header_table.setStyle(
             TableStyle([
-                ("ALIGN", (0, 0), (0, 0), "CENTER"),
-                ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (0, 0), 11),
-                ("TEXTCOLOR", (0, 0), (0, 0), self.crimson),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                
+                # Brand (subtle)
+                ("FONTNAME", (0, 0), (0, 0), "Helvetica"),
+                ("FONTSIZE", (0, 0), (0, 0), 9),
+                ("TEXTCOLOR", (0, 0), (0, 0), self.medium_gray),
                 ("BOTTOMPADDING", (0, 0), (0, 0), 2),
-                ("TOPPADDING", (0, 0), (0, 0), 2),
-                ("LINEBELOW", (0, 0), (0, 0), 1, self.crimson),
+                
+                # Page title (primary)
+                ("FONTNAME", (0, 1), (0, 1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 1), (0, 1), 14),
+                ("TEXTCOLOR", (0, 1), (0, 1), self.crimson),
+                ("TOPPADDING", (0, 1), (0, 1), 2),
+                ("BOTTOMPADDING", (0, 1), (0, 1), 4),
+                
+                # Accent line
+                ("LINEBELOW", (0, 1), (0, 1), 1.5, self.crimson),
             ])
         )
         header_table._is_header = True
