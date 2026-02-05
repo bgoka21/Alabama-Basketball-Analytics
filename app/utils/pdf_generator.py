@@ -597,7 +597,7 @@ class ShotTypeReportGenerator:
         )
     
         spacer = Spacer(1, 6)
-        return KeepTogether([*elements, spacer])
+        return [*elements, spacer]
 
     def _build_breakdown_lookup(self, shot_type: str):
         shot_summaries = self.player_data.get("shot_summaries", {})
@@ -1225,7 +1225,11 @@ class ShotTypeReportGenerator:
         page_margin = self.margin if margin is None else margin
         content_height = self.height - (2 * page_margin)
         usable_width = self.width - (2 * page_margin)
-        header_height = self._create_breakdown_header("Shot Breakdown").wrap(usable_width, content_height)[1]
+        header_elements = self._create_breakdown_header("Shot Breakdown")
+        header_height = 0
+        for el in header_elements:
+            _, h = el.wrap(usable_width, content_height)
+            header_height += h
         summary_height = self._create_player_summary(
             "atr",
             margin=page_margin,
