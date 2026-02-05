@@ -37,7 +37,7 @@ class ShotTypeReportGenerator:
         self.header_font_size = 10
         self.header_title_font_size = 13  # Increased from 12.5
         self.header_subtitle_font_size = 11
-        self.section_header_font_size = 8.5  # Increased from 9
+        self.section_header_font_size = 8.0  # Increased from 9
         self.totals_strip_font_size = 9
         
         # IMPROVED: Better row heights for breathing room (balanced for page fit)
