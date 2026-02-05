@@ -879,39 +879,47 @@ class ShotTypeReportGenerator:
         grade_metric = {"atr": "atr2fg_pct", "fg2": "fg2_pct", "fg3": "fg3_pct"}.get(summary_key)
         # IMPROVED: Better summary table styling with clearer sections
         style_commands = [
-            ("BOX", (0, 0), (-1, -1), 1, self.border_color),  # Thicker, softer border
-            ("LINEBELOW", (0, 1), (-1, 1), 0.8, self.border_color),
+            # Alignment
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 1), (0, -1), "LEFT"),
+        
+            # Typography
+            ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), self.totals_strip_font_size),
+            ("FONTSIZE", (0, 1), (-1, -1), self.totals_strip_font_size),
+            ("LEADING", (0, 0), (-1, -1), self.totals_strip_font_size * self.line_height),
+        
+            # Section headers (light band only)
             ("BACKGROUND", (1, 0), (4, 0), self.totals_header_gray),
             ("BACKGROUND", (5, 0), (8, 0), self.light_gray),
             ("BACKGROUND", (9, 0), (12, 0), self.light_gray),
+        
+            # Spans
             ("SPAN", (1, 0), (4, 0)),
             ("SPAN", (5, 0), (8, 0)),
             ("SPAN", (9, 0), (12, 0)),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("ALIGN", (0, 1), (0, -1), "LEFT"),
-            ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), self.totals_strip_font_size),
-            ("LEADING", (0, 0), (-1, -1), self.totals_strip_font_size * self.line_height),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
+        
+            # Horizontal structure only
+            ("LINEABOVE", (0, 0), (-1, 0), 1.4, self.crimson),
+            ("LINEBELOW", (0, 1), (-1, 1), 0.6, self.border_color),
+        
+            # Padding (tight + clean)
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("LEFTPADDING", (0, 0), (-1, -1), self.horiz_padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), self.horiz_padding),
-            ("TEXTCOLOR", (1, 2), (1, 2), self.medium_gray),
-            ("TEXTCOLOR", (5, 2), (5, 2), self.medium_gray),
-            ("TEXTCOLOR", (9, 2), (9, 2), self.medium_gray),
+        
+            # De-emphasize frequency columns
             ("TEXTCOLOR", (4, 2), (4, 2), self.freq_text_gray),
             ("TEXTCOLOR", (8, 2), (8, 2), self.freq_text_gray),
             ("TEXTCOLOR", (12, 2), (12, 2), self.freq_text_gray),
-            ("FONTSIZE", (4, 2), (4, 2), 8),
-            ("FONTSIZE", (8, 2), (8, 2), 8),
-            ("FONTSIZE", (12, 2), (12, 2), 8),
+        
+            # Emphasize PPS
             ("FONTNAME", (3, 2), (3, 2), "Helvetica-Bold"),
             ("FONTNAME", (7, 2), (7, 2), "Helvetica-Bold"),
             ("FONTNAME", (11, 2), (11, 2), "Helvetica-Bold"),
-            # IMPROVED: Add vertical separators between sections
-            ("LINEBEFORE", (5, 0), (5, -1), 0.8, self.border_color),
-            ("LINEBEFORE", (9, 0), (9, -1), 0.8, self.border_color),
         ]
+
         fg_total = getattr(total, "fg_pct", 0)
         fg_transition = getattr(transition, "fg_pct", 0)
         fg_halfcourt = getattr(half_court, "fg_pct", 0)
