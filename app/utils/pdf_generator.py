@@ -15,7 +15,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Spacer, Table, TableStyle, Paragraph, KeepTogether
+from reportlab.platypus import Spacer, Table, TableStyle, Paragraph
 from app.grades import grade_token
 
 
@@ -1138,7 +1138,7 @@ class ShotTypeReportGenerator:
         atr_layout = self._resolve_atr_layout()
         atr_row_height = self.totals_row_height * atr_layout.row_height_scale
         elements = [
-            self._create_breakdown_header("At The Rim | Individual Breakdown"),
+            *self._create_breakdown_header("At The Rim | Individual Breakdown"),
             Spacer(1, self.header_spacer),
             self._create_player_summary(
                 "atr",
@@ -1173,7 +1173,7 @@ class ShotTypeReportGenerator:
 
     def _create_2fg_page(self):
         elements = [
-            self._create_breakdown_header("Non-ATR 2FG | Individual Breakdown"),
+            *self._create_breakdown_header("Non-ATR 2FG | Individual Breakdown"),
             Spacer(1, self.header_spacer),
             self._create_player_summary("2fg"),
             Spacer(1, self.summary_spacer),
@@ -1196,7 +1196,7 @@ class ShotTypeReportGenerator:
 
     def _create_3fg_page(self):
         elements = [
-            self._create_breakdown_header("3FG Shots | Individual Breakdown"),
+            *self._create_breakdown_header("3FG Shots | Individual Breakdown"),
             Spacer(1, self.header_spacer),
             self._create_player_summary("3fg"),
             Spacer(1, self.summary_spacer),
