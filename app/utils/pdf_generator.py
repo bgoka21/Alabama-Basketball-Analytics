@@ -49,7 +49,7 @@ class ShotTypeReportGenerator:
         
         # IMPROVED: Better padding for visual comfort (balanced for page fit)
         self.vert_padding = 0.8  # Increased from 1 (was 1.5, reduced for fit)
-        self.horiz_padding = 3  # Increased from 4
+        self.horiz_padding = 2  # Slightly tighter for cleaner numeric columns
         self.header_vert_padding = self.vert_padding + 3
         
         self.section_space_before = 6
