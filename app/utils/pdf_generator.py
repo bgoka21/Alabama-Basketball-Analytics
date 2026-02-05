@@ -80,7 +80,7 @@ class ShotTypeReportGenerator:
         self.red = colors.HexColor("#FFB6C1")
         self.tan = colors.HexColor("#F5DEB3")
         self.light_gray = colors.HexColor("#E8E8E8")  # Slightly lighter
-        self.very_light_gray = colors.HexColor("#F9F9F9")  # Even lighter for subtle zebra
+        self.very_light_gray = colors.HexColor("#FCFCFC")  # Even lighter for subtle zebra
         self.totals_header_gray = colors.HexColor("#D8D8D8")  # Slightly lighter
         self.medium_gray = colors.HexColor("#6B7278")  # Darker for better contrast
         self.freq_text_gray = colors.HexColor("#8B9299")  # Adjusted for readability
