@@ -668,23 +668,25 @@ class ShotTypeReportGenerator:
             for row_idx, label in enumerate(labels, start=2):
                 if attempts_by_row[row_idx - 2] == 0 and zero_attempts_style:
                     continue
+        
                 bucket = breakdown.get(label, empty_bucket)
-                fg_soften = 0.45 if color_soften_factor is None else color_soften_factor
-                fg_fill = self._soften_color(self._grade_fill(grade_metric, getattr(bucket.total, "fg_pct", 0)), factor=fg_soften)
-                if fg_fill:
-                    style_commands.append(("BACKGROUND", (2, row_idx), (2, row_idx), fg_fill))
+        
+                # PPS coloring ONLY (single visual signal)
                 pps_fill = self._grade_fill("pps", getattr(bucket.total, "pps", 0))
                 if pps_fill and color_soften_factor is not None:
                     pps_fill = self._soften_color(pps_fill, factor=color_soften_factor)
                 if pps_fill:
                     style_commands.append(("BACKGROUND", (3, row_idx), (3, row_idx), pps_fill))
+        
         if zero_attempts_style:
             for row_idx, attempts in enumerate(attempts_by_row, start=2):
                 if attempts == 0:
                     style_commands.append(("TEXTCOLOR", (0, row_idx), (-1, row_idx), self.freq_text_gray))
                     style_commands.append(("BACKGROUND", (0, row_idx), (-1, row_idx), self.very_light_gray))
+        
         table.setStyle(TableStyle(style_commands))
         return table
+
 
     def _breakdown_group_breaks(self, shot_type: str, labels):
         group_sizes_map = {
