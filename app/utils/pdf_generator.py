@@ -644,9 +644,9 @@ class ShotTypeReportGenerator:
             ("FONTSIZE", (0, 2), (0, -1), self.base_font_size * label_font_scale),
             ("LEADING", (0, 0), (-1, 0), section_header_font_size * self.line_height),
             ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
-            ("LINEBELOW", (0, 0), (-1, 0), 1, colors.white),  # Thicker white line
-            ("LINEBELOW", (0, 1), (-1, 1), 0.8, self.border_color),  # Softer border
-            ("BOX", (0, 0), (-1, -1), 1, self.border_color),  # Thicker, softer border
+            ("LINEABOVE", (0, 0), (-1, 0), 1.2, self.crimson),
+            ("LINEBELOW", (0, 1), (-1, 1), 0.6, self.border_color),
+            ("BOX", (0, 0), (-1, -1), 0.8, self.border_color),
             ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, 0), header_padding),
