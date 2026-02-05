@@ -556,37 +556,48 @@ class ShotTypeReportGenerator:
         return colors.Color(red, green, blue)
 
     def _create_breakdown_header(self, title: str):
-        header_table = Table(
-            [
-                ["ALABAMA CRIMSON TIDE"],
-                [title],
-            ],
-            colWidths=[7 * inch],
-            rowHeights=[8, 14],
+        elements = []
+    
+        elements.append(
+            Paragraph(
+                "ALABAMA CRIMSON TIDE",
+                ParagraphStyle(
+                    "brand",
+                    fontSize=9,
+                    textColor=self.medium_gray,
+                    alignment=TA_CENTER,
+                    spaceAfter=2,
+                ),
+            )
         )
-        header_table.setStyle(
-            TableStyle([
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                
-                # Brand (subtle)
-                ("FONTNAME", (0, 0), (0, 0), "Helvetica"),
-                ("FONTSIZE", (0, 0), (0, 0), 9),
-                ("TEXTCOLOR", (0, 0), (0, 0), self.medium_gray),
-                ("BOTTOMPADDING", (0, 0), (0, 0), 2),
-                
-                # Page title (primary)
-                ("FONTNAME", (0, 1), (0, 1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 1), (0, 1), 14),
-                ("TEXTCOLOR", (0, 1), (0, 1), self.crimson),
-                ("TOPPADDING", (0, 1), (0, 1), 2),
-                ("BOTTOMPADDING", (0, 1), (0, 1), 4),
-                
-                # Accent line
-                ("LINEBELOW", (0, 1), (0, 1), 1.5, self.crimson),
-            ])
+    
+        elements.append(
+            Paragraph(
+                title,
+                ParagraphStyle(
+                    "page_title",
+                    fontSize=15,
+                    fontName="Helvetica-Bold",
+                    textColor=self.crimson,
+                    alignment=TA_CENTER,
+                    spaceAfter=6,
+                ),
+            )
         )
-        header_table._is_header = True
-        return header_table
+    
+        elements.append(
+            Table(
+                [[""]],
+                colWidths=[6.5 * inch],
+                rowHeights=[1],
+                style=TableStyle([
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.5, self.crimson),
+                ]),
+            )
+        )
+    
+        spacer = Spacer(1, 6)
+        return [*elements, spacer]
 
     def _build_breakdown_lookup(self, shot_type: str):
         shot_summaries = self.player_data.get("shot_summaries", {})
@@ -659,7 +670,6 @@ class ShotTypeReportGenerator:
             ("LEADING", (0, 1), (-1, -1), self.base_font_size * self.line_height),
             ("LINEABOVE", (0, 0), (-1, 0), 1.2, self.crimson),
             ("LINEBELOW", (0, 1), (-1, 1), 0.6, self.border_color),
-            ("BOX", (0, 0), (-1, -1), 0.8, self.border_color),
             ("BOTTOMPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, -1), self.vert_padding),
             ("TOPPADDING", (0, 0), (-1, 0), header_padding),
@@ -737,7 +747,9 @@ class ShotTypeReportGenerator:
     ):
         page_margin = self.margin if margin is None else margin
         usable_width = self.width - (2 * page_margin)
+        usable_width *= 0.94  # pull content in from edges
         col_width = usable_width / 2
+
 
         breakdown, empty_bucket = self._build_breakdown_lookup(shot_type)
         grade_metric = {"atr": "atr2fg_pct", "2fg": "fg2_pct", "3fg": "fg3_pct"}.get(shot_type)
@@ -1243,7 +1255,7 @@ class ShotTypeReportGenerator:
             space_before = section_space_before + extra_spacing.get(section_title, 0)
             flowables.append(Spacer(1, space_before))
             flowables.append(table)
-            flowables.append(Spacer(1, section_space_after))
+            flowables.append(Spacer(1, max(2, section_space_after - 2)))
         return flowables
 
     def _section_height(
