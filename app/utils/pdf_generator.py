@@ -633,8 +633,8 @@ class ShotTypeReportGenerator:
         # IMPROVED: Better section table styling with rounded corners effect
         style_commands = [
             ("SPAN", (0, 0), (-1, 0)),
-            ("BACKGROUND", (0, 0), (-1, 0), self.crimson),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.white),
+            ("TEXTCOLOR", (0, 0), (-1, 0), self.crimson),
             ("BACKGROUND", (0, 1), (-1, 1), self.light_gray),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("ALIGN", (0, 2), (0, -1), "LEFT"),
